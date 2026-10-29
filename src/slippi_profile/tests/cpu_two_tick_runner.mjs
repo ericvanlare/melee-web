@@ -85,7 +85,13 @@ export function decodeCpuClassPieceCaptureWitness(bytes) {
  if(!(bytes instanceof Uint8Array)||bytes.length!==160)throw Error('Capture-time piece extent');
  const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),u=o=>v.getUint32(o,true);
  const n=o=>v.getBigUint64(o,true),hex=o=>n(o).toString(16).padStart(16,'0');
- if(u(0)!==1||u(4)!==160||u(8)>2||u(12)>11||u(16)!==1||u(20)>1||u(24)>1||u(28)>11||u(32)>4||u(36)>3||u(60)||u(148)>1||bytes.slice(152).some(x=>x))throw Error('Capture-time piece schema');
+ const schema=u(0),originSite=u(152),originStatus=u(156);
+ if((schema!==1&&schema!==2)||u(4)!==160||u(8)>2||u(12)>12||u(16)!==1||u(20)>1||u(24)>1||u(28)>12||u(32)>4||u(36)>3||u(60)||u(148)>1)throw Error('Capture-time piece schema');
+ if(schema===1&&bytes.slice(152).some(x=>x))throw Error('Capture-time legacy reserved bytes');
+ if(schema===2&&(originSite>11||originStatus>2||
+    (u(8)===1&&((originStatus===1)!==(originSite>=1&&originSite<=11) ||
+      (originStatus===2&&originSite!==0) || (originStatus===0))) ||
+    (u(8)!==1&&(originSite!==0||originStatus!==0))))throw Error('Capture-time origin site');
  if(u(20)&&(!n(104)||!n(112)||!n(64)||!n(72)||!u(56)||u(48)>=u(56)))throw Error('Capture-time piece row');
  if(u(8)===1){
   if(u(12)||!u(20)||!u(24)||!n(80)||!u(128)||(u(128)&31)||!u(132)||u(132)>u(128)||u(128)-u(132)>31||!u(136)||u(124)>=u(128))throw Error('Capture-time piece geometry');
@@ -94,7 +100,7 @@ export function decodeCpuClassPieceCaptureWitness(bytes) {
   if(u(36)===1){if(u(140)||u(144))throw Error('Capture-time raw class');}
   else if(u(36)!==3||!u(140)||(u(140)&3)||u(144)!==u(140)||u(132)<4)throw Error('Capture-time saved header');
  }
- return {schema:1,bytes:160,status:u(8),reason:u(12),scope:'CAPTURE_TIME_ONLY',firstDifferenceMatches:u(20),hookActive:u(24),liveReason:u(28),coverageState:u(32),recordState:u(36),preRow:u(40),postRow:u(44),offset:u(48),source:u(52),requested:u(56),epoch:hex(64),world:hex(72),instance:hex(80),captureSerial:hex(88),eventSerial:hex(96),host:hex(104),generation:hex(112),pieceSource:u(120),pieceOffset:u(124),physical:u(128),originalRequested:u(132),pieceGeneration:u(136),classInfo:u(140),savedClassInfo:u(144),physicalSlack:!!u(148)};
+ return {schema,bytes:160,status:u(8),reason:u(12),scope:'CAPTURE_TIME_ONLY',originScope:schema===1?'LEGACY_SCHEMA_UNAVAILABLE':'ALLOCATION_CALLER_AT_CAPTURE_ONLY',livePieceLifetime:'UNKNOWN',originSite:schema===2?originSite:null,originStatus:schema===2?originStatus:0,originAvailable:schema===2&&originStatus===1,firstDifferenceMatches:u(20),hookActive:u(24),liveReason:u(28),coverageState:u(32),recordState:u(36),preRow:u(40),postRow:u(44),offset:u(48),source:u(52),requested:u(56),epoch:hex(64),world:hex(72),instance:hex(80),captureSerial:hex(88),eventSerial:hex(96),host:hex(104),generation:hex(112),pieceSource:u(120),pieceOffset:u(124),physical:u(128),originalRequested:u(132),pieceGeneration:u(136),classInfo:u(140),savedClassInfo:u(144),physicalSlack:!!u(148)};
 }
 
 // Boundaries/type labels are diagnostic only; UNKNOWN never admits restore.
@@ -102,7 +108,7 @@ export function decodeCpuClassPieceWitness(bytes) {
   if(!(bytes instanceof Uint8Array)||bytes.length!==208)throw Error('Class piece extent');
   const v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),u=o=>v.getUint32(o,true);
   const hex=o=>v.getBigUint64(o,true).toString(16).padStart(16,'0');
-  if(u(0)!==1||u(4)!==208||u(8)>2||u(12)>11||u(16)>1||u(20)>1||u(24)>4||u(28)>3||u(132)>1||bytes.slice(192).some(b=>b))throw Error('Class piece schema');
+  if(u(0)!==1||u(4)!==208||u(8)>2||u(12)>12||u(16)>1||u(20)>1||u(24)>4||u(28)>3||u(132)>1||bytes.slice(192).some(b=>b))throw Error('Class piece schema');
   if(u(16)&&(!v.getBigUint64(72,true)||!v.getBigUint64(80,true)||!u(100)||u(92)>=u(100)))throw Error('Class piece allocation identity');
   if(u(8)===1&&(!u(16)||!u(20)||u(12)||!u(112)||(u(112)&31)||!u(116)||u(116)>u(112)||u(112)-u(116)>31||u(108)>=u(112)||!u(120)||!u(28)))throw Error('Class piece live geometry');
   if(u(8)===1&&(!v.getBigUint64(32,true)||!v.getBigUint64(40,true)||!v.getBigUint64(48,true)||

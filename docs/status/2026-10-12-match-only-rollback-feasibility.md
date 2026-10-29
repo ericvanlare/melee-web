@@ -1204,8 +1204,18 @@ also traps on the terminal refusal; renderer shutdown succeeds and all owned
 browser processes are absent. Both producers and failed runs are retained. The
 reviewed repair reuses the existing CPU interval authority to allow original
 preparation while preserving strict topology checks during the armed interval,
-as well as all child/image/inverse guards. V11's later two-tick results remain
-historical and cannot be attributed to this candidate.
+as well as all child/image/inverse guards. At `09989c75`, the reduced original
+sample-0 draw and checked snapshot/renderer cleanup pass. The unchanged two-tick
+run then completes reference recording, restore and correction, but command 11
+still refuses strict equality with 1216: allocation row 1765, offset 72, expected
+byte `0x10`, actual `0x00`. Both final-command-11 raw-five pairs agree; this does
+not override the payload failure. The capture-time piece receipt locates a
+16-byte allocation at row offset 64; its live class witness is inconclusive after
+an intervening allocator event. The next step records the original allocation caller at capture; it does not
+claim a current type, writer or lifetime. The diagnostic preserves the strict
+comparison and the frozen capture-time ledger. Snapshot close and renderer shutdown return one;
+CPU close retains 1216 and all owned processes are absent. V11's later results
+remain historical and cannot be attributed to this candidate.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

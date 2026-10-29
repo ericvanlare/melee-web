@@ -8931,6 +8931,24 @@
           "path": "shadow-v12-reason-source-review-v1.json",
           "sha256": "690624d7fea69256eb7c495f13fb0377b406041f3cb8d13930026b207fe1f2e9"
         }
+      },
+      "preparation_interval_repair": {
+        "source_commit": "09989c75cc6d21886a6fa1b588548e96dbc4c565",
+        "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/topology-active-query-source-sol-review-v1.json",
+        "reduced_sample0": "rollback-renderer-resume-20261028-155740-eef0524c/browser-first-draw-shadow-preparation-v1/result-receipt.json",
+        "two_tick_result": "rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-shadow-preparation-v1/result-receipt.json",
+        "producer_archive": "rollback-renderer-resume-20261028-155740-eef0524c/shadow-v12-preparation-browser-archive/archive.json",
+        "scope": "Sample0 passes. Same-input two-tick final raw-five pairs agree, strict payload equality fails1216 at row1765 offset72. Final present remains unrun. Live class attribution inconclusive; no rollback acceptance.",
+        "result_review": {
+          "path": "rollback-renderer-resume-20261028-155740-eef0524c/shadow-preparation-two-tick-result-analysis-v1.json",
+          "sha256": "2fe8dd65ad9d5d92d81771ab0d1c18b2139301d113644df86c9882ea8ea0e29d"
+        }
+      },
+      "current_next_boundary": "Capture-only original allocation caller diagnostic: finite11 call sites, schema2 reserved tail; strict payload/raw-five and all2175 source policies unchanged. No live type or lifetime authority.",
+      "raw_piece_caller_diagnostic_review": {
+        "path": "rollback-renderer-resume-20261028-155740-eef0524c/raw-piece-callsite-source-sol-review-v1.json",
+        "sha256": "b93bef10f6d4ea82446abf187207450ef8217a546f2f1aa3ca48daffbad0ab43",
+        "scope": "Source and focused controls reviewed; actual browser caller result pending."
       }
     }
   }

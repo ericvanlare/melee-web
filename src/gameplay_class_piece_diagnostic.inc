@@ -1,13 +1,13 @@
 /* One named original class allocator. No source bytes or restore authority. */
 namespace {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
-struct PieceCell { uint32_t geometry,tag,generation; };
+struct PieceCell { uint32_t geometry,tag,generation,origin_site; };
 struct PieceOwner {
  uint64_t epoch=0,world=0,instance=0,serial=0,capture=0;
  uint32_t begin=0,end=0,count=0,next_generation=0,state=0,reason=0;
  MeleeWebClassPieceEvent first{}; PieceCell* cells=nullptr;
 } piece_owner;
-static_assert(sizeof(PieceCell)==12);
+static_assert(sizeof(PieceCell)==16);
 #if UINTPTR_MAX==UINT32_MAX
 static_assert(sizeof(PieceOwner)==120);
 #endif
@@ -15,7 +15,7 @@ constexpr uint32_t piece_live=0x80000000u,piece_units=0x03ffffffu;
 // states:0 unavailable,1 AwaitCold,2 Tracking,3 Armed,4 Refused.
 // reasons:1 unavailable,2 not-cold,3 bounds,4 missing,5 conflict,
 // 6 generation/serial exhausted,7 interval changed,8 topology/mirror,
-// 9 stale owner/anchor,10 header,11 descriptor lifetime.
+// 9 stale owner/anchor,10 header,11 descriptor lifetime,12 origin-site refusal.
 void piece_refuse(uint32_t reason,uint32_t kind=0,const HostAllocation* a=nullptr,
                   uintptr_t host=0,uint32_t requested=0,uint32_t physical=0,
                   uint32_t before=0,uint32_t after=0) {
@@ -84,7 +84,23 @@ void piece_allocate(void* pointer,int32_t requested,uint32_t physical,uint32_t k
      uint64_t(index)*32<uint64_t(i)*32+piece_extent(c)){piece_refuse(5,kind,row,p,requested,physical);return;}}
  if(piece_owner.next_generation==UINT32_MAX){piece_refuse(6,kind,row,p,requested,physical);return;}
  if(!piece_event(kind,row,p,requested,physical))return;
- piece_owner.cells[index]={piece_live|(physical/32)|((physical-uint32_t(requested))<<26),0,++piece_owner.next_generation};
+ piece_owner.cells[index]={piece_live|(physical/32)|((physical-uint32_t(requested))<<26),0,++piece_owner.next_generation,0};
+}
+void piece_origin(void* pointer,int32_t requested,uint32_t site) {
+ if(!active||!piece_owner.cells||piece_owner.reason)return;
+ const uintptr_t p=reinterpret_cast<uintptr_t>(pointer);
+ if(!pointer||site<1||site>11||requested<=0||uint32_t(requested)>0x7fffffc0u){
+  piece_refuse(12,12,nullptr,p,requested>0?uint32_t(requested):0,0,0,site);return;
+ }
+ const uint32_t physical=(uint32_t(requested)+31u)&~31u;
+ HostAllocation* row=nullptr;uint32_t source=0,index=0;
+ if(!piece_span(p,physical,row,source,index)){piece_refuse(12,12,nullptr,p,uint32_t(requested),physical,0,site);return;}
+ auto& c=piece_owner.cells[index];
+ if(!(c.geometry&piece_live)||!c.generation||piece_requested(c)!=uint32_t(requested)||
+    piece_extent(c)!=physical||c.origin_site){
+  piece_refuse(12,12,row,p,uint32_t(requested),physical,c.origin_site,site);return;
+ }
+ if(piece_event(12,row,p,uint32_t(requested),physical,c.origin_site,site))c.origin_site=site;
 }
 #endif
 }
@@ -107,6 +123,13 @@ extern "C" void melee_web_class_piece_alloc(void* p,int32_t req,uint32_t extent)
  piece_allocate(p,req,extent,1);
 #else
  (void)p;(void)req;(void)extent;
+#endif
+}
+extern "C" void melee_web_class_piece_origin(void* p,int32_t req,uint32_t site) {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_origin(p,req,site);
+#else
+ (void)p;(void)req;(void)site;
 #endif
 }
 extern "C" void melee_web_class_piece_promote(void* p,int32_t req) {

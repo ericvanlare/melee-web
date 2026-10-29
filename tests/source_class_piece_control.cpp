@@ -4,6 +4,7 @@
 extern "C" {
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/tobj.h>
 #include <dolphin/os/OSAlloc.h>
 }
 #include <cstdlib>
@@ -25,10 +26,10 @@ extern "C" void* __wrap_calloc(std::size_t n,std::size_t bytes){
 #endif
 void* operator new(std::size_t n){if(deny_allocation)std::abort();if(auto p=std::malloc(n?n:1))return p;throw std::bad_alloc();}
 void operator delete(void* p) noexcept{std::free(p);}void operator delete(void* p,std::size_t) noexcept{std::free(p);}
-alignas(32) static unsigned char arena[131072];static unsigned cursor,calls,assertions;static bool fail_next;
+alignas(32) static unsigned char arena[131072];static unsigned cursor,calls,assertions;
 extern "C" int HSD_GetHeap(){return 3;}
 extern "C" void* OSAllocFromHeap(int heap,u32 size){
- deny_allocation=false;++calls;if(fail_next||size>sizeof(arena)-cursor)return nullptr;
+ deny_allocation=false;++calls;if(size>sizeof(arena)-cursor)return nullptr;
  auto* p=arena+cursor;cursor+=(size+31)&~31u;std::memset(p,0,size);
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  if(!melee_web_source_memory_alloc(heap,p,size))std::abort();
@@ -68,9 +69,38 @@ int main(int argc,char** argv){
  fail_diagnostic_calloc=false;
 #endif
  if(!std::strcmp(mode,"inactive")){
-  auto* p=hsdAllocMemPiece(48);check(p,"inactive raw");hsdFreeMemPiece(p,48);return 0;
+  auto* p=hsdAllocMemPieceAt(48,0xffffffffu);check(p,"inactive raw");hsdFreeMemPiece(p,48);return 0;
  }
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ if(!std::strncmp(mode,"origin",6)){
+  static_assert(sizeof(HSD_Tlut)==16,"pinned wasm HSD_Tlut request size");
+  const auto before=piece_owner.serial;
+  const uint32_t site=!std::strcmp(mode,"origin-unknown")?12:MELEE_WEB_CLASS_PIECE_SITE_TLUT;
+  auto* p=static_cast<unsigned char*>(hsdAllocMemPieceAt(sizeof(HSD_Tlut),site));
+  check(p,"caller wrapper returns original allocator pointer");
+  const auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));
+  check(row,"wrapper result maps to existing backing row");
+  const auto source=row->source.value()+reinterpret_cast<uintptr_t>(p)-row->host;
+  const auto index=(source-piece_owner.begin)/32;
+  auto& cell=piece_owner.cells[index];
+  check(!cell.tag,"raw wrapper allocation remains untyped");
+  if(!std::strcmp(mode,"origin-unknown")){
+   check(piece_owner.reason==12&&!cell.origin_site&&piece_owner.serial>before,"unknown site refuses provenance without labeling the allocation");
+  }else if(!std::strcmp(mode,"origin-duplicate")){
+   check(!piece_owner.reason&&cell.origin_site==MELEE_WEB_CLASS_PIECE_SITE_TLUT,"first exact site label");
+   const auto generation=cell.generation;
+   const auto serial=piece_owner.serial;
+   melee_web_class_piece_origin(p,sizeof(HSD_Tlut),MELEE_WEB_CLASS_PIECE_SITE_TLUT);
+   check(piece_owner.reason==12&&piece_owner.serial==serial&&cell.generation==generation&&cell.origin_site==MELEE_WEB_CLASS_PIECE_SITE_TLUT,"duplicate site refuses without relabel");
+  }else{
+   check(!piece_owner.reason&&piece_owner.serial>before&&cell.origin_site==MELEE_WEB_CLASS_PIECE_SITE_TLUT,"successful allocation gets one caller label");
+   const auto generation=cell.generation;
+   hsdFreeMemPiece(p,sizeof(HSD_Tlut));check(!cell.origin_site,"free clears origin");
+   auto* reused=static_cast<unsigned char*>(hsdAllocMemPieceAt(sizeof(HSD_Tlut),MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC));
+   check(reused==p&&cell.generation>generation&&cell.origin_site==MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC&&!piece_owner.reason,"same-address reuse gets fresh generation and caller");
+  }
+  return 0;
+ }
  auto* raw=static_cast<unsigned char*>(hsdAllocMemPiece(160));check(raw,"raw allocation");
  hsdFreeMemPiece(raw,160);auto* small=static_cast<unsigned char*>(hsdAllocMemPiece(32));
  auto* next=static_cast<unsigned char*>(hsdAllocMemPiece(32));
@@ -88,12 +118,24 @@ int main(int argc,char** argv){
   for(size_t n=0;find_host_allocation(reinterpret_cast<uintptr_t>(p))==find_host_allocation(reinterpret_cast<uintptr_t>(next));++n){
    check(n<sizeof(arena)/64,"fixture distinct-row construction exhausted");p=static_cast<unsigned char*>(hsdNew(&a));check(p,"capture distinct class row");
   }
+  auto* raw_target=static_cast<unsigned char*>(p);
+  size_t target_offset=8;
+  if(!std::strcmp(mode,"capture-raw")){
+   raw_target=nullptr;
+   for(size_t n=0;;++n){
+    check(n<sizeof(arena)/16,"fixture raw target row construction exhausted");
+    raw_target=static_cast<unsigned char*>(hsdAllocMemPieceAt(sizeof(HSD_Tlut),MELEE_WEB_CLASS_PIECE_SITE_TLUT));
+    check(raw_target,"actual raw TLUT-sized piece");
+    if(find_host_allocation(reinterpret_cast<uintptr_t>(raw_target))!=find_host_allocation(reinterpret_cast<uintptr_t>(next)))break;
+   }
+   target_offset=0;
+  }
   // A preexisting free32 piece ensures the first event is a piece allocation,
   // not a new outer heap topology event. Class48 uses a distinct backing row.
   hsdFreeMemPiece(next,32);
   auto* pre=snapshot();auto* post=snapshot();auto anchor=melee_web_class_piece_arm();
   check(anchor.ready,"capture ready");const uint64_t frozen=cell_hash();
-  p[8]^=1;
+  raw_target[target_offset]^=1;
   if(!std::strcmp(mode,"capture-armed")){
    auto w=capture_query(pre,post,anchor);check(w.status==1&&w.live_reason==0&&w.scope==1&&w.class_info==reinterpret_cast<uintptr_t>(&a),"armed capture-only");
   }else if(!std::strcmp(mode,"capture-disarm")){
@@ -116,7 +158,7 @@ int main(int argc,char** argv){
    check(query(post,anchor).status==2&&query(post,anchor).reason==7,"existing live witness stays refused");
    // POST expected endpoint follows the unrelated event. Its allocator-link
    // writes must not be silently substituted for the intended later mismatch.
-   p[8]^=1;melee_web_source_memory_payload_snapshot_destroy(post);post=snapshot();p[8]^=1;
+   raw_target[target_offset]^=1;melee_web_source_memory_payload_snapshot_destroy(post);post=snapshot();raw_target[target_offset]^=1;
    if(!std::strcmp(mode,"capture-reuse")){
     // Actual free and constructor overwrite the target's live header. Only
     // PRE saved header remains a valid interpretation of the frozen cell.
@@ -143,9 +185,6 @@ int main(int argc,char** argv){
     // Injected metadata negative, no production setter: PENDING is UNKNOWN.
     const auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));const auto source=row->source.value()+reinterpret_cast<uintptr_t>(p)-row->host;
     piece_owner.cells[(source-piece_owner.begin)/32].tag=reinterpret_cast<uintptr_t>(&a)|1;
-   }else if(!std::strcmp(mode,"capture-raw")){
-    const auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));const auto source=row->source.value()+reinterpret_cast<uintptr_t>(p)-row->host;
-    piece_owner.cells[(source-piece_owner.begin)/32].tag=0;
    }else if(!std::strcmp(mode,"capture-missing")){
     const auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));const auto source=row->source.value()+reinterpret_cast<uintptr_t>(p)-row->host;
     piece_owner.cells[(source-piece_owner.begin)/32]={};
@@ -172,7 +211,10 @@ int main(int argc,char** argv){
    }else if(!std::strcmp(mode,"capture-null-class")){
     check(w.status==2&&w.reason==10&&!w.class_info&&!w.saved_class_info,"malformed confirmed null pointer refuses");
     EM_ASM({console.log('ACTUAL_CLASS_CAPTURE_NULL_BASE64='+Buffer.from(HEAPU8.subarray($0,$0+160)).toString('base64'));},&w);
-   }else if(!std::strcmp(mode,"capture-raw")){check(w.status==1&&w.record_state==1&&!w.class_info,"raw capture type UNKNOWN");}
+   }else if(!std::strcmp(mode,"capture-raw")){
+    check(w.status==1&&w.record_state==1&&!w.class_info&&w.origin_site==MELEE_WEB_CLASS_PIECE_SITE_TLUT&&w.origin_status==1,"actual raw TLUT-sized caller capture stays type UNKNOWN");
+    EM_ASM({console.log('ACTUAL_CLASS_CAPTURE_RAW_BASE64='+Buffer.from(HEAPU8.subarray($0,$0+160)).toString('base64'));},&w);
+   }
    else if(!std::strcmp(mode,"capture-pending")||!std::strcmp(mode,"capture-missing")){check(!w.status&&w.reason==4,"pending/missing UNKNOWN");}
    else {check(w.status!=1&&w.reason,"capture invalid identity/header/lifecycle refuses");}
   }

@@ -326,7 +326,10 @@ test('class observer ABI refusal preserves original native and earlier witness e
 
 test('capture-time160 strict decoder cannot claim live continuity or accept malformed scope',()=>{
  const b=new Uint8Array(160),v=new DataView(b.buffer),set=(o,n)=>v.setUint32(o,n,true),wide=(o,n)=>v.setBigUint64(o,BigInt(n),true);
- set(0,1);set(4,160);set(16,1);assert.equal(decodeCpuClassPieceCaptureWitness(b).scope,'CAPTURE_TIME_ONLY');
+ set(0,1);set(4,160);set(16,1);
+ const legacy=decodeCpuClassPieceCaptureWitness(b);
+ assert.equal(legacy.scope,'CAPTURE_TIME_ONLY');assert.equal(legacy.originSite,null);assert.equal(legacy.originStatus,0);
+ assert.equal(legacy.originAvailable,false);assert.equal(legacy.originScope,'LEGACY_SCHEMA_UNAVAILABLE');assert.equal(legacy.livePieceLifetime,'UNKNOWN');
  set(8,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/geometry/);
  set(20,1);set(24,1);set(28,7);set(32,4);set(36,3);set(48,8);set(52,0x80000000);set(56,1024);
  for(const o of [64,72,80,104,112])wide(o,1);wide(88,10);wide(96,11);
@@ -337,9 +340,35 @@ test('capture-time160 strict decoder cannot claim live continuity or accept malf
  set(140,0);set(144,0);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/saved header/);set(140,4096);set(144,4096);
  set(144,4097);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/header/);set(144,4096);
  set(148,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/bounds/);set(148,0);
- set(152,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/schema/);set(152,0);
+ set(152,1);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/Capture-time legacy reserved bytes/);set(152,0);
  set(16,0);assert.throws(()=>decodeCpuClassPieceCaptureWitness(b),/schema/);
  assert.throws(()=>decodeCpuClassPieceCaptureWitness(b.slice(0,159)),/extent/);
+});
+test('capture-time schema2 reports only a valid raw allocation caller and keeps absence/refusal explicit',()=>{
+ const b=new Uint8Array(160),v=new DataView(b.buffer),set=(o,n)=>v.setUint32(o,n,true),wide=(o,n)=>v.setBigUint64(o,BigInt(n),true);
+ set(0,2);set(4,160);set(8,1);set(16,1);set(20,1);set(24,1);set(28,7);set(32,4);set(36,1);
+ set(40,0);set(44,0);set(48,8);set(52,0x80000000);set(56,1024);
+ for(const o of [64,72,80,104,112])wide(o,1);wide(88,10);wide(96,11);
+ set(120,0x80000000);set(124,8);set(128,64);set(132,48);set(136,1);
+ set(152,4);set(156,1);
+ const d=decodeCpuClassPieceCaptureWitness(b);
+ assert.equal(d.schema,2);assert.equal(d.status,1);assert.equal(d.recordState,1);assert.equal(d.classInfo,0);assert.equal(d.savedClassInfo,0);
+ assert.equal(d.originSite,4);assert.equal(d.originStatus,1);assert.equal(d.originAvailable,true);assert.equal(d.originScope,'ALLOCATION_CALLER_AT_CAPTURE_ONLY');assert.equal(d.livePieceLifetime,'UNKNOWN');
+
+ const badSite=new Uint8Array(b);new DataView(badSite.buffer).setUint32(152,12,true);
+ assert.throws(()=>decodeCpuClassPieceCaptureWitness(badSite),/Capture-time origin site/);
+ const missingStatus=new Uint8Array(b);new DataView(missingStatus.buffer).setUint32(156,0,true);
+ assert.throws(()=>decodeCpuClassPieceCaptureWitness(missingStatus),/Capture-time origin site/);
+
+ const absent=new Uint8Array(b),av=new DataView(absent.buffer);av.setUint32(152,0,true);av.setUint32(156,2,true);
+ const a=decodeCpuClassPieceCaptureWitness(absent);
+ assert.equal(a.status,1);assert.equal(a.originSite,0);assert.equal(a.originStatus,2);assert.equal(a.originAvailable,false);assert.equal(a.livePieceLifetime,'UNKNOWN');
+ av.setUint32(152,4,true);assert.throws(()=>decodeCpuClassPieceCaptureWitness(absent),/Capture-time origin site/);
+
+ const refused=new Uint8Array(b),rv=new DataView(refused.buffer);rv.setUint32(8,2,true);rv.setUint32(12,12,true);rv.setUint32(152,0,true);rv.setUint32(156,0,true);
+ const r=decodeCpuClassPieceCaptureWitness(refused);
+ assert.equal(r.status,2);assert.equal(r.originSite,0);assert.equal(r.originStatus,0);assert.equal(r.originAvailable,false);assert.equal(r.livePieceLifetime,'UNKNOWN');
+ rv.setUint32(152,4,true);rv.setUint32(156,1,true);assert.throws(()=>decodeCpuClassPieceCaptureWitness(refused),/Capture-time origin site/);
 });
 test('capture-time observer failure preserves native and all earlier diagnostic evidence',async()=>{
  const f=makeRunner({fault:'bad-capture-piece-size'});let error;try{await f.run();}catch(e){error=e;}

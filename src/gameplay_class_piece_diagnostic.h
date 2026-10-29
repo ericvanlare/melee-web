@@ -25,10 +25,27 @@ typedef struct MeleeWebClassPieceCaptureWitness {
  uint32_t coverage_state,record_state,pre_row,post_row,offset,source,requested,reserved0;
  uint64_t epoch,world,instance,capture_serial,event_serial,host,generation;
  uint32_t piece_source,piece_offset,physical,original_requested,piece_generation;
- uint32_t class_info,saved_class_info,flags,reserved[2];
+ uint32_t class_info,saved_class_info,flags,origin_site,origin_status;
 } MeleeWebClassPieceCaptureWitness;
+
+/* Exact source call-site labels for the finite hsdAllocMemPiece callers.
+ * These name the allocation caller at capture only, never a live type. */
+enum MeleeWebClassPieceOriginSite {
+ MELEE_WEB_CLASS_PIECE_SITE_HSD_CLASS_ALLOC=1,
+ MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC=2,
+ MELEE_WEB_CLASS_PIECE_SITE_MATERIAL=3,
+ MELEE_WEB_CLASS_PIECE_SITE_TLUT=4,
+ MELEE_WEB_CLASS_PIECE_SITE_TOBJ_TEV=5,
+ MELEE_WEB_CLASS_PIECE_SITE_IMAGE_DESC=6,
+ MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV=7,
+ MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST=8,
+ MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV_DESC=9,
+ MELEE_WEB_CLASS_PIECE_SITE_ENVELOPE=10,
+ MELEE_WEB_CLASS_PIECE_SITE_SHAPE_SET=11
+};
 void melee_web_class_piece_cold(const void* list,int32_t count);
 void melee_web_class_piece_alloc(void* piece,int32_t requested,uint32_t physical);
+void melee_web_class_piece_origin(void* piece,int32_t requested,uint32_t site);
 void melee_web_class_piece_promote(void* piece,int32_t requested);
 void melee_web_class_piece_free(void* piece,int32_t requested);
 void melee_web_class_piece_label(void* piece,const void* info,int32_t size,uint32_t stage,const void* previous);

@@ -1155,11 +1155,12 @@ extern "C" MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness
 static_assert(sizeof(MeleeWebClassPieceCaptureWitness)==160);
 static_assert(offsetof(MeleeWebClassPieceCaptureWitness,epoch)==64);
 static_assert(offsetof(MeleeWebClassPieceCaptureWitness,piece_source)==120);
-static_assert(offsetof(MeleeWebClassPieceCaptureWitness,reserved)==152);
+static_assert(offsetof(MeleeWebClassPieceCaptureWitness,origin_site)==152);
+static_assert(offsetof(MeleeWebClassPieceCaptureWitness,origin_status)==156);
 extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_witness(
  const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,
  MeleeWebSourcePayloadComparison original,MeleeWebClassPieceAnchor anchor) {
- MeleeWebClassPieceCaptureWitness r{};r.schema=1;r.bytes=sizeof(r);r.scope=1;
+ MeleeWebClassPieceCaptureWitness r{};r.schema=2;r.bytes=sizeof(r);r.scope=1;
  const auto w=melee_web_source_memory_payload_snapshot_witness(post);
  if(original.status!=2||w.status!=2||original.allocation_index!=w.row||original.byte_offset!=w.offset||
     original.host_address!=w.host_address||original.source_address!=w.source_address||
@@ -1208,7 +1209,11 @@ extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_
  r.piece_generation=c.generation;r.flags=r.piece_offset>=r.original_requested?1:0;
  if(!c.generation){r.status=2;r.reason=6;return r;}
  r.record_state=c.tag?((c.tag&3)==2?3:2):1;
- if(!c.tag){r.status=1;return r;} // Raw at capture: no class identity.
+ if(!c.tag){
+  if(c.origin_site>11){r.status=2;r.reason=12;return r;}
+  r.origin_site=c.origin_site;r.origin_status=c.origin_site?1:2;
+  r.status=1;return r; // Raw at capture: no class identity.
+ }
  if((c.tag&3)!=2){r.reason=4;return r;}
  const size_t in_row=r.piece_source-begin;
  if(r.original_requested<4||row.requested<4||in_row>row.requested-4){r.status=2;r.reason=3;return r;}
@@ -1218,6 +1223,8 @@ extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_
  if(!r.class_info){r.status=2;r.reason=10;return r;}
  std::memcpy(&r.saved_class_info,payload_bytes(pre)+saved,4);
  if(r.saved_class_info!=r.class_info){r.status=2;r.reason=10;return r;}
+ if(c.origin_site>11){r.status=2;r.reason=12;return r;}
+ r.origin_site=c.origin_site;r.origin_status=c.origin_site?1:2;
  r.status=1;
 #else
  (void)pre;(void)anchor;r.reason=1;

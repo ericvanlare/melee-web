@@ -18529,7 +18529,7 @@ index 72776f83322214c6cee06d235e9af762c71b1d3a..2aa1009954979ea4566538cb1bc711a2
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
-index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c9772305d22f455 100644
+index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..febb4973ed315e7f0db2baeea48ca2b4e9b3f3e1 100644
 --- a/src/sysdolphin/baselib/class.c
 +++ b/src/sysdolphin/baselib/class.c
 @@ -1,4 +1,11 @@
@@ -18544,7 +18544,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
  
  #include <string.h>
  
-@@ -55,6 +62,10 @@ void hsdInitClassInfo(HSD_ClassInfo* class_info, HSD_ClassInfo* parent_info,
+@@ -55,6 +62,10 @@
          class_info->head.next = parent_info->head.child;
          parent_info->head.child = class_info;
      }
@@ -18555,7 +18555,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
  }
  
  void OSReport_PrintSpaces(s32 count)
-@@ -94,10 +105,19 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -94,10 +105,19 @@
              }
              memset(memory_list, 0, new_nb * sizeof(*memory_list));
              nb_memory_list = new_nb;
@@ -18575,7 +18575,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
  
              new_nb = nb_memory_list * 2;
              while (idx >= new_nb) {
-@@ -108,6 +128,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -108,6 +128,12 @@
              if (new_list == NULL) {
                  return NULL;
              }
@@ -18588,7 +18588,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
  
              memcpy(new_list, memory_list,
                     sizeof(*memory_list) * nb_memory_list);
-@@ -121,8 +147,15 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -121,8 +147,15 @@
              memory_list = new_list;
              nb_memory_list = new_nb;
  
@@ -18604,7 +18604,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
          }
      }
  
-@@ -157,6 +190,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -157,6 +190,12 @@
                      }
                  }
              }
@@ -18617,7 +18617,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
          }
          return memory_list[idx];
      }
-@@ -176,6 +215,10 @@ void* hsdAllocMemPiece(s32 size)
+@@ -176,6 +215,10 @@
      s32 temp_r29;
      void* temp_r3;
  
@@ -18628,7 +18628,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
      temp_r29 = (size + 0x1F) / 32 - 1;
      temp_r3_3 = GetMemoryEntry((size + 0x1F) / 32 - 1);
      if (temp_r3_3 == NULL) {
-@@ -184,6 +227,10 @@ void* hsdAllocMemPiece(s32 size)
+@@ -184,6 +227,10 @@
      if ((temp_r3_2 = temp_r3_3->free_list)) {
          temp_r3_3->free_list = temp_r3_2->next;
          temp_r3_3->nb_free -= 1;
@@ -18639,7 +18639,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
          return temp_r3_2;
      }
      var_r28 = temp_r3_3->next;
-@@ -204,6 +251,10 @@ void* hsdAllocMemPiece(s32 size)
+@@ -204,6 +251,10 @@
              temp_r3_4->nb_alloc += 1;
              temp_r3_4->nb_free += 1;
              temp_r3_3->nb_alloc += 1;
@@ -18650,7 +18650,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
              return temp_r5;
          }
          var_r28 = var_r28->next;
-@@ -228,6 +279,17 @@ void* hsdAllocMemPiece(s32 size)
+@@ -228,8 +279,28 @@
          var_r30->nb_free += 1;
      }
      temp_r3_3->nb_alloc += 1;
@@ -18667,8 +18667,19 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
 +#endif
      return temp_r3;
  }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_hsdAllocMemPieceAt(s32 size, u32 site)
++{
++    void* piece = hsdAllocMemPiece(size);
++    if (piece) melee_web_class_piece_origin(piece, size, site);
++    return piece;
++}
++#endif
  
-@@ -241,6 +303,9 @@ void hsdFreeMemPiece(void* mem, s32 size)
+ void hsdFreeMemPiece(void* mem, s32 size)
+ {
+@@ -241,19 +312,27 @@
          piece->next = entry->free_list;
          entry->free_list = piece;
          entry->nb_free += 1;
@@ -18678,7 +18689,15 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
      }
  }
  
-@@ -254,6 +319,10 @@ HSD_Class* _hsdClassAlloc(HSD_ClassInfo* info)
+ /// _hsdClassAlloc
+ HSD_Class* _hsdClassAlloc(HSD_ClassInfo* info)
+ {
+-    HSD_Class* mem_piece = hsdAllocMemPiece(info->head.obj_size);
++    HSD_Class* mem_piece = hsdAllocMemPieceAt(
++        info->head.obj_size, MELEE_WEB_CLASS_PIECE_SITE_HSD_CLASS_ALLOC);
+     if (mem_piece != NULL) {
+         info->head.nb_exist += 1;
+         if (info->head.nb_exist > info->head.nb_peak) {
              info->head.nb_peak = info->head.nb_exist;
          }
      }
@@ -18689,7 +18708,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
      return mem_piece;
  }
  
-@@ -276,6 +345,10 @@ void _hsdClassAmnesia(HSD_ClassInfo* info)
+@@ -276,6 +355,10 @@
      info->head.nb_exist = 0;
      info->head.nb_peak = 0;
      if (info == &hsdClass) {
@@ -18700,7 +18719,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
          nb_memory_list = 0;
          memory_list = NULL;
          current_hash = NULL;
-@@ -312,6 +385,10 @@ void* hsdNew(HSD_ClassInfo* i)
+@@ -312,6 +395,10 @@
          info->destroy(cls);
          return NULL;
      }
@@ -18711,7 +18730,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
      return cls;
  }
  
-@@ -331,10 +408,17 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+@@ -331,10 +418,17 @@
  {
      HSD_ClassInfo* var_r29;
      HSD_ClassInfo* var_r28;
@@ -18729,7 +18748,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..ab224bd65708bfc2f12b5b635c977230
      !var_r29;
      var_r28 = HSD_PushClassInfo(class_info);
      if (!(var_r28->head.flags & 1)) {
-@@ -360,6 +444,10 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+@@ -360,6 +454,10 @@
              class_info->head.nb_peak = class_info->head.nb_exist;
          }
          object->parent.class_info = class_info;
@@ -19339,10 +19358,10 @@ index c788005215cd2982c61d3b201ef1e20ee8d195c8..cfe3ca11b3fee9c281b21b935470a088
 +
  #endif
 diff --git a/src/sysdolphin/baselib/mobj.c b/src/sysdolphin/baselib/mobj.c
-index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bb73f48fd3f7706f45654993b6dc08c6eab5492e 100644
+index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bc7fc63d9b6f84589a27aaca8e34f82c2857f96c 100644
 --- a/src/sysdolphin/baselib/mobj.c
 +++ b/src/sysdolphin/baselib/mobj.c
-@@ -91,6 +91,14 @@ static void MObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
+@@ -91,6 +91,14 @@
          return;
      }
  
@@ -19357,6 +19376,26 @@ index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bb73f48fd3f7706f45654993b6dc08c6
      switch (type) {
      case HSD_A_M_AMBIENT_R:
          mobj->mat->ambient.r = (u8) (255.0 * val->fv);
+@@ -157,7 +165,8 @@
+     memcpy(mobj->mat, desc->mat, sizeof(HSD_Material));
+     mobj->rendermode |= RENDER_TOON;
+     if (desc->pedesc != NULL) {
+-        mobj->pe = hsdAllocMemPiece(sizeof(HSD_PEDesc));
++        mobj->pe = hsdAllocMemPieceAt(
++            sizeof(HSD_PEDesc), MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC);
+         memcpy(mobj->pe, desc->pedesc, sizeof(HSD_PEDesc));
+     }
+     mobj->aobj = NULL;
+@@ -495,7 +504,8 @@
+ 
+ HSD_Material* HSD_MaterialAlloc(void)
+ {
+-    HSD_Material* mat = hsdAllocMemPiece(sizeof(HSD_Material));
++    HSD_Material* mat = hsdAllocMemPieceAt(
++        sizeof(HSD_Material), MELEE_WEB_CLASS_PIECE_SITE_MATERIAL);
+     HSD_ASSERT(943, mat);
+     memset(mat, 0, sizeof(HSD_Material));
+     mat->alpha = 1.0F;
 diff --git a/src/sysdolphin/baselib/mtx.c b/src/sysdolphin/baselib/mtx.c
 index 15fa8a880a290516780c5febbc76db6c0cf04105..d6acdf2e32548b6c119cda499038ee387195301c 100644
 --- a/src/sysdolphin/baselib/mtx.c
@@ -20740,7 +20779,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..dec05f9cdb95867ffd3c3adbee2c598b
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
-index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0aa3a0bfe2 100644
+index a9f2c8b5759c64a71edf098e7e9a2210433c570d..6eb9caafc81956e106bd9d739934dec6962ad6b6 100644
 --- a/src/sysdolphin/baselib/tobj.c
 +++ b/src/sysdolphin/baselib/tobj.c
 @@ -1,3 +1,4 @@
@@ -20748,7 +20787,7 @@ index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0a
  #include "tobj.h"
  
  #include <placeholder.h>
-@@ -68,6 +69,7 @@ void HSD_TObjAddAnim(HSD_TObj* tobj, HSD_TexAnim* texanim)
+@@ -68,6 +69,7 @@
              }
              tobj->aobj = HSD_AObjLoadDesc(ta->aobjdesc);
              tobj->imagetbl = ta->imagetbl;
@@ -20756,10 +20795,12 @@ index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0a
  
              if (tobj->tluttbl != NULL) {
                  for (i = 0; tobj->tluttbl[i]; i++) {
-@@ -140,6 +142,19 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
-         return;
-     }
+@@ -138,6 +140,19 @@
  
+     if (tobj == NULL) {
+         return;
++    }
++
 +#ifdef TARGET_PC
 +    if (type >= HSD_A_T_KONST_R && type <= HSD_A_T_TEV1_A) {
 +        double converted = 255.0 * val->fv;
@@ -20771,12 +20812,40 @@ index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0a
 +        !melee_web_texture_index_valid(tobj, type, val->fv))
 +    {
 +        HSD_Panic(__FILE__, __LINE__, "Native texture animation index exceeds its owned table");
-+    }
-+
+     }
+ 
      switch (type) {
-     case HSD_A_T_TIMG: {
-         int n;
-@@ -1595,6 +1610,7 @@ void HSD_ImageDescCopyFromEFB(HSD_ImageDesc* idesc, u16 origx, u16 origy,
+@@ -1521,7 +1536,8 @@
+ 
+ HSD_Tlut* HSD_TlutAlloc(void)
+ {
+-    HSD_Tlut* tlut = hsdAllocMemPiece(sizeof(HSD_Tlut));
++    HSD_Tlut* tlut = hsdAllocMemPieceAt(
++        sizeof(HSD_Tlut), MELEE_WEB_CLASS_PIECE_SITE_TLUT);
+     HSD_ASSERT(2069, tlut);
+     memset(tlut, 0, sizeof(HSD_Tlut));
+     return tlut;
+@@ -1541,7 +1557,8 @@
+ 
+ HSD_TObjTev* HSD_TObjTevAlloc(void)
+ {
+-    HSD_TObjTev* tev = hsdAllocMemPiece(sizeof(HSD_TObjTev));
++    HSD_TObjTev* tev = hsdAllocMemPieceAt(
++        sizeof(HSD_TObjTev), MELEE_WEB_CLASS_PIECE_SITE_TOBJ_TEV);
+     HSD_ASSERT(2112, tev);
+     memset(tev, 0, sizeof(HSD_TObjTev));
+     return tev;
+@@ -1561,7 +1578,8 @@
+ 
+ HSD_ImageDesc* HSD_ImageDescAlloc(void)
+ {
+-    HSD_ImageDesc* idesc = hsdAllocMemPiece(sizeof(HSD_ImageDesc));
++    HSD_ImageDesc* idesc = hsdAllocMemPieceAt(
++        sizeof(HSD_ImageDesc), MELEE_WEB_CLASS_PIECE_SITE_IMAGE_DESC);
+     HSD_ASSERT(2155, idesc);
+     memset(idesc, 0, sizeof(HSD_ImageDesc));
+     return idesc;
+@@ -1595,6 +1613,7 @@
  static void TObjRelease(HSD_Class* o)
  {
      HSD_TObj* tobj = HSD_TOBJ(o);
@@ -20784,3 +20853,89 @@ index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0a
  
      HSD_AObjRemove(tobj->aobj);
      HSD_TlutRemove(tobj->tlut);
+diff --git a/src/sysdolphin/baselib/class.h b/src/sysdolphin/baselib/class.h
+index 90de5e6fc77454f4a47357371e326aa28ee4c7eb..7b7178d2f7fcaf03e1e518e512e69721c604e7e9 100644
+--- a/src/sysdolphin/baselib/class.h
++++ b/src/sysdolphin/baselib/class.h
+@@ -2,6 +2,10 @@
+ #define _class_h_
+ 
+ #include <Runtime/platform.h>
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_class_piece_diagnostic.h"
++#endif
+ 
+ #include <sysdolphin/baselib/forward.h>
+ 
+@@ -60,6 +64,13 @@
+ void OSReport_PrintSpaces(s32 count);
+ 
+ void* hsdAllocMemPiece(s32 size);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_hsdAllocMemPieceAt(s32 size, u32 site);
++#define hsdAllocMemPieceAt(size, site) \
++    melee_web_hsdAllocMemPieceAt((size), (site))
++#else
++#define hsdAllocMemPieceAt(size, site) hsdAllocMemPiece((size))
++#endif
+ void hsdFreeMemPiece(void* mem, s32 size);
+ void* hsdNew(HSD_ClassInfo*);
+ bool hsdChangeClass(void* object, void* class_info);
+diff --git a/src/sysdolphin/baselib/texp.c b/src/sysdolphin/baselib/texp.c
+index 30394f74d46a744dabbd34feee96dd97998a80b5..77db36b90f911b626ad1ce00ef0dda60bea077eb 100644
+--- a/src/sysdolphin/baselib/texp.c
++++ b/src/sysdolphin/baselib/texp.c
+@@ -24,14 +24,16 @@
+ 
+ static HSD_TExp* TevAlloc(void)
+ {
+-    HSD_TExp* texp = hsdAllocMemPiece(sizeof(HSD_TETev));
++    HSD_TExp* texp = hsdAllocMemPieceAt(
++        sizeof(HSD_TETev), MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV);
+     HSD_ASSERT(62, texp);
+     return texp;
+ }
+ 
+ static HSD_TExp* CnstAlloc(void)
+ {
+-    HSD_TExp* texp = hsdAllocMemPiece(sizeof(HSD_TECnst));
++    HSD_TExp* texp = hsdAllocMemPieceAt(
++        sizeof(HSD_TECnst), MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST);
+     HSD_ASSERT(70, texp);
+     return texp;
+ }
+@@ -1212,7 +1214,8 @@
+     HSD_TExpSchedule(num, list, order, &res);
+     *tevdesc = NULL;
+     for (i = 0; i < num; ++i) {
+-        HSD_TExpTevDesc* tdesc = hsdAllocMemPiece(sizeof(HSD_TExpTevDesc));
++        HSD_TExpTevDesc* tdesc = hsdAllocMemPieceAt(
++            sizeof(HSD_TExpTevDesc), MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV_DESC);
+         tdesc->desc.stage = HSD_Index2TevStage(i);
+         TExp2TevDesc(order[(num - i) - 1], tdesc, &init_cprev, &init_aprev);
+         tdesc->desc.next = &(*tevdesc)->desc;
+diff --git a/src/sysdolphin/baselib/pobj.c b/src/sysdolphin/baselib/pobj.c
+index 8b16a28c877984e309bd91a5bb57a5f09a9f8d2c..945b2abc416f9e34fb9dd3e24dff447ec66f4ea7 100644
+--- a/src/sysdolphin/baselib/pobj.c
++++ b/src/sysdolphin/baselib/pobj.c
+@@ -172,7 +172,8 @@
+ 
+ static HSD_Envelope* HSD_EnvelopeAlloc(void)
+ {
+-    HSD_Envelope* envelope = hsdAllocMemPiece(sizeof(HSD_Envelope));
++    HSD_Envelope* envelope = hsdAllocMemPieceAt(
++        sizeof(HSD_Envelope), MELEE_WEB_CLASS_PIECE_SITE_ENVELOPE);
+     HSD_ASSERT(441, envelope);
+     memset(envelope, 0, sizeof(HSD_Envelope));
+     return envelope;
+@@ -254,7 +255,8 @@
+ {
+     int i;
+ 
+-    HSD_ShapeSet* shape_set = hsdAllocMemPiece(sizeof(HSD_ShapeSet));
++    HSD_ShapeSet* shape_set = hsdAllocMemPieceAt(
++        sizeof(HSD_ShapeSet), MELEE_WEB_CLASS_PIECE_SITE_SHAPE_SET);
+     HSD_ASSERT(498, shape_set);
+     memset(shape_set, 0, sizeof(HSD_ShapeSet));
+     shape_set->flags = sdesc->flags;
