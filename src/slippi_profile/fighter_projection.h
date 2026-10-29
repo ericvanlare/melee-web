@@ -10,6 +10,7 @@ extern "C" {
 int slippi_fighter_projection_world_begin(uint64_t);
 int slippi_fighter_projection_world_end(uint64_t);
 int slippi_fighter_projection_created(void*, const void*, size_t);
+int slippi_fighter_projection_shadow_retiring(void*, void*);
 int slippi_fighter_projection_retiring(void*);
 int slippi_fighter_projection_require(void*);
 int slippi_fighter_projection_draw_begin(void);
@@ -20,6 +21,7 @@ int slippi_fighter_projection_draw_end(void);
 #else
 static inline int slippi_fighter_projection_world_begin(uint64_t w){(void)w;return 1;}
 static inline int slippi_fighter_projection_world_end(uint64_t w){(void)w;return 1;}
+static inline int slippi_fighter_projection_shadow_retiring(void* lb,void* s){(void)lb;(void)s;return 1;}
 static inline int slippi_fighter_projection_draw_begin(void){return 1;}
 static inline int slippi_fighter_projection_draw_end(void){return 1;}
 #endif

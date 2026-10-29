@@ -18,6 +18,24 @@ SPEC.loader.exec_module(BUILD)
 
 
 class SelectedTraceBuildTests(unittest.TestCase):
+    def test_presentation_profile_requires_cpu_owner_provenance_before_preparation(self):
+        options = dict(slippi_logical_frame_clock=True,
+                       slippi_lobj_presentation_cache=True,
+                       slippi_tobj_presentation_cache=True)
+        with self.assertRaisesRegex(ValueError, "CPU owner provenance"):
+            BUILD.build_directory(target="gameplay_slippi_synctest",
+                                  configuration="Release", **options)
+        with patch.object(BUILD, "prepare_sources",
+                          side_effect=AssertionError("must refuse before preparation")):
+            with self.assertRaisesRegex(ValueError, "CPU owner provenance"):
+                BUILD.build(1, configuration="Release",
+                            trace_targets=("gameplay_slippi_synctest",), **options)
+        path = BUILD.build_directory(target="gameplay_slippi_synctest",
+                                     configuration="Release",
+                                     aurora_staging_shadow_diagnostic=True, **options)
+        self.assertEqual(path.name,
+                         "slippi-synctest-logical-frame-lobj-presentation-tobj-presentation-aurora-staging-release")
+
     def _configured_root(self):
         temporary = tempfile.TemporaryDirectory(prefix="melee selected trace build ")
         root = Path(temporary.name)

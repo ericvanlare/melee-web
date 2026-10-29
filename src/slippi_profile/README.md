@@ -195,7 +195,7 @@ Reduced clock controls with modeled service leaves do not establish gameplay,
 seven-tick, whole-profile or rollback milestone acceptance. No browser interval
 is enabled by this option alone.
 
-### Private V11 fighter projection view
+### Private fighter and shadow presentation views
 
 V11 is a port presentation adaptation for no-draw experiments, not an upstream
 Slippi patch equivalence claim. It preserves original projection arithmetic,
@@ -207,3 +207,15 @@ returns without writing. Actual create receipts and current main-pool allocation
 and Fighter identities are required; no capture-time owner adoption is allowed.
 The ordinary profile remains unchanged. The fixed strict payload comparison is
 retained, and focused view controls do not establish browser/visual correctness.
+
+V12 extends this private port adaptation to the verified fighter shadow-camera
+write boundary. The actual Fighter completion hook follows shadow construction;
+child ownership ends before original shadow teardown. Camera/WObj values and the
+direct shadow texture matrix stay visible through the complete original draw,
+including late texture consumers, before canonical values are restored. Original
+arithmetic, draw order, list/refcount operations and GPU output remain in place.
+Ownership pointers are not value snapshots. Unsupported child, image, membership
+or inverse-cache transitions must refuse explicitly. This is not authority over
+the main camera's independent inverse cache or complete Slippi compatibility.
+The private build requires the existing CPU provenance configuration; V11
+manifests/snapshots are refused by V12. Ordinary profiles remain unchanged.

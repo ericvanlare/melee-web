@@ -146,6 +146,8 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("Logical-frame clock requires the Release Slippi synctest")
     if slippi_tobj_presentation_cache and not slippi_lobj_presentation_cache:
         raise ValueError("TObj presentation cache requires the private v7 light owner profile")
+    if slippi_tobj_presentation_cache and not aurora_staging_shadow_diagnostic:
+        raise ValueError("The private presentation profile requires --aurora-staging-shadow-diagnostic for CPU owner provenance")
     if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
             target != "gameplay_slippi_synctest" or configuration != "Release"):
         raise ValueError("LObj presentation cache requires the private Release logical-frame Slippi synctest")
@@ -1000,6 +1002,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
     slippi_synctest = trace_targets == ("gameplay_slippi_synctest",)
     if slippi_tobj_presentation_cache and not slippi_lobj_presentation_cache:
         raise ValueError("TObj presentation cache requires the private v7 light owner profile")
+    if slippi_tobj_presentation_cache and not aurora_staging_shadow_diagnostic:
+        raise ValueError("The private presentation profile requires --aurora-staging-shadow-diagnostic for CPU owner provenance")
     if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
             not slippi_synctest or configuration != "Release"):
         raise ValueError("--slippi-lobj-presentation-cache requires the private Release logical-frame Slippi synctest")

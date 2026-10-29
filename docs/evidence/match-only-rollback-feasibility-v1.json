@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "V11 fighter projection repair preserves both exact raw replay pairs. Test whether the new HSD_WObj.pos mismatch belongs to an actual fighter shadow camera with bounded original setter observations, then repair the verified owner boundary and complete strict two-tick replay/present.",
+    "current_next_boundary": "Implement reviewed typed shadow-camera/texture-matrix presentation view with constructor-bound child tuple and early retirement. Preserve original topology and full-draw consumers; refuse unsupported inverse/resize/membership transitions. Then repeat strict fixed2tick restore/present for this changed repair.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8854,6 +8854,36 @@
       "escalated_final_result_review": {
         "path": "fighter-projection-v11-result-sol-review.json",
         "sha256": "d820c4367666c84d21a04a73c64018397b42531317d9e399047c031eb1c96b8c"
+      },
+      "shadow_writer_attribution": {
+        "producer_commit": "cd035987bca79faa099d9d8c25f3deea17fc946d",
+        "harness_commit": "cd035987bca79faa099d9d8c25f3deea17fc946d",
+        "result": "Positive exact shadow-camera interest membership and original position writer; strict1216 and finalpresent exclusion unchanged.",
+        "receipt": {
+          "path": "browser-two-tick-shadow-membership-v1/shadow-owner-receipt.json",
+          "sha256": "c9804a774b22884195475a1b3d8326bd63cb86f006b5fa31dbd16196cc9587c3"
+        },
+        "source_review": {
+          "path": "shadow-membership-source-review-v1.json",
+          "sha256": "3358b213c2d165138d3a0346617f98747ee3cc8a385dc316e42533048fac4941"
+        },
+        "build": {
+          "path": "browser-build-shadow-membership-v1/artifact-inventory.json",
+          "sha256": "98f37a2a246d1f8a690bc2bf507f2a1745a034fc54236eb78b87a11e3fdcf8c0"
+        },
+        "configuration_review": {
+          "path": "linked-config-shadow-membership-v1/row-review.json",
+          "sha256": "d4882b923732d71f7522c9dbdcc8d10820ca941c5ce61c50681aa95d4e7606a0"
+        },
+        "preserved_producer": {
+          "path": "pre-shadow-repair-observer-browser-archive/archive.json",
+          "sha256": "afb54ef0205b076e7b0a8134bd399bbd4969338e3038b51ea202bbd46bd85d4d"
+        },
+        "repair_design_review": {
+          "path": "shadow-wobj-camera-design-sol-review-v1.json",
+          "sha256": "882d908d768e119911413fc37fe4fd9589aa6d9d8ab42d1e20dad6005b2e1ce8"
+        },
+        "scope": "Typed callback pointer/write occurrence only; not continuous child lifetime or restoration authority. All10 final raw pairs equal; process cleanup and nine artifact hashes independently verified."
       }
     }
   }

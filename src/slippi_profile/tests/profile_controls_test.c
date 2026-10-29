@@ -50,9 +50,14 @@ static void test_draw_policy(void)
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
     MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     const SlippiProfileIdentity profile =
-        SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11;
+        SLIPPI_PROFILE_IDENTITY_SHADOW_CAMERA_V12;
     assert(strcmp(slippi_profile_identity_name(profile),
-                  SLIPPI_PROFILE_FIGHTER_PROJECTION_V11_ID) == 0);
+                  SLIPPI_PROFILE_SHADOW_CAMERA_V12_ID) == 0);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_identity_name(
                SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9) == NULL);
     assert(slippi_profile_source_draw_decision(

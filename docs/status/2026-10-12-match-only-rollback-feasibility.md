@@ -1176,9 +1176,23 @@ match its drawn reference. The earlier fighter-pool mismatch is gone. Strict
 comparison still refuses with 1216 at row 1295, offset 972. The capture-time
 class witness joins the exact producer's `hsdWObj` symbol; the differing field
 is `HSD_WObj.pos` at piece offset 12. This identifies a type and field, not its
-parent owner or continuous lifetime. The next bounded diagnostic records the
-actual fighter shadow-camera eye/interest pointers and original setter writes
-to test that owner hypothesis. No generic world-object handling is admitted.
+parent owner or continuous lifetime. The subsequent observer at `cd035987`
+positively joins that exact object to the first fighter's shadow-camera interest
+point. Its original setter's before/after position bytes exactly match the
+strict comparison's actual/expected bytes. Both drawn references emit complete
+typed records with no truncation; the correction command emits none. All ten
+final raw category pairs still match, and strict refusal and final-present
+exclusion remain unchanged. This proves the write occurrence and pointer
+membership for the observed interval, not continuous child lifetime.
+
+The reviewed next repair isolates the camera's typed values and the directly
+written shadow texture matrix through the full original draw. Late shadow-texture
+consumers must see that matrix before canonical values are restored. Source list,
+reference-count, image and active-texture membership operations retain their
+ownership; they cannot be replaced by pointer copies. The existing Fighter
+completion hooks follow shadow construction, while child retirement must occur
+before the original shadow destruction. No generic world-object handling or
+main-camera ownership is inferred from this shadow proof.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

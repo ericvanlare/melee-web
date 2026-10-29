@@ -43,6 +43,9 @@ option(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
   message(FATAL_ERROR "TObj presentation cache requires the private v7 logical-frame light owner profile")
 endif()
+if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+  message(FATAL_ERROR "The private presentation profile requires the Aurora staging-shadow inventory and CPU owner provenance")
+endif()
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
   "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
 option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC
