@@ -1,6 +1,9 @@
 /* Private browser adapter; included only by the existing Aurora diagnostic
  * synctest. Default fixture/Node/player paths have no activation or exports. */
 #if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
+#define MELEE_WEB_SHADOW_WOBJ_DIAGNOSTIC_IMPLEMENTATION 1
+#include "shadow_wobj_diagnostic.h"
+#undef MELEE_WEB_SHADOW_WOBJ_DIAGNOSTIC_IMPLEMENTATION
 extern "C" unsigned char __global_base;
 extern "C" unsigned char __data_end;
 namespace {
@@ -36,6 +39,17 @@ struct CpuTwoTickEvidence {
 static_assert(offsetof(CpuTwoTickEvidence,tick_pairs)==64&&
               offsetof(CpuTwoTickEvidence,drawn_pair)==22896&&
               offsetof(CpuTwoTickEvidence,diagnostics)==34312&&sizeof(CpuTwoTickEvidence)==35368);
+struct CpuShadowWObjDiagnosticEvent {
+    uint32_t command=0,command_entry_frame=0,site=0,before_valid=0,after_valid=0,complete=0;
+    uintptr_t fp=0,shadow=0,camera=0,eye=0,interest=0,target_before=0,target_after=0;
+    std::array<uint8_t,12> before{},after{};
+};
+struct CpuShadowWObjDiagnostic {
+    std::array<CpuShadowWObjDiagnosticEvent,32> events{};
+    uint32_t count=0,site_count[2]{},command_dropped[2]{};
+    uint32_t command=0,command_entry_frame=0;
+    bool active=false;
+};
 struct CpuRestoreControl {
     enum State:uint32_t {Idle,Configured,Captured,Equal,DrawSubmitted,Complete,Failed,Closed,BaselineSubmitted,
         CapturedTwo,Baseline0SubmittedTwo,Baseline1SubmittedTwo,TwoEqual,TwoDrawSubmitted};
@@ -57,6 +71,7 @@ struct CpuRestoreControl {
     MeleeWebSourceAllocationOriginWitness origin_witness{1,sizeof(MeleeWebSourceAllocationOriginWitness)};
     MeleeWebLObjWriterEvidence lobj_writer_evidence{1,sizeof(MeleeWebLObjWriterEvidence)};
     MeleeWebTObjWriterEvidence tobj_writer_evidence{1,sizeof(MeleeWebTObjWriterEvidence)};
+    CpuShadowWObjDiagnostic shadow_wobj_diagnostic{};
     bool two_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
@@ -406,6 +421,77 @@ uint32_t cpu_execute(uint32_t command){
     return cpu_fail(0x484u,"unknown command");
 }
 }
+extern "C" int melee_web_shadow_wobj_diagnostic_active(void){
+    return cpu_restore.shadow_wobj_diagnostic.active?1:0;
+}
+extern "C" uint32_t melee_web_shadow_wobj_diagnostic_before(
+    uint32_t site,const void* fp,const void* shadow,const void* camera,
+    const void* eye,const void* interest,const void* target,const void* position){
+    auto& d=cpu_restore.shadow_wobj_diagnostic;
+    if(!d.active||(site!=1&&site!=2))return 0;
+    const unsigned slot=site-1;
+    if(d.site_count[slot]>=16||d.count>=d.events.size()){
+        ++d.command_dropped[slot];return 0;
+    }
+    const uint32_t index=d.count++;
+    auto& event=d.events[index];event={};
+    event.command=d.command;event.command_entry_frame=d.command_entry_frame;event.site=site;
+    event.fp=reinterpret_cast<uintptr_t>(fp);
+    event.shadow=reinterpret_cast<uintptr_t>(shadow);
+    event.camera=reinterpret_cast<uintptr_t>(camera);
+    event.eye=reinterpret_cast<uintptr_t>(eye);
+    event.interest=reinterpret_cast<uintptr_t>(interest);
+    event.target_before=reinterpret_cast<uintptr_t>(target);
+    if(position){std::memcpy(event.before.data(),position,event.before.size());event.before_valid=1;}
+    ++d.site_count[slot];
+    return index+1;
+}
+extern "C" void melee_web_shadow_wobj_diagnostic_after(uint32_t token,const void* target,const void* position){
+    auto& d=cpu_restore.shadow_wobj_diagnostic;
+    if(!d.active||!token||token>d.count)return;
+    auto& event=d.events[token-1];
+    if(event.command!=d.command||event.complete)return;
+    event.target_after=reinterpret_cast<uintptr_t>(target);
+    if(position){
+        std::memcpy(event.after.data(),position,event.after.size());
+        event.after_valid=1;
+    }
+    event.complete=event.before_valid&&event.after_valid;
+}
+extern "C" void melee_web_shadow_wobj_diagnostic_context(uint32_t command,uint32_t command_entry_frame){
+    auto& d=cpu_restore.shadow_wobj_diagnostic;
+    if(command==8)d={};
+    else {d.count=0;d.site_count[0]=d.site_count[1]=0;}
+    d.command=command;d.command_entry_frame=command_entry_frame;
+    d.command_dropped[0]=d.command_dropped[1]=0;
+    d.active=command>=8&&command<=13;
+}
+static void cpu_shadow_wobj_diagnostic_hex(const std::array<uint8_t,12>& bytes){
+    for(uint8_t byte:bytes)std::printf("%02x",static_cast<unsigned>(byte));
+}
+extern "C" void melee_web_shadow_wobj_diagnostic_flush(void){
+    auto& d=cpu_restore.shadow_wobj_diagnostic;
+    if(!d.active)return;
+    uint32_t incomplete=0;
+    for(uint32_t i=0;i<d.count;++i){
+        const auto& e=d.events[i];incomplete+=e.complete?0u:1u;
+        const char* site=e.site==1?"eye":"interest";
+        std::printf("MELEE_SHADOW_WOBJ command=%u command_entry_frame=%u site=%s fp=%p shadow=%p camera=%p eye=%p interest=%p target_before=%p before_valid=%u target_after=%p after_valid=%u complete=%u before=",
+            e.command,e.command_entry_frame,site,reinterpret_cast<const void*>(e.fp),
+            reinterpret_cast<const void*>(e.shadow),reinterpret_cast<const void*>(e.camera),
+            reinterpret_cast<const void*>(e.eye),reinterpret_cast<const void*>(e.interest),
+            reinterpret_cast<const void*>(e.target_before),e.before_valid,
+            reinterpret_cast<const void*>(e.target_after),e.after_valid,e.complete);
+        cpu_shadow_wobj_diagnostic_hex(e.before);std::printf(" after=");
+        cpu_shadow_wobj_diagnostic_hex(e.after);std::printf(" scope=command-entry-host-pointer-only-lifetime-unknown\n");
+    }
+    const uint32_t command_events=d.count;
+    const uint32_t truncated=(d.command_dropped[0]||d.command_dropped[1])?1u:0u;
+    std::printf("MELEE_SHADOW_WOBJ_SUMMARY command=%u command_entry_frame=%u events=%u dropped_eye=%u dropped_interest=%u truncated=%u incomplete=%u scope=command-entry-host-pointer-only-lifetime-unknown\n",
+        d.command,d.command_entry_frame,command_events,d.command_dropped[0],
+        d.command_dropped[1],truncated,incomplete);
+    std::fflush(stdout);d.active=false;
+}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configure(uint32_t address,uint32_t count){
     try {
     if(cpu_restore.state!=CpuRestoreControl::Idle||cpu_restore.inflight||cpu_boundary())return cpu_fail(0x490u,"configuration order/boundary refused");
@@ -457,11 +543,13 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(command==5){if(cpu_restore.two_active)cpu_restore.two.last_command=5;return cpu_close();}
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
+    melee_web_shadow_wobj_diagnostic_context(command,observation.frame);
     melee_web_lobj_writer_phase(command);
     melee_web_tobj_writer_phase(command);
     cpu_restore.inflight=true;uint32_t result=0;
     try{result=cpu_execute(command);}catch(const std::exception& failure){result=cpu_fail(0x496u,failure.what());}
     cpu_restore.inflight=false;
+    melee_web_shadow_wobj_diagnostic_flush();
     if(cpu_restore.close_requested){cpu_restore.close_requested=false;cpu_close();}
     cpu_restore.evidence.state=cpu_restore.state;
     if(cpu_restore.two_active)cpu_restore.two.state=cpu_restore.state;

@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Browser exercised / One-tick restore-replay-and-present passed; V10 fixes the observed Ground matrix dependency and replays two ticks with exact raw sample agreement, but strict source-payload equality now fails later in the fighter pool. Final present and full browser rollback remain unproven.**
+**Browser exercised / One-tick restore-replay-and-present passed; V11 fixes the observed fighter projection dependency and replays two ticks with exact raw sample agreement. Strict source-payload equality now fails at a world-object position. Two-tick final present and full browser rollback remain unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1148,9 +1148,9 @@ The strict whole owned-payload comparison still refuses with 1216, now at row
 568, offset `0x2188`, extent `0x23ec`. Its allocation-pool descriptor joins
 `fighter_alloc_data` in this exact producer map; the source layout names the
 field `Fighter.x2188`, a cached screen position. This pool attribution does not
-prove continuous object lifetime or the dynamic writer. The next source
-reduction follows the projection and magnifier consumers before changing that
-presentation dependency. Final present remains unrun. Snapshot close and
+prove continuous object lifetime or the dynamic writer. The subsequent source
+reduction followed the projection and magnifier consumers before changing that
+presentation dependency. Final present remained unrun. Snapshot close and
 renderer shutdown pass; CPU CLOSE retains the comparison failure. All recorded
 owned processes are independently absent and producer hashes are unchanged.
 The structured `ground_matrix_v10_result_20261029` receipt records the exact
@@ -1159,6 +1159,32 @@ producer, review, byte checks and new failure. The earlier
 failure, compatibility repair and two diagnostic captures. No full regression,
 publication-head CI, online profile admission or complete browser rollback is
 claimed for V10.
+
+V11 at `1ede0517` isolates the fighter's cached screen coordinates and visibility
+bit in a presentation view around the complete original draw. Actual source
+constructors and the existing allocation/Fighter identities establish each
+owner; a checked restore can reactivate a retained creation receipt. The view
+keeps the original projection, no-write fallback and late magnifier consumers,
+then restores only those canonical fields. It changes neither vanilla nor the
+strict payload comparator. The temporary joint observer was retired while its
+producer artifacts and failed runs remain retained.
+
+The focused source controls, affected browser build and unchanged-policy relink
+pass. In the fresh browser run, actual restore and both no-draw ticks complete,
+and each tick's literal observation, PCM, PAD, RNG/profile and transfer bytes
+match its drawn reference. The earlier fighter-pool mismatch is gone. Strict
+comparison still refuses with 1216 at row 1295, offset 972. The capture-time
+class witness joins the exact producer's `hsdWObj` symbol; the differing field
+is `HSD_WObj.pos` at piece offset 12. This identifies a type and field, not its
+parent owner or continuous lifetime. The next bounded diagnostic records the
+actual fighter shadow-camera eye/interest pointers and original setter writes
+to test that owner hypothesis. No generic world-object handling is admitted.
+
+The two-tick final-present commands remain unrun. All recorded owned processes
+are independently absent and all nine producer pins are unchanged. The
+structured `fighter_projection_v11_result_20261029` receipt preserves the source,
+build, configuration, raw-result and review identities. Full regression,
+publication-head CI, profile admission and working browser rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

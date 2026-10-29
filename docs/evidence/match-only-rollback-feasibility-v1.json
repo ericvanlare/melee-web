@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "Ground V10 selected source/correction matrix updates agree. Reduce the fighter-pool screen-projection mismatch at offset0x2188, preserving strict owned payload and raw comparison; then complete the fixed two-tick present boundary.",
+    "current_next_boundary": "V11 fighter projection repair preserves both exact raw replay pairs. Test whether the new HSD_WObj.pos mismatch belongs to an actual fighter shadow camera with bounded original setter observations, then repair the verified owner boundary and complete strict two-tick replay/present.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8795,6 +8795,65 @@
       "pool_attribution": {
         "path": "browser-two-tick-ground-v10-v1/fighter-pool-attribution.json",
         "sha256": "5cc12c1939b05874a3d8c4f051a3a6d9e7e72c41b0744a8b125ac3ab5525547a"
+      }
+    },
+    "fighter_projection_v11_result_20261029": {
+      "producer_commit": "1ede0517d5f67a48db328a69c3d995b5b76fc261",
+      "harness_commit": "1ede0517d5f67a48db328a69c3d995b5b76fc261",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-fighter-projection-v11",
+      "result": "strict comparison refusal1216 after successful restore and two no-draw corrections",
+      "raw_pairs_equal": true,
+      "previous_fighter_projection_mismatch_gone": true,
+      "first_failure": {
+        "row": 1295,
+        "offset": 972,
+        "allocation_extent": 1024,
+        "piece_source": "0x80c9dbc0",
+        "piece_extent": 32,
+        "piece_field_offset": 12,
+        "class_info": "0xdb0c0",
+        "class_symbol": "hsdWObj",
+        "field": "HSD_WObj.pos"
+      },
+      "scope": "Capture-time type/field attribution only; parent owner and continuous lifetime not established. Final present unrun. Failed scoped run, not working browser rollback or profile admission. Full regression and publication-head CI pending.",
+      "cleanup": "All recorded owned processes independently absent and nine producer pins unchanged; CPU CLOSE retains comparison refusal1216, snapshot close and renderer shutdown succeed.",
+      "evidence_run": "rollback-renderer-resume-20261028-155740-eef0524c",
+      "receipt": {
+        "path": "browser-two-tick-fighter-projection-v11-v1/result-receipt.json",
+        "sha256": "4b1aac6b8fe4fddb4f92e7ecd5ee2bf7263e4c57e43978711d78e3b36abcd6ea"
+      },
+      "review": {
+        "path": "fighter-projection-v11-result-review.json",
+        "sha256": "972775849f6c6143a800297cd067a7942e35eb4e315311e89b11eea4edcdfb12"
+      },
+      "build": {
+        "path": "browser-build-fighter-projection-v11-v1/artifact-inventory.json",
+        "sha256": "83ef578c972a853d04172931bef9c6b3550b6755f237b3d26c89a5f05bf4c6a6"
+      },
+      "source_review": {
+        "path": "fighter-projection-v11-source-review.json",
+        "sha256": "164b68b42bb47ac983c00f54bf16f6cd3174c861ce2e9c17a7163c805315e3e3"
+      },
+      "configuration_review": {
+        "path": "linked-config-fighter-projection-v11-v1/row-review.json",
+        "sha256": "e488445489911336724670196615b042b9017a801329a672b650ac5004e43091"
+      },
+      "preserved_producer": {
+        "path": "pre-wobj-v11-browser-archive/archive.json",
+        "sha256": "aa76a7701129adfb6975347b46f0ca822fa1418b5359d0a4a611bd7e6fc3ecbc"
+      },
+      "root_raw_check": {
+        "path": "fighter-projection-v11-root-final-raw-check.json",
+        "sha256": "f74f628f83f67636976c55c320202a8f362890e247e78aa290edb8fd97d1f1f3"
+      },
+      "invalid_review_retained": {
+        "path": "fighter-projection-v11-result-review-invalid-command8.json",
+        "sha256": "f39f34d811c6489c296b81f2e2469dfd2b43d666c72561a1ddd1a31408056b15"
+      },
+      "review_correction": "Initial independent review selected pre-replay command8 zero arrays; retained as invalid. Corrected review and root check use final command11 completed replay arrays, with matching receipt SHA/lengths for all ten categories.",
+      "escalated_final_result_review": {
+        "path": "fighter-projection-v11-result-sol-review.json",
+        "sha256": "d820c4367666c84d21a04a73c64018397b42531317d9e399047c031eb1c96b8c"
       }
     }
   }

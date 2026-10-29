@@ -1240,6 +1240,7 @@ diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
      if (!fp->x2229_b3 && !fp->x2220_b7) {
          camera_gobj = Camera_80030A50();
          if (camera_gobj != NULL) {
+diff --git a/src/melee/ft/ftdemo.c b/src/melee/ft/ftdemo.c
 --- a/src/melee/ft/ftdemo.c
 +++ b/src/melee/ft/ftdemo.c
 @@ -1,3 +1,6 @@
@@ -1264,3 +1265,84 @@ diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
      return gobj;
  }
  
+diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
+--- a/src/melee/lb/lbshadow.c
++++ b/src/melee/lb/lbshadow.c
+@@ -1,4 +1,8 @@
+ #include "lbshadow.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tests/shadow_wobj_diagnostic.h>
++#include <sysdolphin/baselib/wobj.h>
++#endif
+ 
+ #include "lbvector.h"
+ #include "types.h"
+@@ -21,6 +25,42 @@
+ #include <sysdolphin/baselib/util.h>
+ #include <sysdolphin/baselib/video.h>
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++static uint32_t shadow_wobj_diagnostic_before(uint32_t site, Fighter* fp,
++                                               HSD_Shadow* shadow, HSD_CObj* camera)
++{
++    HSD_WObj* eye = NULL;
++    HSD_WObj* interest = NULL;
++    HSD_WObj* target;
++    if (melee_web_shadow_wobj_diagnostic_active == NULL ||
++        !melee_web_shadow_wobj_diagnostic_active()) {
++        return 0;
++    }
++    if (camera != NULL) {
++        eye = camera->eyepos;
++        interest = camera->interest;
++    }
++    target = site == 1 ? eye : interest;
++    return melee_web_shadow_wobj_diagnostic_before(
++        site, fp, shadow, camera, eye, interest, target,
++        target != NULL ? &target->pos : NULL);
++}
++
++static void shadow_wobj_diagnostic_after(uint32_t token, uint32_t site,
++                                          HSD_CObj* camera)
++{
++    HSD_WObj* target = NULL;
++    if (token == 0) {
++        return;
++    }
++    if (camera != NULL) {
++        target = site == 1 ? camera->eyepos : camera->interest;
++    }
++    melee_web_shadow_wobj_diagnostic_after(
++        token, target, target != NULL ? &target->pos : NULL);
++}
++#endif
++
+ static void splGetCardinalTangent(Vec3* p, Vec3* cp, f32 tension, f32 u)
+ {
+     f32 u2 = u * u;
+@@ -506,8 +546,25 @@
+ 
+                 PSVECAdd(&cm->bone_pos, &lightPos, &eyePos);
+                 PSVECAdd(&cm->bone_pos, &lightDir, &interestPos);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++                {
++                    HSD_CObj* diag_camera = shadow2->camera;
++                    uint32_t diag_token = shadow_wobj_diagnostic_before(
++                        1, fp, shadow2, diag_camera);
++                    HSD_CObjSetEyePosition(fp->x20A4.shadow->camera, &eyePos);
++                    shadow_wobj_diagnostic_after(diag_token, 1, diag_camera);
++                }
++                {
++                    HSD_CObj* diag_camera = shadow2->camera;
++                    uint32_t diag_token = shadow_wobj_diagnostic_before(
++                        2, fp, shadow2, diag_camera);
++                    HSD_CObjSetInterest(fp->x20A4.shadow->camera, &interestPos);
++                    shadow_wobj_diagnostic_after(diag_token, 2, diag_camera);
++                }
++#else
+                 HSD_CObjSetEyePosition(fp->x20A4.shadow->camera, &eyePos);
+                 HSD_CObjSetInterest(fp->x20A4.shadow->camera, &interestPos);
++#endif
+                 HSD_CObjSetUpVector(fp->x20A4.shadow->camera, &upVec);
+ 
+                 if (cm != NULL) {
