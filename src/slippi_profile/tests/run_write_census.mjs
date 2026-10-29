@@ -26,7 +26,7 @@ const SAMPLE = PREFIX_SAMPLES;
 const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
-const EFFECT_MATRIX_V14_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-effect-matrix-v14';
+const LOBJ_CURRENT_SET_V15_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -157,7 +157,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v14 effect matrix lane requires v7 and the fixed two-tick route');
+    throw new Error('The v15 current light set lane requires v7 and the fixed two-tick route');
   }
   if (values['--slippi-lobj-presentation-cache'] === true && !twoTick) {
     throw new Error('The v7 light owner requires the fixed two-tick route');
@@ -171,8 +171,8 @@ export function validateCpuRestoreRouteSelection(values) {
 
 export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false, tobjPresentationCache = false) {
   if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
-  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v14 effect matrix lane requires v7 and two ticks');
-  const expectedProfile = tobjPresentationCache ? EFFECT_MATRIX_V14_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v15 current light set lane requires v7 and two ticks');
+  const expectedProfile = tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
   if (twoTickDrawnReference && (!twoTickExports ||
@@ -569,7 +569,7 @@ async function main() {
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
       seed: SOURCE_SEED, name: SYNCTEST_PROFILE,
       sourceTextureMatrixWriterDiagnostic: tobjPresentationCache
-        ? 'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V14'
+        ? 'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15'
         : 'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',
       sourceLvecWriterDiagnostic: lobjPresentationCache
         ? 'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'
@@ -689,7 +689,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: tobjPresentationCache ? EFFECT_MATRIX_V14_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+      name: tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache};
     const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {

@@ -344,5 +344,212 @@ class LObjPresentationCacheTests(OwnedWorkspaceTests):
         self.assertNotEqual(tokens.group(1), tokens.group(2))
 
 
+class LObjCurrentSetV15Tests(OwnedWorkspaceTests):
+    """Exercise the real LObj selection bodies with a private current-set view."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.work = retained_workspace(cls)
+
+    def test_actual_replace_all_view_matches_source_gx_and_preserves_source(self):
+        sdk = ROOT / ".deps/emsdk/upstream/emscripten"
+        emcc, empp = sdk / "emcc", sdk / "em++"
+        if not emcc.is_file() or not empp.is_file():
+            self.skipTest("Pinned Emscripten toolchain is unavailable")
+        try:
+            node = node_runtime(ROOT)
+        except (OSError, ValueError) as exc:
+            self.skipTest(f"Pinned Node runtime is unavailable: {exc}")
+
+        compile_db = Path(os.environ.get(
+            "MELEE_LOBJ_CACHE_COMPILE_COMMANDS",
+            ROOT / ("build/slippi-synctest-logical-frame-stage-arena-"
+                    "aurora-staging-release/compile_commands.json"),
+        )).resolve()
+        if not compile_db.is_file():
+            self.skipTest("Existing profiled runtime compile graph is unavailable")
+        commands = json.loads(compile_db.read_text())
+        class_entries = [entry for entry in commands
+                         if entry["file"].endswith("/src/sysdolphin/baselib/class.c")]
+        self.assertEqual(len(class_entries), 1, "Actual class compile entry is ambiguous")
+        prepared = Path(class_entries[0]["file"]).resolve().parents[2]
+        for relative in ("Runtime/platform.h", "sysdolphin/baselib/class.h",
+                         "sysdolphin/baselib/object.h", "sysdolphin/baselib/lobj.h"):
+            self.assertTrue((prepared / relative).is_file(),
+                            "Actual prepared header is missing: " + relative)
+
+        melee = ROOT / ".deps/melee"
+        lock = json.loads((ROOT / "dependencies.lock.json").read_text())
+        commit = lock["repositories"]["melee"]["commit"]
+        actual_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=melee, text=True
+        ).strip()
+        self.assertEqual(actual_head, commit,
+                         "Upstream Melee checkout differs from its lock pin")
+        rels = ["src/sysdolphin/baselib/class.c",
+                "src/sysdolphin/baselib/object.c",
+                "src/sysdolphin/baselib/lobj.c"]
+        tree = self.work / "current-set-melee-source"
+        for relative in rels:
+            target = tree / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(subprocess.check_output(
+                ["git", "show", f"{commit}:{relative}"], cwd=melee
+            ))
+        env = dict(os.environ)
+        for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
+            env.pop(key, None)
+        env["GIT_CEILING_DIRECTORIES"] = str(tree.parent)
+        include_args = [f"--include={relative}" for relative in rels]
+        gameplay_patch = ROOT / "patches/melee-gameplay.patch"
+        profile_patch = ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch"
+        run = LObjPresentationCacheTests._run
+        run(self.work, "v15-apply-gameplay-check",
+            ["git", "apply", "--check", *include_args, gameplay_patch], cwd=tree, env=env)
+        run(self.work, "v15-apply-gameplay",
+            ["git", "apply", *include_args, gameplay_patch], cwd=tree, env=env)
+        run(self.work, "v15-apply-profile-check",
+            ["git", "apply", "--check", *include_args, profile_patch], cwd=tree, env=env)
+        run(self.work, "v15-apply-profile",
+            ["git", "apply", *include_args, profile_patch], cwd=tree, env=env)
+        for relative in rels:
+            path = tree / relative
+            path.write_text(transform_source(Path(relative), path.read_text()))
+
+        # Test-only copied-source bridge: read canonical source statics after
+        # undefining every V15 lvalue route. Never added to production source.
+        lobj_path = tree / rels[2]
+        lobj_path.write_text(lobj_path.read_text() + r'''
+
+void slippi_test_lobj_canonical_domain(void **head, void **active, int *count, int *masks)
+{
+    int i;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+#undef current_lights
+#undef active_lights
+#undef nb_active_lights
+#undef lightmask_diffuse
+#undef lightmask_specular
+#undef lightmask_attnfunc
+#undef lightmask_alpha
+#endif
+    *head = current_lights;
+    for (i = 0; i < MAX_GXLIGHT; ++i) active[i] = active_lights[i];
+    *count = nb_active_lights;
+    masks[0] = lightmask_diffuse; masks[1] = lightmask_specular;
+    masks[2] = lightmask_attnfunc; masks[3] = lightmask_alpha;
+}
+''')
+
+        control = self.work / "lobj_current_set_v15_control.cpp"
+        control.write_text((ROOT / "src/slippi_profile/tests/"
+                            "lobj_current_set_v15_control.c.in").read_text())
+        sources = {
+            "class": tree / rels[0], "object": tree / rels[1],
+            "lobj": tree / rels[2],
+            "cache": ROOT / "src/slippi_profile/lobj_presentation_cache.c",
+            "profile": ROOT / "src/slippi_profile/profile.c",
+            "control": control,
+            "ps-math": ROOT / "src/gameplay_ps_math.c",
+            "vec": ROOT / ".deps/aurora/lib/dolphin/mtx/vec.c",
+            "mtxvec": ROOT / ".deps/aurora/lib/dolphin/mtx/mtxvec.c",
+            "gx-lighting": ROOT / ".deps/aurora/lib/dolphin/gx/GXLighting.cpp",
+        }
+        common = ["-DMELEE_WEB_SLIPPI_PROFILE=1",
+                  "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1",
+                  "-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1"]
+
+        def compiler_args(key, v15):
+            source = sources[key]
+            suffix = {"class": "/src/sysdolphin/baselib/class.c",
+                      "object": "/src/sysdolphin/baselib/object.c",
+                      "lobj": "/src/sysdolphin/baselib/lobj.c",
+                      "mtxvec": "/mtxvec.c",
+                      "gx-lighting": "/GXLighting.cpp"}.get(key)
+            if suffix:
+                entries = [entry for entry in commands
+                           if entry["file"].endswith(suffix)]
+                self.assertEqual(len(entries), 1,
+                                 "Expected one compiler entry for " + suffix)
+                words = shlex.split(entries[0]["command"])
+                kept = [words[0]]
+                i = 1
+                while i < len(words):
+                    word = words[i]
+                    if word in ("-o", "-c"):
+                        i += 2 if word == "-o" else 1
+                        if word == "-c" and i < len(words) and words[i] == entries[0]["file"]:
+                            i += 1
+                        continue
+                    if word.startswith("-DMELEE_WEB_"):
+                        i += 1
+                        continue
+                    if word == "-include" and i + 1 < len(words):
+                        kept.extend([word, str(ROOT / "src/gameplay_compat.h")])
+                        i += 2
+                        continue
+                    kept.append(word)
+                    i += 1
+                args = [str(empp if key == "gx-lighting" else emcc), *kept[1:]]
+            else:
+                args = [str(empp if key == "control" else emcc),
+                        "-O3", "-DNDEBUG", "-DAURORA", "-DAURORA_ENABLE_GX",
+                        "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
+                        "-ffp-contract=off", "-I" + str(ROOT / "src"),
+                        "-I" + str(prepared), "-I" + str(ROOT / ".deps/aurora/include"),
+                        "-include", str(ROOT / "src/gameplay_compat.h")]
+                if key == "control":
+                    args[1:1] = ["-std=c++20", "-fexceptions", "-x", "c++"]
+                else:
+                    args[1:1] = ["-std=gnu11"]
+            if key in ("class", "object", "lobj"):
+                args.insert(1, "-I" + str(prepared / "sysdolphin/baselib"))
+            args += common
+            args.append("-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=" +
+                        ("1" if v15 else "0"))
+            return args
+
+        output = {}
+        for lane, v15 in (("source-reference", False), ("v15", True)):
+            objects = []
+            for key in ("class", "object", "lobj", "profile", "cache", "control",
+                        "ps-math", "vec", "mtxvec", "gx-lighting"):
+                obj = self.work / f"{lane}-{key}.o"
+                run(self.work, f"v15-compile-{lane}-{key}",
+                    [*compiler_args(key, v15), "-c", str(sources[key]), "-o", str(obj)],
+                    env=env)
+                objects.append(obj)
+            binary = self.work / f"{lane}-current-set.js"
+            run(self.work, f"v15-link-{lane}",
+                [str(empp), "-std=c++20", "-O1", "-fexceptions",
+                 "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+                 "-Wl,--wrap=malloc", "-Wl,--wrap=free", "-sENVIRONMENT=node",
+                 "-sEXIT_RUNTIME=1", *map(str, objects), "-o", str(binary)], env=env)
+            output[lane] = run(self.work, f"v15-run-{lane}",
+                               [node, binary], env=env).stdout
+            if v15:
+                for case in ("noref", "sole-member", "overflow", "class-change",
+                             "foreign-chain", "wrong-token-clean"):
+                    result = run(self.work, f"v15-run-{lane}-{case}",
+                                 [node, binary, case], env=env).stdout
+                    self.assertIn(f"CONTROL_OK_CURRENT_SET_{case.upper().replace('-', '_')}",
+                                  result)
+
+        def field(name, output_text):
+            match = re.search(rf"^{name}=([0-9a-f]*)$", output_text, re.M)
+            self.assertIsNotNone(match, "Missing control output " + name)
+            return match.group(1)
+
+        self.assertEqual(field("FIFO_REPLACED", output["source-reference"]),
+                         field("FIFO_REPLACED", output["v15"]),
+                         "V15 current-set ReplaceAll changed actual GX output")
+        self.assertIn("slippi-render-dependencies-logical-frame-lobj-tobj-"
+                      "current-light-set-v15", output["v15"])
+        self.assertIn("CONTROL_OK_CURRENT_SET", output["v15"])
+        self.assertIn("CURRENT_SET_PERSISTED_SELECTION=1", output["v15"])
+        self.assertIn("CURRENT_SET_RESET_SELECTION=1", output["v15"])
+        self.assertRegex(output["v15"], r"ref_first=[1-9][0-9]* ref_second=[1-9][0-9]*")
+
+
 if __name__ == "__main__":
     unittest.main()

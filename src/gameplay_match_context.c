@@ -6,8 +6,8 @@
 #include "slippi_profile/effect_matrix.h"
 #include "slippi_profile/profile.h"
 _Static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY ==
-                   SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14,
-               "Effect matrix post-step is restricted to private V14");
+                   SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15,
+               "Effect matrix post-step is restricted to the active private V15 profile");
 #endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_source_memory_runtime.h"

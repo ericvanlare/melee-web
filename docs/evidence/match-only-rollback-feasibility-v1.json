@@ -9025,6 +9025,55 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/effect-matrix-v14-target-result-sol-review-v1.json",
         "sha256": "8030a3803e81713bdbc38863f24ba361b7a1160740161ebd06bf664b931ebe9a"
       }
+    },
+    "slist_writer_result_20261029": {
+      "status": "EXACT_TARGET_DRAW_WRITE_IDENTIFIED_COVERAGE_PARTIAL",
+      "runtime_source": "22ce6ee8f1f52f31f20c997416f5120fa4fe2ef3",
+      "observed_writer": [
+        "HSD_SListAllocAndPrepend",
+        "HSD_LObj_803668EC",
+        "ftCo_8009F54C",
+        "HSD_GObj_80390ED0",
+        "fn_800301D0",
+        "GameplayMatchSession::draw"
+      ],
+      "limits": [
+        "32-event collector overflowed during first baseline DRAW; complete writer coverage is false.",
+        "Canonical current/free heads are sampled, but list memberships remain UNKNOWN. used846 exceeds walk cap512; no cap expansion requested.",
+        "Captured stack tail and escaped output are clipped; only retained named prefix is claimed.",
+        "Target allocation identity is joined to final difference, not a persistent SList object lifetime.",
+        "All10 raw vectors agree; full source payload still fails1216 and final present unrun."
+      ],
+      "root_receipt": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-slist-target-v1/writer-attribution-root.json",
+        "sha256": "e21f9273c791caa3f19a930bd596ec9c5f4dd4691f9f58e8531ef69d10b63901"
+      },
+      "pins": [
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-slist-target-v1/result-receipt.json",
+          "sha256": "ec5d847971ed36ac066103ff464aff4ec96f6ed244fba7b921354d06c829b010"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-slist-target-v1/slist-observations.json",
+          "sha256": "43a34b7974d05d34ed1616110f1639d9ebec53e11f528f832fd9aa31d2cf405a"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-slist-target-v1/raw-five-comparison.json",
+          "sha256": "001edb027885df71bf4743674cb7a8bf36add4e073799f9f7feca5429d0cc61a"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-slist-target-v1/independent-postflight.json",
+          "sha256": "f19d02a413ec9505efdaac9a8810fddc12c8307c82c75aa86ce4f6a5150d3842"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/slist-target-browser-archive/archive.json",
+          "sha256": "20070513d9fc844797b245b543c54bd13c75b6c2ad247382262b17b4585be510"
+        }
+      ],
+      "independent_result_and_repair_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/slist-target-result-and-v15-contract-sol-review-v1.json",
+        "sha256": "c9570ec5c4a85ea61a562b40699714e3c89f2178a776522f4bb23524fa5dbb61"
+      }
     }
   }
 }

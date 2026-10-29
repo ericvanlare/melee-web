@@ -245,4 +245,14 @@ are not treated as effect owners. Unsupported class-8 effect shapes fail before
 any effect matrix preparation.
 The full source payload comparison remains strict. V13 manifests and snapshots
 are refused by this candidate, which remains an incomplete diagnostic profile
-pending its browser result and later rollback gates.
+pending the browser and later rollback gates recorded in the scoped receipt.
+
+The next private V15 candidate separates the full draw-time current-light set
+from canonical source state during an already captured stable-owner interval.
+It reuses the constructor-bound LObj owner and one embedded membership node per
+unique light, preserving original selection order and arithmetic. Canonical
+source references, list allocation and source statics stay under the existing
+strict CPU comparison. Unsupported lifetime cases refuse; presentation
+selection is reset only after checked source restoration. V14 remains a
+historical identity and is refused by the V15 lane. This candidate is not a
+completed browser rollback or an admitted online profile.

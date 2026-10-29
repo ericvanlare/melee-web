@@ -1,0 +1,474 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef __cplusplus
+#error This focused control uses the actual C++ source ABI.
+#endif
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+extern "C" {
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/debug.h>
+#include <sysdolphin/baselib/list.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <sysdolphin/baselib/memory.h>
+#include <sysdolphin/baselib/wobj.h>
+#include <dolphin/os.h>
+}
+#include <slippi_profile/lobj_presentation_cache.h>
+#include <slippi_profile/profile.h>
+extern "C" HSD_LObjInfo hsdLObj;
+extern "C" void slippi_test_lobj_canonical_domain(void **, void **, int *, int *);
+
+struct DomainSnapshot {
+    void* head;
+    void* active[9];
+    int count;
+    int masks[4];
+    void* nodes[8];
+    void* next[8];
+    void* data[8];
+    unsigned node_count;
+};
+static DomainSnapshot source_domain()
+{
+    DomainSnapshot result{};
+    slippi_test_lobj_canonical_domain(&result.head, result.active,
+                                     &result.count, result.masks);
+    for (HSD_SList* node = static_cast<HSD_SList*>(result.head);
+         node && result.node_count < 8; node = node->next) {
+        const unsigned i = result.node_count++;
+        result.nodes[i] = node;
+        result.next[i] = node->next;
+        result.data[i] = node->data;
+    }
+    return result;
+}
+
+namespace aurora::gx::fifo::detail {
+uint8_t* sBufferData = nullptr;
+uint32_t sBufferSize = 0;
+uint32_t sBufferCapacity = 0;
+bool sInDisplayList = false;
+uint8_t* sDlBuffer = nullptr;
+uint32_t sDlSize = 0;
+uint32_t sDlWritePos = 0;
+}
+namespace aurora::gx::fifo {
+void write_data_grow(const void*, uint32_t)
+{
+    std::fputs("CONTROL_FAILURE unexpected GX FIFO growth\n", stderr);
+    std::abort();
+}
+}
+
+alignas(32) static uint8_t source_heap[1u << 20];
+static size_t source_heap_used;
+static uint8_t gx_fifo[4096];
+static HSD_SList slist_pool[8];
+static unsigned slist_used;
+static HSD_WObj position_wobj;
+static HSD_WObj interest_wobj;
+static bool track_allocations;
+static uint32_t interval_mallocs;
+static uint32_t interval_frees;
+extern "C" void* __real_malloc(size_t);
+extern "C" void __real_free(void*);
+extern "C" void* __wrap_malloc(size_t size)
+{
+    if (track_allocations) ++interval_mallocs;
+    return __real_malloc(size);
+}
+extern "C" void __wrap_free(void* pointer)
+{
+    if (track_allocations) ++interval_frees;
+    __real_free(pointer);
+}
+
+[[noreturn]] static void control_fail(const char* message)
+{
+    std::fprintf(stderr, "CONTROL_FAILURE %s\n", message);
+    std::exit(1);
+}
+#define CONTROL_CHECK(condition, message) \
+    do { if (!(condition)) control_fail(message); } while (0)
+
+extern "C" void* HSD_MemAlloc(ssize_t size)
+{
+    CONTROL_CHECK(size > 0, "non-positive modeled source allocation");
+    const size_t start = (source_heap_used + 31u) & ~size_t(31u);
+    const size_t count = static_cast<size_t>(size);
+    if (start > sizeof(source_heap) || count > sizeof(source_heap) - start)
+        return nullptr;
+    source_heap_used = start + count;
+    return source_heap + start;
+}
+extern "C" void HSD_Free(void*)
+{
+    control_fail("unexpected HSD_Free in bounded source allocator model");
+}
+extern "C" void HSD_AObjRemove(HSD_AObj* object)
+{
+    if (object) control_fail("unexpected non-null animation removal");
+}
+extern "C" HSD_WObj* HSD_WObjLoadDesc(HSD_WObjDesc*)
+{
+    control_fail("unexpected source WObj descriptor load");
+    return nullptr;
+}
+extern "C" void HSD_WObjGetPosition(HSD_WObj* object, Vec3* output)
+{
+    CONTROL_CHECK(output, "null WObj position output");
+    CONTROL_CHECK(object == &position_wobj || object == &interest_wobj,
+                  "WObj lookup outside the explicit position fixtures");
+    CONTROL_CHECK(object->flags == 0 && object->aobj == nullptr &&
+                      object->robj == nullptr,
+                  "WObj fixture left the modeled plain-position scope");
+    *output = object->pos;
+}
+extern "C" HSD_SList* HSD_SListAllocAndPrepend(HSD_SList* next, void* data)
+{
+    CONTROL_CHECK(slist_used < sizeof(slist_pool) / sizeof(slist_pool[0]),
+                  "modeled SList arena exhausted");
+    HSD_SList* node = &slist_pool[slist_used++];
+    node->next = next;
+    node->data = data;
+    return node;
+}
+extern "C" HSD_SList* HSD_SListRemove(HSD_SList* node)
+{
+    CONTROL_CHECK(node, "null SList removal");
+    return node->next;
+}
+extern "C" void OSReport(const char*, ...)
+{
+    control_fail("unexpected source diagnostic output");
+}
+extern "C" void HSD_Panic(char*, u32, char*)
+{
+    control_fail("unexpected HSD_Panic");
+}
+extern "C" void __assert(char*, u32, char*)
+{
+    control_fail("unexpected source assertion");
+}
+
+static void set_fifo()
+{
+    using namespace aurora::gx::fifo::detail;
+    sBufferData = gx_fifo;
+    sBufferSize = 0;
+    sBufferCapacity = sizeof(gx_fifo);
+    sInDisplayList = false;
+    sDlBuffer = nullptr;
+    sDlSize = 0;
+    sDlWritePos = 0;
+}
+static void attach_inputs(HSD_LObj* object, uint8_t color)
+{
+    object->flags = LOBJ_INFINITE | LOBJ_DIFFUSE | LOBJ_SPECULAR;
+    object->priority = 3;
+    object->color = GXColor{color, static_cast<uint8_t>(color + 1),
+                            static_cast<uint8_t>(color + 2), 255};
+    object->position = &position_wobj;
+    object->interest = &interest_wobj;
+    object->aobj = nullptr;
+}
+static void setup_camera(HSD_CObj* camera)
+{
+    std::memset(camera, 0, sizeof(*camera));
+    camera->view_mtx[0][0] = 1.0f;
+    camera->view_mtx[1][1] = 1.0f;
+    camera->view_mtx[2][2] = 1.0f;
+    camera->view_mtx[0][3] = 0.25f;
+    camera->view_mtx[1][3] = 0.5f;
+    camera->view_mtx[2][3] = 1.0f;
+}
+static void emit_fifo(const char* label)
+{
+    using namespace aurora::gx::fifo::detail;
+    std::printf("%s=", label);
+    for (uint32_t i = 0; i < sBufferSize; ++i)
+        std::printf("%02x", sBufferData[i]);
+    std::putchar('\n');
+}
+
+static HSD_LObj* new_light(uint8_t color)
+{
+    HSD_LObj* result = static_cast<HSD_LObj*>(hsdNew((HSD_ClassInfo*)&hsdLObj));
+    CONTROL_CHECK(result, "actual canonical hsdNew failed");
+    CONTROL_CHECK(result->parent.parent.class_info == (HSD_ClassInfo*)&hsdLObj,
+                  "actual hsdNew returned an unexpected class");
+    attach_inputs(result, color);
+    return result;
+}
+
+static int run_refusal_case(const char* mode)
+{
+#if !defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    (void)mode;
+    control_fail("negative current-set controls require the V15 profile");
+#else
+    position_wobj.parent.ref_count = 2;
+    interest_wobj.parent.ref_count = 2;
+    set_fifo();
+    CONTROL_CHECK(slippi_lobj_world_begin(0x151u), "actual source world did not begin");
+    HSD_LObj* first = new_light(17);
+    HSD_LObj* second = new_light(83);
+    first->priority = 5;
+    second->priority = 2;
+    first->next = second;
+    HSD_LObjAddCurrent(first);
+    if (std::strcmp(mode, "overflow") != 0) HSD_LObjAddCurrent(second);
+    const DomainSnapshot before = source_domain();
+    HSD_SList pool_before[8];
+    std::memcpy(pool_before, slist_pool, sizeof(pool_before));
+    const unsigned used_before = slist_used;
+    const uint16_t first_refs = first->parent.ref_count;
+    SlippiLObjAnchor anchor{};
+
+    if (std::strcmp(mode, "noref") == 0 || std::strcmp(mode, "sole-member") == 0) {
+        first->parent.ref_count = std::strcmp(mode, "noref") == 0 ? HSD_OBJ_NOREF : 0;
+        anchor = slippi_lobj_anchor_capture();
+        CONTROL_CHECK(anchor.token == 0 && slippi_lobj_failure() != 0,
+                      "invalid canonical reference count was admitted at capture");
+        first->parent.ref_count = first_refs;
+        const DomainSnapshot after = source_domain();
+        CONTROL_CHECK(std::memcmp(&before, &after, sizeof(before)) == 0,
+                      "failed capture changed canonical source selection");
+        CONTROL_CHECK(slist_used == used_before &&
+                          std::memcmp(pool_before, slist_pool, sizeof(pool_before)) == 0,
+                      "failed capture changed the SList arena");
+        std::printf("CONTROL_OK_CURRENT_SET_%s\n",
+                    std::strcmp(mode, "noref") == 0 ? "NOREF" : "SOLE_MEMBER");
+        return 0;
+    }
+
+    anchor = slippi_lobj_anchor_capture();
+    CONTROL_CHECK(anchor.token != 0 && slippi_lobj_anchor_admit(anchor),
+                  "valid current-set anchor was refused");
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(), "current-set view did not begin");
+    if (std::strcmp(mode, "overflow") == 0) {
+        second->parent.ref_count = 65534;
+        HSD_LObjAddCurrent(second);
+        CONTROL_CHECK(slippi_lobj_failure() != 0 && second->parent.ref_count == 65534,
+                      "overflow Add changed references or was not refused");
+    } else if (std::strcmp(mode, "wrong-token-clean") == 0) {
+        CONTROL_CHECK(slippi_lobj_current_set_view_end() &&
+                          slippi_lobj_failure() == 0,
+                      "clean wrong-token case did not end its first view cleanly");
+        const DomainSnapshot before_reset = source_domain();
+        const HSD_LObj* selected_before = HSD_LObjGetCurrentByType(LOBJ_INFINITE);
+        SlippiLObjAnchor wrong = anchor;
+        ++wrong.token;
+        CONTROL_CHECK(!slippi_lobj_current_set_view_reset_after_restore(wrong) &&
+                          slippi_lobj_failure() != 0,
+                      "wrong-token restore reset was accepted without prior failure");
+        const DomainSnapshot after_reset = source_domain();
+        CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == selected_before &&
+                          std::memcmp(&before_reset, &after_reset,
+                                      sizeof(before_reset)) == 0,
+                      "clean wrong-token refusal changed canonical selection");
+        slippi_lobj_anchor_disarm(anchor);
+        CONTROL_CHECK(!slippi_lobj_current_set_view_begin(),
+                      "clean wrong-token refusal did not remain sticky after disarm");
+        std::puts("CONTROL_OK_CURRENT_SET_WRONG_TOKEN_CLEAN");
+        return 0;
+    } else if (std::strcmp(mode, "class-change") == 0) {
+        second->parent.parent.class_info = (HSD_ClassInfo*)&hsdObj;
+        CONTROL_CHECK(!slippi_lobj_current_set_view_end() &&
+                          slippi_lobj_failure() != 0,
+                      "changed linked-owner class was accepted at view end");
+        second->parent.parent.class_info = (HSD_ClassInfo*)&hsdLObj;
+    } else if (std::strcmp(mode, "foreign-chain") == 0) {
+        HSD_LObj foreign{};
+        foreign.next = reinterpret_cast<HSD_LObj*>(uintptr_t(1));
+        HSD_LObjDeleteCurrentAll(&foreign);
+        CONTROL_CHECK(slippi_lobj_failure() != 0,
+                      "foreign delete chain was not refused before dereference");
+        CONTROL_CHECK(slippi_lobj_current_set_view_end() == 0,
+                      "foreign delete failure did not remain sticky at view end");
+    } else {
+        control_fail("unknown refusal case");
+    }
+
+    SlippiLObjAnchor wrong = anchor;
+    ++wrong.token;
+    CONTROL_CHECK(!slippi_lobj_current_set_view_reset_after_restore(wrong),
+                  "wrong-token restore reset was accepted");
+    slippi_lobj_anchor_disarm(anchor);
+    CONTROL_CHECK(!slippi_lobj_current_set_view_begin(),
+                  "sticky refusal was cleared by disarm before view begin");
+    const DomainSnapshot after = source_domain();
+    CONTROL_CHECK(std::memcmp(&before, &after, sizeof(before)) == 0,
+                  "refusal changed canonical source selection");
+    CONTROL_CHECK(slist_used == used_before &&
+                      std::memcmp(pool_before, slist_pool, sizeof(pool_before)) == 0,
+                  "refusal changed the SList arena");
+    char label[32]{};
+    const size_t mode_length = std::strlen(mode);
+    CONTROL_CHECK(mode_length < sizeof(label), "negative-case label too long");
+    for (size_t i = 0; i < mode_length; ++i) {
+        const char value = mode[i] == '-' ? '_' : mode[i];
+        label[i] = value >= 'a' && value <= 'z' ? value - 'a' + 'A' : value;
+    }
+    std::printf("CONTROL_OK_CURRENT_SET_%s\n", label);
+    return 0;
+#endif
+}
+
+int main(int argc, char** argv)
+{
+    if (argc == 2) return run_refusal_case(argv[1]);
+    position_wobj.parent.ref_count = 2;
+    position_wobj.pos = Vec3{0.25f, 0.5f, 0.75f};
+    interest_wobj.parent.ref_count = 2;
+    interest_wobj.pos = Vec3{1.25f, 1.5f, 1.75f};
+    set_fifo();
+    CONTROL_CHECK(slippi_lobj_world_begin(0x151u),
+                  "actual source world did not begin");
+
+    HSD_LObj* first = static_cast<HSD_LObj*>(hsdNew((HSD_ClassInfo*)&hsdLObj));
+    HSD_LObj* second = static_cast<HSD_LObj*>(hsdNew((HSD_ClassInfo*)&hsdLObj));
+    CONTROL_CHECK(first && second, "actual canonical hsdNew failed");
+    CONTROL_CHECK(first->parent.parent.class_info == (HSD_ClassInfo*)&hsdLObj &&
+                      second->parent.parent.class_info == (HSD_ClassInfo*)&hsdLObj,
+                  "actual hsdNew returned an unexpected class");
+    attach_inputs(first, 17);
+    attach_inputs(second, 83);
+    first->priority = 5;
+    second->priority = 2;
+    first->next = second;
+    HSD_LObjAddCurrent(first);
+    HSD_LObjAddCurrent(second);
+    HSD_LObjAddCurrent(second);
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == second,
+                  "original mixed-priority/duplicate insertion order changed");
+
+    const uint16_t first_refs = first->parent.ref_count;
+    const uint16_t second_refs = second->parent.ref_count;
+    uint8_t first_before[sizeof(HSD_LObj)];
+    uint8_t second_before[sizeof(HSD_LObj)];
+    std::memcpy(first_before, first, sizeof(first_before));
+    std::memcpy(second_before, second, sizeof(second_before));
+    const DomainSnapshot canonical_before = source_domain();
+    HSD_SList pool_before[8];
+    std::memcpy(pool_before, slist_pool, sizeof(pool_before));
+    const unsigned slist_used_before = slist_used;
+    SlippiLObjAnchor anchor = slippi_lobj_anchor_capture();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    CONTROL_CHECK(anchor.world == 0x151u && anchor.token != 0 &&
+                      anchor.count == 2 && slippi_lobj_anchor_admit(anchor),
+                  "actual two-owner current-set anchor was not admitted");
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(),
+                  "current-set presentation view did not begin");
+#endif
+    using namespace aurora::gx::fifo::detail;
+    interval_mallocs = interval_frees = 0;
+    track_allocations = true;
+    HSD_LObjAddCurrent(second);
+    HSD_LObjDeleteCurrent(first);
+    HSD_LObjAddCurrent(first);
+    HSD_LObj_803668EC(first);
+    HSD_LObjDeleteCurrent(second);
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == first,
+                  "mixed-priority ReplaceAll/Delete did not select first light");
+    HSD_CObj camera{};
+    setup_camera(&camera);
+    sBufferSize = 0;
+    HSD_LObjSetupInit(&camera);
+    track_allocations = false;
+    CONTROL_CHECK(sBufferSize == 138,
+                  "actual single-light SetupInit emitted unexpected GX extent");
+    emit_fifo("FIFO_REPLACED");
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    CONTROL_CHECK(interval_mallocs == 0 && interval_frees == 0,
+                  "current-set ReplaceAll or SetupInit allocated/freed during view");
+    CONTROL_CHECK(first->parent.ref_count == first_refs &&
+                      second->parent.ref_count == second_refs,
+                  "current-set ReplaceAll changed canonical source references");
+    CONTROL_CHECK(std::memcmp(first_before, first, sizeof(first_before)) == 0 &&
+                      std::memcmp(second_before, second, sizeof(second_before)) == 0,
+                  "current-set draw changed canonical LObj source bytes");
+    const DomainSnapshot canonical_after = source_domain();
+    CONTROL_CHECK(std::memcmp(&canonical_before, &canonical_after,
+                              sizeof(canonical_before)) == 0,
+                  "current-set draw changed canonical head/active/count/masks/list");
+    CONTROL_CHECK(slist_used == slist_used_before &&
+                      std::memcmp(pool_before, slist_pool, sizeof(pool_before)) == 0,
+                  "current-set draw changed canonical SList pool storage");
+    CONTROL_CHECK(slippi_lobj_current_set_view_end(),
+                  "current-set view did not unwind");
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == second,
+                  "view selection leaked into canonical source selection");
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(),
+                  "second current-set view did not begin");
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == first,
+                  "prior presentation selection was not retained between draws");
+    CONTROL_CHECK(slippi_lobj_current_set_view_end(),
+                  "second current-set view did not unwind");
+    std::puts("CURRENT_SET_PERSISTED_SELECTION=1");
+    CONTROL_CHECK(slippi_lobj_current_set_view_reset_after_restore(anchor),
+                  "checked-restore selection reset failed");
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(),
+                  "restored current-set view did not begin");
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == second,
+                  "restore reset did not recover captured selection");
+    std::puts("CURRENT_SET_RESET_SELECTION=1");
+    CONTROL_CHECK(slippi_lobj_current_set_view_end(),
+                  "restored current-set view did not unwind");
+    HSD_LObjDeleteCurrent(second);
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(),
+                  "view did not import an outside-view source deletion");
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == first,
+                  "outside-view deletion was not imported");
+    CONTROL_CHECK(second->parent.ref_count == 0,
+                  "source deletion did not leave an unlisted raw-zero LObj");
+    const DomainSnapshot before_zero_host_add = source_domain();
+    uint8_t second_zero_before[sizeof(HSD_LObj)];
+    std::memcpy(second_zero_before, second, sizeof(second_zero_before));
+    HSD_SList zero_pool_before[8];
+    std::memcpy(zero_pool_before, slist_pool, sizeof(zero_pool_before));
+    const unsigned zero_pool_used_before = slist_used;
+    HSD_LObjAddCurrent(second);
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == second,
+                  "host view rejected a valid unlisted raw-zero LObj Add");
+    CONTROL_CHECK(second->parent.ref_count == 0 &&
+                      std::memcmp(second_zero_before, second,
+                                  sizeof(second_zero_before)) == 0,
+                  "host-only Add changed raw-zero source bytes or references");
+    const DomainSnapshot after_zero_host_add = source_domain();
+    CONTROL_CHECK(std::memcmp(&before_zero_host_add, &after_zero_host_add,
+                              sizeof(before_zero_host_add)) == 0 &&
+                      slist_used == zero_pool_used_before &&
+                      std::memcmp(zero_pool_before, slist_pool,
+                                  sizeof(zero_pool_before)) == 0,
+                  "host-only Add changed canonical selection or SList pool");
+    CONTROL_CHECK(slippi_lobj_current_set_view_end(),
+                  "view after outside-view deletion did not unwind");
+    HSD_LObjAddCurrent(second);
+    CONTROL_CHECK(slippi_lobj_current_set_view_begin(),
+                  "view did not import an outside-view source addition");
+    CONTROL_CHECK(HSD_LObjGetCurrentByType(LOBJ_INFINITE) == second,
+                  "outside-view addition was not imported");
+    CONTROL_CHECK(slippi_lobj_current_set_view_end(),
+                  "view after outside-view addition did not unwind");
+    std::puts("CURRENT_SET_SOURCE_MUTATION_IMPORTED=1");
+#endif
+    slippi_lobj_anchor_disarm(anchor);
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "current-set source control poisoned the owner world");
+    HSD_LObjDeleteCurrent(first);
+    HSD_LObjDeleteCurrent(second);
+    hsdDelete(first);
+    hsdDelete(second);
+    slippi_lobj_world_end(0x151u);
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "normal source teardown did not end cleanly");
+    std::printf("CONTROL_OK_CURRENT_SET profile=%s ref_first=%u ref_second=%u\n",
+                slippi_profile_identity_name(SLIPPI_PROFILE_ACTIVE_IDENTITY),
+                static_cast<unsigned>(first_refs), static_cast<unsigned>(second_refs));
+    return 0;
+}

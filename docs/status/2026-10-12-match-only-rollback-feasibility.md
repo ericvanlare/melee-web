@@ -1265,8 +1265,19 @@ at row 3138, offset 0, associated with the exact producer's `slist_alloc_data`.
 That identifies the allocator, not the node's live owner or writer. Final present
 remains unrun. Both failed producers and runs are retained; snapshot close and
 renderer shutdown return 1, CPU close retains 1216, and all owned PIDs are absent.
-The next step is a bounded list-owner/writer diagnosis. Same-profile agreement
-does not establish original hidden-joint semantic equivalence.
+Same-profile agreement does not establish original hidden-joint semantic equivalence.
+
+The observation-only producer `22ce6ee8` joins that exact eight-byte allocation
+to the same strict difference. Its first retained changed write occurs during
+the baseline DRAW: `HSD_SListAllocAndPrepend` clears the node, called from
+`HSD_LObj_803668EC` through the fighter callback `ftCo_8009F54C`. This identifies
+a current-light rendering write to the failing allocation. The 32-event recorder
+overflows during that first draw, membership remains UNKNOWN, and the stack
+tail is clipped; complete writer or node-lifetime coverage is not claimed.
+All ten raw pairs still agree, strict 1216 remains, final present is unrun, and
+all owned processes are absent. The next repair targets current-light
+presentation ownership, reusing the existing LObj owner. The structured receipt
+pins this result separately from the earlier V14 target-matrix result.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

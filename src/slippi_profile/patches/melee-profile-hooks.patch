@@ -536,8 +536,55 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  #include "gameplay_lobj_writer_diagnostic.h"
  #include <stddef.h>
-@@ -35,7 +47,13 @@
+@@ -33,9 +45,60 @@
+ static s32 lightmask_attnfunc;
+ static s32 lightmask_alpha;
  
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++/* Preserve these canonical source symbols for the linked source policy. The
++ * self-reference in each macro expansion resolves to the original lvalue. */
++#define current_lights (*slippi_lobj_current_set_head_slot(&current_lights))
++#define active_lights (slippi_lobj_current_set_active_slots(active_lights))
++#define nb_active_lights (*slippi_lobj_current_set_count_slot(&nb_active_lights))
++#define lightmask_diffuse (*slippi_lobj_current_set_mask_slot(0, &lightmask_diffuse))
++#define lightmask_specular (*slippi_lobj_current_set_mask_slot(1, &lightmask_specular))
++#define lightmask_attnfunc (*slippi_lobj_current_set_mask_slot(2, &lightmask_attnfunc))
++#define lightmask_alpha (*slippi_lobj_current_set_mask_slot(3, &lightmask_alpha))
++
++static void current_set_state(SlippiLObjCurrentSetState* state)
++{
++    int i;
++    state->head = current_lights;
++    for (i = 0; i < MAX_GXLIGHT; i++) state->active[i] = active_lights[i];
++    state->active_count = nb_active_lights;
++    state->masks[0] = lightmask_diffuse;
++    state->masks[1] = lightmask_specular;
++    state->masks[2] = lightmask_attnfunc;
++    state->masks[3] = lightmask_alpha;
++}
++
++int melee_web_lobj_current_set_anchor_capture(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_capture(&state);
++}
++
++int melee_web_lobj_current_set_view_import(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_import(&state);
++}
++
++int melee_web_lobj_current_set_refresh_source_members(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_refresh_source_members(&state);
++}
++#endif
++
  u32 HSD_LObjGetFlags(HSD_LObj* lobj)
  {
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
@@ -550,7 +597,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  void HSD_LObjSetFlags(HSD_LObj* lobj, u32 flags)
-@@ -43,7 +61,14 @@
+@@ -43,7 +106,14 @@
      if (lobj == NULL) {
          return;
      }
@@ -565,7 +612,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  void HSD_LObjClearFlags(HSD_LObj* lobj, u32 flags)
-@@ -51,7 +76,14 @@
+@@ -51,7 +121,14 @@
      if (lobj == NULL) {
          return;
      }
@@ -580,7 +627,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  GXLightID HSD_LObjGetLightMaskDiffuse(void)
-@@ -81,6 +113,9 @@
+@@ -81,6 +158,9 @@
  
  void HSD_LObjSetActive(HSD_LObj* lobj)
  {
@@ -590,16 +637,32 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      int idx;
  
      if (HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
-@@ -92,7 +127,7 @@
+@@ -91,8 +171,12 @@
+     } else {
          idx = nb_active_lights++;
      }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
      active_lights[idx] = lobj;
 -    lobj->id = HSD_Index2LightID(idx);
 +    LOBJ_CACHE(lobj, id) = HSD_Index2LightID(idx);
  }
  
  s32 HSD_LObjGetNbActive(void)
-@@ -270,6 +305,9 @@
+@@ -122,6 +206,10 @@
+ void HSD_LObjClearActive(void)
+ {
+     int i;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
+ 
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+@@ -270,6 +358,9 @@
  
  void HSD_LObjSetup(HSD_LObj* lobj, GXColor color, f32 shininess)
  {
@@ -609,7 +672,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      f32 k0 = shininess;
  
      if (lobj->flags & LOBJ_HIDDEN || HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
-@@ -277,32 +315,32 @@
+@@ -277,32 +368,32 @@
      }
  
      if ((lobj->flags & LOBJ_DIFFUSE) != 0) {
@@ -665,7 +728,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          }
      }
  }
-@@ -324,28 +362,28 @@
+@@ -324,28 +415,28 @@
          Vec3 half, ldir;
          HSD_LObj* lobj = HSD_LObjGetActiveByIndex(i);
  
@@ -699,7 +762,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -353,15 +391,15 @@
+@@ -353,15 +444,15 @@
  {
      u32 _ = lobj->flags;
  
@@ -720,7 +783,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          break;
      case LOBJ_INFINITE:
          break;
-@@ -370,7 +408,7 @@
+@@ -370,7 +461,7 @@
      }
  
      if (lobj->flags & LOBJ_ALPHA) {
@@ -729,7 +792,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -378,41 +416,41 @@
+@@ -378,41 +469,41 @@
  {
      f32 x;
  
@@ -785,7 +848,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          lightmask_specular |= spec_id;
      }
  }
-@@ -427,11 +465,11 @@
+@@ -427,11 +518,11 @@
      lpos.z *= 1048576.0F;
      MTXMultVec(vmtx, &lpos, &lpos);
      if (lobj->flags & LOBJ_DIFFUSE) {
@@ -800,7 +863,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -439,22 +477,22 @@
+@@ -439,22 +530,22 @@
  {
      Vec3 lpos;
  
@@ -831,7 +894,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -468,11 +506,11 @@
+@@ -468,11 +559,11 @@
      HSD_LObjGetLightVector(lobj, &ldir);
      PSMTXMultVecSR(mtx, &ldir, &ldir);
      PSVECNormalize(&ldir, &ldir);
@@ -847,7 +910,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
                          lobj->u.attn.a2, lobj->u.attn.k0, lobj->u.attn.k1,
                          lobj->u.attn.k2);
      } else {
-@@ -482,14 +520,18 @@
+@@ -482,14 +573,22 @@
          s32 spot_func = lobj->u.spot.spot_func;
          s32 dist_func = lobj->u.spot.dist_func;
  
@@ -862,6 +925,10 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  
  void HSD_LObjSetupInit(HSD_CObj* cobj)
  {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +    for (HSD_SList* n = current_lights; n != NULL; n = n->next)
 +        slippi_lobj_cache_require(n->data);
@@ -869,7 +936,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      MtxPtr vmtx;
      int i, num, idx;
      HSD_SList* list;
-@@ -541,7 +583,7 @@
+@@ -541,7 +640,7 @@
          HSD_LObjSetActive(lobj);
          idx = HSD_LObjGetNbActive();
  
@@ -878,7 +945,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  
          switch (type) {
          case LOBJ_INFINITE:
-@@ -563,7 +605,7 @@
+@@ -563,7 +662,7 @@
              setup_diffuse_lightobj(lobj);
              break;
          case LOBJ_SPECULAR:
@@ -887,7 +954,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
              num++;
              break;
          }
-@@ -603,7 +645,7 @@
+@@ -603,7 +702,7 @@
          if (!(lobj = HSD_LObjGetActiveByIndex(i))) {
              return;
          }
@@ -896,7 +963,174 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -909,6 +951,9 @@
+@@ -612,6 +711,15 @@
+     HSD_SList* node;
+     HSD_SList** p;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL) {
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_preflight_add(lobj)) return;
++        } else {
++            slippi_lobj_current_set_source_mutated();
++        }
++    }
++#endif
+     if (lobj != NULL) {
+         node = current_lights;
+         while (node != NULL) {
+@@ -621,13 +729,25 @@
+             }
+             node = node->next;
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (!slippi_lobj_current_set_view_active()) ref_INC(lobj);
++#else
+         ref_INC(lobj);
++#endif
+         for (p = &current_lights; *p != NULL; p = &(*p)->next) {
+             if (HSD_LObjGetPriority((*p)->data) > HSD_LObjGetPriority(lobj)) {
+                 break;
+             }
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_insert_at(p, lobj)) return;
++        } else {
++            *p = HSD_SListAllocAndPrepend(*p, lobj);
++        }
++#else
+         *p = HSD_SListAllocAndPrepend(*p, lobj);
++#endif
+     }
+ }
+ 
+@@ -643,6 +763,10 @@
+ 
+ void HSD_LObjDeleteCurrent(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL && slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_delete(lobj)) return;
++#endif
+     if (lobj != NULL) {
+         HSD_SList** p;
+         for (p = &current_lights; *p != NULL; p = &(*p)->next) {
+@@ -653,8 +777,18 @@
+                         active_lights[i] = NULL;
+                     }
+                 }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++                if (slippi_lobj_current_set_view_active()) {
++                    if (!slippi_lobj_current_set_remove_at(p, lobj)) return;
++                } else {
++                    slippi_lobj_current_set_source_mutated();
++                    *p = HSD_SListRemove(*p);
++                    HSD_LObjUnrefThis(lobj);
++                }
++#else
+                 *p = HSD_SListRemove(*p);
+                 HSD_LObjUnrefThis(lobj);
++#endif
+                 return;
+             }
+         }
+@@ -664,18 +798,39 @@
+ static inline void LObjRemoveAll(void)
+ {
+     int i;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        if (!slippi_lobj_current_set_preflight_remove_all()) return;
++    } else {
++        slippi_lobj_current_set_source_mutated();
++    }
++#endif
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+     }
+     nb_active_lights = 0;
+     while (current_lights != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_remove_at(&current_lights,
++                                                    current_lights->data)) return;
++        } else {
++            HSD_LObjUnrefThis(current_lights->data);
++            current_lights = HSD_SListRemove(current_lights);
++        }
++#else
+         HSD_LObjUnrefThis(current_lights->data);
+         current_lights = HSD_SListRemove(current_lights);
++#endif
+     }
+ }
+ 
+ void HSD_LObjDeleteCurrentAll(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL && slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_delete_chain(lobj)) return;
++#endif
+     if (lobj != NULL) {
+         while (lobj != NULL) {
+             HSD_LObjDeleteCurrent(lobj);
+@@ -689,6 +844,10 @@
+ void HSD_LObjSetCurrentAll(HSD_LObj* lobj)
+ {
+     u32 _;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_add(lobj)) return;
++#endif
+ 
+     LObjRemoveAll();
+     HSD_LObjAddCurrent(lobj);
+@@ -698,13 +857,30 @@
+ {
+     int i;
+     HSD_LObj* cur;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        if (!slippi_lobj_current_set_preflight_replace_all(lobj)) return;
++    } else {
++        slippi_lobj_current_set_source_mutated();
++    }
++#endif
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+     }
+     nb_active_lights = 0;
+     while (current_lights != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_remove_at(&current_lights,
++                                                    current_lights->data)) return;
++        } else {
++            HSD_LObjUnrefThis(current_lights->data);
++            current_lights = HSD_SListRemove(current_lights);
++        }
++#else
+         HSD_LObjUnrefThis(current_lights->data);
+         current_lights = HSD_SListRemove(current_lights);
++#endif
+     }
+     for (cur = lobj; cur != NULL; cur = cur->next) {
+         HSD_LObjAddCurrent(cur);
+@@ -798,6 +974,12 @@
+ 
+ void HSD_LObjRemoveAll(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        slippi_lobj_current_set_retire_blocked();
++        return;
++    }
++#endif
+     HSD_LObj* next;
+     HSD_LObj* cur;
+ 
+@@ -909,6 +1091,9 @@
  
  void HSD_LObjSetDefaultClass(HSD_LObjInfo* info)
  {
@@ -906,7 +1140,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      if (info != NULL) {
          HSD_ASSERT(1420, hsdIsDescendantOf(info, &hsdLObj));
      }
-@@ -1021,6 +1066,9 @@
+@@ -1021,6 +1206,9 @@
          {
              *p = HSD_LObjAlloc();
          } else {
@@ -916,17 +1150,21 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
              *p = hsdNew(info);
              HSD_ASSERT(1644, *p);
          }
-@@ -1077,6 +1125,9 @@
+@@ -1077,6 +1265,13 @@
  
  static void LObjAmnesia(HSD_ClassInfo* info)
  {
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +    slippi_lobj_amnesia(info);
 +#endif
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (info == HSD_CLASS_INFO(&hsdLObj))
++        slippi_lobj_current_set_source_mutated();
++#endif
      if (info == HSD_CLASS_INFO(default_class)) {
          default_class = NULL;
      }
-@@ -1094,4 +1145,17 @@
+@@ -1094,4 +1289,17 @@
      HSD_CLASS_INFO(&hsdLObj)->release = LObjRelease;
      HSD_CLASS_INFO(&hsdLObj)->amnesia = LObjAmnesia;
      HSD_LOBJ_INFO(&hsdLObj)->load = LObjLoad;

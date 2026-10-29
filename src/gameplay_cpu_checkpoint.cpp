@@ -201,6 +201,15 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSessio
     if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
         return GameplayCpuCommitResult::MissingOwner;
     const auto result=gameplay_cpu_commit(commit_);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    if(result==GameplayCpuCommitResult::Ok&&
+       !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
+        // Source restoration has committed. A failed presentation reset is
+        // terminal and must not admit corrective source work.
+        phase_=Phase::Failed;
+        return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
+#endif
     phase_=result==GameplayCpuCommitResult::Ok?Phase::Replaying:Phase::Failed;
     return result;
 }

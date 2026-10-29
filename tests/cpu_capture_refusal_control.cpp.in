@@ -1,9 +1,9 @@
 #include "gameplay_class_piece_diagnostic.h"
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
-/* Actual production capture body below, explicitly modeled owner/factory
- * leaves. This proves attribution/order/temporary cleanup, not live source
- * owner admission or a complete game checkpoint. */
+/* Actual production capture/restore bodies below with explicitly modeled
+ * owner/factory/commit/reset leaves. This proves lifecycle ordering, not live
+ * owner admission, engine-state rollback, or a complete game checkpoint. */
 #include <array>
 #include <algorithm>
 #include <cstdlib>
@@ -18,6 +18,12 @@
 #include <stdexcept>
 #include <vector>
 #include <span>
+namespace melee_web {
+enum class GameplayCpuCommitResult : std::uint32_t {
+    Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
+    Statics, UnexpectedWriterFailure, LObj, TObj
+};
+}
 @ACTUAL_COMPARISON@
 static unsigned class_arms=0,class_disarms=0;
 static bool class_unavailable=false;
@@ -83,10 +89,19 @@ std::uint32_t live_frame=176;
 bool effect_ok=true,action_ok=true,payload_ok=true,flow_ok=true,bytes_ok=true;
 std::array<unsigned,16> trace{};unsigned count=0;
 std::array<unsigned char,64> source_bytes{};
+unsigned commit_calls=0,profile_reset_calls=0;
+melee_web::GameplayCpuCommitResult modeled_commit_result=melee_web::GameplayCpuCommitResult::Ok;
+bool profile_reset_ok=true;
+SlippiLObjAnchor last_profile_reset_anchor{};
 void visit(unsigned leaf){trace[count++]=leaf;if(throw_leaf==leaf)throw std::bad_alloc();}
 Snapshot* snapshot(unsigned leaf){visit(leaf);if(refuse_leaf==leaf)return nullptr;++created;return new Snapshot{leaf};}
 void destroy(Snapshot* p){if(p){++destroyed;delete p;}}
 void leaf_error(char* p,std::size_t n,unsigned leaf){if(refuse_leaf==leaf)std::snprintf(p,n,"actual fixture leaf%u refused",leaf);}
+}
+extern "C" int fixture_profile_reset_after_restore(SlippiLObjAnchor anchor) {
+    ++profile_reset_calls;
+    last_profile_reset_anchor=anchor;
+    return profile_reset_ok;
 }
 Snapshot* melee_web_gameplay_bootstrap_snapshot_capture(char* p,std::size_t n){leaf_error(p,n,1);return snapshot(1);}
 Snapshot* melee_web_match_flow_cpu_snapshot_capture(MeleeWebMatchFlow*,char* p,std::size_t n){leaf_error(p,n,2);return snapshot(2);}
@@ -125,6 +140,10 @@ class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool ca
  CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
 struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
  const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};};
+GameplayCpuCommitResult gameplay_cpu_commit(const Commit&) noexcept {
+ ++commit_calls;
+ return modeled_commit_result;
+}
 class GameplayCpuCheckpoint{public:
  static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {return capsule_alloc_failure?nullptr:std::malloc(n);}
  static void operator delete(void* p) noexcept {std::free(p);}
@@ -133,12 +152,15 @@ class GameplayCpuCheckpoint{public:
  const CpuComparison& comparison()const{return comparison_;}
  bool interval_boundary(const GameplayMatchSession&) noexcept;
  bool seal_post(const GameplayMatchSession&) noexcept;
+ GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
  bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
  bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
  void fixture_sealed(){phase_=Phase::Sealed;post_frame_=176;commit_.effect_token=1;}
  void fixture_recording(){phase_=Phase::Recording;commit_.effect_token=1;}
  void fixture_replaying(){phase_=Phase::Replaying;}
  void fixture_finished(){phase_=Phase::Finished;}
+ bool fixture_failed()const{return phase_==Phase::Failed;}
+ bool fixture_is_replaying()const{return phase_==Phase::Replaying;}
  void disarm() noexcept;
  void release() noexcept;
 private:
@@ -188,6 +210,7 @@ void melee_web_tobj_writer_disarm(uint64_t session){assert(session==0);++tobj_di
 @ACTUAL_CAPTURE_FUNCTION@
 @ACTUAL_INTERVAL_BOUNDARY@
 @ACTUAL_SEAL_POST@
+@ACTUAL_RESTORE@
 @ACTUAL_DRAWN_SEAL@
 @ACTUAL_DRAWN_MATCH@
 @ACTUAL_RELEASE_FUNCTION@
@@ -202,7 +225,7 @@ int main(){
 #if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
  const auto disabled_tobj=slippi_tobj_anchor_capture();assert(disabled_tobj.token==0&&slippi_tobj_anchor_admit(disabled_tobj)==1&&slippi_tobj_failure()==0);slippi_tobj_anchor_disarm(disabled_tobj);
 #endif
- auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;};
+ auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=profile_reset_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=true;last_profile_reset_anchor={};};
  const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
  for(unsigned failure=1;failure<=8;++failure){reset();refuse_leaf=failure;CpuCaptureDiagnostic d;
   auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
@@ -308,9 +331,44 @@ int main(){
    }
    unchanged();
  }
+ // Exercise the extracted restore body with counted commit/reset leaves. A
+ // failed reset follows committed source writes, so the fixture must stay
+ // terminal; it cannot undo or model the engine-side state transition.
+ auto sealed_checkpoint=[&](){CpuCaptureDiagnostic d;auto checkpoint=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(checkpoint);checkpoint->fixture_sealed();return checkpoint;};
+ reset();CpuCaptureDiagnostic wrong_phase_diag;auto wrong_phase=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),wrong_phase_diag);assert(wrong_phase);
+ assert(wrong_phase->restore(session)==GameplayCpuCommitResult::MissingOwner);assert(commit_calls==0&&profile_reset_calls==0&&!wrong_phase->fixture_failed());wrong_phase.reset();
+ reset();auto wrong_owner=sealed_checkpoint();owner_missing=true;
+ assert(wrong_owner->restore(session)==GameplayCpuCommitResult::MissingOwner);owner_missing=false;
+ assert(commit_calls==0&&profile_reset_calls==0);wrong_owner.reset();
+ reset();auto wrong_frame=sealed_checkpoint();++live_frame;
+ assert(wrong_frame->restore(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(commit_calls==0&&profile_reset_calls==0);wrong_frame.reset();
+ reset();auto refused_restore=sealed_checkpoint();modeled_commit_result=GameplayCpuCommitResult::Action;
+ assert(refused_restore->restore(session)==GameplayCpuCommitResult::Action);
+ assert(commit_calls==1&&profile_reset_calls==0&&refused_restore->fixture_failed()&&!refused_restore->fixture_is_replaying());
+ assert(refused_restore->restore(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(commit_calls==1&&profile_reset_calls==0);refused_restore.reset();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ reset();auto failed_reset=sealed_checkpoint();profile_reset_ok=false;
+ assert(failed_reset->restore(session)==GameplayCpuCommitResult::UnexpectedWriterFailure);
+ assert(commit_calls==1&&profile_reset_calls==1&&last_profile_reset_anchor.token==1);
+ assert(failed_reset->fixture_failed()&&!failed_reset->fixture_is_replaying());
+ assert(failed_reset->restore(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(commit_calls==1&&profile_reset_calls==1);failed_reset.reset();
+#endif
+ reset();auto successful_restore=sealed_checkpoint();
+ assert(successful_restore->restore(session)==GameplayCpuCommitResult::Ok);
+ assert(commit_calls==1&&successful_restore->fixture_is_replaying()&&!successful_restore->fixture_failed());
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert(profile_reset_calls==1&&last_profile_reset_anchor.token==1);
+#else
+ assert(profile_reset_calls==0);
+#endif
+ successful_restore.reset();
  reset();CpuCaptureDiagnostic early;auto t=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),early,CpuCheckpointSpan::TwoTicks);assert(t);
  t->fixture_recording();++live_frame;assert(!t->seal_post(session));t.reset();unchanged();
  std::puts("Actual one/two span bounds, interval owner/effect/journal refusals and exact seal endpoints passed (named leaves modeled)");
  std::puts("Actual read-only drawn endpoint seal/match predicates, factory order, domain refusals and source nonmutation passed (named owner leaves modeled)");
  std::puts("Actual capture body: eight first-leaf refusals and exceptions, Owner/alloc/missing guards, exact text/status, order, cleanup and source nonmutation passed (factory leaves modeled)");
+ std::puts("restore commit/reset lifecycle guards passed (leaves modeled; engine-state rollback is outside this control)");
 }

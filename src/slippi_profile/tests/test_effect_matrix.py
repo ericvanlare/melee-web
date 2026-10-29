@@ -181,10 +181,10 @@ int main(void){char e[128]={0};reset();assert(melee_web_gameplay_step_post_sourc
         else:
             shutil.rmtree(scratch)
 
-    def test_only_live_raw_and_normalized_match_paths_use_v14_hook(self):
+    def test_only_live_raw_and_normalized_match_paths_use_current_private_hook(self):
         source = (ROOT / "src/gameplay_match_context.c").read_text(encoding="utf-8")
         self.assertEqual(source.count("if(!match_gameplay_step(e,n))return 0;"), 2)
-        self.assertIn("SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14", source)
+        self.assertIn("SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15", source)
         self.assertIn("return slippi_profile_effect_matrices_post_step", source)
         bootstrap = (ROOT / "src/gameplay_bootstrap.c").read_text(encoding="utf-8")
         body = _function(bootstrap, "gameplay_step")

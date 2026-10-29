@@ -1,4 +1,5 @@
 #include "slippi_profile/fighter_projection.h"
+#include "slippi_profile/lobj_presentation_cache.h"
 #include "gameplay_render.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_stage_context.h"
@@ -163,8 +164,14 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     if(h->original_controller&&!h->match_camera_ready)
         return fail(e,n,"Original match camera cannot draw before Ground camera setup");
     if(h->drawing)return fail(e,n,"Native render frame is not reentrant");
+    if(!slippi_lobj_current_set_view_begin())
+        return fail(e,n,"Current light presentation view admission failed");
     BOUNDARY("select lights");
-    if(!melee_web_stage_lights_select_current(e,n))return 0;
+    if(!melee_web_stage_lights_select_current(e,n)){
+        if(!slippi_lobj_current_set_view_end())
+            return fail(e,n,"Current light presentation restoration failed after light selection failure");
+        return 0;
+    }
     const unsigned old_stage_pass=Camera_8003108C(),old_fighter_pass=Camera_80031060();
     HSD_CObj* previous=HSD_CObjGetCurrent();HSD_RenderPass pass=HSD_GetCurrentRenderPass();
     HSD_GObj* previous_camera_gobj=HSD_GObj_804D7818;
@@ -175,8 +182,11 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     mode.fbWidth=mode.viWidth=h->settings.width;
     mode.efbHeight=mode.xfbHeight=mode.viHeight=h->settings.height;
     mode.aa=0;mode.field_rendering=0;
-    if(!slippi_fighter_projection_draw_begin())
+    if(!slippi_fighter_projection_draw_begin()){
+        if(!slippi_lobj_current_set_view_end())
+            return fail(e,n,"Current light presentation restoration failed after projection admission failure");
         return fail(e,n,"Fighter presentation view admission failed");
+    }
     *HSD_VIGetRenderMode()=mode;
     h->drawing=1;
     BOUNDARY("start render");
@@ -244,12 +254,15 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     int restored=camera_owned&&melee_web_native_camera_restore_current(final_camera,previous);
     *HSD_VIGetRenderMode()=old_mode;HSD_StartRender(pass);
     const int projection_restored=slippi_fighter_projection_draw_end();
+    const int lights_restored=slippi_lobj_current_set_view_end();
     h->drawing=0;
     if(!projection_restored){
         if(e&&n)snprintf(e,n,"Fighter presentation view restoration failed: %s",
                          slippi_fighter_projection_failure_reason());
         return 0;
     }
+    if(!lights_restored)
+        return fail(e,n,"Current light presentation view restoration failed");
     if(!accepted)return fail(e,n,"Original HSD camera rejected the render target");
     if(!restored)return fail(e,n,"Source callback changed the current camera without restoration");
     return ok(e,n);

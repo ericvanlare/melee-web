@@ -1,4 +1,4 @@
-"""Actual capture/refusal/cleanup bodies with explicitly modeled factory leaves."""
+"""Actual capture/restore/refusal/cleanup bodies with explicitly modeled leaves."""
 from pathlib import Path
 import hashlib
 import json
@@ -46,12 +46,18 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         payload=payload[payload.index('typedef enum MeleeWebSourceMemoryPayloadSnapshotStatus'):payload.index('MeleeWebSourceMemoryPayloadSnapshotCaptureResult;')+len('MeleeWebSourceMemoryPayloadSnapshotCaptureResult;')]
         diag=header[header.index('enum class CpuCaptureRefusal'):header.index('class GameplayCpuCheckpoint final')]
         generated=source('tests/cpu_capture_refusal_control.cpp.in')
+        restore=function(src,'GameplayCpuCommitResult GameplayCpuCheckpoint::restore(')
+        self.assertIn('slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)',restore)
+        # Replace only the reset leaf with its counted fixture implementation;
+        # keep the extracted production guards, ordering, and phase changes.
+        restore=restore.replace('slippi_lobj_current_set_view_reset_after_restore','fixture_profile_reset_after_restore')
         replacements={
             '@ACTUAL_COMPARISON@':comparison,'@ACTUAL_CAPTURE_DIAGNOSTIC@':diag,
             '@ACTUAL_PAYLOAD_RESULT@':payload,
             '@ACTUAL_CAPTURE_FUNCTION@':function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture('),
             '@ACTUAL_INTERVAL_BOUNDARY@':function(src,'bool GameplayCpuCheckpoint::interval_boundary('),
             '@ACTUAL_SEAL_POST@':function(src,'bool GameplayCpuCheckpoint::seal_post('),
+            '@ACTUAL_RESTORE@':restore,
             '@ACTUAL_DRAWN_SEAL@':function(src,'bool GameplayCpuCheckpoint::seal_drawn_reference('),
             '@ACTUAL_DRAWN_MATCH@':function(src,'bool GameplayCpuCheckpoint::matches_drawn_reference('),
             '@ACTUAL_RELEASE_FUNCTION@':function(src,'void GameplayCpuCheckpoint::release()'),
@@ -73,6 +79,7 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
             (lane/'run.json').write_text(json.dumps({'profile':profile,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('eight first-leaf refusals',result.stdout)
+            self.assertIn('restore commit/reset lifecycle guards passed',result.stdout)
             print('Actual capture control profile/output:',profile,lane)
             print(result.stdout.strip())
 
