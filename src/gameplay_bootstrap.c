@@ -1,5 +1,6 @@
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
+#include "slippi_profile/particle_source_schedule.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_source_context.h"
 #include "gameplay_source_memory_runtime.h"
@@ -262,7 +263,10 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     if (next_world_generation == 0) next_world_generation = 1;
     const int lobj_world_started = slippi_lobj_world_begin(next_world_generation);
     const int tobj_world_started = lobj_world_started && slippi_tobj_world_begin(next_world_generation);
-    if (!tobj_world_started || !melee_web_source_memory_begin(next_world_generation, heap)) {
+    const int particle_world_started = tobj_world_started &&
+        slippi_particle_source_world_begin(next_world_generation);
+    if (!particle_world_started || !melee_web_source_memory_begin(next_world_generation, heap)) {
+        if (particle_world_started) (void) slippi_particle_source_world_end(next_world_generation);
         if (tobj_world_started) slippi_tobj_world_end(next_world_generation);
         if (lobj_world_started) slippi_lobj_world_end(next_world_generation);
         OSDestroyHeap(heap);
@@ -304,6 +308,7 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             startup_in_progress = 0;
             HSD_ObjSetHeap(0, NULL);
             HSD_SetHeap(-1);
+            (void) slippi_particle_source_world_end(generation);
             slippi_tobj_world_end(generation);
             slippi_lobj_world_end(generation);
             const int source_memory_ok = melee_web_source_memory_end(generation);
@@ -634,6 +639,7 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     _HSD_ObjAllocForgetMemory(NULL, NULL);
     HSD_ObjSetHeap(0, NULL);
     HSD_SetHeap(-1);
+    const int particle_world_ok = slippi_particle_source_world_end(generation);
     slippi_tobj_world_end(generation);
     slippi_lobj_world_end(generation);
     const int source_memory_ok = melee_web_source_memory_end(generation);
@@ -659,6 +665,8 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
         shutting_down = 0;
         if (!source_memory_ok)
             return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+        if (!particle_world_ok)
+            return fail(error, error_size, "Particle presentation owner failed before teardown");
         return success(error, error_size);
     }
     if (!melee_web_gameplay_heap_release(arena, error, error_size)) {
@@ -673,6 +681,8 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     shutting_down = 0;
     if (!source_memory_ok)
         return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+    if (!particle_world_ok)
+        return fail(error, error_size, "Particle presentation owner failed before teardown");
     return success(error, error_size);
 }
 

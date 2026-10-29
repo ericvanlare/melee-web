@@ -2,12 +2,18 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
+#include "gameplay_cpu_interval.h"
+#include "slippi_profile/particle_source_schedule.h"
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 #include "slippi_profile/effect_matrix.h"
 #include "slippi_profile/profile.h"
 _Static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY ==
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+                   SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16,
+#else
                    SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15,
-               "Effect matrix post-step is restricted to the active private V15 profile");
+#endif
+               "Effect matrix post-step requires its exact active private profile");
 #endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_source_memory_runtime.h"
@@ -51,7 +57,9 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 static int post_effect_matrices(void* context, char* error, size_t error_size)
 {
     (void) context;
-    return slippi_profile_effect_matrices_post_step(error, error_size);
+    if (!slippi_profile_effect_matrices_post_step(error, error_size)) return 0;
+    return slippi_particle_source_prepare(melee_web_gameplay_generation(),
+        melee_web_cpu_interval_token(), error, error_size);
 }
 
 static int match_gameplay_step(char* error, size_t error_size)

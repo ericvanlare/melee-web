@@ -122,6 +122,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                     stage_arena_owner_diagnostic=False,
                     slippi_logical_frame_clock=False, slippi_lobj_presentation_cache=False,
                     slippi_tobj_presentation_cache=False,
+                    slippi_particle_presentation_cache=False,
                     stadium_c1a_diagnostic=False,
                     fma_collision_diagnostic=False,
                     fma_velocity_y_diagnostic=False):
@@ -148,6 +149,8 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("TObj presentation cache requires the private v7 light owner profile")
     if slippi_tobj_presentation_cache and not aurora_staging_shadow_diagnostic:
         raise ValueError("The private presentation profile requires --aurora-staging-shadow-diagnostic for CPU owner provenance")
+    if slippi_particle_presentation_cache and not slippi_tobj_presentation_cache:
+        raise ValueError("Particle presentation cache requires the private v15 TObj profile")
     if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
             target != "gameplay_slippi_synctest" or configuration != "Release"):
         raise ValueError("LObj presentation cache requires the private Release logical-frame Slippi synctest")
@@ -160,6 +163,7 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
             suffix += "-aurora-staging" if aurora_staging_shadow_diagnostic else ""
             owner = "-lobj-presentation" if slippi_lobj_presentation_cache else ""
             if slippi_tobj_presentation_cache: owner += "-tobj-presentation"
+            if slippi_particle_presentation_cache: owner += "-particle-presentation"
             return root / f"build/slippi-synctest-logical-frame{owner}{suffix}-release"
         if stage_arena_owner_diagnostic and aurora_staging_shadow_diagnostic:
             return root / "build/slippi-synctest-stage-arena-aurora-staging-release"
@@ -994,7 +998,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           fma_velocity_y_diagnostic=False, slippi_synctest_assets=None,
           aurora_staging_shadow_diagnostic=False,
           stage_arena_owner_diagnostic=False, slippi_logical_frame_clock=False,
-          slippi_lobj_presentation_cache=False, slippi_tobj_presentation_cache=False):
+          slippi_lobj_presentation_cache=False, slippi_tobj_presentation_cache=False,
+          slippi_particle_presentation_cache=False):
     trace_targets = tuple(trace_targets or ())
     if ("gameplay_slippi_synctest" in trace_targets and
             trace_targets != ("gameplay_slippi_synctest",)):
@@ -1004,6 +1009,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("TObj presentation cache requires the private v7 light owner profile")
     if slippi_tobj_presentation_cache and not aurora_staging_shadow_diagnostic:
         raise ValueError("The private presentation profile requires --aurora-staging-shadow-diagnostic for CPU owner provenance")
+    if slippi_particle_presentation_cache and not slippi_tobj_presentation_cache:
+        raise ValueError("Particle presentation cache requires the private v15 TObj profile")
     if slippi_lobj_presentation_cache and (not slippi_logical_frame_clock or
             not slippi_synctest or configuration != "Release"):
         raise ValueError("--slippi-lobj-presentation-cache requires the private Release logical-frame Slippi synctest")
@@ -1109,6 +1116,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
                                     slippi_logical_frame_clock=slippi_logical_frame_clock,
                                     slippi_lobj_presentation_cache=slippi_lobj_presentation_cache,
                                     slippi_tobj_presentation_cache=slippi_tobj_presentation_cache,
+                                    slippi_particle_presentation_cache=slippi_particle_presentation_cache,
                                     stadium_c1a_diagnostic=stadium_c1a_diagnostic,
                                     fma_collision_diagnostic=fma_collision_diagnostic,
                                     fma_velocity_y_diagnostic=fma_velocity_y_diagnostic)
@@ -1163,6 +1171,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         configure.append(f"-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK={'ON' if slippi_logical_frame_clock else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE={'ON' if slippi_lobj_presentation_cache else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE={'ON' if slippi_tobj_presentation_cache else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE={'ON' if slippi_particle_presentation_cache else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST={'ON' if slippi_synctest else 'OFF'}")
         if slippi_synctest:
             configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT={assets_root}")
@@ -1234,6 +1243,8 @@ def main():
                         help="Enable the isolated private Release v7 canonical light presentation owner")
     parser.add_argument("--slippi-tobj-presentation-cache", action="store_true",
                         help="Enable the isolated private incomplete v9 stateless texture matrix presentation")
+    parser.add_argument("--slippi-particle-presentation-cache", action="store_true",
+                        help="Enable the private v16 particle-preparation presentation profile")
     parser.add_argument("--stage-arena-owner-diagnostic", action="store_true",
                         help="Enable the private Release Slippi stage-arena owner inventory")
     args = parser.parse_args()
@@ -1254,7 +1265,8 @@ def main():
               stage_arena_owner_diagnostic=args.stage_arena_owner_diagnostic,
               slippi_logical_frame_clock=args.slippi_logical_frame_clock,
               slippi_lobj_presentation_cache=args.slippi_lobj_presentation_cache,
-              slippi_tobj_presentation_cache=args.slippi_tobj_presentation_cache)
+              slippi_tobj_presentation_cache=args.slippi_tobj_presentation_cache,
+              slippi_particle_presentation_cache=args.slippi_particle_presentation_cache)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

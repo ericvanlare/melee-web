@@ -1,0 +1,236 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Real helper + extracted real sort/preparation bridges. Allocation/interval
+ * providers and HSD_MtxSRT are modeled; no GPU/original matrix-math claim. */
+#include <assert.h>
+#include <float.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <slippi_profile/particle_presentation_source.h>
+#include <slippi_profile/particle_pass_plan.h>
+#include <gameplay_cpu_interval.h>
+#include <gameplay_source_memory_runtime.h>
+#include <sysdolphin/baselib/mtx.h>
+static uint64_t token;
+static unsigned world_calls, mint_calls;
+static HSD_ObjAllocData particle_pool, app_pool;
+static HSD_Particle particles[3];
+static HSD_psAppSRT app;
+HSD_Particle* hsd_804D0908[16];
+static HSD_Particle* particle_list[17];
+static u8 HSD_PSDisp_8040C360[16];
+static u8 psFrameNum=0x7b;
+typedef struct { HSD_Particle *head,*tail; } psdisp_ParticleSortBucket;
+uint64_t melee_web_cpu_interval_token(void) { return token; }
+int melee_web_cpu_interval_active(void) { return token!=0; }
+int melee_web_cpu_interval_admit(uint64_t t) { return t && t==token; }
+int melee_web_source_memory_pool_cell_identity(void* p,const void* pool,size_t n,
+                                              MeleeWebSourcePoolCellIdentity* out)
+{
+    ++mint_calls;
+    if((pool!=&particle_pool || n!=sizeof(HSD_Particle)) &&
+       (pool!=&app_pool || n!=sizeof(HSD_psAppSRT))) return 0;
+    *out=(MeleeWebSourcePoolCellIdentity){1,2,3,(uintptr_t)p,(uintptr_t)pool,4,0,(uint32_t)n};
+    return 1;
+}
+int melee_web_source_memory_pool_cell_matches(void* p,const void* pool,size_t n,
+                                              const MeleeWebSourcePoolCellIdentity* id)
+{ return id && id->world==1 && id->epoch==2 && id->allocation==3 &&
+         id->pool==(uintptr_t)p && id->descriptor==(uintptr_t)pool && id->stride==n; }
+#if defined(ACTUAL_LINKED_MATH)
+static void measured_world(Mtx m,Vec3* scale,Vec3* rotate,Vec3* translate,Vec3* unused)
+{
+    ++world_calls;
+    HSD_MtxSRT(m,scale,rotate,translate,unused);
+}
+#else
+void HSD_MtxSRT(Mtx m,Vec3* scale,Vec3* rotate,Vec3* translate,Vec3* unused)
+{
+    (void)rotate;(void)unused;++world_calls;
+    memset(m,0,sizeof(Mtx));m[0][0]=scale->x;m[1][1]=scale->y;m[2][2]=scale->z;
+    m[0][3]=translate->x;m[1][3]=translate->y;m[2][3]=translate->z;
+}
+#endif
+void psDispParticles(u32 mask,u32 sw)
+{
+    (void)mask;
+    assert(sw==0);
+    ACTUAL_SW0
+    abort();
+}
+ACTUAL_SORT
+uint8_t slippi_particle_source_frame_key(void) { return psFrameNum; }
+ACTUAL_PREFLIGHT
+#if defined(ACTUAL_LINKED_MATH)
+#define HSD_MtxSRT measured_world
+#endif
+ACTUAL_PREPARE
+#undef HSD_MtxSRT
+#if defined(ACTUAL_LINKED_MATH)
+static HSD_psAppSRT reference_app;
+static Mtx vmtx={{0.9f,0.1f,0.0f,3.0f},{0.0f,0.8f,0.2f,4.0f},{0.3f,0.0f,0.7f,5.0f}};
+ACTUAL_PROJECTIONS
+#endif
+static HSD_GObj camera, manager;
+static SlippiParticlePassVisit visits[3];
+static void init(void)
+{
+    unsigned i;
+    assert(slippi_particle_presentation_world_begin(1));
+    assert(slippi_particle_presentation_pool_initialized(&particle_pool,sizeof(HSD_Particle),4));
+    assert(slippi_particle_presentation_appsrt_pool_initialized(&app_pool,sizeof(HSD_psAppSRT),4));
+    memset(&app,0,sizeof(app));app.status=PS_APPSTATUS_ONCE;
+    app.scale.x=app.scale.y=app.scale.z=1;app.translate.x=17;
+    app.ssx=-123;
+    assert(slippi_particle_presentation_appsrt_created(&app,&app_pool));
+    for(i=0;i<3;++i) {
+        particles[i].kind=i==0?(5u<<25)|TexEdge:i==1?(1u<<25):(2u<<25)|TexEdge;
+        particles[i].next=i<2?&particles[i+1]:NULL;
+        particles[i].linkNo=0;particles[i].idnum=(u16)(i+1);particles[i].size=1;
+        particles[i].appsrt=&app;
+        assert(slippi_particle_presentation_particle_created(&particles[i],&particle_pool));
+    }
+    hsd_804D0908[0]=particles;
+    for(i=0;i<3;++i) visits[i]=(SlippiParticlePassVisit){SLIPPI_PARTICLE_CAMERA_MAIN_TAIL,&camera,i,7,5,&manager};
+}
+static void draw(void)
+{
+    unsigned i;
+    assert(slippi_particle_presentation_draw_begin(1,token,NULL,0));
+    assert(slippi_particle_presentation_camera_begin(&camera,NULL,0));
+    for(i=0;i<3;++i) {
+        HSD_Particle *sorted,*nonedge;u8 key;
+        assert(slippi_particle_presentation_dispatch_begin(&manager,i,7,5,NULL,0)==SLIPPI_PARTICLE_DISPATCH_ROUTED);
+        assert(slippi_particle_presentation_render_data(0,i,&key,&sorted,&nonedge)==SLIPPI_PARTICLE_DISPATCH_ROUTED);
+        assert(key==psFrameNum);
+        if(i) {
+            HSD_psAppSRT scratch;
+            HSD_psAppSRT original=app;
+            assert(sorted==&particles[2] && nonedge==&particles[1]);
+            assert(slippi_particle_presentation_app_srt_view(&app,&scratch)==&scratch);
+            assert(scratch.frameNum==0 && scratch.status==PS_APPSTATUS_STILL && scratch.mmtx[0][3]==17);
+#if defined(ACTUAL_LINKED_MATH)
+            {
+                HSD_Particle ref=*sorted;
+                HSD_psAppSRT point, polygon;
+                ref.appsrt=&reference_app;
+                reference_point(&ref);
+                candidate_point(sorted,&point);
+                assert(!memcmp(point.mmtx,reference_app.mmtx,sizeof(Mtx)));
+                assert(!memcmp(&point.ssx,&reference_app.ssx,14*sizeof(float)));
+                reference_polygon(&ref);
+                candidate_polygon(sorted,&polygon);
+                assert(!memcmp(polygon.mmtx,reference_app.mmtx,sizeof(Mtx)));
+                assert(!memcmp(&polygon.ssx,&reference_app.ssx,14*sizeof(float)));
+            }
+#endif
+            scratch.ssx=999;
+            assert(!memcmp(&original,&app,sizeof(app)));
+        }
+        assert(slippi_particle_presentation_dispatch_end(NULL,0));
+    }
+    assert(slippi_particle_presentation_camera_end(&camera,NULL,0));
+    assert(slippi_particle_presentation_draw_end(NULL,0));
+}
+int main(int argc,char** argv)
+{
+    SlippiParticlePresentationAnchor anchor;
+    HSD_Particle before[3];HSD_psAppSRT before_app;
+    u8 initial_key, expected_key;
+    const char* mode=argc>1?argv[1]:"positive";
+    init();
+#if defined(ACTUAL_LINKED_MATH)
+    app.rot.x=0.23f;app.rot.y=-0.5f;app.rot.z=0.9f;
+    app.scale.x=1.2f;app.scale.y=0.7f;app.scale.z=2.0f;
+    app.xA2=1;
+    reference_app=app;
+#endif
+    if(!strcmp(mode,"wrap")) psFrameNum=0xfe;
+    initial_key=psFrameNum; expected_key=initial_key<255?(u8)(initial_key+1):1;
+    if(!strcmp(mode,"stale")) app.frameNum=0x7c;
+    if(!strcmp(mode,"kind")) particles[0].kind|=PrimEnv;
+    if(!strcmp(mode,"foreign")) hsd_804D0908[2]=(HSD_Particle*)&camera;
+    memcpy(before,particles,sizeof(before));before_app=app;
+    assert(!token);
+    anchor=slippi_particle_presentation_anchor_capture();
+    assert(anchor.world==1 && anchor.token && anchor.particle_count==3 && anchor.appsrt_count==1);
+    assert(slippi_particle_presentation_anchor_admit(anchor));
+    assert(mint_calls==4); /* Capture/admit never adopt a new cell. */
+    token=41;
+    if(!strcmp(mode,"lifetime")) {
+        assert(slippi_particle_presentation_particle_retiring(&particles[0],&particle_pool));
+        assert(slippi_particle_presentation_particle_created(&particles[0],&particle_pool));
+        assert(mint_calls==5);
+    }
+    if(!strcmp(mode,"poolbusy")) {
+        assert(!slippi_particle_presentation_pool_reinitialization_allowed());
+        assert(psFrameNum==initial_key && !memcmp(before,particles,sizeof(before)) && !memcmp(&before_app,&app,sizeof(app)));
+    } else if(!strcmp(mode,"stale") || !strcmp(mode,"kind") || !strcmp(mode,"foreign")) {
+        assert(!slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+        assert(psFrameNum==initial_key && !memcmp(before,particles,sizeof(before)) && !memcmp(&before_app,&app,sizeof(app)));
+        assert(!world_calls);
+    } else {
+        assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+        assert(psFrameNum==expected_key && world_calls==1 && app.status==PS_APPSTATUS_STILL);
+        assert(hsd_804D0908[0]==&particles[2] && particles[2].next==&particles[0] && particles[0].next==&particles[1]);
+        if(!strcmp(mode,"changed")) {
+            particles[0].kind^=TexEdge;
+            assert(!slippi_particle_presentation_draw_begin(1,token,NULL,0));
+        } else if(!strcmp(mode,"wrong")) {
+            assert(slippi_particle_presentation_draw_begin(1,token,NULL,0));
+            assert(slippi_particle_presentation_camera_begin(&camera,NULL,0));
+            assert(slippi_particle_presentation_dispatch_begin(&manager,2,7,5,NULL,0)==SLIPPI_PARTICLE_DISPATCH_REFUSED);
+            assert(!slippi_particle_presentation_draw_end(NULL,0));
+        } else {
+            s32 source_value=42;
+            draw();
+            if(!strcmp(mode,"repeat")) assert(!slippi_particle_presentation_draw_begin(1,token,NULL,0));
+            else {
+                /* Model only the checked source commit. The actual coordinator
+                 * pre-write/reset contract is tested in its existing controls. */
+                memcpy(particles,before,sizeof(before));app=before_app;
+                hsd_804D0908[0]=particles;psFrameNum=initial_key;
+                memset(HSD_PSDisp_8040C360,0,sizeof(HSD_PSDisp_8040C360));
+                memset(particle_list,0,sizeof(particle_list));
+                assert(slippi_particle_presentation_reset_after_restore(anchor));
+                assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+                assert(world_calls==2);
+#if defined(ACTUAL_LINKED_MATH)
+                reference_app=before_app;
+                draw();
+                app.status=0;reference_app.status=0;
+                app.translate.y=reference_app.translate.y=19.0f;
+                app.rot.z=reference_app.rot.z=-0.11f;
+                assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+                draw();
+                assert(app.status==0);
+                app.status=reference_app.status=PS_APPSTATUS_STILL;
+                app.translate.z=reference_app.translate.z=200.0f;
+                assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+                draw();
+                assert(app.status==PS_APPSTATUS_STILL);
+                assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+#endif
+                assert(slippi_particle_presentation_draw_begin(1,token,NULL,0));
+                *slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_PREV_POINT_SIZE,&source_value)=99;
+                assert(source_value==42);
+                /* A source mutation attempt latches failure before the caller store. */
+                assert(!slippi_particle_presentation_source_mutation_allowed());
+                assert(!slippi_particle_presentation_draw_end(NULL,0));
+            }
+        }
+    }
+    assert(mint_calls==(!strcmp(mode,"lifetime")?5u:4u));
+    assert(slippi_particle_presentation_failure());
+    assert(slippi_particle_presentation_interval_end(1,token));
+    slippi_particle_presentation_anchor_disarm(anchor);
+    token=0;
+    assert(!slippi_particle_presentation_world_end(1)); /* Cleanup preserves failure. */
+    assert(slippi_particle_presentation_world_begin(2));
+    assert(slippi_particle_presentation_world_end(2));
+#if defined(ACTUAL_LINKED_MATH)
+    puts("actual archived HSD_MtxSRT/PS math + original point/polygon prefixes: ONCE/shared/continuous/STILL/xA2 passed");
+#endif
+    printf("particle presentation control %s passed; actual sort/preparation gates; modeled providers\n",mode);
+    return 0;
+}

@@ -16,6 +16,7 @@ uint64_t melee_web_cpu_interval_begin(void)
 int melee_web_cpu_interval_admit(uint64_t token)
 {return active&&token&&token==epoch&&!failure;}
 int melee_web_cpu_interval_active(void){return active!=0;}
+uint64_t melee_web_cpu_interval_token(void){return active?epoch:0;}
 int melee_web_cpu_interval_attempt(enum MeleeWebCpuIntervalEffect effect)
 {
  if(!active)return 1;

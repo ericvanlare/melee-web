@@ -9074,6 +9074,183 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/slist-target-result-and-v15-contract-sol-review-v1.json",
         "sha256": "c9570ec5c4a85ea61a562b40699714e3c89f2178a776522f4bb23524fa5dbb61"
       }
+    },
+    "current_light_v15_result_20261029": {
+      "status": "ALLOCATION_DOMAIN_MATCHES_SOURCE_STATIC_MISMATCH_REMAINS",
+      "runtime_source": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15",
+      "commands": [
+        [
+          8,
+          0
+        ],
+        [
+          9,
+          0
+        ],
+        [
+          10,
+          0
+        ],
+        [
+          11,
+          1216
+        ]
+      ],
+      "raw_pair_count": 10,
+      "raw_pairs_equal": true,
+      "checked_cpu_mask": 1022,
+      "matched_cpu_mask": 510,
+      "matched_scope": "Domains1..8 including complete admitted allocation payload. Source statics stop at first difference; later rows remain unchecked.",
+      "comparison": {
+        "domain": 9,
+        "status": 2,
+        "row": 1172,
+        "offset": 0,
+        "expected": 215,
+        "actual": 213,
+        "address": 900185,
+        "extent": 1,
+        "detail": 0
+      },
+      "source_static": "libfighter_source_runtime.a(psdisp.c.o):.data.psFrameNum",
+      "final_present": "UNRUN",
+      "cleanup": "CPU close1216 retained; snapshot/renderer1; all recorded owned PIDs absent;9 archived producers unchanged.",
+      "observer_limits": "No changed target bytes; unknown list membership remains; no failure join because allocation payload is equal.",
+      "pins": [
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-current-light-v15-v1/result-receipt.json",
+          "sha256": "ca1b41813d7971ad4be10098232cad2afb35b3df20d1d42f8c2cef4fcc76e665"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-current-light-v15-v1/raw-five-comparison.json",
+          "sha256": "001edb027885df71bf4743674cb7a8bf36add4e073799f9f7feca5429d0cc61a"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-current-light-v15-v1/runner/evidence.json",
+          "sha256": "89dc44192b7d3c4eaa5889fa8fb87d96f0bfe865cfbdb79011216d1a624dcd0d"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-current-light-v15-v1/independent-postflight.json",
+          "sha256": "d3672c4001c40f4d2f166e74b18456b2e965c23cf70ae1db79e342b96b32aec0"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/current-light-v15-browser-archive/archive.json",
+          "sha256": "473fd62214e2ec297633535cfae8f7e80313dd550f6e16a1eeab481ec28c520a"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/current-light-v15-result-sol-review-v1.json",
+          "sha256": "52167f650c7fb4be807fa7186e33717c43fc500048cdffbea6431fd4209e7001"
+        }
+      ],
+      "scope": "Private fixed same-input two-tick component result. No working browser rollback, profile admission, original equivalence, Internet play or acceptance.",
+      "next": "Canonical post-entire-scheduler particle preparation plus coherent draw deduplication/cache ownership; unchanged strict comparison."
+    },
+    "particle_render_key_control_20261029": {
+      "status": "RENDER_ONLY_TOPOLOGY_SHORTCUT_FALSIFIED",
+      "scope": "Reduced actual-source particle sorter, successor update and RNG control; no runtime repair or live-scene/AppSRT/GPU equivalence.",
+      "source_calls": [
+        "psDispParticles(sw0)",
+        "particleSort",
+        "hsd_8039CEAC",
+        "hsd_8039930C",
+        "HSD_Randf"
+      ],
+      "sorted_successor_order": [
+        3,
+        1,
+        2
+      ],
+      "sorted_life_by_id": [
+        170,
+        458,
+        639
+      ],
+      "isolated_sort_successor_order": [
+        1,
+        2,
+        3
+      ],
+      "isolated_sort_life_by_id": [
+        239,
+        370,
+        658
+      ],
+      "initial_seed": "12345678",
+      "both_final_seeds": "cc0ddcad",
+      "test": {
+        "passed": 1,
+        "skipped": 0,
+        "duration_seconds": 3.327
+      },
+      "provenance": "Pre-existing runtime archives, all 65 ordered linked inputs pinned; particle/psdisp/random members match their build objects. Historical compilation source identity is not inferred from current HEAD.",
+      "retention": "Failed setup/link attempts and raw result preserved; owned successful disposable binaries removed after hashing.",
+      "pins": [
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-render-key-actual-source-v1/freeze-v1.json",
+          "sha256": "2f4491b091e5c551f77dc36cf29e078e906537f114f81d823761255f11a4ddd7"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-render-key-actual-source-v1/final-v5-test-result.json",
+          "sha256": "39b27ed309a77387256a88578c1b9f44fdc1486c625d51044ad847b001b8fc5a"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-render-key-actual-source-v1/independent-sol-review-v1.json",
+          "sha256": "e8d63ef302064ffd4bb1787b71919fcdfa1d2688534503bedb3fb5112c78c01e"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-render-key-actual-source-v1/focused-v5.log",
+          "sha256": "038a77c0bfa63bd8dbde5d432106287e410d92b14851720f756e3804ad64263b"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-post-source-pass-plan-sol-v1.json",
+          "sha256": "5d3e859ff796c494bea3649c48522d8bdd284ef8b37885729aa1ae9dda74a68d"
+        }
+      ],
+      "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
+    },
+    "particle_v16_candidate_20261029": {
+      "status": "INDEPENDENT_COMPOSED_SOURCE_REVIEW_GO; affected build/browser still unrun",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
+      "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
+      "helper_freeze": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-presentation-freeze-v1/freeze.json",
+        "sha256": "51e151097f3fc680da3ed7189fc519450fcabc75b5823e1941bcefb1d65be347"
+      },
+      "schedule_freeze": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/particle-source-schedule-control-20261029-v4/freeze.json",
+        "sha256": "9f278478dbea3c2c07b374eddbfd1b5fb707eb8ae4c0ac099b23db8383c14219"
+      },
+      "root_focused": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-pool-and-commit-focused-v1.json",
+        "sha256": "432946ab79558f52e5601db22962dd22ef8c86f58be2c3fe3c09fa61b4dc8dd5"
+      },
+      "root_source_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-root-activation-luna-review-v1.json",
+        "sha256": "09717e1686658ba6767e21a3186e3bdb4ecb1d909288358427c999a86b17a406"
+      },
+      "flat_discovery": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-flat-discovery-v1.json",
+        "sha256": "9aef05b423d0341e7cccc93b2da2dfc4c9d0b514f0757f10e3012ad63bed0797"
+      },
+      "frozen_shim_delta": "Root replaced direct imported test classes with flat import-and-subclass discovery shims; control bodies unchanged, historical freeze hashes retained. Final composed review covers the delta.",
+      "scope": [
+        "Complete source camera schedule/control with manager-process identity-only providers",
+        "Actual original particleSort and source preparation bridges with modeled pool/interval providers",
+        "Actual pre-existing pinned SDK matrix objects for original AppSRT point/polygon prefix equivalence; not GPU rendering",
+        "Actual source allocator backing-cell query and actual restore coordinator; explicit modeled OS/owner leaves"
+      ],
+      "limitations": [
+        "Composed source review passed; affected build and linked policy review still required",
+        "No V16 runtime build, browser correction, final present, public profile admission or online rollback result",
+        "Initial capability refuses unknown writers, historical projection cache hits, active pool reset, repeated presents and source TEV kind-clearing cases",
+        "Strict source comparison policy unchanged; any future linked layout drift needs explicit source/byte-coverage review"
+      ],
+      "next": "Distinct V16 affected build and linked policy review, then unchanged two-tick strict browser comparison and actual final present; only after success increase to seven.",
+      "composed_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
+        "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
+      }
     }
   }
 }

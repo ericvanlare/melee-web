@@ -8,7 +8,7 @@ import {decodeDrawDiagnostics} from './runner_contract.mjs';
 import {assembleCompletedCensusExecution, recordFailedCensusExecution,
   recordCensusFailurePageState, recordClassPieceSlabTrace,
   selectTobjFailureStatics, recordTobjFailureStatics,
-  validateCensusDrawSample, validateCpuRestoreRouteSelection, validateBrowserProfileForRoute} from './run_write_census.mjs';
+  validateCensusDrawSample, validateCpuRestoreRouteSelection, validateBrowserProfileForRoute, parseArgs} from './run_write_census.mjs';
 import {
   classifyHeapRanges, decodeAudioOwnerInventory, decodeMatchContextRangeInventory,
   decodeAuroraStagingShadowInventory, diffHeapRanges, requireStableAudioOwnerInventory,
@@ -1940,22 +1940,52 @@ test('current light set v15 identity requires explicit light owner and two-tick 
 });
 
 
+test('particle preparation v16 is explicit atop the unchanged v15 route and refuses prior identities', () => {
+  const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};
+  const v15={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15'};
+  const v16={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'};
+  assert.equal(validateBrowserProfileForRoute(v15,true,exports,true,true),v15.profile);
+  assert.equal(validateBrowserProfileForRoute(v16,true,exports,true,true,true),v16.profile);
+  assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,true,true),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v15,true,exports,true,true,true),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,false,false,true),/requires v15 TObj/);
+  assert.throws(()=>validateBrowserProfileForRoute(v16,false,exports,true,true,true),/requires/);
+  for (const profile of [
+    'slippi-render-dependencies-logical-frame-lobj-tobj-v8',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-fighter-projection-v11',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-shadow-camera-v12',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-shadow-camera-local-tlut-v13',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-effect-matrix-v14',
+  ]) assert.throws(()=>validateBrowserProfileForRoute({profile},true,exports,true,true,true),/Unexpected profile identity/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-particle-presentation-cache':true}),/requires v15 TObj/);
+  const route={'--aggregate-cpu-drawn-reference-two-tick':true,
+    '--aggregate-cpu-restore-config':'config.json','--slippi-lobj-presentation-cache':true,
+    '--slippi-tobj-presentation-cache':true,'--slippi-particle-presentation-cache':true};
+  assert.equal(validateCpuRestoreRouteSelection(route),'drawn-reference-no-draw-two-tick-v1');
+  assert.throws(()=>parseArgs(['--browser-runtime','runtime.mjs','--assets','assets','--manifest','manifest.json','--out','new-output',
+    '--slippi-particle-presentation-cache']),/requires v15 TObj/);
+});
+
+
 test('actual initialized profile assignment retains writer scope, not zero-count success', () => {
   const source=readFileSync(new URL('./run_write_census.mjs',import.meta.url),'utf8');
   const initial=source.match(/profile: (\{identity: null, sourceIdentity: null,[\s\S]*?\}),\n    input:/)?.[1];
   const initialized=source.match(/report\.profile = \{\.\.\.report\.profile, identity: init\.profile,[\s\S]*?\};/)?.[0];
   assert.ok(initial,'actual initial profile object is extracted');assert.ok(initialized,'actual post-initialization profile assignment is extracted');
-  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15'];
+  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15','slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'];
   for(let i=0;i<profiles.length;i++) {
     const context={init:{profile:profiles[i],source:'actual-source',rngHelper:'rng',stageBridge:'stage'},SOURCE_SEED:7,
       SYNCTEST_PROFILE:profiles[0],LOGICAL_FRAME_V6_PROFILE:profiles[1],LOBJ_PRESENTATION_V7_PROFILE:profiles[2],LOBJ_CURRENT_SET_V15_PROFILE:profiles[3],
-      twoTickDrawnReference:i>0,lobjPresentationCache:i>1,tobjPresentationCache:i>2};
+      PARTICLE_PRESENTATION_V16_PROFILE:profiles[4],
+      twoTickDrawnReference:i>0,lobjPresentationCache:i>1,tobjPresentationCache:i>2,particlePresentationCache:i>3};
     context.report={profile:vm.runInNewContext('('+initial+')',context)};
     const prior=context.report.profile.sourceTextureMatrixWriterDiagnostic;
     vm.runInNewContext(initialized,context);
     assert.equal(context.report.profile.identity,profiles[i]);assert.equal(context.report.profile.sourceIdentity,'actual-source');
     assert.equal(context.report.profile.name,profiles[i]);assert.equal(context.report.profile.sourceTextureMatrixWriterDiagnostic,prior);
-    assert.equal(prior,i===3?'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15':'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN');
+    assert.equal(prior,i>=3?'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15':'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN');
     assert.notEqual(prior,0);assert.notEqual(prior,'PASS');
   }
 });

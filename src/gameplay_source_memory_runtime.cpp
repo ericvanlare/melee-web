@@ -482,6 +482,64 @@ extern "C" int melee_web_source_memory_fighter_projection_matches(
 #endif
 }
 
+extern "C" int melee_web_source_memory_pool_cell_identity(
+    void* cell, const void* descriptor, size_t extent,
+    MeleeWebSourcePoolCellIdentity* out)
+{
+    if (out) *out = {};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (!out || !active || !healthy || pool_refusal || !cell || !descriptor ||
+        !extent || extent > UINT32_MAX) return 0;
+    const uintptr_t host = reinterpret_cast<uintptr_t>(cell);
+    const HostAllocation* row = find_host_allocation(host);
+    if (!row || row->pool.state != 1 ||
+        row->pool.descriptor != reinterpret_cast<uintptr_t>(descriptor) ||
+        row->pool.generation != row->generation || row->pool.epoch != owner_epoch ||
+        row->pool.world != world_generation || row->pool.stride != extent ||
+        host < row->host || (host-row->host) % extent ||
+        host-row->host > row->requested || extent > row->requested-(host-row->host))
+        return 0;
+    *out = {world_generation, owner_epoch, row->generation, row->host,
+            reinterpret_cast<uintptr_t>(descriptor),
+            row->source.value()+static_cast<uint32_t>(host-row->host),
+            static_cast<uint32_t>(host-row->host), static_cast<uint32_t>(extent)};
+    return 1;
+#else
+    (void)cell; (void)descriptor; (void)extent; return 0;
+#endif
+}
+
+extern "C" int melee_web_source_memory_pool_cell_matches(
+    void* cell, const void* descriptor, size_t extent,
+    const MeleeWebSourcePoolCellIdentity* expected)
+{
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (!expected || !active || !healthy || pool_refusal || !cell || !descriptor ||
+        !extent || extent > UINT32_MAX || expected->world != world_generation ||
+        expected->epoch != owner_epoch || expected->stride != extent ||
+        expected->descriptor != reinterpret_cast<uintptr_t>(descriptor))
+        return 0;
+    const uintptr_t host = reinterpret_cast<uintptr_t>(cell);
+    const HostAllocation* row = find_host_allocation(host);
+    if (!row || row->host != expected->pool || row->generation != expected->allocation ||
+        host < row->host || host-row->host != expected->cell_offset ||
+        (host-row->host) % extent || host-row->host > row->requested ||
+        extent > row->requested-(host-row->host) ||
+        expected->source != row->source.value()+host-row->host)
+        return 0;
+    /* Checked source-memory restore can clear diagnostic pool metadata.
+     * Only the caller's original constructor receipt retains the pool proof;
+     * present contradictory metadata still refuses. No new identity is minted. */
+    if (row->pool.state && (row->pool.state != 1 ||
+        row->pool.descriptor != expected->descriptor || row->pool.stride != extent ||
+        row->pool.generation != row->generation || row->pool.epoch != owner_epoch ||
+        row->pool.world != world_generation)) return 0;
+    return 1;
+#else
+    (void)cell; (void)descriptor; (void)extent; (void)expected; return 0;
+#endif
+}
+
 extern "C" int melee_web_source_memory_fighter_release(void* host_fighter)
 {
     if (!active || !healthy || !host_fighter)

@@ -1279,6 +1279,45 @@ all owned processes are absent. The next repair targets current-light
 presentation ownership, reusing the existing LObj owner. The structured receipt
 pins this result separately from the earlier V14 target-matrix result.
 
+The reviewed private V15 producer `d0e76f59` routes draw-time current-light
+selection and its membership references through the existing LObj presentation
+owner. Its actual-source controls and affected browser build pass. In the fixed
+two-tick browser run, all ten raw pairs agree and every admitted allocation
+payload byte now matches; the other checked CPU owner domains also match.
+Strict comparison still refuses 1216 at source-static row 1172, offset 0
+(`psFrameNum`, expected `0xd7`, actual `0xd5`). Later static rows and final
+present remain unchecked. The source policies and comparison are unchanged.
+The prior target-list observer records no changed target bytes, but its unknown
+membership and lack of a final failure join remain explicit. Independent review
+confirms this allocation-domain advance, not working browser rollback.
+CPU close retains 1216; snapshot close and renderer shutdown return 1, all nine
+producer files are archived unchanged, and all recorded owned PIDs are absent.
+The reduced actual-source particle control rejects treating sorted particle
+links as disposable rendering state. The original sorter makes the next real
+update visit IDs `3,1,2`; sorting a separate rendering copy leaves that update
+visiting `1,2,3`. The same three original RNG calls then produce different
+per-particle lifetimes despite the same final seed. Independent review confirms
+this causal result. The control uses pre-existing, individually pinned runtime
+archives; it does not attribute their build to V15 or establish live-scene,
+AppSRT or GPU equivalence. The failed fixture attempts remain retained.
+
+The private V16 candidate now preserves canonical sorting after the complete
+source scheduler, using the original camera/particle dispatch selection, and
+draws from a checked pass journal with typed presentation scratch. Its complete
+camera schedule, ordinary-draw lifecycle and refusal control passed. Separate
+controls cover actual source sorting, constructor-receipt restore and key wrap;
+an actual archived-math control compares the original AppSRT point/polygon
+prefixes for ONCE, shared, continuous, STILL and xA2 paths. The allocator and
+restore-coordinator controls also pass, including particle-owner refusal before
+any restore writer. Their modeled providers and prior math-object identities
+remain explicit in the structured receipt. Failed fixtures are retained.
+
+The frozen candidate passed independent composed source review. Focused controls and
+source-unit syntax are not a runtime build or browser result. Unknown particle
+writers, active pool reset, unproved historical projection-cache hits and repeated
+presents explicitly refuse. No counter-only fix, source-policy exception or
+repeated browser capture has been used to bypass the mismatch.
+
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The
 structured receipt preserves each attempt’s distinct source, build,

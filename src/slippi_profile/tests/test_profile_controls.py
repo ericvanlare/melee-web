@@ -55,6 +55,58 @@ def _source_function(source, signature):
 
 
 class ProfileControlsTests(unittest.TestCase):
+    def test_v15_v16_profile_identity_boundary_compiles_profile_c_only(self):
+        work_root = ROOT / "work"
+        work_root.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(prefix="slippi-profile-v15-v16-", dir=work_root))
+        source = output / "identity_control.c"
+        source.write_text(r'''#include <assert.h>
+#include <string.h>
+#include "slippi_profile/profile.h"
+
+int main(void)
+{
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
+    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16;
+    assert(strcmp(SLIPPI_PROFILE_PARTICLE_PRESENTATION_V16_ID,
+                  "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16") == 0);
+    assert(strcmp(slippi_profile_identity_name(active),
+                  SLIPPI_PROFILE_PARTICLE_PRESENTATION_V16_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15) == 0);
+#else
+    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15;
+    assert(strcmp(slippi_profile_identity_name(active),
+                  SLIPPI_PROFILE_LOBJ_CURRENT_SET_V15_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16) == 0);
+#endif
+    assert(slippi_profile_source_draw_decision(active, SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ALLOW);
+    assert(slippi_profile_source_draw_decision(active, SLIPPI_TICK_CORRECTION) ==
+           SLIPPI_SOURCE_DRAW_SKIP);
+    return 0;
+}
+''', encoding="utf-8")
+        compiler = shlex.split(os.environ.get("CC", "cc"))
+        try:
+            for name, definitions in (
+                ("v15", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1"]),
+                ("v16", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1",
+                          "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1"]),
+            ):
+                executable = output / f"profile-{name}"
+                command = [*compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                           "-I", str(ROOT / "src"), *definitions,
+                           str(ROOT / "src/slippi_profile/profile.c"), str(source),
+                           "-o", str(executable)]
+                wrapped = [os.environ.get("PYTHON", "python3"),
+                           str(ROOT / "scripts/agent_workspace.py"), "run", "--", *command]
+                subprocess.run(wrapped, cwd=ROOT, check=True)
+                subprocess.run([str(executable)], cwd=ROOT, check=True)
+        except Exception as error:
+            self.fail(f"V15/V16 identity controls failed: {error}; retained reproducer directory: {output}")
+        else:
+            shutil.rmtree(output)
+
     def test_profile_policy_and_dependency_controls(self):
         work_root = ROOT / "work"
         work_root.mkdir(exist_ok=True)

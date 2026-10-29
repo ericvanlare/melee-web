@@ -214,6 +214,23 @@ int melee_web_source_memory_fighter_projection_matches(
     void*, const void* descriptor, size_t extent,
     const MeleeWebFighterProjectionIdentity*);
 
+/* Read-only backing allocation identity for an actual source-pool constructor.
+ * This proves a cell's containing row and observed descriptor/stride only.
+ * It does not prove the cell's type, liveness or incarnation, and grants no
+ * restoration authority. Callers retain their own create/free lifetime receipt.
+ * Never call identity to adopt a cell during capture, restore or drawing. */
+typedef struct MeleeWebSourcePoolCellIdentity {
+    uint64_t world, epoch, allocation;
+    uintptr_t pool, descriptor;
+    uint32_t source, cell_offset, stride;
+} MeleeWebSourcePoolCellIdentity;
+int melee_web_source_memory_pool_cell_identity(
+    void* cell, const void* descriptor, size_t extent,
+    MeleeWebSourcePoolCellIdentity*);
+int melee_web_source_memory_pool_cell_matches(
+    void* cell, const void* descriptor, size_t extent,
+    const MeleeWebSourcePoolCellIdentity*);
+
 /* Read-only private diagnostic, paired with the original strict comparison. */
 MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_witness(
  const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,

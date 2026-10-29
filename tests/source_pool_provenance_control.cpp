@@ -73,6 +73,28 @@ int main(int argc,char** argv){
        reinterpret_cast<void*>(descriptor.freehead->next)==pool+32&&
        descriptor.freehead->next->next==nullptr,"original allocator call/link/accounting exact");
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ MeleeWebSourcePoolCellIdentity cell_identity{};
+ const bool valid_pool=std::strcmp(mode,"bad-mask")!=0;
+ check(bool(melee_web_source_memory_pool_cell_identity(pool+32,&descriptor,32,&cell_identity))==valid_pool,
+       "read-only cell identity requires actual valid AddFree association");
+ if(valid_pool){
+  check(cell_identity.world==912&&cell_identity.pool==reinterpret_cast<uintptr_t>(pool)&&
+        cell_identity.descriptor==reinterpret_cast<uintptr_t>(&descriptor)&&cell_identity.cell_offset==32&&
+        cell_identity.stride==32&&melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&cell_identity),
+        "actual backing pool identity includes exact interior cell");
+  MeleeWebSourcePoolCellIdentity invalid{};HSD_ObjAllocData foreign_descriptor{};
+  check(!melee_web_source_memory_pool_cell_identity(pool+33,&descriptor,32,&invalid)&&
+        !melee_web_source_memory_pool_cell_identity(pool+64,&descriptor,32,&invalid)&&
+        !melee_web_source_memory_pool_cell_identity(pool+32,&descriptor,64,&invalid)&&
+        !melee_web_source_memory_pool_cell_identity(pool+32,&foreign_descriptor,32,&invalid)&&
+        !melee_web_source_memory_pool_cell_matches(pool,&descriptor,32,&cell_identity)&&
+        !melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,16,&cell_identity)&&
+        !melee_web_source_memory_pool_cell_matches(pool+32,&foreign_descriptor,32,&cell_identity),
+        "misaligned/outside/stride/descriptor/substituted cell all refuse");
+  invalid=cell_identity;++invalid.allocation;
+  check(!melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&invalid),
+        "wrong backing generation refuses");
+ }
  auto* snapshot=capture();pool[20]^=1;auto first=witness(snapshot);
  const auto original=melee_web_source_memory_payload_snapshot_compare_live(snapshot);
  const auto origin=melee_web_source_memory_allocation_origin_witness(snapshot,original);
@@ -96,6 +118,8 @@ int main(int argc,char** argv){
   HSD_ObjAllocData other{};
   const bool foreign=!std::strcmp(mode,"foreign"),overflow=!std::strcmp(mode,"overflow"),internal=!std::strcmp(mode,"internal");
   melee_web_source_memory_objalloc_event(foreign?pool+1:pool,&other,overflow?UINT32_MAX:32,overflow?UINT32_MAX:2,0,64,internal?1:0);
+  check(!melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&cell_identity),
+        "pool event conflict revokes retained backing identity");
   const unsigned reason=foreign?3:overflow?5:internal?7:6;
   auto bad=witness(snapshot);check(bad.attribution==2&&bad.reason==reason&&!bad.descriptor,"sticky rejection hides prior valid identity");
   auto* fresh=capture();pool[21]^=1;check(witness(fresh).attribution==2&&witness(fresh).reason==reason,"fresh snapshot cannot launder conflict");
@@ -109,11 +133,17 @@ int main(int argc,char** argv){
  }else if(!std::strcmp(mode,"mirror")){
   MeleeWebSourceMemorySnapshot* mirror=nullptr;check(melee_web_source_memory_snapshot_capture(&mirror)==0,"capture provenance in mirror");
   check(melee_web_source_memory_snapshot_restore(mirror)==0,"restore mirror without source event");
+  MeleeWebSourcePoolCellIdentity new_identity{};
+  check(!melee_web_source_memory_pool_cell_identity(pool+32,&descriptor,32,&new_identity)&&
+        melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&cell_identity),
+        "restore cannot mint pool identity; constructor receipt still matches unchanged backing row");
   auto* fresh=capture();pool[21]^=1;auto unknown=witness(fresh);
   check(unknown.first_difference_matches&&!unknown.attribution&&unknown.reason==2&&!unknown.descriptor,"copied mirror fields cannot revive allocating event");
   melee_web_source_memory_payload_snapshot_destroy(fresh);melee_web_source_memory_snapshot_destroy(mirror);
  }else if(!std::strcmp(mode,"reuse")){
   check(melee_web_source_memory_free(3,pool)&&melee_web_source_memory_alloc(3,pool,64),"new allocation generation");
+  check(!melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&cell_identity),
+        "same-address backing reuse invalidates original cell identity");
   auto* fresh=capture();pool[21]^=1;auto unknown=witness(fresh);
   check(unknown.first_difference_matches&&!unknown.attribution&&unknown.reason==2,"fresh allocation does not inherit association");
   melee_web_source_memory_payload_snapshot_destroy(fresh);
@@ -129,6 +159,8 @@ int main(int argc,char** argv){
  check(melee_web_source_memory_begin(912,3),"new owner resets diagnostic refusal");
  check(melee_web_source_memory_alloc(3,pool,64),"new owner allocation");
  melee_web_source_memory_objalloc_event(pool,&descriptor,32,2,3,64,0);
+ check(!melee_web_source_memory_pool_cell_matches(pool+32,&descriptor,32,&cell_identity),
+       "same world number in a new owner epoch rejects old identity");
  auto* final=capture();pool[20]^=1;check(witness(final).attribution==1,"new owner genuine event accepted");
  melee_web_source_memory_payload_snapshot_destroy(final);check(melee_web_source_memory_end(912),"end");
  std::printf("Actual source AddFree/provenance %s passed (memory/OS leaves modeled)\n",mode);

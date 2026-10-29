@@ -1823,3 +1823,960 @@ diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc
  #endif
  }
  
+diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
+--- a/src/melee/cm/camera.c
++++ b/src/melee/cm/camera.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "camera.h"
+ 
+ #include <Runtime/platform.h>
+@@ -4128,6 +4133,17 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_main_camera_identity(HSD_GObj** gobj, GObj_RenderFunc* render,
++                                                HSD_GObjEvent* process, unsigned* x398_b3)
++{
++    *gobj = cm_80452C68.gobj;
++    *render = fn_800301D0;
++    *process = fn_8002F360;
++    *x398_b3 = (unsigned) cm_80452C68.x398_b3;
++}
++#endif
++
+ void Camera_800304E0(HSD_GObj* gobj)
+ {
+     s64 prio8;
+diff --git a/src/melee/ef/eflib.c b/src/melee/ef/eflib.c
+--- a/src/melee/ef/eflib.c
++++ b/src/melee/ef/eflib.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ /*
+  * TODO: I looked at the strings in the ASM, I think there was only
+  *       ever eflib.c and efasync.c (?) The files in this folder
+@@ -658,13 +663,26 @@
+     default:
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    SlippiParticleDispatchResult routed = slippi_particle_presentation_dispatch_begin(
++        gobj, particles_code, gobj->gx_link,
++        gobj->gx_link == 7 ? (PTCL_RENDER_LINKNO_0 | PTCL_RENDER_LINKNO_2) : PTCL_RENDER_LINKNO_1,
++        NULL, 0);
++    if (routed == SLIPPI_PARTICLE_DISPATCH_REFUSED) return;
++#endif
+     HSD_StateSetColorUpdate(1);
+     if (gobj->gx_link == 7) {
+         psDispParticles(PTCL_RENDER_LINKNO_0 | PTCL_RENDER_LINKNO_2,
+                         particles_code);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_dispatch_end(NULL, 0)) return;
++#endif
+         return;
+     }
+     psDispParticles(PTCL_RENDER_LINKNO_1, particles_code);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_dispatch_end(NULL, 0)) return;
++#endif
+ }
+ 
+ void efLib_particles_proc_main(HSD_GObj* gobj)
+diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
+--- a/src/sysdolphin/baselib/gobj.c
++++ b/src/sysdolphin/baselib/gobj.c
+@@ -1,3 +1,11 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_source_schedule.h>
++#endif
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ #include "pipeline_provenance_runtime.h"
+ #endif
+@@ -206,11 +214,22 @@
+             MeleeWebPipelineScope provenance_scope = {0};
+             melee_web_provenance_owner_begin(cur->classifier, cur->gx_link, 0, &provenance_scope);
+ #endif
++            #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++int particle_camera_ok = slippi_particle_source_camera_begin(cur, NULL, 0);
++            if (particle_camera_ok) {
++#endif
+             cur->render_cb(cur, 0);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++                particle_camera_ok = slippi_particle_source_camera_end(cur, NULL, 0);
++            }
++#endif
+ #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+             melee_web_provenance_scope_end(&provenance_scope);
+ #endif
+             HSD_GObj_804D7818 = saved;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!particle_camera_ok) return;
++#endif
+         }
+         cur = cur->next_gx;
+     }
+diff --git a/src/sysdolphin/baselib/particle.c b/src/sysdolphin/baselib/particle.c
+--- a/src/sysdolphin/baselib/particle.c
++++ b/src/sysdolphin/baselib/particle.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "particle.h"
+ 
+ #include "generator.h"
+@@ -335,6 +340,15 @@
+ 
+ void hsd_80398A08(u32 unused)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_reinitialization_allowed()) __builtin_trap();
++#endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int i;
+ 
+     (void) hsd_804D0908;
+@@ -346,6 +360,9 @@
+     (void) ptclref_804D0E5C;
+ 
+     HSD_ObjAllocInit(&hsd_804D0F60.alloc_data, sizeof(HSD_Particle), 4);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_initialized(&hsd_804D0F60.alloc_data, sizeof(HSD_Particle), 4)) __builtin_trap();
++#endif
+     PAD_STACK(16);
+ 
+     for (i = 0; i < 16; i++) {
+@@ -378,6 +395,11 @@
+                                   f32 vy, f32 vz, f32 size, f32 grav, f32 fric,
+                                   HSD_Generator* gp, int flgInterpret)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_Particle* pp;
+     HSD_Particle** slot;
+     s16 cmd_wait;
+@@ -390,6 +412,9 @@
+         return NULL;
+     }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_particle_created(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+     hsd_804D78E2 += 1;
+     if (hsd_804D78E2 > numPeakParticles) {
+         numPeakParticles = hsd_804D78E2;
+@@ -709,6 +734,9 @@
+ 
+             /* Free particle */
+             hsd_8039D048(pp);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, pp);
+             hsd_804D78E2--;
+             return next_pp;
+@@ -716,6 +744,11 @@
+ }
+ void melee_web_particle_clear_all(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int link;
+     for (link = 0; link < 16; ++link) {
+         while (hsd_804D0908[link] != NULL)
+@@ -726,6 +759,11 @@
+ 
+ void* hsd_8039930C(HSD_Particle* pp, HSD_Particle* prev)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int bank;
+     f32 val;
+     u8* pc;
+@@ -2918,6 +2956,9 @@
+ 
+             /* Free particle */
+             hsd_8039D048(pp);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, pp);
+             hsd_804D78E2--;
+             return next_pp;
+@@ -3021,6 +3062,11 @@
+ 
+ void hsd_8039CEAC(u32 mask)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     void* cur;
+     void* prev;
+     s32 i;
+@@ -3081,6 +3127,11 @@
+ 
+ void hsd_8039D048(void* particle)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     u32 flags = ((HSD_Particle*) particle)->kind;
+     if (flags & 0x8000) {
+         HSD_JObj** p = &hsd_804D08E8[(flags >> 12) & 7];
+@@ -3093,6 +3144,11 @@
+ 
+ void hsd_8039D0A0(HSD_Generator* gen)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     typedef struct {
+         HSD_JObj* jobj[8];
+         HSD_Particle* particle[146];
+@@ -3142,6 +3198,9 @@
+                 }
+             }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(prt, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, prt);
+             hsd_804D78E2--;
+         } else {
+diff --git a/src/sysdolphin/baselib/psappsrt.c b/src/sysdolphin/baselib/psappsrt.c
+--- a/src/sysdolphin/baselib/psappsrt.c
++++ b/src/sysdolphin/baselib/psappsrt.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psappsrt.h"
+ 
+ #include <string.h>
+@@ -11,15 +16,32 @@
+ 
+ melee_source_bool psInitAppSRT(int num, int size)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_reinitialization_allowed()) __builtin_trap();
++#endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     hsd_804D78DE = 0;
+     hsd_804D78D8 = 0;
+     HSD_PSAppSrt_804D7958[0] = (u16) size;
+     HSD_ObjAllocInit(&HSD_PSAppSrt_804D10B0, size, 4U);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_pool_initialized(&HSD_PSAppSrt_804D10B0, size, 4)) __builtin_trap();
++#endif
+     return 0;
+ }
+ 
+ HSD_psAppSRT* psAddGeneratorAppSRT(s32 status, u16 idnum)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+ 
+     srt = HSD_ObjAlloc(&HSD_PSAppSrt_804D10B0);
+@@ -49,39 +71,73 @@
+             hsd_804D78D8 = hsd_804D78DE;
+         }
+     }
++    #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (srt && !slippi_particle_presentation_appsrt_created(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+     return srt;
+ }
+ 
+ HSD_psAppSRT* psAddParticleAppSRT_begin(HSD_Particle* pp, s32 status)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     return (pp->appsrt = psAddGeneratorAppSRT(status, pp->idnum));
+ }
+ 
+ HSD_psAppSRT* psAddGeneratorAppSRT_begin(HSD_Generator* gp, s32 status)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     return gp->appsrt = psAddGeneratorAppSRT(status, gp->idnum);
+ }
+ 
+ int psAttachParticleAppSRT(HSD_Particle* pp, HSD_psAppSRT* srt)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     if (srt == NULL || pp == NULL || pp->appsrt != NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_attached(pp, srt, 0)) __builtin_trap();
++#endif
+     pp->appsrt = srt;
+     return (++srt->usedCount);
+ }
+ 
+ int psAttachGeneratorAppSRT(HSD_Generator* gp, HSD_psAppSRT* srt)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     if (srt == NULL || gp == NULL || gp->appsrt != NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_attached(gp, srt, 1)) __builtin_trap();
++#endif
+     gp->appsrt = srt;
+     return (++srt->usedCount);
+ }
+ 
+ int psRemoveParticleAppSRT(HSD_Particle* pp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+     int count;
+ 
+@@ -89,12 +145,18 @@
+     if (srt == NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_detaching(pp, srt, 0)) __builtin_trap();
++#endif
+     count = --srt->usedCount;
+     if (count == 0) {
+         srt = pp->appsrt;
+         if (srt->freefunc != NULL) {
+             srt->freefunc(srt);
+         }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_appsrt_retiring(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+         HSD_ObjFree(&HSD_PSAppSrt_804D10B0, srt);
+         hsd_804D78DE--;
+     }
+@@ -104,6 +166,11 @@
+ 
+ int psRemoveGeneratorSRT(HSD_Generator* gp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+     int count;
+ 
+@@ -118,12 +185,18 @@
+         }
+     }
+     srt = gp->appsrt;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_detaching(gp, srt, 1)) __builtin_trap();
++#endif
+     count = --srt->usedCount;
+     if (count == 0) {
+         srt = gp->appsrt;
+         if (srt->freefunc != NULL) {
+             srt->freefunc(srt);
+         }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_appsrt_retiring(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+         HSD_ObjFree(&HSD_PSAppSrt_804D10B0, srt);
+         hsd_804D78DE--;
+     }
+diff --git a/src/sysdolphin/baselib/psdisp.c b/src/sysdolphin/baselib/psdisp.c
+--- a/src/sysdolphin/baselib/psdisp.c
++++ b/src/sysdolphin/baselib/psdisp.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psdisp.h"
+ 
+ #include <string.h>
+@@ -81,6 +86,32 @@
+ 
+ ASSERT_SIZE(HSD_PSDisp_8040C340, 0x20);
+ ASSERT_SIZE(HSD_PSDisp_8040C360, 0x10);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++uint8_t slippi_particle_source_frame_key(void) { return psFrameNum; }
++#define psFrameNum (*slippi_particle_presentation_frame_slot(&psFrameNum))
++#define prevPointSize (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_PREV_POINT_SIZE, &prevPointSize))
++#define prevLineWidth (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_PREV_LINE_WIDTH, &prevLineWidth))
++#define HSD_PSDisp_804D792C (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_BLEND_MODE, &HSD_PSDisp_804D792C))
++#define prevChanCtrl (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_CHAN_CTRL, &prevChanCtrl))
++#define HSD_PSDisp_804D7914 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7914, &HSD_PSDisp_804D7914))
++#define HSD_PSDisp_804D7918 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7918, &HSD_PSDisp_804D7918))
++#define HSD_PSDisp_804D791C (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D791C, &HSD_PSDisp_804D791C))
++#define HSD_PSDisp_804D7920 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7920, &HSD_PSDisp_804D7920))
++#define HSD_PSDisp_804D7924 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7924, &HSD_PSDisp_804D7924))
++#define HSD_PSDisp_804D7928 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7928, &HSD_PSDisp_804D7928))
++#define prevChanMat (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_CHAN_MAT, &prevChanMat))
++#define prevChanAmb (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_CHAN_AMB, &prevChanAmb))
++#define prevColorPrim (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_PRIM, &prevColorPrim))
++#define prevColorEnv (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_ENV, &prevColorEnv))
++#define prevColorMat (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_MAT, &prevColorMat))
++#define vmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_VMTX, &vmtx))
++#define rvmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_RVMTX, &rvmtx))
++#define pvmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_PVMTX, &pvmtx))
++#define prj (slippi_particle_presentation_projection_slot(prj))
++#define HSD_PSDisp_804D7948 (*slippi_particle_presentation_slot_array2(&HSD_PSDisp_804D7948))
++#define HSD_PSDisp_804D7908 (*slippi_particle_presentation_fog_slot(&HSD_PSDisp_804D7908))
++#endif
++
+ 
+ void setVtxDesc(s32 fmt)
+ {
+@@ -1258,6 +1289,15 @@
+ 
+ static inline void psDispSubAPPSRTPoint(HSD_Particle* pp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_psAppSRT app_scratch;
++    HSD_psAppSRT* app_view = slippi_particle_presentation_app_srt_view(pp->appsrt, &app_scratch);
++    if (!app_view) __builtin_trap();
++#define SLIPPI_APP app_view
++#else
++#define SLIPPI_APP (pp->appsrt)
++#endif
++
+     Mtx scratch_mtx;
+     Vec3 scratch_scale;
+     f32 cur_x;
+@@ -1269,58 +1309,58 @@
+     u8 w;
+ 
+     psSetCurrentMtx(GX_PNMTX1);
+-    if (pp->appsrt != NULL) {
+-        if (pp->appsrt->frameNum != psFrameNum) {
++    if (SLIPPI_APP != NULL) {
++        if (SLIPPI_APP->frameNum != psFrameNum) {
+             f32 scale_x;
+             f32 scale_y;
+ 
+-            if (pp->appsrt->status != PS_APPSTATUS_STILL) {
+-                Vec3* translate = &pp->appsrt->translate;
+-                Vec3* rotate = (Vec3*) &pp->appsrt->rot;
+-                Vec3* scale = &pp->appsrt->scale;
+-                MtxPtr mmtx = pp->appsrt->mmtx;
++            if (SLIPPI_APP->status != PS_APPSTATUS_STILL) {
++                Vec3* translate = &SLIPPI_APP->translate;
++                Vec3* rotate = (Vec3*) &SLIPPI_APP->rot;
++                Vec3* scale = &SLIPPI_APP->scale;
++                MtxPtr mmtx = SLIPPI_APP->mmtx;
+ 
+                 HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
+             }
+-            if (pp->appsrt->status == PS_APPSTATUS_ONCE) {
+-                pp->appsrt->status = PS_APPSTATUS_STILL;
+-            }
+-            PSMTXConcat(vmtx, pp->appsrt->mmtx, (MtxPtr) &pp->appsrt->ssx);
+-            scale_x = pp->appsrt->ssx * pp->appsrt->ssx +
+-                      pp->appsrt->x74 * pp->appsrt->x74 +
+-                      pp->appsrt->x84 * pp->appsrt->x84;
++            if (SLIPPI_APP->status == PS_APPSTATUS_ONCE) {
++                SLIPPI_APP->status = PS_APPSTATUS_STILL;
++            }
++            PSMTXConcat(vmtx, SLIPPI_APP->mmtx, (MtxPtr) &SLIPPI_APP->ssx);
++            scale_x = SLIPPI_APP->ssx * SLIPPI_APP->ssx +
++                      SLIPPI_APP->x74 * SLIPPI_APP->x74 +
++                      SLIPPI_APP->x84 * SLIPPI_APP->x84;
+             scale_x = sqrtf(scale_x);
+-            pp->appsrt->x94 = scale_x;
+-            scale_y = pp->appsrt->ssy * pp->appsrt->ssy +
+-                      pp->appsrt->x78 * pp->appsrt->x78 +
+-                      pp->appsrt->x88 * pp->appsrt->x88;
++            SLIPPI_APP->x94 = scale_x;
++            scale_y = SLIPPI_APP->ssy * SLIPPI_APP->ssy +
++                      SLIPPI_APP->x78 * SLIPPI_APP->x78 +
++                      SLIPPI_APP->x88 * SLIPPI_APP->x88;
+             scale_y = sqrtf(scale_y);
+-            pp->appsrt->x98 = scale_y;
+-            if (pp->appsrt->xA2 != 0) {
++            SLIPPI_APP->x98 = scale_y;
++            if (SLIPPI_APP->xA2 != 0) {
+                 PSMTXIdentity(scratch_mtx);
+-                scratch_mtx[0][3] = pp->appsrt->translate.x;
+-                scratch_mtx[1][3] = pp->appsrt->translate.y;
+-                scratch_mtx[2][3] = pp->appsrt->translate.z;
++                scratch_mtx[0][3] = SLIPPI_APP->translate.x;
++                scratch_mtx[1][3] = SLIPPI_APP->translate.y;
++                scratch_mtx[2][3] = SLIPPI_APP->translate.z;
+                 PSMTXConcat(vmtx, scratch_mtx, scratch_mtx);
+                 HSD_MtxGetScale(scratch_mtx, &scratch_scale);
+-                PSMTXScale((MtxPtr) &pp->appsrt->ssx, scratch_scale.x,
++                PSMTXScale((MtxPtr) &SLIPPI_APP->ssx, scratch_scale.x,
+                            scratch_scale.y, scratch_scale.z);
+-                pp->appsrt->x70 = scratch_mtx[0][3];
+-                pp->appsrt->x80 = scratch_mtx[1][3];
+-                pp->appsrt->x90 = scratch_mtx[2][3];
+-            }
+-        }
+-        pp->appsrt->frameNum = psFrameNum;
+-    }
+-    cur_x = pp->appsrt->x70 +
+-            (pp->appsrt->x6C * pp->pos.z +
+-             (pp->appsrt->ssx * pp->pos.x + pp->appsrt->ssy * pp->pos.y));
+-    cur_y = pp->appsrt->x80 +
+-            (pp->appsrt->x7C * pp->pos.z +
+-             (pp->appsrt->x74 * pp->pos.x + pp->appsrt->x78 * pp->pos.y));
+-    cur_z = pp->appsrt->x90 +
+-            (pp->appsrt->x8C * pp->pos.z +
+-             (pp->appsrt->x84 * pp->pos.x + pp->appsrt->x88 * pp->pos.y));
++                SLIPPI_APP->x70 = scratch_mtx[0][3];
++                SLIPPI_APP->x80 = scratch_mtx[1][3];
++                SLIPPI_APP->x90 = scratch_mtx[2][3];
++            }
++        }
++        SLIPPI_APP->frameNum = psFrameNum;
++    }
++    cur_x = SLIPPI_APP->x70 +
++            (SLIPPI_APP->x6C * pp->pos.z +
++             (SLIPPI_APP->ssx * pp->pos.x + SLIPPI_APP->ssy * pp->pos.y));
++    cur_y = SLIPPI_APP->x80 +
++            (SLIPPI_APP->x7C * pp->pos.z +
++             (SLIPPI_APP->x74 * pp->pos.x + SLIPPI_APP->x78 * pp->pos.y));
++    cur_z = SLIPPI_APP->x90 +
++            (SLIPPI_APP->x8C * pp->pos.z +
++             (SLIPPI_APP->x84 * pp->pos.x + SLIPPI_APP->x88 * pp->pos.y));
+     (void) (pp->pos.x, pp->pos.y);
+     (void) (pp->pos.z, pp->size);
+     if (pp->kind & Tornado) {
+@@ -1330,27 +1370,27 @@
+ 
+         calcTornadoLastPos(pp, &x, &y, &z);
+         prev_x =
+-            pp->appsrt->x70 + (pp->appsrt->x6C * z +
+-                               (pp->appsrt->ssx * x + pp->appsrt->ssy * y));
++            SLIPPI_APP->x70 + (SLIPPI_APP->x6C * z +
++                               (SLIPPI_APP->ssx * x + SLIPPI_APP->ssy * y));
+         prev_y =
+-            pp->appsrt->x80 + (pp->appsrt->x7C * z +
+-                               (pp->appsrt->x74 * x + pp->appsrt->x78 * y));
++            SLIPPI_APP->x80 + (SLIPPI_APP->x7C * z +
++                               (SLIPPI_APP->x74 * x + SLIPPI_APP->x78 * y));
+         prev_z =
+-            pp->appsrt->x90 + (pp->appsrt->x8C * z +
+-                               (pp->appsrt->x84 * x + pp->appsrt->x88 * y));
++            SLIPPI_APP->x90 + (SLIPPI_APP->x8C * z +
++                               (SLIPPI_APP->x84 * x + SLIPPI_APP->x88 * y));
+     } else {
+         prev_x =
+-            pp->appsrt->x70 + (pp->appsrt->x6C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->ssx * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->ssy * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x70 + (SLIPPI_APP->x6C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->ssx * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->ssy * (pp->pos.y - pp->vel.y)));
+         prev_y =
+-            pp->appsrt->x80 + (pp->appsrt->x7C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->x74 * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->x78 * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x80 + (SLIPPI_APP->x7C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->x74 * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->x78 * (pp->pos.y - pp->vel.y)));
+         prev_z =
+-            pp->appsrt->x90 + (pp->appsrt->x8C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->x84 * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->x88 * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x90 + (SLIPPI_APP->x8C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->x84 * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->x88 * (pp->pos.y - pp->vel.y)));
+     }
+ 
+     w = (pp->size > 42.5) ? 255.0f : 6.0f * pp->size;
+@@ -1397,10 +1437,21 @@
+             GXTexCoord1x8(1);
+         }
+     }
++
++#undef SLIPPI_APP
+ }
+ 
+ static inline void psDispSubAppSRT(HSD_Particle* pp, u8* texform)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_psAppSRT app_scratch;
++    HSD_psAppSRT* app_view = slippi_particle_presentation_app_srt_view(pp->appsrt, &app_scratch);
++    if (!app_view) __builtin_trap();
++#define SLIPPI_APP app_view
++#else
++#define SLIPPI_APP (pp->appsrt)
++#endif
++
+     Mtx draw_mtx;
+     /* Retail keeps a dead 12-byte aggregate at this position. */
+     Vec3 pad;
+@@ -1441,52 +1492,52 @@
+     f32 cur_y;
+     f32 cur_z;
+ 
+-    if (pp->appsrt->frameNum != psFrameNum) {
++    if (SLIPPI_APP->frameNum != psFrameNum) {
+         f32 scale_x;
+         f32 scale_y;
+ 
+-        if (pp->appsrt->status != PS_APPSTATUS_STILL) {
+-            Vec3* translate = &pp->appsrt->translate;
+-            Vec3* rotate = (Vec3*) &pp->appsrt->rot;
+-            Vec3* scale = &pp->appsrt->scale;
+-            MtxPtr mmtx = pp->appsrt->mmtx;
++        if (SLIPPI_APP->status != PS_APPSTATUS_STILL) {
++            Vec3* translate = &SLIPPI_APP->translate;
++            Vec3* rotate = (Vec3*) &SLIPPI_APP->rot;
++            Vec3* scale = &SLIPPI_APP->scale;
++            MtxPtr mmtx = SLIPPI_APP->mmtx;
+ 
+             HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
+         }
+-        if (pp->appsrt->status == PS_APPSTATUS_ONCE) {
+-            pp->appsrt->status = PS_APPSTATUS_STILL;
+-        }
+-        PSMTXConcat(vmtx, pp->appsrt->mmtx, (MtxPtr) &pp->appsrt->ssx);
+-        scale_x = pp->appsrt->ssx * pp->appsrt->ssx +
+-                  pp->appsrt->x74 * pp->appsrt->x74 +
+-                  pp->appsrt->x84 * pp->appsrt->x84;
++        if (SLIPPI_APP->status == PS_APPSTATUS_ONCE) {
++            SLIPPI_APP->status = PS_APPSTATUS_STILL;
++        }
++        PSMTXConcat(vmtx, SLIPPI_APP->mmtx, (MtxPtr) &SLIPPI_APP->ssx);
++        scale_x = SLIPPI_APP->ssx * SLIPPI_APP->ssx +
++                  SLIPPI_APP->x74 * SLIPPI_APP->x74 +
++                  SLIPPI_APP->x84 * SLIPPI_APP->x84;
+         scale_x = sqrtf(scale_x);
+-        pp->appsrt->x94 = scale_x;
+-        scale_y = pp->appsrt->ssy * pp->appsrt->ssy +
+-                  pp->appsrt->x78 * pp->appsrt->x78 +
+-                  pp->appsrt->x88 * pp->appsrt->x88;
++        SLIPPI_APP->x94 = scale_x;
++        scale_y = SLIPPI_APP->ssy * SLIPPI_APP->ssy +
++                  SLIPPI_APP->x78 * SLIPPI_APP->x78 +
++                  SLIPPI_APP->x88 * SLIPPI_APP->x88;
+         scale_y = sqrtf(scale_y);
+-        pp->appsrt->x98 = scale_y;
+-        if (pp->appsrt->xA2 != 0) {
++        SLIPPI_APP->x98 = scale_y;
++        if (SLIPPI_APP->xA2 != 0) {
+             PSMTXIdentity(draw_mtx);
+-            draw_mtx[0][3] = pp->appsrt->translate.x;
+-            draw_mtx[1][3] = pp->appsrt->translate.y;
+-            draw_mtx[2][3] = pp->appsrt->translate.z;
++            draw_mtx[0][3] = SLIPPI_APP->translate.x;
++            draw_mtx[1][3] = SLIPPI_APP->translate.y;
++            draw_mtx[2][3] = SLIPPI_APP->translate.z;
+             PSMTXConcat(vmtx, draw_mtx, draw_mtx);
+             HSD_MtxGetScale(draw_mtx, &scratch_scale);
+-            PSMTXScale((MtxPtr) &pp->appsrt->ssx, scratch_scale.x,
++            PSMTXScale((MtxPtr) &SLIPPI_APP->ssx, scratch_scale.x,
+                        scratch_scale.y, scratch_scale.z);
+-            pp->appsrt->x70 = draw_mtx[0][3];
+-            pp->appsrt->x80 = draw_mtx[1][3];
+-            pp->appsrt->x90 = draw_mtx[2][3];
+-        }
+-        pp->appsrt->frameNum = psFrameNum;
++            SLIPPI_APP->x70 = draw_mtx[0][3];
++            SLIPPI_APP->x80 = draw_mtx[1][3];
++            SLIPPI_APP->x90 = draw_mtx[2][3];
++        }
++        SLIPPI_APP->frameNum = psFrameNum;
+     }
+     {
+         f32 pos_x;
+         f32 pos_y;
+ 
+-        PSMTXCopy((MtxPtr) &pp->appsrt->ssx, draw_mtx);
++        PSMTXCopy((MtxPtr) &SLIPPI_APP->ssx, draw_mtx);
+         cur_x = draw_mtx[0][3] + (draw_mtx[0][2] * pp->pos.z +
+                                   (draw_mtx[0][0] * (pos_x = pp->pos.x) +
+                                    draw_mtx[0][1] * (pos_y = pp->pos.y)));
+@@ -1529,8 +1580,8 @@
+         psScaleAppSRTAxes(pp, draw_mtx);
+         (void) &pad;
+     }
+-    x_extent = pp->appsrt->x94 * pp->size;
+-    y_extent = pp->appsrt->x98 * pp->size;
++    x_extent = SLIPPI_APP->x94 * pp->size;
++    y_extent = SLIPPI_APP->x98 * pp->size;
+     if (it == NULL) {
+         ay = y_extent;
+         by = -ay;
+@@ -1546,18 +1597,18 @@
+         f32 vf2;
+         /* The retail frame reserves twelve float slots here, matching one
+          * unused copy of each AppSRT matrix element. */
+-        UNUSED f32 m00 = pp->appsrt->ssx;
+-        UNUSED f32 m01 = pp->appsrt->ssy;
+-        UNUSED f32 m02 = pp->appsrt->x6C;
+-        UNUSED f32 m03 = pp->appsrt->x70;
+-        UNUSED f32 m10 = pp->appsrt->x74;
+-        UNUSED f32 m11 = pp->appsrt->x78;
+-        UNUSED f32 m12 = pp->appsrt->x7C;
+-        UNUSED f32 m13 = pp->appsrt->x80;
+-        UNUSED f32 m20 = pp->appsrt->x84;
+-        UNUSED f32 m21 = pp->appsrt->x88;
+-        UNUSED f32 m22 = pp->appsrt->x8C;
+-        UNUSED f32 m23 = pp->appsrt->x90;
++        UNUSED f32 m00 = SLIPPI_APP->ssx;
++        UNUSED f32 m01 = SLIPPI_APP->ssy;
++        UNUSED f32 m02 = SLIPPI_APP->x6C;
++        UNUSED f32 m03 = SLIPPI_APP->x70;
++        UNUSED f32 m10 = SLIPPI_APP->x74;
++        UNUSED f32 m11 = SLIPPI_APP->x78;
++        UNUSED f32 m12 = SLIPPI_APP->x7C;
++        UNUSED f32 m13 = SLIPPI_APP->x80;
++        UNUSED f32 m20 = SLIPPI_APP->x84;
++        UNUSED f32 m21 = SLIPPI_APP->x88;
++        UNUSED f32 m22 = SLIPPI_APP->x8C;
++        UNUSED f32 m23 = SLIPPI_APP->x90;
+         if (0.0f == prj[0]) {
+             f32 prev_x;
+             f32 prev_y;
+@@ -1570,24 +1621,24 @@
+                 prev_y = pp->pos.y - pp->vel.y;
+                 prev_z = pp->pos.z - pp->vel.z;
+             }
+-            w0 = pp->appsrt->x90 +
+-                 (pp->appsrt->x8C * pp->pos.z +
+-                  (pp->appsrt->x84 * pp->pos.x + pp->appsrt->x88 * pp->pos.y));
+-            s808 = prj[1] * pp->appsrt->ssx + prj[2] * pp->appsrt->x84;
+-            s804 = prj[1] * pp->appsrt->ssy + prj[2] * pp->appsrt->x88;
+-            f16 = prj[1] * pp->appsrt->x6C + prj[2] * pp->appsrt->x8C;
+-            f20 = prj[1] * pp->appsrt->x70 + prj[2] * pp->appsrt->x90;
+-            f12 = prj[3] * pp->appsrt->x74 + prj[4] * pp->appsrt->x84;
+-            f8 = prj[3] * pp->appsrt->x78 + prj[4] * pp->appsrt->x88;
+-            f11 = prj[3] * pp->appsrt->x7C + prj[4] * pp->appsrt->x8C;
+-            f13 = prj[3] * pp->appsrt->x80 + prj[4] * pp->appsrt->x90;
++            w0 = SLIPPI_APP->x90 +
++                 (SLIPPI_APP->x8C * pp->pos.z +
++                  (SLIPPI_APP->x84 * pp->pos.x + SLIPPI_APP->x88 * pp->pos.y));
++            s808 = prj[1] * SLIPPI_APP->ssx + prj[2] * SLIPPI_APP->x84;
++            s804 = prj[1] * SLIPPI_APP->ssy + prj[2] * SLIPPI_APP->x88;
++            f16 = prj[1] * SLIPPI_APP->x6C + prj[2] * SLIPPI_APP->x8C;
++            f20 = prj[1] * SLIPPI_APP->x70 + prj[2] * SLIPPI_APP->x90;
++            f12 = prj[3] * SLIPPI_APP->x74 + prj[4] * SLIPPI_APP->x84;
++            f8 = prj[3] * SLIPPI_APP->x78 + prj[4] * SLIPPI_APP->x88;
++            f11 = prj[3] * SLIPPI_APP->x7C + prj[4] * SLIPPI_APP->x8C;
++            f13 = prj[3] * SLIPPI_APP->x80 + prj[4] * SLIPPI_APP->x90;
+             if (0.0f == w0) {
+                 return;
+             }
+             w0inv = -1.0f / w0;
+-            w1 = pp->appsrt->x90 +
+-                 (pp->appsrt->x8C * prev_z +
+-                  (pp->appsrt->x84 * prev_x + pp->appsrt->x88 * prev_y));
++            w1 = SLIPPI_APP->x90 +
++                 (SLIPPI_APP->x8C * prev_z +
++                  (SLIPPI_APP->x84 * prev_x + SLIPPI_APP->x88 * prev_y));
+             if (0.0f == w1) {
+                 return;
+             }
+@@ -1601,12 +1652,12 @@
+                                 (f12 * pp->pos.x + f8 * pp->pos.y))) -
+                 w1inv * (f13 + (f11 * prev_z + (f12 * prev_x + f8 * prev_y)));
+         } else {
+-            s800 = prj[1] * pp->appsrt->ssx + prj[2];
+-            s7FC = prj[1] * pp->appsrt->ssy + prj[2];
+-            s7F8 = prj[1] * pp->appsrt->x6C + prj[2];
+-            f17 = prj[3] * pp->appsrt->x74 + prj[4];
+-            f18 = prj[3] * pp->appsrt->x78 + prj[4];
+-            f20b = prj[3] * pp->appsrt->x7C + prj[4];
++            s800 = prj[1] * SLIPPI_APP->ssx + prj[2];
++            s7FC = prj[1] * SLIPPI_APP->ssy + prj[2];
++            s7F8 = prj[1] * SLIPPI_APP->x6C + prj[2];
++            f17 = prj[3] * SLIPPI_APP->x74 + prj[4];
++            f18 = prj[3] * SLIPPI_APP->x78 + prj[4];
++            f20b = prj[3] * SLIPPI_APP->x7C + prj[4];
+             if (pp->kind & Tornado) {
+                 f32 tx;
+                 f32 ty;
+@@ -1880,6 +1931,8 @@
+             }
+         }
+     }
++
++#undef SLIPPI_APP
+ }
+ 
+ static inline void psUpdateBillboardAxes(const Mtx inv_view)
+@@ -1932,6 +1985,12 @@
+     u32 prev_kind;
+     HSD_Particle* pp;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (melee_web_cpu_interval_active() &&
++        !slippi_particle_presentation_preparing() &&
++        !slippi_particle_presentation_dispatch_active()) __builtin_trap();
++    if (slippi_particle_presentation_dispatch_active() && sw == 0) return;
++#endif
+     alpha_compare_mode = 0;
+     prev_tex_interp_near = 0;
+     sp7A5 = 0;
+@@ -1948,6 +2007,13 @@
+     sp7B4 = 0;
+     do {
+         if (target_link & (1 << sp7B4)) {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            u8 prepared_key;
++            SlippiParticleDispatchResult routed = slippi_particle_presentation_render_data(
++                sp7B4, sw, &prepared_key, &sorted_particles, &non_edge_particles);
++            if (routed == SLIPPI_PARTICLE_DISPATCH_REFUSED) return;
++            if (routed == SLIPPI_PARTICLE_DISPATCH_SOURCE)
++#endif
+             particleSort(sp7B4, psFrameNum, &sorted_particles,
+                          &non_edge_particles);
+             if (sw == 1) {
+@@ -2299,3 +2365,67 @@
+ #ifdef MUST_MATCH
+ #pragma pop
+ #endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++int slippi_particle_source_preflight_visit(const SlippiParticlePassVisit* v, uint8_t key)
++{
++    unsigned link;
++    if (!v || v->code > 2 || !v->camera || !v->manager ||
++        (v->gx_link != 7 && v->gx_link != 8) ||
++        v->target_mask != (v->gx_link == 7 ? 5u : 2u)) return 0;
++    if (v->code == 0) return 1;
++    for (link = 0; link < 16; ++link) if (v->target_mask & (1u << link)) {
++        HSD_Particle* p = hsd_804D0908[link];
++        size_t visited = 0, bound = slippi_particle_presentation_particle_bound();
++        for (; p; p = p->next) {
++            unsigned kind;
++            if (visited++ >= bound || !slippi_particle_presentation_particle_require(p)) return 0;
++            if (p->linkNo != link) return 0;
++            if ((v->code == 1) != !!(p->kind & TexEdge) || (p->size < FLT_EPSILON)) continue;
++            /* psSetupTev clears this canonical kind bit in these four cases.
++             * Until that dependency has a source-phase proof, refuse BEFORE
++             * any key/sort/world writes rather than localize it into a cache. */
++            kind = p->kind & 0x80100480u;
++            if (kind == 0x80u || kind == 0x80000080u ||
++                kind == 0x00100080u || kind == 0x80100080u) return 0;
++            if (p->appsrt && !slippi_particle_presentation_app_future(p->appsrt, key, v->camera)) return 0;
++        }
++    }
++    return 1;
++}
++int slippi_particle_source_prepare_visit(const SlippiParticlePassVisit* v)
++{
++    SlippiParticlePreparedDispatch data;
++    unsigned link;
++    memset(&data, 0, sizeof(data));
++    if (v->code == 0) {
++        psDispParticles(v->target_mask, 0);
++    } else for (link = 0; link < 16; ++link) if (v->target_mask & (1u << link)) {
++        HSD_Particle* p;
++        particleSort(link, psFrameNum, &data.sorted[link], &data.nonedge[link]);
++        p = v->code == 1 ? data.sorted[link] : data.nonedge[link];
++        for (; p; p = p->next) {
++            HSD_psAppSRT* app;
++            int refreshed;
++            if (v->code == 1 && !(p->kind & TexEdge)) break;
++            if (p->size < FLT_EPSILON || !(app = p->appsrt)) continue;
++            refreshed = app->frameNum != psFrameNum;
++            if (refreshed) {
++                if (app->status != PS_APPSTATUS_STILL) {
++                    Vec3* translate = &app->translate;
++                    Vec3* rotate = (Vec3*) &app->rot;
++                    Vec3* scale = &app->scale;
++                    MtxPtr mmtx = app->mmtx;
++                    HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
++                }
++                if (app->status == PS_APPSTATUS_ONCE) app->status = PS_APPSTATUS_STILL;
++                app->frameNum = psFrameNum;
++            }
++            slippi_particle_presentation_app_prepared(app, psFrameNum, refreshed);
++            if (slippi_particle_presentation_failure()) return 0;
++        }
++    }
++    data.key = psFrameNum;
++    return slippi_particle_presentation_record_prepared(v, &data);
++}
++#endif
+diff --git a/src/sysdolphin/baselib/psdisptev.c b/src/sysdolphin/baselib/psdisptev.c
+--- a/src/sysdolphin/baselib/psdisptev.c
++++ b/src/sysdolphin/baselib/psdisptev.c
+@@ -1,8 +1,16 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psdisptev.h"
+ 
+ #include <dolphin/gx.h>
+ 
+ static u32 prevTev[2];
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#define prevTev (*slippi_particle_presentation_tev_slots(&prevTev))
++#endif
+ 
+ void psSetupTevCommon(void)
+ {

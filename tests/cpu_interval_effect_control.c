@@ -24,15 +24,19 @@ int main(int argc,char** argv){
  assert(!callbacks);assert(melee_web_source_files_pump(error,sizeof(error)));assert(callbacks==1&&memcmp(bytes,destination,32)==0);
  melee_web_cpu_interval_pad_motor(2,1);assert(motors==1);
  assert(!melee_web_cpu_interval_active());
+ assert(!melee_web_cpu_interval_token());
  uint64_t token=melee_web_cpu_interval_begin();assert(token&&!melee_web_cpu_interval_begin());
  assert(melee_web_cpu_interval_active());
+ assert(melee_web_cpu_interval_token()==token);
  assert(HSD_DevComRequest(entry,0,(uintptr_t)destination,32,0x21,1,callback,NULL)==-1);
  assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_SOURCE_FILE);
  assert(melee_web_cpu_interval_active()); /* Failure does not disarm the interval. */
+ assert(melee_web_cpu_interval_token()==token);
  assert(callbacks==1&&!melee_web_source_file_drive_busy());
  assert(!melee_web_cpu_interval_admit(token));
  assert(!melee_web_cpu_interval_end(token+1));assert(melee_web_cpu_interval_end(token));
  assert(!melee_web_cpu_interval_active()&&!melee_web_cpu_interval_active_failure()&&melee_web_cpu_interval_failure());
+ assert(!melee_web_cpu_interval_token());
  if(argc>1){HSD_DevComRequest(entry,1,(uintptr_t)destination,32,0x21,1,callback,NULL);assert(0);}
  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_admit(token));
  fixture_bank_barrier();assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_SSM);

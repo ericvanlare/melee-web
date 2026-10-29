@@ -1,5 +1,6 @@
 #include "gameplay_cpu_checkpoint.hpp"
 #include "gameplay_cpu_interval.h"
+#include "slippi_profile/particle_source_schedule.h"
 #include <cstring>
 #include <limits>
 #include <new>
@@ -78,6 +79,11 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
             std::snprintf(leaf_error,sizeof(leaf_error),"Canonical TObj owner capture refused (%u)",slippi_tobj_failure());
             refused(CpuComparisonDomain::Owner,code(CpuCaptureRefusal::TObjOwner),leaf_error);return {};
         }
+        c->commit_.particle_anchor=slippi_particle_presentation_anchor_capture();
+        if(!slippi_particle_presentation_anchor_admit(c->commit_.particle_anchor)){
+            refused(CpuComparisonDomain::Owner,code(CpuCaptureRefusal::ParticleOwner),
+                    "Particle constructor ownership capture refused");return {};
+        }
         // Diagnostic arm is not a CPU-admission condition. It owns no source
         // memory, and its serial/table are never captured or restored.
         c->class_piece_anchor_=melee_web_class_piece_arm();
@@ -109,7 +115,9 @@ bool GameplayCpuCheckpoint::same_owner(const GameplayMatchSession& session) cons
      * typed snapshots then check epoch/generation before source dereferences. */
     const auto live=session.diagnostic_cpu_owners();
     return live.storage&&live.storage==owner_.storage&&live.context==owner_.context&&
-        live.flow==owner_.flow&&live.audio==owner_.audio&&live.world==owner_.world&&live.context_epoch==owner_.context_epoch;
+        live.flow==owner_.flow&&live.audio==owner_.audio&&live.world==owner_.world&&
+        live.context_epoch==owner_.context_epoch&&
+        slippi_particle_presentation_anchor_admit(commit_.particle_anchor);
 }
 bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Captured||!same_owner(session)||
@@ -210,6 +218,11 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSessio
         return GameplayCpuCommitResult::UnexpectedWriterFailure;
     }
 #endif
+    if(result==GameplayCpuCommitResult::Ok&&
+       !slippi_particle_source_reset_after_restore(commit_.particle_anchor)){
+        phase_=Phase::Failed;
+        return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
     phase_=result==GameplayCpuCommitResult::Ok?Phase::Replaying:Phase::Failed;
     return result;
 }
@@ -358,6 +371,11 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
 }
 void GameplayCpuCheckpoint::disarm() noexcept {
     melee_web_source_memory_class_piece_slab_trace_early_close();
+    // Cleanup revokes host routing even after a failed interval. Its result is
+    // not a source comparison or successful rollback assertion.
+    if(commit_.effect_token)
+        (void)slippi_particle_source_interval_end(owner_.world,commit_.effect_token);
+    slippi_particle_presentation_anchor_disarm(commit_.particle_anchor);
     slippi_tobj_anchor_disarm(commit_.tobj_anchor);
     slippi_lobj_anchor_disarm(commit_.lobj_anchor);
     melee_web_lobj_writer_disarm(lobj_writer_session_);

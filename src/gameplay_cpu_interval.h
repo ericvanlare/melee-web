@@ -23,6 +23,9 @@ uint64_t melee_web_cpu_interval_begin(void);
 int melee_web_cpu_interval_admit(uint64_t token);
 /* Raw armed state, including an interval whose first effect already failed. */
 int melee_web_cpu_interval_active(void);
+/* Identity only: a failed armed interval retains its token. Call admit before
+ * source work; zero means there is no active diagnostic interval. */
+uint64_t melee_web_cpu_interval_token(void);
 int melee_web_cpu_interval_attempt(enum MeleeWebCpuIntervalEffect);
 unsigned melee_web_cpu_interval_failure(void);
 int melee_web_cpu_interval_active_failure(void);
@@ -31,6 +34,7 @@ int melee_web_cpu_interval_end(uint64_t token);
 static inline uint64_t melee_web_cpu_interval_begin(void){return 0;}
 static inline int melee_web_cpu_interval_admit(uint64_t token){(void)token;return 0;}
 static inline int melee_web_cpu_interval_active(void){return 0;}
+static inline uint64_t melee_web_cpu_interval_token(void){return 0;}
 static inline int melee_web_cpu_interval_attempt(enum MeleeWebCpuIntervalEffect effect){(void)effect;return 1;}
 static inline unsigned melee_web_cpu_interval_failure(void){return 0;}
 static inline int melee_web_cpu_interval_active_failure(void){return 0;}

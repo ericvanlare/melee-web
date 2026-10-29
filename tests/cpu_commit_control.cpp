@@ -26,6 +26,9 @@ bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topolog
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
 }
 extern "C" {
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+int slippi_particle_presentation_anchor_admit(SlippiParticlePresentationAnchor){return admitted(11);}
+#endif
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 int slippi_tobj_anchor_admit(SlippiTObjAnchor){return admitted(10);}
 #endif
@@ -53,6 +56,9 @@ int main(){
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
         +1
 #endif
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+        +1
+#endif
         ;
 #else
     const unsigned last_refusal=8;
@@ -64,7 +70,11 @@ int main(){
             reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
             reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
         fail_admission=fail;if(fail==8)invariant=6;
-        assert(gameplay_cpu_commit(o)!=R::Ok);assert(writes==0&&order==0&&fighter_fields==9&&private_slots==9&&static_value==9);
+        const auto result=gameplay_cpu_commit(o);
+        assert(result!=R::Ok);assert(writes==0&&order==0&&fighter_fields==9&&private_slots==9&&static_value==9);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+        if(fail==11)assert(result==R::Particle);
+#endif
         assert(audio_value==9&&flow_value==9&&bootstrap_value==9&&context_value==9);
     }
     fail_admission=0;writes=order=0;invariant=5;static_value=3;auto s=statics();
@@ -75,7 +85,11 @@ int main(){
     assert(fighter_fields==3&&private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3&&static_value==3);
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    puts("Actual fixed commit coordinator: eleven admission refusals write zero; light/texture/particle leaves modeled; ordered successful chain");
+#else
     puts("Actual fixed commit coordinator: ten admission refusals write zero; light/texture leaves modeled; ordered successful chain");
+#endif
 #else
     puts("Actual fixed commit coordinator: nine admission refusals write zero; light leaf modeled; ordered successful chain preserves later predicates");
 #endif
