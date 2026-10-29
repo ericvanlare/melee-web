@@ -1217,6 +1217,17 @@ comparison and the frozen capture-time ledger. Snapshot close and renderer shutd
 CPU close retains 1216 and all owned processes are absent. V11's later results
 remain historical and cannot be attributed to this candidate.
 
+At `6ce4962c`, the finite allocation-caller diagnostic repeats the same strict
+failure and positively joins the captured piece to original `HSD_TlutAlloc`
+(site 4). Its field at piece offset 8 is the palette GPU slot name; the drawn
+reference contains 16 and the no-draw result contains zero. All ten final raw
+vector comparisons still agree. This is allocation-caller evidence at capture,
+not a current lifetime or observed-writer claim. The next private V13 candidate
+keeps that slot name local to original TObj setup, with the same ordered GPU
+commands and eight-entry palette selection. Strict source comparison remains
+unchanged; V13 has not yet run in the browser. The exact V12 diagnostic producer,
+failed evidence and cleanup are retained.
+
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The
 structured `fighter_projection_v11_result_20261029` receipt preserves the source,

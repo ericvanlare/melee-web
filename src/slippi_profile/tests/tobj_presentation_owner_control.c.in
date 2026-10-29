@@ -26,6 +26,9 @@ extern HSD_TObjInfo hsdTObj;
 void fixture_tobj_update(HSD_TObj*, float);
 void fixture_tobj_update_type(HSD_TObj*, u32, float);
 void fixture_tobj_setup(HSD_TObj*);
+void fixture_tobj_setup_full(HSD_TObj*);
+void fixture_tobj_setup_unbounded(HSD_TObj*);
+s32 fixture_tobj_assign_resources_all(HSD_TObj*);
 void fixture_tobj_amnesia(void);
 HSD_TObj* fixture_actual_shadow(void);
 void fixture_actual_make(HSD_TObj*);
@@ -114,6 +117,12 @@ void melee_web_class_piece_descriptor(const void* p) {
 }
 void melee_web_class_piece_alloc(void* p, int32_t n, uint32_t z) {
     require(p && n > 0 && z >= (uint32_t) n, "piece event");
+}
+/* Modeled diagnostic sink only; allocation caller provenance is not under test. */
+void melee_web_class_piece_origin(void* p, int32_t n, uint32_t site) {
+    require(p && n > 0 && site >= MELEE_WEB_CLASS_PIECE_SITE_HSD_CLASS_ALLOC &&
+                site <= MELEE_WEB_CLASS_PIECE_SITE_SHAPE_SET,
+            "finite allocation origin diagnostic leaf");
 }
 void melee_web_class_piece_promote(void* p, int32_t n) {
     (void) p;
@@ -221,11 +230,88 @@ MtxPtr HSD_CObjGetInvViewingMtxPtrDirect(HSD_CObj* cobj) {
 struct Submission { u32 id, type; unsigned char matrix[48]; };
 static struct Submission gx[32];
 static unsigned count;
+static unsigned gx_setup_calls, state_setup_calls;
 void GXLoadTexMtxImm(const void* m, u32 id, GXTexMtxType type) {
+    ++gx_setup_calls;
     require(count < 32 && type == GX_MTX3x4, "GX 3x4 sink");
     gx[count].id = id;
     gx[count].type = type;
     memcpy(gx[count++].matrix, m, 48);
+}
+
+#define TLUT_TEST_MAX 12
+static const void* tlut_test_luts[TLUT_TEST_MAX];
+static const void* tlut_test_images[TLUT_TEST_MAX];
+static unsigned tlut_test_lut_count, tlut_test_image_count;
+static int pointer_tag(const void* p, const void* const* table, unsigned count_)
+{
+    for (unsigned i = 0; i < count_; ++i) {
+        if (table[i] == p) return (int) i;
+    }
+    return -1;
+}
+void HSD_StateRegisterTexGen(int coord) {
+    ++state_setup_calls;
+    printf("STATE_TEXGEN:%d\n", coord);
+}
+void GXInitTlutObj(GXTlutObj* obj, const void* lut, GXTlutFmt fmt, u16 n_entries)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TLUT_INIT:%d:%u:%u\n",
+           pointer_tag(lut, tlut_test_luts, tlut_test_lut_count),
+           (unsigned) fmt, (unsigned) n_entries);
+}
+void GXLoadTlut(const GXTlutObj* obj, u32 name)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TLUT_LOAD:%u\n", name);
+}
+void GXInitTexObjCI(GXTexObj* obj, const void* image_ptr, u16 width, u16 height,
+                    GXCITexFmt format, GXTexWrapMode wrap_s,
+                    GXTexWrapMode wrap_t, GXBool mipmap, u32 tlut_name)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX_CI:%d:%u:%u:%u:%u:%u:%u:%u\n",
+           pointer_tag(image_ptr, tlut_test_images, tlut_test_image_count),
+           (unsigned) width, (unsigned) height, (unsigned) format,
+           (unsigned) wrap_s, (unsigned) wrap_t, (unsigned) mipmap,
+           (unsigned) tlut_name);
+}
+void GXInitTexObj(GXTexObj* obj, const void* image_ptr, u16 width, u16 height,
+                  GXTexFmt format, GXTexWrapMode wrap_s,
+                  GXTexWrapMode wrap_t, GXBool mipmap)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX:%d:%u:%u:%u:%u:%u:%u\n",
+           pointer_tag(image_ptr, tlut_test_images, tlut_test_image_count),
+           (unsigned) width, (unsigned) height, (unsigned) format,
+           (unsigned) wrap_s, (unsigned) wrap_t, (unsigned) mipmap);
+}
+void GXInitTexObjLOD(GXTexObj* obj, GXTexFilter min_filt, GXTexFilter mag_filt,
+                     f32 min_lod, f32 max_lod, f32 lod_bias,
+                     GXBool bias_clamp, GXBool do_edge_lod,
+                     GXAnisotropy max_aniso)
+{
+    ++gx_setup_calls;
+    u32 min_bits, max_bits, bias_bits;
+    (void) obj;
+    memcpy(&min_bits, &min_lod, sizeof(min_bits));
+    memcpy(&max_bits, &max_lod, sizeof(max_bits));
+    memcpy(&bias_bits, &lod_bias, sizeof(bias_bits));
+    printf("TEX_LOD:%u:%u:%08x:%08x:%08x:%u:%u:%u\n",
+           (unsigned) min_filt, (unsigned) mag_filt, min_bits, max_bits,
+           bias_bits, (unsigned) bias_clamp, (unsigned) do_edge_lod,
+           (unsigned) max_aniso);
+}
+void GXLoadTexObj(GXTexObj* obj, GXTexMapID id)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX_LOAD:%u\n", (unsigned) id);
 }
 
 static HSD_TObj* make_flags(u32 flags) {
@@ -346,6 +432,164 @@ static int finish_world(void) {
     return 0;
 }
 
+static int run_tlut_control(int force_unbounded_resources)
+{
+    enum { BASIC_COUNT = 8, OVERFLOW_COUNT = 9 };
+    const unsigned n = force_unbounded_resources ? OVERFLOW_COUNT : BASIC_COUNT;
+    HSD_TObjDesc desc[OVERFLOW_COUNT];
+    HSD_ImageDesc images[OVERFLOW_COUNT];
+    HSD_TlutDesc palette_descs[OVERFLOW_COUNT];
+    HSD_TexLODDesc lod = {GX_LIN_MIP_LIN, 0.375f, GX_TRUE, GX_FALSE,
+                          GX_ANISO_2};
+    static unsigned char image_bytes[OVERFLOW_COUNT][32];
+    static unsigned char lut_bytes[OVERFLOW_COUNT][512];
+    HSD_TObj* objects[OVERFLOW_COUNT];
+    HSD_TObj* head;
+    HSD_Tlut* fixture_palette_table[2];
+    u32 original_names[OVERFLOW_COUNT];
+    HSD_Tlut original_palettes[OVERFLOW_COUNT];
+
+    memset(desc, 0, sizeof(desc));
+    memset(images, 0, sizeof(images));
+    memset(palette_descs, 0, sizeof(palette_descs));
+    tlut_test_lut_count = 0;
+    tlut_test_image_count = n;
+    for (unsigned i = 0; i < n; ++i) {
+        images[i].image_ptr = image_bytes[i];
+        images[i].width = 16 + i;
+        images[i].height = 8 + i;
+        images[i].mipmap = i == 1;
+        images[i].format = force_unbounded_resources ? (GXTexFmt) GX_TF_C4 :
+            (i == 0 ? (GXTexFmt) GX_TF_C4 : i == 1 ? (GXTexFmt) GX_TF_C8 :
+             i == 2 ? (GXTexFmt) GX_TF_C14X2 : i == BASIC_COUNT - 1 ? GX_TF_I4 : (GXTexFmt) GX_TF_C4);
+        tlut_test_images[i] = image_bytes[i];
+        desc[i].next = i + 1 < n ? &desc[i + 1] : NULL;
+        desc[i].id = GX_TEXMAP0;
+        desc[i].src = GX_TG_TEX0;
+        desc[i].scale.x = desc[i].scale.y = desc[i].scale.z = 1.0f;
+        desc[i].repeat_s = desc[i].repeat_t = 1;
+        desc[i].wrap_s = GX_REPEAT;
+        desc[i].wrap_t = GX_MIRROR;
+        desc[i].blend_flags = TEX_COORD_UV;
+        desc[i].imagedesc = &images[i];
+        desc[i].lod = i == 1 ? &lod : NULL;
+        desc[i].tlutdesc = images[i].format == (GXTexFmt) GX_TF_C4 ||
+                           images[i].format == (GXTexFmt) GX_TF_C8 ||
+                           images[i].format == (GXTexFmt) GX_TF_C14X2
+            ? &palette_descs[i] : NULL;
+        palette_descs[i].lut = lut_bytes[i];
+        palette_descs[i].fmt = (GXTlutFmt) (GX_TL_IA8 + (i & 1));
+        palette_descs[i].tlut_name = 0xA500u + i;
+        palette_descs[i].n_entries = force_unbounded_resources
+            ? (u16) (100 + i)
+            : (u16) (i == 0 ? 255 : i <= 3 ? 256 : 238 + i);
+        if (desc[i].tlutdesc != NULL) {
+            tlut_test_luts[tlut_test_lut_count++] = lut_bytes[i];
+        }
+    }
+
+    head = HSD_TObjLoadDesc(desc);
+    require(head != NULL, "actual canonical TObj Load for TLUT control");
+    HSD_TObj* current = head;
+    for (unsigned i = 0; i < n; ++i) {
+        require(current != NULL, "loaded TObj chain extent");
+        objects[i] = current;
+        if (desc[i].tlutdesc != NULL) {
+            require(current->tlut != NULL &&
+                        current->tlut != (HSD_Tlut*) desc[i].tlutdesc,
+                    "actual HSD_TlutLoadDesc creates copied runtime storage");
+            require(current->tlut->lut == desc[i].tlutdesc->lut &&
+                        current->tlut->tlut_name == desc[i].tlutdesc->tlut_name,
+                    "HSD_TlutLoadDesc preserves copied descriptor fields");
+            original_names[i] = current->tlut->tlut_name;
+        } else {
+            original_names[i] = 0;
+        }
+        current = current->next;
+    }
+    require(current == NULL, "loaded TObj chain terminates");
+
+    if (!force_unbounded_resources) {
+        /* Exercise table selection and both distinct-equal-entry and exact
+         * pointer duplicates without changing source descriptor behavior. */
+        objects[1]->tlut_no = 0;
+        /* Explicit modeled animation table; canonical LoadDesc leaves it NULL. */
+        fixture_palette_table[0] = objects[1]->tlut;
+        fixture_palette_table[1] = NULL;
+        objects[1]->tluttbl = fixture_palette_table;
+        objects[3]->tlut = objects[1]->tlut;
+    }
+    for (unsigned i = 0; i < n; ++i) {
+        if (objects[i]->tlut != NULL) {
+            original_names[i] = objects[i]->tlut->tlut_name;
+            memcpy(&original_palettes[i], objects[i]->tlut,
+                   sizeof(original_palettes[i]));
+        }
+    }
+
+    memset(gx, 0, sizeof(gx));
+    count = 0;
+    size_t source_allocations_before_setup = used;
+    unsigned host_allocations_before_setup = host_allocs;
+    if (force_unbounded_resources) {
+        fixture_tobj_setup_unbounded(head);
+    } else {
+        fixture_tobj_setup_full(head);
+        unsigned gx_calls_after_setup = gx_setup_calls;
+        unsigned state_calls_after_setup = state_setup_calls;
+        fixture_tobj_setup_full(NULL);
+        require(gx_setup_calls == gx_calls_after_setup &&
+                    state_setup_calls == state_calls_after_setup,
+                "NULL full setup returns without issuing state or GX calls");
+    }
+    require(used == source_allocations_before_setup &&
+                host_allocs == host_allocations_before_setup,
+            "full TObj setup adds no source or host allocations");
+
+    for (unsigned i = 0; i < n; ++i) {
+        if (objects[i]->tlut != NULL) {
+            fprintf(stderr, "SOURCE_TLUT:%u:%08x:%08x:%u\n", i,
+                    original_names[i], objects[i]->tlut->tlut_name,
+                    (unsigned) objects[i]->tlut->n_entries);
+#if PROPOSED_LANE
+            require(objects[i]->tlut->tlut_name == original_names[i],
+                    "profile HSD_TObjSetup preserves every runtime TLUT name");
+            require(memcmp(objects[i]->tlut, &original_palettes[i],
+                           sizeof(original_palettes[i])) == 0,
+                    "profile HSD_TObjSetup preserves all runtime TLUT bytes");
+#else
+            HSD_Tlut after = *objects[i]->tlut;
+            after.tlut_name = original_palettes[i].tlut_name;
+            require(memcmp(&after, &original_palettes[i], sizeof(after)) == 0,
+                    "original HSD_TObjSetup only changes the palette-name field");
+#endif
+        }
+        require(desc[i].tlutdesc == NULL ||
+                    desc[i].tlutdesc->tlut_name == 0xA500u + i,
+                "source TLUT descriptors remain unchanged");
+    }
+    if (!force_unbounded_resources) {
+        require(objects[2]->tlut != objects[1]->tlut &&
+                    objects[2]->tlut->n_entries == objects[1]->tlut->n_entries &&
+                    objects[2]->tlut->fmt != objects[1]->tlut->fmt,
+                "distinct same-entry palettes retain original duplicate selection");
+        require(objects[3]->tlut == objects[1]->tlut,
+                "same-pointer palette repeat uses the selected local slot");
+    }
+    printf("TLUT_RESULT:%u:%u:%u\n", n, (unsigned) force_unbounded_resources,
+           (unsigned) count);
+    printf("TLUT_CONSTANTS:%u:%u:%u:%u:%u:%u:%u:%u:%u\n",
+           (unsigned) GX_TLUT0, (unsigned) GX_TLUT1,
+           (unsigned) GX_TLUT2, (unsigned) GX_TLUT3,
+           (unsigned) GX_TLUT4, (unsigned) GX_TLUT5,
+           (unsigned) GX_TLUT6, (unsigned) GX_TLUT7,
+           (unsigned) GX_BIGTLUT0);
+    puts(force_unbounded_resources
+             ? "ACTUAL:source HSD_TObjSetup CI block with explicit all-resource test seam"
+             : "ACTUAL:canonical HSD_TObjSetup CI and non-CI source paths");
+    return finish_world();
+}
+
 int main(int argc, char** argv) {
     const char* mode = argc > 1 ? argv[1] : "changed";
 #if PROPOSED_LANE
@@ -354,6 +598,8 @@ int main(int argc, char** argv) {
 #endif
     _Static_assert(sizeof(HSD_TObj) == 172, "exact canonical extent");
     _Static_assert(offsetof(HSD_TObj, mtx) == 116, "matrix field offset");
+    if (!strcmp(mode, "tlut-basic")) return run_tlut_control(0);
+    if (!strcmp(mode, "tlut-overflow")) return run_tlut_control(1);
     HSD_TObj* p = make();
 
 #if PROPOSED_LANE

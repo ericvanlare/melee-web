@@ -221,3 +221,14 @@ the existing armed CPU interval, including the final draw. This is not authority
 the main camera's independent inverse cache or complete Slippi compatibility.
 The private build requires the existing CPU provenance configuration; V11
 manifests/snapshots are refused by V12. Ordinary profiles remain unchanged.
+
+V13 keeps GPU palette slot names local to each original TObj setup call. A
+parallel eight-entry local name array follows the original palette-pointer list,
+its duplicate comparison and its normal/big slot counters. GPU commands consume
+the same selected names without writing them into the loaded source palette.
+This avoids a draw-only payload difference during no-draw correction; it does
+not change palette contents, selection order or the ordinary Vanilla path.
+The canonical original loader copies descriptors into distinct runtime palettes;
+this adaptation does not admit arbitrary external aliases between those palettes
+and SObj descriptors. The private V13 identity refuses V12 snapshots/manifests.
+It remains an incomplete diagnostic profile, not online-profile admission.

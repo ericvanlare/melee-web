@@ -27,7 +27,7 @@ sys.path[:] = _saved_path
 
 def function(text, name):
     match = re.search(
-        r"^(?:static )?(?:void|HSD_TObj\*) " + re.escape(name) +
+        r"^(?:static )?(?:void|HSD_TObj\*|HSD_SObj\*) " + re.escape(name) +
         r"\([^;]*?\)\s*\{", text, re.M,
     )
     if not match:
@@ -196,6 +196,27 @@ class TObjPresentationCacheTests(OwnedWorkspaceTests):
         self.assertNotRegex(cache_text, r"\b(?:malloc|calloc|realloc)\s*\(")
         self.assertNotIn("TObjOwner", cache_text)
         self.assertNotIn("slippi_tobj_matrix_require", cache_header.read_text())
+        original_setup_all = function(original_tobj, "HSD_TObjSetup")
+        profile_setup_all = function(patched_tobj.read_text(), "HSD_TObjSetup")
+        self.assertIn("if (!DifferentTluts(tluts[i], tlut))", original_setup_all)
+        self.assertIn("(t0->n_entries != t1->n_entries)", original_tobj)
+        self.assertIn("u32 tlut_names[8];", profile_setup_all)
+        self.assertIn("selected_tlut_name = tlut_names[i];", profile_setup_all)
+        self.assertIn("GXLoadTlut(&tlutobj, selected_tlut_name);", profile_setup_all)
+        profile_ci_start = profile_setup_all.index(
+            "#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)",
+            profile_setup_all.index("for (i = 0;"),
+        )
+        profile_ci_end = profile_setup_all.index("#else", profile_ci_start)
+        self.assertNotIn("tlut->tlut_name =",
+                         profile_setup_all[profile_ci_start:profile_ci_end])
+        self.assertIn("GXInitTexObj(&texobj, imagedesc->image_ptr", profile_setup_all)
+        original_sobj = (prepared / "sysdolphin/baselib/sobjlib.c").read_text()
+        sobj_setup = function(original_sobj, "HSD_SObjLib_803A477C")
+        self.assertIn("tlut = desc->tlut;", sobj_setup)
+        self.assertIn("tlut->tlut_name", sobj_setup)
+        self.assertNotRegex(profile_patch.read_text(),
+                            r"diff --git a/src/sysdolphin/baselib/sobjlib\.c")
 
         overlay = self.work / "overlay"
         (overlay / "src/slippi_profile/tests").mkdir(parents=True)
@@ -213,10 +234,25 @@ class TObjPresentationCacheTests(OwnedWorkspaceTests):
 void fixture_tobj_update_type(HSD_TObj* p,u32 type,float v){HSD_ObjData d;memset(&d,0,sizeof(d));d.fv=v;TObjUpdateFunc(p,(enum_t)type,&d);}
 void fixture_tobj_update(HSD_TObj* p,float v){fixture_tobj_update_type(p,HSD_A_T_TRAV,v);}
 void fixture_tobj_setup(HSD_TObj* p){TObjSetupMtx(p);}
+void fixture_tobj_setup_full(HSD_TObj* p){HSD_TObjSetup(p);}
 void fixture_tobj_amnesia(void){TObjAmnesia((HSD_ClassInfo*)&hsdTObj);}
 int fixture_tobj_default_callbacks(void){return hsdTObj.make_mtx==MakeTextureMtx&&hsdTObj.load==TObjLoad&&hsdTObj.make_texp==TObjMakeTExp&&hsdTObj.parent.release==TObjRelease&&hsdTObj.parent.amnesia==TObjAmnesia;}
 int fixture_reload(HSD_TObj* p,HSD_TObjDesc* d){return HSD_TOBJ_METHOD(p)->load(p,d);}
 """)
+        unbounded_setup = function(patched_tobj.read_text(), "HSD_TObjSetup")
+        unbounded_setup = unbounded_setup.replace(
+            "void HSD_TObjSetup(HSD_TObj* tobj)",
+            "void fixture_tobj_setup_unbounded(HSD_TObj* tobj)", 1)
+        self.assertEqual(unbounded_setup.count(
+            "num = HSD_TObjAssignResources(tobj);"), 1)
+        unbounded_setup = unbounded_setup.replace(
+            "num = HSD_TObjAssignResources(tobj);",
+            "num = fixture_tobj_assign_resources_all(tobj);", 1)
+        with patched_tobj.open("a") as stream:
+            stream.write("\ns32 fixture_tobj_assign_resources_all(HSD_TObj* top) {\n"
+                         "    for (HSD_TObj* p = top; p; p = p->next) p->id = GX_TEXMAP0;\n"
+                         "    return 0;\n}\n\n")
+            stream.write(unbounded_setup + "\n")
         shadow = self.work / "shadow-construction.c"
         shadow.write_text(
             '#include <sysdolphin/baselib/tobj.h>\n' +
@@ -363,6 +399,48 @@ int fixture_reload(HSD_TObj* p,HSD_TObjDesc* d){return HSD_TOBJ_METHOD(p)->load(
                     outputs[("active", case)][1].count("SOURCE172_ACTIVE_DRAW:UNCHANGED"),
                     active[0].count("GX:"), case,
                 )
+        tlut_results = {}
+        for case in ("tlut-basic", "tlut-overflow"):
+            for lane in ("original", "active"):
+                stdout, stderr = self.run_command(
+                    lane + "-" + case, [node_runtime(), self.work / (lane + ".js"), case],
+                    env=env,
+                )
+                tlut_results[(lane, case)] = (stdout, stderr)
+                self.assertIn("ACTUAL:", stdout)
+            self.assertEqual(tlut_results[("original", case)][0],
+                             tlut_results[("active", case)][0], case)
+            self.assertEqual(tlut_results[("original", case)][0].count("TLUT_INIT:"),
+                             8 if case == "tlut-overflow" else 5, case)
+            self.assertEqual(tlut_results[("original", case)][0].count("TLUT_LOAD:"),
+                             8 if case == "tlut-overflow" else 5, case)
+            self.assertEqual(tlut_results[("original", case)][0].count("TEX_CI:"),
+                             9 if case == "tlut-overflow" else 7, case)
+        basic_stdout, _ = tlut_results[("original", "tlut-basic")]
+        constants = next(line for line in basic_stdout.splitlines()
+                         if line.startswith("TLUT_CONSTANTS:")).split(":")[1:]
+        tlut0, tlut1, _, _, _, _, _, _, bigtlut0 = map(int, constants)
+        self.assertIn(f"TLUT_LOAD:{tlut0}\n", basic_stdout)
+        self.assertIn(f"TLUT_LOAD:{bigtlut0}\n", basic_stdout)
+        self.assertIn(f"TEX_CI:2:18:10:{int(0xA)}:", basic_stdout)
+        basic_ci_names = [int(line.rsplit(":", 1)[1]) for line in
+                          basic_stdout.splitlines() if line.startswith("TEX_CI:")]
+        self.assertEqual(basic_ci_names,
+                         [tlut0, bigtlut0, bigtlut0, bigtlut0,
+                          tlut1, tlut1 + 1, tlut1 + 2])
+        overflow_stdout, _ = tlut_results[("original", "tlut-overflow")]
+        ci_names = [int(line.rsplit(":", 1)[1]) for line in
+                    overflow_stdout.splitlines() if line.startswith("TEX_CI:")]
+        self.assertEqual(ci_names[:8], [tlut0, tlut1, tlut0 + 2, tlut0 + 3,
+                                        tlut0 + 4, tlut0 + 5, tlut0 + 6, tlut0 + 7])
+        self.assertEqual(ci_names[8], tlut0)
+        for i, initial in enumerate((0xA500, 0xA501, 0xA502, 0xA501,
+                                     0xA504, 0xA505, 0xA506)):
+            self.assertIn(f"SOURCE_TLUT:{i}:{initial:08x}:{initial:08x}:",
+                          tlut_results[("active", "tlut-basic")][1])
+        vanilla_names = tlut_results[("original", "tlut-basic")][1]
+        self.assertIn(f"SOURCE_TLUT:0:{0xA500:08x}:{tlut0:08x}:255", vanilla_names)
+        self.assertIn(f"SOURCE_TLUT:1:{0xA501:08x}:{bigtlut0:08x}:256", vanilla_names)
         (self.work / "input-pins.json").write_text(json.dumps({
             "compile_graph": str(compile_db),
             "compile_graph_sha256": hashlib.sha256(compile_db.read_bytes()).hexdigest(),
@@ -379,8 +457,10 @@ int fixture_reload(HSD_TObj* p,HSD_TObjDesc* d){return HSD_TOBJ_METHOD(p)->load(
                 "HSD_TObj class identity and retain relocated raw class pointers "
                 "separately; entire stdout semantic result compared; active lane "
                 "checks full 172-byte source preservation for scratch matrix draws; "
-                "modeled memory/null-AObj, identity camera provider for Shadow, GX sink; "
-                "no full TObj resources, texgen, PObj, renderer, or CPU restore claim"
+                "also runs actual canonical HSD_TObjSetup CI/non-CI paths and "
+                "HSD_TlutLoadDesc copy using an inert GX argument sink; overflow "
+                "uses a test-only resource-assignment seam; modeled memory/null-AObj, "
+                "identity camera provider for Shadow; no renderer or CPU-restore claim"
             ),
         }, indent=2) + "\n")
         print("PASS actual TObj matrix scratch/component scope only", self.work)
