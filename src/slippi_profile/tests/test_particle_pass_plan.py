@@ -50,7 +50,7 @@ typedef struct HSD_Class { HSD_ClassInfo *class_info; } HSD_Class;
 #define FIXTURE_OBJECT_H
 #include "class.h"
 typedef struct HSD_Obj { HSD_Class parent; } HSD_Obj;
-#define HSD_OBJECT_METHOD(o) (((HSD_Obj *)(o))->parent.class_info)
+#define HSD_OBJECT_METHOD(o) (o->parent.parent.class_info)
 #endif
 ''',
     "sysdolphin/baselib/lobj.h": r'''#ifndef FIXTURE_LOBJ_H
@@ -165,7 +165,7 @@ extern HSD_PObjInfo hsdPObj;
     "sysdolphin/baselib/tobj.h": r'''#ifndef FIXTURE_TOBJ_H
 #define FIXTURE_TOBJ_H
 #include "object.h"
-typedef struct HSD_TObj { HSD_Obj object; struct HSD_TObj *next; } HSD_TObj;
+typedef struct HSD_TObj { HSD_Obj parent; struct HSD_TObj *next; } HSD_TObj;
 typedef struct HSD_TObjInfo { HSD_ClassInfo parent; } HSD_TObjInfo;
 extern HSD_TObjInfo hsdTObj;
 #endif

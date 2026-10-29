@@ -399,9 +399,9 @@ static int snapshot_selected_links(Schedule* schedule,
                     return refuse(error, error_size,
                                   "HUD GX10/GX11 link contains an unverified callback");
                 if (link == 10) {
+                    const HSD_LObj* light = object->hsd_obj;
                     if (object->obj_kind != HSD_GObj_LightKind ||
-                        !object->hsd_obj ||
-                        HSD_OBJECT_METHOD(object->hsd_obj) !=
+                        !light || HSD_OBJECT_METHOD(light) !=
                             HSD_CLASS_INFO(&hsdLobj))
                         return refuse(error, error_size,
                                       "HUD GX10 callback does not own a base LObj");
