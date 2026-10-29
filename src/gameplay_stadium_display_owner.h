@@ -1,0 +1,390 @@
+#ifndef MELEE_WEB_GAMEPLAY_STADIUM_DISPLAY_OWNER_H
+#define MELEE_WEB_GAMEPLAY_STADIUM_DISPLAY_OWNER_H
+
+#include <stddef.h>
+#include <stdint.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_source_memory_runtime.h"
+#include "gameplay_source_files.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Provenance is returned by the actual source buffer-selection branch. */
+typedef enum MeleeWebStadiumImageOrigin {
+    MELEE_WEB_STADIUM_IMAGE_ORIGIN_UNKNOWN = 0,
+    MELEE_WEB_STADIUM_IMAGE_ORIGIN_OWNED_HSD = 1,
+    MELEE_WEB_STADIUM_IMAGE_ORIGIN_BORROWED_PRELOAD = 2,
+    MELEE_WEB_STADIUM_IMAGE_ORIGIN_RELEASED = 3,
+} MeleeWebStadiumImageOrigin;
+
+typedef struct MeleeWebStadiumImageProvenance {
+    void* image_ptr;
+    MeleeWebStadiumImageOrigin origin;
+} MeleeWebStadiumImageProvenance;
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+typedef struct HSD_GObj HSD_GObj;
+typedef struct HSD_GObjProc HSD_GObjProc;
+/* Borrowed identities from exactly one original Ground manager construction.
+ * Source heap leases remain with StageLast, separate from logical identity. */
+typedef struct MeleeWebStadiumManagerView {
+    HSD_GObj* object;
+    HSD_GObjProc* proc;
+    void (*callback)(HSD_GObj*);
+} MeleeWebStadiumManagerView;
+typedef struct MeleeWebStadiumDisplayOwner MeleeWebStadiumDisplayOwner;
+typedef void (*MeleeWebStadiumBufferFree)(void* image_ptr, void* context);
+
+typedef enum MeleeWebStadiumMap2BufferOrigin {
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_UNKNOWN = 0,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_BORROWED_PRELOAD = 1,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK = 2,
+    MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_RETIRED = 3,
+} MeleeWebStadiumMap2BufferOrigin;
+
+#define MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY 8
+
+#define MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION 2U
+typedef struct MeleeWebStadiumIdleSnapshot {
+    uint32_t version;
+    uint64_t world_generation;
+    uint64_t world_ticks;
+    uint32_t source_frame;
+    int32_t map2_gate;
+    int32_t map2_countdown;
+    int16_t map2_phase;
+    int16_t map2_form;
+    int16_t map2_history_e0;
+    int16_t map2_history_e2;
+    int16_t display_mode;
+    int16_t display_e6;
+    int16_t display_e8;
+    /* Object bytes only: no current-object timer write receipt is available.
+     * Zero observed means unknown, not asserted uninitialized. */
+    unsigned char display_timer_native_bytes[sizeof(int32_t)];
+    uint32_t display_timer_initialization_observed;
+    int16_t display_previous_mode;
+    int16_t display_selected_player;
+    int16_t display_f2;
+    uint32_t display_flags;
+    uint32_t sis_font_slot;
+    uint32_t sis_static_text_role;
+    uint32_t sis_dynamic_text_role;
+    uint32_t sis_context_present;
+    uint32_t sis_title_entry_seen;
+    int32_t sis_title_entry_index;
+    uint32_t title_bytes_captured;
+    int32_t sis_source_heap_handle;
+    uint64_t sis_world_generation;
+    uint64_t sis_allocation_generation;
+    uint64_t sis_source_epoch;
+    uint32_t sis_requested_bytes;
+    int32_t map2_source_heap_handle;
+    uint64_t map2_world_generation;
+    uint64_t map2_allocation_generation;
+    uint32_t map2_requested_bytes;
+    uint32_t map2_buffer_origin;
+    /* Private, versioned address-free relation extension; legacy JSON stays v2. */
+    uint32_t typed_relations_version;
+    uint32_t map2_gate_mask_40;
+    uint32_t map5_root_relation;
+    uint32_t sis_font1_present;
+    uint32_t title_child_present;
+    uint32_t title_wrapper_present;
+    uint32_t title_static_present;
+    uint32_t title_dynamic_present;
+} MeleeWebStadiumIdleSnapshot;
+
+/* Publish a fully checked, address-free diagnostic candidate atomically.
+ * The source owner/map/proc/SIS guards run before the caller creates candidate. */
+static inline int melee_web_stadium_idle_snapshot_copy(
+    MeleeWebStadiumIdleSnapshot* out,
+    const MeleeWebStadiumIdleSnapshot* candidate)
+{
+    if (out == NULL || candidate == NULL ||
+        candidate->version != MELEE_WEB_STADIUM_IDLE_SNAPSHOT_VERSION ||
+        candidate->world_generation == 0 ||
+        candidate->display_timer_initialization_observed != 0 ||
+        candidate->map2_gate < 0 || candidate->map2_gate > 1 ||
+        (candidate->display_flags & ~7U) != 0 ||
+        candidate->sis_font_slot != 1 ||
+        candidate->sis_static_text_role != 0 ||
+        candidate->sis_dynamic_text_role != 1 ||
+        candidate->sis_context_present != 1 ||
+        candidate->sis_title_entry_seen > 1 ||
+        (candidate->sis_title_entry_seen &&
+         candidate->sis_title_entry_index < 0) ||
+        (!candidate->sis_title_entry_seen &&
+         candidate->sis_title_entry_index != -1) ||
+        candidate->title_bytes_captured != 0 ||
+        candidate->sis_world_generation != candidate->world_generation ||
+        candidate->map2_world_generation != candidate->world_generation ||
+        candidate->sis_source_heap_handle != candidate->map2_source_heap_handle ||
+        candidate->sis_allocation_generation == 0 ||
+        candidate->map2_allocation_generation == 0 ||
+        candidate->sis_source_epoch == 0 ||
+        candidate->sis_requested_bytes == 0 ||
+        candidate->map2_requested_bytes == 0 ||
+        candidate->map2_buffer_origin !=
+            MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK)
+        return 0;
+    *out = *candidate;
+    return 1;
+}
+
+typedef enum MeleeWebStadiumSourceEventKind {
+    MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8 = 1,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_24C = 2,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_GROUND_0800 = 3,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_ON_INIT = 4,
+    MELEE_WEB_STADIUM_SOURCE_EVENT_MAP_GOBJ = 5,
+} MeleeWebStadiumSourceEventKind;
+
+typedef struct MeleeWebStadiumSourceEvent {
+    MeleeWebStadiumSourceEventKind kind;
+    int map_id;
+    HSD_GObj* gobj;
+} MeleeWebStadiumSourceEvent;
+
+typedef struct MeleeWebStadiumSourceJournal {
+    MeleeWebStadiumSourceEvent events[MELEE_WEB_STADIUM_SOURCE_EVENT_CAPACITY];
+    unsigned count;
+    int failed;
+    int overflowed;
+} MeleeWebStadiumSourceJournal;
+
+/* Exact first selected-transform lifetime. The legacy Fire contract remains
+ * five events; Water has a separate source-derived eleven-event contract.
+ * These are actual source call receipts, not allocator generations, current
+ * membership, or original equivalence. */
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS 5U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM 3U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM 9U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS 11U
+#define MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENT_CAPACITY \
+    MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS
+typedef struct MeleeWebStadiumFirstTransformEvent {
+    unsigned kind; /* 1 original creation return, 2 removal entry, 3 removal return */
+    int map_id;
+    HSD_GObj* object;
+} MeleeWebStadiumFirstTransformEvent;
+typedef struct MeleeWebStadiumFirstTransformJournal {
+    uint64_t world_generation;
+    unsigned armed, count, failed;
+    uint32_t selected_form; /* exact authored Stadium form: Fire=3, Water=9 */
+    HSD_GObj* initial_map5;
+    HSD_GObj* fire_map3;
+    HSD_GObj* water_map9;
+    HSD_GObj* water_child7;
+    HSD_GObj* water_child8;
+    HSD_GObjProc* water_map9_proc;
+    HSD_GObjProc* water_child7_proc;
+    HSD_GObjProc* water_child8_proc;
+    void* source_slot;
+    /* Read-only status fields, copied from the current checked source owner. */
+    int phase,form,history_e0,history_e2,countdown,pending;
+    unsigned buffer_uses;
+    /* Scalar values are the last successfully validated LIVE graph sample.
+     * Sealed terminal events do not reread any destroyed display/Ground. */
+    int map2_gate,display_mode,display_e6,display_e8;
+    int display_previous_mode,display_selected_player,display_f2;
+    unsigned display_flags,scalar_sample_valid;
+    uint64_t scalar_world_ticks;
+    MeleeWebStadiumFirstTransformEvent events[MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENT_CAPACITY];
+} MeleeWebStadiumFirstTransformJournal;
+static inline unsigned melee_web_stadium_first_transform_event_count(
+    const MeleeWebStadiumFirstTransformJournal* j)
+{
+    if (j == NULL) return 0;
+    if (j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM)
+        return MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS;
+    if (j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+        return MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS;
+    return 0;
+}
+/* Pure fixed call-order reducer used by the passive source hooks. Object
+ * tokens are compared locally only; callers establish the live source owner. */
+static inline int melee_web_stadium_first_transform_record(
+    MeleeWebStadiumFirstTransformJournal* j,unsigned kind,int id,HSD_GObj* object)
+{
+    static const unsigned fire_kinds[5]={1,2,3,2,3};
+    static const int fire_ids[5]={3,5,5,3,3};
+    static const unsigned water_kinds[MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS]={
+        1,1,1,2,3,2,2,3,2,3,3};
+    static const int water_ids[MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS]={
+        9,7,8,5,5,9,7,7,8,8,9};
+    const unsigned expected = j != NULL &&
+        j->selected_form == MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM
+        ? MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_EVENTS
+        : MELEE_WEB_STADIUM_FIRST_TRANSFORM_EVENTS;
+    if(!j||j->armed!=1||j->failed||!j->world_generation||!j->initial_map5||
+       !object||j->count>=expected||
+       (j->selected_form!=0&&
+        j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
+        j->selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM))
+        {if(j)j->failed=1;return 0;}
+    const unsigned n=j->count;
+    if(j->selected_form==MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM){
+        HSD_GObj* expected_object = NULL;
+        if(kind!=water_kinds[n]||id!=water_ids[n]){j->failed=1;return 0;}
+        switch(n){
+        case 0: if(j->water_map9||object==j->initial_map5){j->failed=1;return 0;}j->water_map9=object;break;
+        case 1: if(j->water_child7||object==j->initial_map5||object==j->water_map9){j->failed=1;return 0;}j->water_child7=object;break;
+        case 2: if(j->water_child8||object==j->initial_map5||object==j->water_map9||object==j->water_child7){j->failed=1;return 0;}j->water_child8=object;break;
+        case 3: case 4: expected_object=j->initial_map5;break;
+        case 5: case 10: expected_object=j->water_map9;break;
+        case 6: case 7: expected_object=j->water_child7;break;
+        case 8: case 9: expected_object=j->water_child8;break;
+        default: j->failed=1;return 0;
+        }
+        if(expected_object&&object!=expected_object){j->failed=1;return 0;}
+        if(expected_object==NULL&&((n==0&&object!=j->water_map9)||
+           (n==1&&object!=j->water_child7)||(n==2&&object!=j->water_child8))){j->failed=1;return 0;}
+    }else{
+        if(kind!=fire_kinds[n]||id!=fire_ids[n]||
+           (n==0&&(j->fire_map3||object==j->initial_map5))||
+           (n!=0&&object!=(id==5?j->initial_map5:j->fire_map3)))
+            {j->failed=1;return 0;}
+        if(n==0)j->fire_map3=object;
+    }
+    j->events[n].kind=kind;j->events[n].map_id=id;j->events[n].object=object;
+    ++j->count;return 1;
+}
+int melee_web_stadium_display_owner_first_transform_arm(
+    MeleeWebStadiumDisplayOwner*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+int melee_web_stadium_display_owner_first_transform_arm_form(
+    MeleeWebStadiumDisplayOwner*,MeleeWebStadiumFirstTransformJournal*,uint32_t,char*,size_t);
+int melee_web_stadium_display_owner_first_transform_graph(
+    const MeleeWebStadiumDisplayOwner*,int retiring,char*,size_t);
+struct MeleeWebStadiumMap2BufferOwner;
+int melee_web_stadium_display_owner_first_transform_end(
+    MeleeWebStadiumFirstTransformJournal*,struct MeleeWebStadiumMap2BufferOwner*,char*,size_t);
+/* Typed static source callback identity, only in the actual live first-fire
+ * owner. This predicate never invokes a callback or selects an arrival. */
+int melee_web_stadium_first_transform_callback_matches(MeleeWebSourceFileCallback);
+int melee_web_stadium_water_graph_callback_matches(MeleeWebSourceFileCallback);
+void melee_web_stadium_display_owner_note_ground_retire(HSD_GObj*,int entering);
+void melee_web_stadium_display_owner_note_first_transform_proc(
+    int,HSD_GObj*,HSD_GObjProc*);
+int melee_web_stadium_display_owner_first_transform_status(
+    const MeleeWebStadiumFirstTransformJournal*,MeleeWebStadiumFirstTransformJournal*,char*,size_t);
+
+/* This source-derived record crosses the private Stadium TU boundary. It
+ * keeps the exact branch provenance alive after display/SIS retirement and
+ * until the original Ground owner objects have been removed. */
+typedef struct MeleeWebStadiumMap2BufferOwner {
+    HSD_GObj* map0_ground;
+    HSD_GObj* display_ground;
+    HSD_GObj* map2_ground;
+    HSD_GObj* nested_map5_ground;
+    void* buffer;
+    MeleeWebStadiumMap2BufferOrigin origin;
+    int captured;
+    /* The OnInit fallback allocation lease travels with this source owner
+     * until its exact post-Ground-retirement free. This is backing identity,
+     * separate from the logical map-2/Ground owner fields above. */
+    MeleeWebSourceMemoryAllocation buffer_allocation_lease;
+    int buffer_allocation_lease_captured;
+    int started_allocation_lease_required;
+    int initial_map5_source_retired; /* selected first-transform journal transfers this receipt */
+} MeleeWebStadiumMap2BufferOwner;
+
+/* The owner is opaque so the private grpstadium TextWrapper ABI stays in its
+ * defining translation unit. Call prepare before E8, bind after E8, and
+ * capture immediately after original Ground_801C0800 returns. */
+int melee_web_stadium_display_owner_prepare(
+    MeleeWebStadiumDisplayOwner** out, char* error, size_t error_size);
+int melee_web_stadium_display_owner_bind_source(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_display_owner_arm_source_journal(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+void melee_web_stadium_display_owner_note_source_event(
+    MeleeWebStadiumSourceEventKind, int map_id, HSD_GObj*);
+int melee_web_stadium_display_owner_source_journal_snapshot(
+    const MeleeWebStadiumDisplayOwner*, MeleeWebStadiumSourceJournal* out);
+int melee_web_stadium_display_owner_capture(
+    MeleeWebStadiumDisplayOwner*, HSD_GObj* display_ground,
+    MeleeWebStadiumMap2BufferOwner* map2_buffer_owner,
+    char* error, size_t error_size);
+/* Called only after original SIS Free finds a matching used allocation.
+ * Pointer comparison records source destruction; it never reads payloads. */
+void melee_web_stadium_display_owner_note_sis_free(const void* payload);
+void melee_web_stadium_display_owner_note_manager(HSD_GObj*, HSD_GObjProc*);
+int melee_web_stadium_display_owner_capture_manager(
+    MeleeWebStadiumDisplayOwner*, MeleeWebStadiumManagerView*, char*, size_t);
+int melee_web_stadium_manager_view_preflight(
+    const MeleeWebStadiumManagerView*, char*, size_t);
+int melee_web_stadium_display_owner_preflight(
+    MeleeWebStadiumDisplayOwner*, char*, size_t);
+/* A canceled, not-yet-started source StageLast may transfer only the SIS
+ * retirement strategy. The transfer never changes source_started/manager
+ * state and is consumed by the exact StageLast owner before display teardown. */
+int melee_web_stadium_display_owner_prepare_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t* token, char* error, size_t error_size);
+void melee_web_stadium_display_owner_abort_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t token);
+void melee_web_stadium_display_owner_publish_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, uint64_t token);
+int melee_web_stadium_display_owner_consume_cancel_transfer(
+    MeleeWebStadiumDisplayOwner*, const void* stage_identity, uint64_t world_generation,
+    uint64_t token, char* error, size_t error_size);
+/* Allocation-free current source-display observation for the GO canary. This
+ * validates exact current owner/map identities and returns scalar gate/mode
+ * fields without entering SIS retirement or changing owner state. */
+int melee_web_stadium_display_owner_go_alignment_view(
+    const MeleeWebStadiumDisplayOwner*,
+    const MeleeWebStadiumMap2BufferOwner*, int source_started,
+    int* map2_gate, int* display_mode);
+int melee_web_stadium_display_owner_idle_snapshot(
+    const MeleeWebStadiumDisplayOwner*,
+    const MeleeWebStadiumMap2BufferOwner*, int source_started,
+    uint64_t world_generation, uint64_t world_ticks, uint32_t source_frame,
+    MeleeWebStadiumIdleSnapshot*);
+void melee_web_stadium_display_owner_note_title_entry(const void* text,
+                                                      int sis_index);
+int melee_web_stadium_display_owner_cancel(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_display_owner_retire(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_display_owner_end(
+    MeleeWebStadiumDisplayOwner*, char* error, size_t error_size);
+int melee_web_stadium_map2_buffer_owner_end(
+    MeleeWebStadiumMap2BufferOwner*, char* error, size_t error_size);
+int melee_web_stadium_image_release(
+    MeleeWebStadiumImageProvenance*, MeleeWebStadiumBufferFree, void* context);
+
+/* A short-lived diagnostic snapshot lets the existing first text-topology
+ * refusal report SIS payload membership against one exact live backing lease.
+ * It does not add ownership to the Stadium display record. */
+struct MeleeWebDiagnosticSisOwner;
+int melee_web_stadium_text_membership_snapshot_begin(
+    const struct MeleeWebDiagnosticSisOwner*, char* error, size_t error_size);
+void melee_web_stadium_text_membership_snapshot_end(void);
+
+/* Focused asset-free controls for the shared source buffer branch and exact
+ * owned-versus-borrowed release behavior. */
+int melee_web_stadium_display_provenance_controls(void);
+int melee_web_stadium_display_list_controls(void);
+int melee_web_stadium_display_owner_retirement_controls(void);
+int melee_web_stadium_map2_buffer_controls(void);
+/* Phase-specific map-2 graph and exact fallback-allocation lease controls.
+ * Called only inside an already-started source-memory world. */
+int melee_web_stadium_map2_started_buffer_controls(void);
+int melee_web_stadium_source_journal_controls(void);
+/* Actual text-only SIS append/remove controls, under a live backing-heap
+ * token. Current payload membership is separate from source lifetime events. */
+struct MeleeWebDiagnosticSisOwner;
+int melee_web_stadium_text_topology_controls(
+    const struct MeleeWebDiagnosticSisOwner*);
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

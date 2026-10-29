@@ -6,10 +6,32 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <dolphin/pad.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Read-only source-owner receipts. Entry is partitioned, not a literal OnEnter. */
+typedef struct MeleeWebMatchSceneRngPoint {
+    uint64_t world_generation;
+    uintptr_t seed_pointer;
+    uint32_t seed;
+} MeleeWebMatchSceneRngPoint;
+typedef struct MeleeWebMatchSceneRngSnapshot {
+    unsigned count;
+    int invalid;
+    MeleeWebMatchSceneRngPoint points[4];
+} MeleeWebMatchSceneRngSnapshot;
+/* Registered once before tick0, called every raw tick after queue staging
+ * and before HSD master renewal consumes it. Not an ordinary renew hook. */
+typedef int (*MeleeWebMatchRecordedPreconsume)(void*,uint64_t,char*,size_t);
+int melee_web_match_recorded_preconsume_arm(MeleeWebMatchContext*,
+    MeleeWebMatchRecordedPreconsume,void*,char*,size_t);
+void melee_web_match_scene_rng_note(unsigned phase);
+int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext*,
+    MeleeWebMatchSceneRngSnapshot*,char*,size_t);
+#endif
 int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
 /* Current live-context allocation provenance only. This descriptor contains
  * the allocation identity/extent and its world/lifetime tags; it is not a
@@ -120,6 +142,32 @@ int melee_web_match_create_fighter(MeleeWebMatchContext*, char*, size_t);
  * processing. Runs original scheduler, including all registered fighter procs. */
 int melee_web_match_step(MeleeWebMatchContext*, uint32_t ticks, char*, size_t);
 int melee_web_match_stats(MeleeWebMatchContext*, MeleeWebMatchStats*, char*, size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Read-only copy of the four source PAD queue slots at the HSD renewal
+ * boundary. This diagnostic is published only after its enclosing phased
+ * source tick succeeds; it never owns or rewrites the queue. */
+typedef struct MeleeWebStadiumPadQueueObservation {
+    uint64_t source_generation, source_tick_before, source_tick_after;
+    uint32_t qnum_before, qread_before, qcount_before, qcount_after_hsd;
+    uint32_t player_count, slots[MELEE_WEB_MATCH_MAX_PLAYERS];
+    uint32_t controllers[MELEE_WEB_MATCH_MAX_PLAYERS];
+    PADStatus queue_slots[4];
+} MeleeWebStadiumPadQueueObservation;
+int melee_web_match_stadium_pad_queue_observation(
+    MeleeWebMatchContext*, MeleeWebStadiumPadQueueObservation*, char*, size_t);
+/* Stadium borrows one subject from this existing pool. These checks traverse
+ * the authored pool bound before original Camera allocation/return runs. */
+int melee_web_match_camera_available(MeleeWebMatchContext*,char*,size_t);
+int melee_web_match_camera_subject_preflight(MeleeWebMatchContext*,const void*,char*,size_t);
+/* The same partition/lease checks in the exact owned status-3 Ready callback.
+ * Ordinary retirement APIs above still require an idle scheduler. */
+int melee_web_match_camera_available_ready(MeleeWebMatchContext*,char*,size_t);
+int melee_web_match_camera_subject_preflight_ready(MeleeWebMatchContext*,const void*,char*,size_t);
+int melee_web_match_camera_subject_return(MeleeWebMatchContext*,void*,char*,size_t);
+/* Read the existing owned source seed without requiring collision attachment.
+ * Used only at the original Stadium constructor callback boundary. */
+int melee_web_match_rng_seed_owner_read(uint32_t* seed);
+#endif
 /* Original GObj disposal invokes registered Fighter_Unload, which clears the
  * player entity through Player_80031FB0, before source globals restore. */
 int melee_web_match_end(MeleeWebMatchContext*, char*, size_t);

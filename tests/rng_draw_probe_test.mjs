@@ -1,3 +1,4 @@
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from '../scripts/rng_draw_probe.mjs';
 
@@ -33,3 +34,43 @@ for (const invalidRows of [
 ]) assert.throws(() => validateRngDrawProbeRows(invalidRows, selection, {observedCursor: 9}));
 assert.throws(() => validateRngDrawProbeRows([row(8)], selection, {observedCursor: 9}), /omitted reached/);
 console.log('Bounded RNG draw probe request and artifact contract passed');
+
+
+test('version 2 owners are explicit and inconsistent or mixed owners refuse', () => {
+  const selection = parseRngDrawProbe({cursors:'40,41'});
+  const outside = {status:'outside_proc',gobj:'0000000000000000',proc:'0000000000000000',callback:'0000000000000000',classifier:0,p_link:0,s_link:0,callback_symbol:null};
+  const scheduled = {status:'scheduled_proc',gobj:'0000000000010000',proc:'0000000000020000',callback:'0000000000000123',classifier:13,p_link:4,s_link:0,callback_symbol:'unknown'};
+  const particle = {...scheduled,callback:'0000000000030123',classifier:8,p_link:11,s_link:15,callback_symbol:'efLib_particles_proc_main'};
+  const fighter = {...scheduled,callback:'0000000000001926',classifier:4,p_link:8,s_link:1,callback_symbol:'Fighter_8006A360'};
+  const ownerRow = (cursor, owner) => JSON.stringify({schema:'melee-web-rng-draw-probe',version:2,source_cursor:cursor,overflowed:false,draws:[{kind:'HSD_Rand',seed_after:'01234567',owner}]});
+  const validate = rows => validateRngDrawProbeRows(rows, selection, {observedCursor:41});
+  assert.equal(validate([ownerRow(40,outside),ownerRow(41,particle)]).complete,true);
+  assert.equal(validate([ownerRow(40,outside),ownerRow(41,fighter)]).complete,true);
+  for (const key of ['classifier','p_link','s_link'])
+    assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...fighter,[key]:fighter[key]+1})]),/fighter callback owner tuple/);
+  assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...fighter,callback_symbol:'Fighter_8006A364'})]),/callback symbol/);
+  assert.throws(()=>validate([ownerRow(40,{...outside,callback:scheduled.callback}),ownerRow(41,scheduled)]),/outside-proc/);
+  assert.throws(()=>validate([ownerRow(40,outside),ownerRow(41,{...scheduled,proc:outside.proc})]),/scheduled/);
+  assert.throws(()=>validate([ownerRow(40,outside),row(41)]),/invalid identity/);
+});
+
+
+test('version 3 fighter membership retains port/entity and refuses missing or invented identity', () => {
+  const selection = parseRngDrawProbe({cursors:'40'});
+  const fighter = {status:'scheduled_proc',gobj:'0000000000010000',proc:'0000000000020000',
+    callback:'0000000000000786',classifier:4,p_link:8,s_link:1,
+    callback_symbol:'Fighter_8006A360',fighter:{slot:1,entity:0,kind:0}};
+  const ownerRow = (owner, version=3) => JSON.stringify({schema:'melee-web-rng-draw-probe',version,
+    source_cursor:40,overflowed:false,draws:[{kind:'HSD_Rand',seed_after:'01234567',owner}]});
+  const validate = text => validateRngDrawProbeRows([text],selection,{observedCursor:40});
+  assert.equal(validate(ownerRow(fighter)).complete,true);
+  assert.equal(validate(ownerRow({...fighter,fighter:{slot:1,entity:1,kind:0}})).complete,true);
+  for (const identity of [null,undefined,{slot:6,entity:0,kind:0},{slot:1,entity:2,kind:0},
+    {slot:-1,entity:0,kind:0},{slot:1,entity:0,kind:-1}])
+    assert.throws(()=>validate(ownerRow({...fighter,fighter:identity})),/slot\/entity/);
+  const outside = {status:'outside_proc',gobj:'0000000000000000',proc:'0000000000000000',
+    callback:'0000000000000000',classifier:0,p_link:0,s_link:0,callback_symbol:null,fighter:null};
+  assert.equal(validate(ownerRow(outside)).complete,true);
+  assert.throws(()=>validate(ownerRow({...outside,fighter:fighter.fighter})),/non-fighter/);
+  assert.throws(()=>validate(ownerRow(fighter,2)),/Version 2/);
+});

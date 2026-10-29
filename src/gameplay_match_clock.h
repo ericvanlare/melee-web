@@ -77,6 +77,22 @@ void melee_web_source_clock_snapshot_destroy(
 /* Compatibility entry points used by the current native menu host. They
  * retain the existing MENU ordering: scene OnFrame is called by the menu
  * session, then the scheduler runs, then menu_clock_tick updates counters. */
+/* MENU constructor counter continuity only. Non-counter begin/reset semantics
+ * stay unchanged. Capture requires idle MENU ownership. Begin acquires a fresh
+ * ordinary MENU lease, then installs actual captured counters; no source
+ * pre/post/present is permitted until finish resets exactly these three once.
+ * Request observation and checked end/rollback remain available while pending.
+ * The host owns provenance, one-use handoff and failure revocation separately. */
+typedef struct MeleeWebMenuClockCounters {
+    uint32_t counter_0;
+    uint32_t counter_4;
+    uint32_t counter_8;
+} MeleeWebMenuClockCounters;
+int melee_web_menu_clock_capture_counters(MeleeWebMenuClockCounters* out);
+int melee_web_menu_clock_begin_with_counters(
+    const MeleeWebMenuClockCounters* counters);
+int melee_web_menu_clock_finish_constructor(void);
+
 int melee_web_menu_clock_begin(void);
 int melee_web_menu_clock_request(int* request);
 int melee_web_menu_clock_tick(void);

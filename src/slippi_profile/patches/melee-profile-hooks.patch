@@ -194,14 +194,14 @@ diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
 diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
 --- a/src/melee/gr/grpstadium.c
 +++ b/src/melee/gr/grpstadium.c
-@@ -18,6 +18,10 @@
- #include <dolphin/gx/GXStruct.h>
+@@ -30,6 +30,10 @@
  #include <melee/cm/camera.h>
  #include <melee/ft/ftlib.h>
 +#ifdef MELEE_WEB_SLIPPI_PROFILE
 +#include <melee/ft/types.h>
 +#include <slippi_profile/ps_camera_independent_monitor_fix.h>
 +#endif
+ #include <melee/gr/ground.h>
  #include <melee/gm/gm_unsplit.h>
  #include <melee/lb/lb_00B0.h>
  #include <melee/lb/lb_00F9.h>

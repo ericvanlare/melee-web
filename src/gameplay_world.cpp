@@ -1,3 +1,4 @@
+#include "gameplay_rng_draw_owner.h"
 #include "gameplay_vs_sis.h"
 #include "gameplay_world.hpp"
 #include "runtime_archive_cache.hpp"
@@ -13,6 +14,7 @@
 #include "dat_stage.hpp"
 #include "dat_trophy_data.hpp"
 #include "dat_native_stage.hpp"
+#include "gameplay_stadium_form_assets.hpp"
 #include "dat_scene.hpp"
 #include "gameplay_stage_last.h"
 #include "gameplay_stage_profile.h"
@@ -35,6 +37,7 @@
 #include "gameplay_item_runtime.h"
 #include "gameplay_archive_sections.h"
 #include "gameplay_source_files_runtime.hpp"
+#include "gameplay_source_memory_runtime.h"
 #include "gameplay_stage_items.h"
 #include "gameplay_font_atlas.h"
 #include "gameplay_ground_data.h"
@@ -46,6 +49,20 @@
 extern "C" {
 #include <sysdolphin/baselib/sislib.h>
 #include <melee/lb/lbarchive.h>
+#include <melee/lb/lblanguage.h>
+#include <melee/ty/toy.h>
+/* These Toy aliases are reset by the same original scene teardown. The Match
+ * owner only accepts the seven TyDatai roots it registered; other Toy archives
+ * remain borrowed and must still be empty at this boundary. */
+extern HSD_Archive* _Toy_sbss_804D6ED0;
+extern HSD_Archive* _Toy_sbss_804D6ECC;
+extern TrophyData* _Toy_sbss_804D6EC4;
+extern TrophyData* _Toy_sbss_804D6EC0;
+extern void* _Toy_sbss_804D6EBC;
+extern void* _Toy_sbss_804D6EB8;
+extern s16* _Toy_sbss_804D6EB4;
+extern void* _Toy_sbss_804D6EA8;
+extern void* _Toy_sbss_804D6EA4;
 }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -59,6 +76,7 @@ extern "C" {
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
 #include <algorithm>
+#include <iterator>
 #include <cstddef>
 #include <set>
 extern "C" void gm_801A4BD4(void);
@@ -82,6 +100,36 @@ int stop_vs_sis(MeleeWebGameplayVSSisOperation operation, int slot,
     return melee_web_gameplay_vs_sis(operation, slot, expected, error, size);
 }
 void check(int ok,const char* error){if(!ok)throw DatError(error);}
+bool toy_loader_aliases_empty(){
+    return !_Toy_sbss_804D6ED0 && !_Toy_sbss_804D6ECC &&
+           !_Toy_sbss_804D6EC4 && !_Toy_sbss_804D6EC0 &&
+           !_Toy_sbss_804D6EBC && !_Toy_sbss_804D6EB8 &&
+           !_Toy_sbss_804D6EB4 && !Toy_sbss_804D6EB0 &&
+           !Toy_sbss_804D6EAC && !_Toy_sbss_804D6EA8 &&
+           !_Toy_sbss_804D6EA4 && !Toy_sbss_804D6EC8;
+}
+bool toy_tables_match(const GameplayTrophyRoots& roots,const char* filename){
+    static constexpr const char* names[]={
+        "tyInitModelTbl","tyInitModelDTbl","tyModelSortTbl",
+        "tyExpDifferentTbl","tyNoGetUsTbl",
+        "tyDisplayModelTbl","tyDisplayModelUsTbl"
+    };
+    std::vector<MeleeWebArchiveSymbol> symbols;
+    symbols.reserve(7);
+    roots.append_symbols(filename,symbols);
+    return symbols.size()==7 &&
+           std::equal(std::begin(names),std::end(names),symbols.begin(),
+               [](const char* name,const MeleeWebArchiveSymbol& symbol){
+                   return std::strcmp(name,symbol.symbol)==0;
+               }) &&
+           _Toy_sbss_804D6EC4==symbols[0].native_data &&
+           _Toy_sbss_804D6EC0==symbols[1].native_data &&
+           _Toy_sbss_804D6EBC==symbols[2].native_data &&
+           _Toy_sbss_804D6EB8==symbols[3].native_data &&
+           _Toy_sbss_804D6EB4==symbols[4].native_data &&
+           Toy_sbss_804D6EB0==symbols[5].native_data &&
+           Toy_sbss_804D6EAC==symbols[6].native_data;
+}
 std::string_view melee_web_runtime_file_name_impl(const RuntimeFiles& files,
                                                   std::string_view authored_name,
                                                   DatMenuSupportLanguage setting_language,
@@ -201,13 +249,100 @@ struct GameplayWorld::Storage {
     std::unique_ptr<DatNativeAnimation> respawn_animation;
     MeleeWebStageVisual* stage_visual=nullptr;
     std::unique_ptr<DatNativeStage> full_stage;
+    std::unique_ptr<StadiumFormAssets> stadium_forms;
     std::unique_ptr<DatScene> quake_model;
     std::unique_ptr<DatTrophyData> trophy_data,trophy_data_dat;
     std::unique_ptr<GameplayTrophyRoots> trophy_roots,trophy_roots_dat;
     MeleeWebArchiveSections* trophy_scope=nullptr;
+    std::string toy_archive_filename;
     std::unique_ptr<DatEffectBanks> stage_effects;
     MeleeWebStageMap* stage_map=nullptr;
     MeleeWebStageLast* stage_last=nullptr;
+    bool stadium_diagnostic=false;
+    bool stadium_first_transform_diagnostic=false;
+    bool stadium_first_water_diagnostic=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebStadiumFirstTransformJournal stadium_first_transform_terminal{};
+    unsigned first_transform_selected_form()const{
+        if(stadium_first_transform_diagnostic&&stadium_first_water_diagnostic)return 0;
+        return stadium_first_water_diagnostic?9U:(stadium_first_transform_diagnostic?3U:0U);
+    }
+
+    bool first_fire_hook_installed=false,first_fire_schedule_declared=false,first_fire_gate_armed=false;
+    uint32_t first_fire_request_tick=0,first_fire_callback_tick=0,first_fire_last_tick=0;
+    MeleeWebSourceFileRecordedCompletionStatus first_fire_completion_retained{};
+    static int first_fire_preconsume(void* context,uint64_t cursor,char* error,size_t size){
+        auto* self=static_cast<Storage*>(context);
+        if(!self||!self->first_transform_selected_form()||!self->first_fire_gate_armed||
+           !self->source_files||!self->stage_last||
+           !melee_web_stage_last_source_work_allowed(self->stage_last)){
+            if(error&&size)std::snprintf(error,size,"First-fire preconsume owner/plan unavailable");
+            return 0;
+        }
+        return melee_web_source_files_recorded_preconsume(self->source_files,cursor,error,size);
+    }
+    bool first_fire_completion_status(MeleeWebSourceFileRecordedCompletionStatus* out,
+                                     char* error,size_t size)const{
+        if(!out||!first_transform_selected_form()||!first_fire_gate_armed)return false;
+        if(source_files)return melee_web_source_files_recorded_completion_status(source_files,out,error,size);
+        if(!first_fire_completion_retained.armed||first_fire_completion_retained.failed||
+           !first_fire_completion_retained.completed)return false;
+        *out=first_fire_completion_retained;
+        if(error&&size)*error=0;
+        return true;
+    }
+    bool first_fire_completion_can_end(char* error,size_t size)const{
+        MeleeWebSourceFileRecordedCompletionStatus status{};
+        const bool ready=first_fire_schedule_declared&&first_fire_hook_installed&&
+            first_fire_completion_status(&status,error,size)&&status.armed&&!status.failed&&
+            status.request_seen&&status.completed&&
+            status.actual_request_cursor==first_fire_request_tick&&
+            status.actual_callback_cursor==first_fire_callback_tick&&
+            status.last_preconsume_cursor>=first_fire_last_tick;
+        if(!ready&&error&&size)std::snprintf(error,size,"First-fire exact recorded completion is incomplete");
+        return ready;
+    }
+    void first_fire_arm_resident_plan(){
+        check(first_transform_selected_form()&&first_fire_schedule_declared&&
+              first_fire_hook_installed&&!first_fire_gate_armed&&stage_last&&source_files&&runtime_files&&
+              source_files==melee_web_source_files_current_scope(),
+              "First-fire resident plan requires its declared live owner before tick0");
+        MeleeWebStadiumMap2BufferOwner maps{};
+        check(melee_web_stage_last_stadium_map2_buffer_snapshot(stage_last,&maps)&&maps.captured==1&&
+              maps.buffer&&maps.origin==MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK&&
+              maps.buffer_allocation_lease_captured,
+              "First-fire recorded plan lost exact map2 fallback allocation");
+        MeleeWebSourceMemoryAllocation lease{};
+        check(melee_web_source_memory_allocation_read(maps.buffer,&lease)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+              lease.live&&lease.requested_bytes==0x50000&&
+              lease.world_generation==melee_web_gameplay_stats().generation&&
+              lease.source_heap_handle==maps.buffer_allocation_lease.source_heap_handle&&
+              lease.world_generation==maps.buffer_allocation_lease.world_generation&&
+              lease.allocation_generation==maps.buffer_allocation_lease.allocation_generation,
+              "First-fire recorded plan map2 allocation lease changed");
+        const auto name=melee_web_runtime_file_name(*runtime_files,stadium_first_water_diagnostic?"GrPs3.dat":"GrPs1.dat");
+        const auto it=runtime_files->find(name);
+        check(!name.empty()&&it!=runtime_files->end()&&!it->second.empty(),
+              "First-fire recorded plan requires resident GrPs1 archive");
+        const auto& bytes=it->second;const auto tail=bytes.transfer_tail();
+        check(bytes.size()<=SIZE_MAX-31&&tail.size()==((32-bytes.size()%32)%32),
+              "First-fire recorded plan requires actual complete DVD tail");
+        MeleeWebSourceFileRecordedCompletionPlan plan{};
+        plan.name=it->first.c_str();plan.entry=melee_web_source_file_entry(plan.name);
+        plan.destination=reinterpret_cast<uintptr_t>(maps.buffer);
+        plan.type=plan.destination>=UINT32_C(0x80000000)?0x21:0x23;
+        plan.priority=1;plan.logical_size=bytes.size();plan.transfer_size=bytes.size()+tail.size();
+        plan.region_base=maps.buffer;plan.region_size=lease.requested_bytes;
+        plan.request_cursor=first_fire_request_tick;plan.callback_cursor=first_fire_callback_tick;
+        plan.last_selected_cursor=first_fire_last_tick;
+        plan.callback_matches=stadium_first_water_diagnostic?
+            melee_web_stadium_water_graph_callback_matches:
+            melee_web_stadium_first_transform_callback_matches;
+        check(melee_web_source_files_recorded_completion_arm(source_files,&plan,error,sizeof(error)),error);
+        first_fire_gate_armed=true;
+    }
+
+#endif
     MeleeWebMatchRules* rules=nullptr;
     MeleeWebMatchContext* match_context=nullptr;
     MeleeWebRender* render_context=nullptr;
@@ -258,9 +393,43 @@ struct GameplayWorld::Storage {
     }
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                RuntimeArchiveCache* cache,bool defer=false,bool source_ordered=false){
+        melee_web_rng_draw_probe_install_source_owners();
         if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
            selection.player_count > MELEE_WEB_MENU_MAX_PLAYERS)
             throw DatError("Gameplay world requires two through four active fighters");
+        if(selection.purpose==GameplayWorldPurpose::Match){
+            check(toy_loader_aliases_empty(),
+                  "Match world requires a clean original Toy archive/table baseline");
+            toy_archive_filename=lbLang_IsSavedLanguageJP()?
+                "TyDatai.dat":"TyDatai.usd";
+        }
+        stadium_diagnostic=selection.stadium_diagnostic;
+        stadium_first_transform_diagnostic=selection.stadium_first_transform_diagnostic;
+        stadium_first_water_diagnostic=selection.stadium_first_water_diagnostic;
+#if !defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        check(!stadium_diagnostic&&!stadium_first_transform_diagnostic&&!stadium_first_water_diagnostic,
+              "Diagnostic Stadium source session is unavailable in this build");
+#else
+        check(!(stadium_first_transform_diagnostic&&stadium_first_water_diagnostic),
+              "First-transform Fire and Water policies are mutually exclusive");
+        check(!(stadium_first_transform_diagnostic||stadium_first_water_diagnostic)||stadium_diagnostic,
+              "First-transform form preparation requires the explicit diagnostic Stadium source session");
+        if(stadium_diagnostic){
+            check(source_ordered && selection.begin_source_match &&
+                  selection.purpose==GameplayWorldPurpose::Match &&
+                  !selection.opening_demo && !selection.sudden_death &&
+                  selection.player_count==2 && selection.source_start_data &&
+                  selection.source_start_data->rules.stkind==St_Kind_PStadium &&
+                  selection.ground_kind==Gr_Kind_PStadium &&
+                  !selection.source_start_data->rules.is_teams,
+                  "Diagnostic Stadium world requires the exact source-session profile");
+            for(unsigned i=0;i<2;++i)
+                check(selection.fighter_kinds[i]==FTKIND_MARIO &&
+                      selection.source_start_data->players[i].ckind==CKIND_MARIO &&
+                      selection.source_start_data->players[i].slot_type==Gm_PKind_Human,
+                      "Diagnostic Stadium world requires two Human Mario players");
+        }
+#endif
         runtime_files=&files;
         archive_cache=cache;
         collision_deferred=source_ordered;
@@ -270,6 +439,9 @@ struct GameplayWorld::Storage {
             selection.source_start_data:nullptr;
         if(purpose==GameplayWorldPurpose::Match){
             stage=melee_web_stage_content_by_ground(selection.ground_kind);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(stadium_diagnostic)stage=melee_web_stage_content_for_profile(St_Kind_PStadium);
+#endif
             if(!stage)throw DatError("No runtime owner for selected source ground kind");
         }
         auto load=[&](std::string_view name,DatExternalPolicy policy=DatExternalPolicy::Reject){
@@ -293,6 +465,11 @@ struct GameplayWorld::Storage {
         if(selection.begin_source_match)
             load("LbRf.dat",DatExternalPolicy::ResolveNull);
         if(stage)load(stage->archive);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(first_transform_selected_form())
+            for(const char* name:{"GrPs1.dat","GrPs2.dat","GrPs3.dat","GrPs4.dat"})
+                load(name,DatExternalPolicy::ResolveNull);
+#endif
         for(unsigned slot=0;slot<selection.player_count;++slot){
             const auto primary=selection.fighter_kinds[slot];
             const auto* dependency=melee_web_fighter_content_by_kind(primary);
@@ -456,7 +633,12 @@ struct GameplayWorld::Storage {
             render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
             check(render_context!=nullptr,error);
             if(source_start_data){
-                const int prepared=selection.sudden_death?
+                const int prepared=
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+                    stadium_diagnostic?melee_web_match_rules_prepare_stadium_from_menu(
+                        rules,source_start_data,error,sizeof(error)):
+#endif
+                    selection.sudden_death?
                     melee_web_match_rules_prepare_sudden_death_from_menu(
                         rules,source_start_data,error,sizeof(error)):
                     melee_web_match_rules_prepare_from_menu(
@@ -514,7 +696,10 @@ struct GameplayWorld::Storage {
         if(stage){
             stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
             auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
-            auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive(stage->archive),"map_head"));
+            const auto* marker_profile=melee_web_stage_profile(stage->stage_kind);
+            if(!marker_profile)throw DatError("Source stage has no admitted marker profile");
+            auto* markers=melee_web_stage_markers_decode_profile(
+                stage_arena->reader(),symbol(*archive(stage->archive),"map_head"),marker_profile);
             collision_data=std::make_unique<DatCollision>(*archive(stage->archive));
             DatLights light_data(*archive(stage->archive),"map_plit",true);
             lights=melee_web_stage_lights_create(light_data.lights.data(),light_data.lights.size(),error,sizeof(error));check(lights!=nullptr,error);
@@ -522,7 +707,8 @@ struct GameplayWorld::Storage {
                 auto flags=read_dat_light_override(*archive(stage->archive),light_data.lights[i].source_offset);
                 check(melee_web_stage_lights_set_override(lights,i,flags.has_value(),flags.value_or(0),error,sizeof(error)),error);
                 if(light_data.animation_tables[i]){
-                    if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind);
+                    if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind,
+                        stadium_diagnostic?DatNativeStage::ProfileMode::DiagnosticOnly:DatNativeStage::ProfileMode::Complete);
                     check(melee_web_stage_lights_set_animations(lights,i,
                         full_stage->light_animation_table(*light_data.animation_tables[i]),error,sizeof(error)),error);
                 }
@@ -687,11 +873,18 @@ struct GameplayWorld::Storage {
     void enable_full_stage(bool defer_start){
         if(!stage)throw DatError("Results uses the original dummy stage during scene entry");
         if(stage_last)return;
+        if(purpose==GameplayWorldPurpose::Match){
+            check(toy_loader_aliases_empty(),
+                  "Match source stage entry found pre-existing Toy archive/table aliases");
+            toy_archive_filename=lbLang_IsSavedLanguageJP()?
+                "TyDatai.dat":"TyDatai.usd";
+        }
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
         if(!source_ordered)
             check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
         auto source=archive(stage->archive);
-        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
+        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind,
+            stadium_diagnostic?DatNativeStage::ProfileMode::DiagnosticOnly:DatNativeStage::ProfileMode::Complete);
         const auto* profile=melee_web_stage_profile(stage->stage_kind);
         check(profile!=nullptr,"Stage has no complete source callback profile");
         const bool has_commands=has_symbol(*source,"map_ptcl");
@@ -711,8 +904,16 @@ struct GameplayWorld::Storage {
                                        stage_effects?stage_effects->texture_root():nullptr);
         if(!quake_model)throw DatError("Source stage quake descriptor owner is missing");
         full_stage->set_quake_model(quake_model->single_model());
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(first_transform_selected_form()&&!stadium_forms){
+            StadiumFormAssets::Archives forms={archive("GrPs1.dat"),archive("GrPs2.dat"),
+                archive("GrPs3.dat"),archive("GrPs4.dat")};
+            stadium_forms=std::make_unique<StadiumFormAssets>(std::move(forms),
+                full_stage->light_overrides(),full_stage->source_light_counts());
+        }
+#endif
         if(source_ordered){
-            const auto counts=full_stage->source_light_counts();
+            const auto counts=stadium_forms?stadium_forms->source_light_counts():full_stage->source_light_counts();
             check(melee_web_stage_lights_set_source_counts(
                 lights,counts.data(),static_cast<uint32_t>(counts.size()),
                 error,sizeof(error)),error);
@@ -724,8 +925,12 @@ struct GameplayWorld::Storage {
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
         const auto& symbols=full_stage->public_symbols();
         check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
-        const auto& overrides=full_stage->light_overrides();
+        const auto& overrides=stadium_forms?stadium_forms->light_overrides():full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic)
+            check(melee_web_stage_map_grdatfiles_arm(stage_map,error,sizeof(error)),error);
+#endif
         /* Non-ordered tooling retains its isolated collision seam. Match
          * startup leaves allocation and ownership to Stage_8022524C below. */
         if(!collision&&!collision_deferred){
@@ -735,6 +940,29 @@ struct GameplayWorld::Storage {
             floor_start=collision_data->line_ranges[0].start;
             collision_data.reset();
         }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic){
+            check(defer_start && source_ordered,"Diagnostic Stadium requires deferred original Ready startup");
+            // owner_out retains the partial source owner if initialization refuses.
+            const auto initialized=melee_web_stage_begin_kind_on_init_diagnostic(
+                stage->stage_kind,full_stage->yakumono(),
+                stage_effects?stage_effects->bank():nullptr,&stage_last,error,sizeof(error));
+            check(initialized!=nullptr,error);
+            if(stadium_forms){
+                stadium_forms->publish();
+                void* form_maps[4]={stadium_forms->map(1).map_head(),
+                    stadium_forms->map(2).map_head(),stadium_forms->map(3).map_head(),
+                    stadium_forms->map(4).map_head()};
+                check(melee_web_stage_map_set_forms(
+                    stage_map,form_maps,error,sizeof(error)),error);
+                check(stadium_first_water_diagnostic?
+                    melee_web_stage_last_stadium_water_graph_arm(stage_last,error,sizeof(error)):
+                    melee_web_stage_last_stadium_first_transform_arm(stage_last,error,sizeof(error)),error);
+            }
+            check(melee_web_stage_last_stadium_on_load(stage_last,error,sizeof(error)),error);
+            if(first_transform_selected_form())first_fire_arm_resident_plan();
+        }else
+#endif
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),
             stage_effects?stage_effects->bank():nullptr,defer_start,source_ordered,
             error,sizeof(error));check(stage_last!=nullptr,error);
@@ -751,9 +979,46 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_numeric_source_stage_ready(numeric,error,sizeof(error)),error);
     }
     void end_stage(){
+        if(source_files)
+            check(melee_web_source_files_quiescent_for(
+                source_files,error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stage_last&&first_transform_selected_form()){
+            check(first_fire_completion_can_end(error,sizeof(error)),error);
+            check(stadium_first_water_diagnostic?
+                melee_web_stage_last_stadium_water_graph_can_end(stage_last,error,sizeof(error)):
+                melee_web_stage_last_stadium_first_transform_can_end(stage_last,error,sizeof(error)),error);
+        }
+#endif
         if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
-        if(stage_last){check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);stage_last=nullptr;}
+        if(stage_last){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(first_transform_selected_form()){
+                check(stadium_first_water_diagnostic?
+                    melee_web_stage_last_stadium_water_graph_end(stage_last,&stadium_first_transform_terminal,error,sizeof(error)):
+                    melee_web_stage_last_stadium_first_transform_end(stage_last,&stadium_first_transform_terminal,error,sizeof(error)),error);
+            }else
+#endif
+            check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);
+            stage_last=nullptr;
+        }
         if(stage_visual){check(melee_web_stage_visual_end(stage_visual,error,sizeof(error)),error);stage_visual=nullptr;}
+    }
+    bool toy_owner_preflight()const{
+        if(!started||purpose!=GameplayWorldPurpose::Match)return false;
+        const auto stats=melee_web_gameplay_stats();
+        if(!melee_web_gameplay_world_exists()||!stats.generation)return false;
+        if(!trophy_scope)return toy_loader_aliases_empty();
+        if(!melee_web_archive_sections_heap_scope_matches(trophy_scope,stats.generation))return false;
+        if(!_Toy_sbss_804D6ED0)return toy_loader_aliases_empty();
+        if(!melee_web_archive_sections_heap_source_matches(
+               trophy_scope,stats.generation,_Toy_sbss_804D6ED0,
+               toy_archive_filename.c_str()))return false;
+        const auto* expected=toy_archive_filename=="TyDatai.dat"?
+            trophy_roots_dat.get():trophy_roots.get();
+        return expected&&toy_tables_match(*expected,toy_archive_filename.c_str())&&
+               !_Toy_sbss_804D6ECC&&!Toy_sbss_804D6EC8&&
+               !_Toy_sbss_804D6EA8&&!_Toy_sbss_804D6EA4;
     }
     void verify()const{
         for(const auto& [name,source]:archives){
@@ -764,6 +1029,9 @@ struct GameplayWorld::Storage {
         }
     }
     void close(const std::function<void()>& after_effect_runtime_end = {}){
+        if(source_files)
+            check(melee_web_source_files_quiescent_for(
+                source_files,error,sizeof(error)),error);
         for(const auto& [kind,fighter]:fighters)
             if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
@@ -785,6 +1053,7 @@ struct GameplayWorld::Storage {
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
         if(after_effect_runtime_end)after_effect_runtime_end();
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}
+        if(stadium_forms){stadium_forms->close();stadium_forms.reset();}
         stage_effects.reset();
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
         stage_material_animation.reset();stage_animation.reset();stage_model.reset();
@@ -812,6 +1081,15 @@ struct GameplayWorld::Storage {
         if(respawn_native){check(melee_web_native_joint_destroy(respawn_native,error,sizeof(error)),error);respawn_native=nullptr;}
         respawn_animation.reset();extra_colors.reset();common_colors.reset();
         if(rules){check(melee_web_match_rules_end(rules,error,sizeof(error)),error);rules=nullptr;}
+        if(started&&purpose==GameplayWorldPurpose::Match){
+            check(toy_owner_preflight(),
+                  "Match Toy aliases do not belong to the live owned locale source");
+            if(trophy_scope){
+                Toy_803127D4();
+                check(toy_loader_aliases_empty(),
+                      "Original Match Toy reset left a loader alias published");
+            }
+        }
         if(started){check(melee_web_gameplay_shutdown(error,sizeof(error)),error);started=false;}
         if(bonus_scope){
             check(melee_web_archive_sections_close(bonus_scope,error,sizeof(error)),error);
@@ -837,6 +1115,12 @@ struct GameplayWorld::Storage {
         full_stage.reset();
         if(font){check(melee_web_font_atlas_close(font,error,sizeof(error)),error);font=nullptr;}
         if(source_files){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(first_transform_selected_form()){
+                check(first_fire_completion_can_end(error,sizeof(error)),error);
+                check(first_fire_completion_status(&first_fire_completion_retained,error,sizeof(error)),error);
+            }
+#endif
             check(melee_web_source_files_end(source_files,error,sizeof(error)),error);
             source_files=nullptr;
         }
@@ -867,13 +1151,125 @@ GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelect
                     construction==GameplayWorldConstruction::SourceOrdered);
 }
 GameplayWorld::~GameplayWorld()=default;
+void GameplayWorld::ensure_source_work_allowed()const{
+    if(!storage_)throw DatError("Gameplay world is closed");
+    if(!storage_->stage_last)return;
+    check(melee_web_stage_last_source_work_allowed(storage_->stage_last),
+          "Gameplay world Stadium source region is closing or no longer owned");
+}
+void GameplayWorld::pump_source_files(){
+    if(!storage_||!storage_->source_files)
+        throw DatError("Gameplay world has no live source RuntimeFiles owner");
+    ensure_source_work_allowed();
+    char error[256]{};
+    check(melee_web_source_files_pump_for(storage_->source_files,
+                                         error,sizeof(error)),error);
+}
+void GameplayWorld::ensure_source_files_quiescent()const{
+    if(!storage_||!storage_->source_files)
+        throw DatError("Gameplay world has no live source RuntimeFiles owner");
+    char error[256]{};
+    check(melee_web_source_files_quiescent_for(storage_->source_files,
+                                              error,sizeof(error)),error);
+}
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
 void GameplayWorld::end_stage(){storage_->end_stage();}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayWorld::diagnostic_toy_owner_preflight()const{
+    return storage_&&storage_->toy_owner_preflight();
+}
+void GameplayWorld::diagnostic_stadium_go_alignment_arm(
+    int expected_branch,char* error,size_t size){
+    check(storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+              storage_->stage_last,
+          "Stadium GO trace requires a complete, exact diagnostic source owner");
+    check(melee_web_stage_last_stadium_go_alignment_arm(
+              storage_->stage_last,expected_branch,error,size),error);
+}
+bool GameplayWorld::diagnostic_stadium_go_alignment_snapshot(
+    MeleeWebStadiumGoAlignmentSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->stage_last&&melee_web_stage_last_stadium_go_alignment_snapshot(
+            storage_->stage_last,out,error,size);
+}
+bool GameplayWorld::diagnostic_stadium_idle_snapshot(
+    MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->stage_last&&melee_web_stage_last_stadium_idle_snapshot(
+            storage_->stage_last,out,error,size);
+}
+bool GameplayWorld::diagnostic_stadium_first_transform_schedule(
+    uint32_t request,uint32_t callback,uint32_t last,char* error,size_t size){
+    if(!storage_||!storage_->first_transform_selected_form()||
+       !storage_->first_fire_hook_installed||storage_->first_fire_schedule_declared||
+       storage_->stage_last||request>=callback||callback>=last){
+        if(error&&size)std::snprintf(error,size,"First-fire schedule must be declared once before stage construction");
+        return false;
+    }
+    storage_->first_fire_request_tick=request;storage_->first_fire_callback_tick=callback;
+    storage_->first_fire_last_tick=last;storage_->first_fire_schedule_declared=true;
+    if(error&&size)*error=0;
+    return true;
+}
+bool GameplayWorld::diagnostic_stadium_first_transform_completion_status(
+    MeleeWebSourceFileRecordedCompletionStatus* out,char* error,size_t size)const{
+    return storage_&&storage_->first_fire_completion_status(out,error,size);
+}
+bool GameplayWorld::diagnostic_stadium_first_transform_can_end(char* error,size_t size)const{
+    if(!storage_||!storage_->first_transform_selected_form())return false;
+    if(!storage_->first_fire_completion_can_end(error,size))return false;
+    if(storage_->stage_last)
+        return storage_->stadium_first_water_diagnostic?
+            melee_web_stage_last_stadium_water_graph_can_end(storage_->stage_last,error,size):
+            melee_web_stage_last_stadium_first_transform_can_end(storage_->stage_last,error,size);
+    const auto& terminal=storage_->stadium_first_transform_terminal;
+    const bool retired=terminal.armed==2&&!terminal.failed&&
+        terminal.selected_form==storage_->first_transform_selected_form()&&
+        terminal.count==melee_web_stadium_first_transform_event_count(&terminal)&&terminal.world_generation;
+    if(retired&&error&&size)*error='\0';
+    return retired;
+}
+bool GameplayWorld::diagnostic_stadium_first_transform_snapshot(
+    MeleeWebStadiumFirstTransformJournal* out,char* error,size_t size)const{
+    if(!out||!storage_||!storage_->first_transform_selected_form())return false;
+    if(storage_->stage_last){
+        const bool observed=storage_->stadium_first_water_diagnostic?
+            melee_web_stage_last_stadium_water_graph_status(storage_->stage_last,out,error,size):
+            melee_web_stage_last_stadium_first_transform_status(storage_->stage_last,out,error,size);
+        return observed&&out->selected_form==storage_->first_transform_selected_form();
+    }
+    const auto& terminal=storage_->stadium_first_transform_terminal;
+    if(terminal.armed!=2||terminal.failed||
+       terminal.selected_form!=storage_->first_transform_selected_form()||
+       terminal.count!=melee_web_stadium_first_transform_event_count(&terminal)||
+       !terminal.world_generation)return false;
+    // StageLast has retired. Only its copied sealed receipt remains readable;
+    // the pointer-shaped tokens are identities and are never dereferenced here.
+    *out=terminal;
+    if(error&&size)*error='\0';
+    return true;
+}
+bool GameplayWorld::diagnostic_stadium_setup_snapshot(
+        MeleeWebStadiumSetupSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->stadium_diagnostic&&
+        storage_->full_stage&&storage_->stage_last&&
+        melee_web_stage_last_stadium_setup_snapshot(
+            storage_->stage_last,storage_->full_stage->yakumono(),out,error,size);
+}
+#endif
 MeleeWebMatchContext* GameplayWorld::take_match_context(){
     if(!storage_||!storage_->match_context)
         throw DatError("Gameplay world has no unclaimed source match context");
     auto* match=storage_->match_context;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->first_transform_selected_form()){
+        check(!storage_->first_fire_hook_installed&&
+              melee_web_match_recorded_preconsume_arm(match,Storage::first_fire_preconsume,
+                  storage_.get(),storage_->error,sizeof(storage_->error)),storage_->error);
+        storage_->first_fire_hook_installed=true;
+    }
+#endif
     storage_->match_context=nullptr;
     return match;
 }
@@ -945,6 +1341,23 @@ GameplayWorldStageArenaInventory GameplayWorld::diagnostic_stage_arena_allocatio
 }
 bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void GameplayWorld::cancel_prepared_stadium_ready()
+{
+    check(storage_ && storage_->stadium_diagnostic,
+          "Prepared Stadium cancellation requires its diagnostic world");
+    if(!storage_->stage_last)return; // Construction has not acquired a stage.
+    char error[256]{};
+    check(melee_web_stage_last_stadium_cancel_prepared_ready(storage_->stage_last,error,sizeof(error)),error);
+}
+void GameplayWorld::prepare_stadium_ready(MeleeWebMatchContext* camera)
+{
+    check(storage_ && storage_->stadium_diagnostic && storage_->stage_last,
+          "Diagnostic Stadium Ready requires its exact prepared source world");
+    char error[256]{};
+    check(melee_web_stage_last_stadium_prepare_ready(storage_->stage_last,camera,error,sizeof(error)),error);
+}
+#endif
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
     if(storage_->source_start_data&&storage_->source_start_data!=&start)

@@ -1,5 +1,6 @@
 import {
   fontFileRange,
+  discFileTransferInfo,
   openDiscImage,
   relativeDiscPath,
 } from "./disc-image.mjs";
@@ -122,9 +123,12 @@ export class DiscAssetSession {
   }
 
   /** Preflight the full scope, then yield one owned file per consumer pull. */
-  async *streamScope(scope, {beforeRead = () => {}} = {}) {
+  async *streamScope(scope, {beforeRead = () => {}, dvdTransfer = false} = {}) {
     this.#assertOpen();
     const plan = preflightScope(this.#entries, scope);
+    if (typeof dvdTransfer !== "boolean") throw new Error("Invalid DVD transfer metadata option");
+    // Preflight every requested extent before reading any payload.
+    const transfers = dvdTransfer ? plan.map(item => this.fileTransferInfo(item.path)) : null;
     this.#assertOpen();
     for (let index = 0; index < plan.length; ++index) {
       const item = plan[index];
@@ -138,7 +142,14 @@ export class DiscAssetSession {
       this.#assertOpen();
       const bytes = await this.#disc.read(item.offset, item.size);
       this.#assertOpen();
-      yield [item.name, bytes];
+      if (transfers) {
+        const info = transfers[index];
+        const tail = await this.#disc.readFileTransfer(item.path, item.size, info.transferSize - item.size);
+        this.#assertOpen();
+        if (!(tail instanceof Uint8Array) || tail.byteLength !== info.transferSize - item.size)
+          throw new Error("Disc returned an incomplete DVD transfer tail");
+        yield [item.name, bytes, Object.freeze({logicalSize: item.size, transferSize: info.transferSize, tail})];
+      } else yield [item.name, bytes];
       this.#assertOpen();
     }
   }
@@ -155,6 +166,23 @@ export class DiscAssetSession {
     this.#assertOpen();
     relativeDiscPath(path);
     return this.#entries.get(path) ?? null;
+  }
+
+  /** FST logical size and actual bounded DVD transfer extent; no payload read. */
+  fileTransferInfo(path) {
+    this.#assertOpen();
+    relativeDiscPath(path);
+    const entry = this.#entries.get(path);
+    if (!entry) throw new Error(`Required game data is missing: ${path}`);
+    return discFileTransferInfo(entry, this.#disc.logicalSize);
+  }
+
+  async readFileTransfer(path, offset = 0, size = undefined) {
+    this.#assertOpen();
+    this.fileTransferInfo(path);
+    const bytes = await this.#disc.readFileTransfer(path, offset, size);
+    this.#assertOpen();
+    return bytes;
   }
 
   /** Read one exact FST file-relative range using the disc reader's bounds. */

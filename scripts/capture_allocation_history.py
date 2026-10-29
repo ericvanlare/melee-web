@@ -11,8 +11,10 @@ import argparse
 import base64
 import datetime
 import json
+import hashlib
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -51,6 +53,7 @@ VS_RULES_ITEMS_ROUTE_SOURCE_FILES = (
     "tools/retail_cpu_menu_prepare.py",
     "tools/retail_allocation_menu.py",
 )
+sys.path.insert(0, str(ROOT)) # Support package-relative tools imports from script entry points.
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tools"))
 import capture_retail_replay as retail
@@ -101,6 +104,84 @@ def validate_reference_build_manifest(path, dolphin):
             "target": manifest["target"], "build_cpu": identity.get("cpu")}
 
 
+def validate_retained_personal_export(receipt, initial_gci):
+    """Admit only the already recorded personal re-export, never arbitrary saves."""
+    from sd_gci_profile import GCI_SHA256, load_profile
+    profile=load_profile(initial_gci)
+    expected_card=dict(file_count=1,format='single imported retained Personal progress GCI',
+        gci_filename=initial_gci.name,gci_sha256=GCI_SHA256,save_mode='Personal progress')
+    if receipt.get('initial_card') != expected_card:
+        raise ValueError('setup receipt does not bind the exact retained Personal progress card')
+    export=receipt.get('source_profile_export')
+    keys={'source_run_report','source_run_report_sha256','source_run_manifest',
+          'source_run_manifest_sha256','source_run_check','profile_mode',
+          'exported_gci_sha256','exported_gci_bytes'}
+    if not isinstance(export,dict) or set(export)!=keys:
+        raise ValueError('retained Personal export receipt fields differ')
+    report_path=Path(export['source_run_report']).expanduser().resolve()
+    manifest_path=Path(export['source_run_manifest']).expanduser().resolve()
+    report_hash=retail._sha256(report_path);manifest_hash=retail._sha256(manifest_path)
+    if (report_hash!='17e16a0238b9b920e9d41714b02ddc69d983ce090b73bb66f08ddeff7bd0586c' or
+            manifest_hash!='0222524ae26c10b44fdefcc623fb6a0f25a92373c0df4c4513dc0b87c34e47cb' or
+            export['source_run_report_sha256']!=report_hash or
+            export['source_run_manifest_sha256']!=manifest_hash or
+            export['profile_mode']!='Personal progress' or
+            export['source_run_check']!='personalStateSurvivedReload' or
+            export['exported_gci_sha256']!=profile['sha256'] or
+            export['exported_gci_bytes']!=initial_gci.stat().st_size):
+        raise ValueError('retained Personal source report/manifest/card identity differs')
+    report=json.loads(report_path.read_text());manifest=json.loads(manifest_path.read_text())
+    expected_package=manifest_path.with_name('roundtrip-player').resolve()
+    if (report.get('discSha256')!=receipt.get('disc',{}).get('sha256') or
+            report.get('inputGciSha256')!='fec85d3faf3df55c1b3476f174f9d6885626ca660ae05321167e409948bfe286' or
+            report.get('reloadedMode')!='personal' or
+            report.get('reloadedExportSha256')!=profile['sha256'] or
+            report.get('personalStateSurvivedReload') is not True or
+            Path(report.get('package','')).resolve()!=expected_package or
+            manifest.get('schema')!='melee-web-public-release-v1' or manifest.get('profile')!='player' or
+            manifest.get('runtime',{}).get('identity_sha256')!=
+                '60cd0a3e200f771420bc8452383a7584b569259637872d053dcbcbc9c8af6113'):
+        raise ValueError('retained Personal actual reload/package evidence differs')
+    # This older report has no result/schema/build_identity. Never manufacture
+    # an Everything public-player PASS or a contemporaneous served-build claim.
+    return report_path,report_hash,manifest_path,manifest_hash,export['source_run_check']
+
+
+def validate_retained_personal_provenance(value, external_hashes, profile_hash, export_report_hash):
+    """Preserve the genuine retail source facts while binding this exact card."""
+    from sd_gci_profile import GCI_SHA256
+    parent=value.get('parent_provenance')
+    if not isinstance(parent,dict) or set(parent)!={'path','sha256'}:
+        raise ValueError('retained Personal provenance lacks its historical parent')
+    parent_path=Path(parent['path']).expanduser().resolve()
+    if (parent['sha256']!='b5ed80140070157dde8b5e4709242ed8fee1262874894b9c107a3ce47f3809ac' or
+            retail._sha256(parent_path)!=parent['sha256']):
+        raise ValueError('retained Personal provenance parent identity differs')
+    preparation=value.get('source_profile_preparation')
+    if not isinstance(preparation,dict) or set(preparation)!={'path','sha256'}:
+        raise ValueError('retained Personal provenance lacks exact preparation evidence')
+    prep_path=Path(preparation['path']).expanduser().resolve()
+    if (preparation['sha256']!='edb1cf5f9eee974c4cf6cd042a3664c58e44adc6ecbc5b3df33c707c85677be2' or
+            retail._sha256(prep_path)!=preparation['sha256']):
+        raise ValueError('retained Personal preparation identity differs')
+    prep=json.loads(prep_path.read_text())
+    if (prep.get('selected',{}).get('sha256')!=GCI_SHA256 or
+            prep.get('owned_copy',{}).get('sha256')!=GCI_SHA256 or
+            prep.get('source_unchanged') is not True or prep.get('original_save_mutated') is not False or
+            len(prep.get('comparison',[]))!=8 or any(x.get('equal') is not True for x in prep['comparison'])):
+        raise ValueError('retained Personal preparation source facts differ')
+    original=json.loads(parent_path.read_text())
+    changed={'external_save_hashes','source_profile_mode','source_profile_gci_sha256',
+             'source_profile_export_report_sha256'}
+    if (any(value.get(k)!=v for k,v in original.items() if k not in changed) or
+            profile_hash!=GCI_SHA256 or value.get('external_save_hashes')!=external_hashes or
+            value.get('source_profile_mode')!='Personal progress' or
+            value.get('source_profile_gci_sha256')!=GCI_SHA256 or
+            value.get('source_profile_export_report_sha256')!=export_report_hash or
+            export_report_hash!='17e16a0238b9b920e9d41714b02ddc69d983ce090b73bb66f08ddeff7bd0586c'):
+        raise ValueError('retained Personal provenance source/card/export facts differ')
+
+
 def validate_setup_receipt(path, args, manifest):
     """Bind the private run inputs to the receipt made during local setup."""
     try:
@@ -147,56 +228,69 @@ def validate_setup_receipt(path, args, manifest):
         if not initial_gci.is_file() or initial_gci.suffix.lower() != ".gci":
             raise ValueError("initial Everything unlocked profile must be a readable .gci file")
         initial_profile_hash = retail._sha256(initial_gci)
-        expected_card = {
-            "file_count": 1,
-            "format": "single imported Everything unlocked GCI",
-            "gci_filename": initial_gci.name,
-            "gci_sha256": initial_profile_hash,
-            "save_mode": "Everything unlocked",
-        }
-        if receipt.get("initial_card") != expected_card:
-            raise ValueError("owned-input setup receipt does not bind the imported Everything unlocked GCI")
-        source_export = receipt.get("source_profile_export")
-        if not isinstance(source_export, dict):
-            raise ValueError("setup receipt lacks the source profile export receipt")
-        report_path = Path(source_export.get("source_run_report", "")).expanduser().resolve()
-        manifest_path = Path(source_export.get("source_run_manifest", "")).expanduser().resolve()
-        try:
-            source_report = json.loads(report_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError(f"cannot read the Everything unlocked export report: {error}") from error
-        report_hash = retail._sha256(report_path)
-        try:
-            source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
-        manifest_hash = retail._sha256(manifest_path)
-        source_check = source_export.get("source_run_check")
-        manifest_runtime = source_manifest.get("runtime")
-        source_build_identity = source_report.get("build_identity")
-        if (source_export.get("source_run_report_sha256") != report_hash or
-                source_export.get("source_run_manifest_sha256") != manifest_hash or
-                source_manifest.get("schema") != "melee-web-public-release-v1" or
-                source_manifest.get("profile") != "player" or
-                not isinstance(manifest_runtime, dict) or
-                not manifest_runtime.get("identity_sha256") or
-                source_report.get("schema") != "webmelee-public-player-browser-v1" or
-                not isinstance(source_build_identity, dict) or
-                source_build_identity.get("schema") != "melee-web-public-release-v1" or
-                source_build_identity.get("profile") != "player" or
-                source_export.get("source_run_result") != "pass" or
-                source_export.get("source_run_result") != source_report.get("result") or
-                source_export.get("source_run_scope") != source_report.get("scope") or
-                source_check not in source_report.get("checks", []) or
-                source_export.get("profile_mode") != "Everything unlocked" or
-                source_export.get("exported_gci_sha256") != initial_profile_hash or
-                source_export.get("exported_gci_bytes") != initial_gci.stat().st_size):
-            raise ValueError("source profile export report, manifest, GCI hash, or save mode disagrees with the setup receipt")
-        card_files = sorted(card.iterdir()) if card.is_dir() else []
-        if (len(card_files) != 1 or card_files[0].name != initial_gci.name or
-                not card_files[0].is_file() or retail._sha256(card_files[0]) != initial_profile_hash):
-            raise ValueError("the isolated GCI folder does not contain the declared Everything unlocked profile")
-        card_baseline = "single imported Everything unlocked GCI"
+        from sd_gci_profile import GCI_SHA256
+        if initial_profile_hash == GCI_SHA256:
+            report_path,report_hash,manifest_path,manifest_hash,source_check = \
+                validate_retained_personal_export(receipt,Path(args.initial_gci).expanduser())
+            if card.is_symlink():
+                raise ValueError('isolated Personal card directory must not be a symlink')
+            card_files = sorted(card.iterdir()) if card.is_dir() else []
+            if (len(card_files)!=1 or card_files[0].name!=initial_gci.name or
+                    card_files[0].is_symlink() or not card_files[0].is_file() or
+                    retail._sha256(card_files[0])!=initial_profile_hash):
+                raise ValueError('isolated card differs from exact retained Personal profile')
+            card_baseline = 'single imported retained Personal progress GCI'
+        else:
+            expected_card = {
+                "file_count": 1,
+                "format": "single imported Everything unlocked GCI",
+                "gci_filename": initial_gci.name,
+                "gci_sha256": initial_profile_hash,
+                "save_mode": "Everything unlocked",
+            }
+            if receipt.get("initial_card") != expected_card:
+                raise ValueError("owned-input setup receipt does not bind the imported Everything unlocked GCI")
+            source_export = receipt.get("source_profile_export")
+            if not isinstance(source_export, dict):
+                raise ValueError("setup receipt lacks the source profile export receipt")
+            report_path = Path(source_export.get("source_run_report", "")).expanduser().resolve()
+            manifest_path = Path(source_export.get("source_run_manifest", "")).expanduser().resolve()
+            try:
+                source_report = json.loads(report_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError(f"cannot read the Everything unlocked export report: {error}") from error
+            report_hash = retail._sha256(report_path)
+            try:
+                source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
+            manifest_hash = retail._sha256(manifest_path)
+            source_check = source_export.get("source_run_check")
+            manifest_runtime = source_manifest.get("runtime")
+            source_build_identity = source_report.get("build_identity")
+            if (source_export.get("source_run_report_sha256") != report_hash or
+                    source_export.get("source_run_manifest_sha256") != manifest_hash or
+                    source_manifest.get("schema") != "melee-web-public-release-v1" or
+                    source_manifest.get("profile") != "player" or
+                    not isinstance(manifest_runtime, dict) or
+                    not manifest_runtime.get("identity_sha256") or
+                    source_report.get("schema") != "webmelee-public-player-browser-v1" or
+                    not isinstance(source_build_identity, dict) or
+                    source_build_identity.get("schema") != "melee-web-public-release-v1" or
+                    source_build_identity.get("profile") != "player" or
+                    source_export.get("source_run_result") != "pass" or
+                    source_export.get("source_run_result") != source_report.get("result") or
+                    source_export.get("source_run_scope") != source_report.get("scope") or
+                    source_check not in source_report.get("checks", []) or
+                    source_export.get("profile_mode") != "Everything unlocked" or
+                    source_export.get("exported_gci_sha256") != initial_profile_hash or
+                    source_export.get("exported_gci_bytes") != initial_gci.stat().st_size):
+                raise ValueError("source profile export report, manifest, GCI hash, or save mode disagrees with the setup receipt")
+            card_files = sorted(card.iterdir()) if card.is_dir() else []
+            if (len(card_files) != 1 or card_files[0].name != initial_gci.name or
+                    not card_files[0].is_file() or retail._sha256(card_files[0]) != initial_profile_hash):
+                raise ValueError("the isolated GCI folder does not contain the declared Everything unlocked profile")
+            card_baseline = "single imported Everything unlocked GCI"
     external_hashes = tree_hashes(args.checkpoint_gc)
     if external_hashes != receipt.get("external_save_hashes"):
         raise ValueError("checkpoint memory-card files differ from the setup receipt")
@@ -215,9 +309,16 @@ def validate_setup_receipt(path, args, manifest):
                 source_provenance_receipt.get("sha256") != provenance_hash or
                 source_provenance_receipt.get("external_save_hashes") != external_hashes or
                 source_provenance.get("external_save_hashes") != external_hashes or
-                source_provenance.get("source_profile_mode") != "Everything unlocked" or
+                source_provenance.get("source_profile_mode") !=
+                    ('Personal progress' if card_baseline == 'single imported retained Personal progress GCI'
+                     else 'Everything unlocked') or
                 source_provenance.get("source_profile_gci_sha256") != initial_profile_hash):
             raise ValueError("retail provenance does not bind the imported Everything unlocked GCI")
+    if initial_profile_hash is not None and card_baseline == 'single imported retained Personal progress GCI':
+        if provenance_path is None:
+            raise ValueError('retained Personal requires its exact source provenance')
+        validate_retained_personal_provenance(source_provenance,external_hashes,
+                                             initial_profile_hash,report_hash)
     configured_ini = args.template_user / "Config/Dolphin.ini"
     if receipt.get("template_source", {}).get("capture_dolphin_ini_sha256") != retail._sha256(configured_ini):
         raise ValueError("capture template Dolphin.ini differs from the setup receipt")
@@ -1101,6 +1202,345 @@ def gdb_script(paths, boot_only=False, menu_round_trip=False,
     return "\n".join(lines)
 
 
+def stadium_three_rule_profile(expected):
+    """Two exact host declarations; does not alter original/native rules."""
+    from retail_setup_validation import _validate_expected_setup
+    expected=_validate_expected_setup(expected)
+    time120 = not (expected['stage']!=3 or expected['is_teams'] or len(expected['players'])!=2 or
+            any(p['player_type']!=0 for p in expected['players']) or expected['is_stock'] or
+            expected['match_kind']!=0 or expected['timer_enabled'] is not True or
+            expected['timer_counts_up'] is not False or expected['time_limit_seconds']!=120 or
+            expected['disable_pausing'] is not False or
+            any(p['stocks']!=3 for p in expected['players']))
+    if time120:
+        return 'boot_time120'
+    stock4_none = dict(stage=3,match_kind=1,timer_enabled=False,timer_counts_up=False,
+        time_limit_seconds=0,is_stock=True,disable_pausing=False,is_teams=False,
+        item_frequency=-1,item_mask_hex='ffffffffffffffff',
+        damage_ratio_bits='3f800000',game_speed_bits='3f800000',players=[
+            dict(port=port,character_kind=8,costume=costume,stocks=4,player_type=0,rumble_enabled=True)
+            for port,costume in [(1,1),(2,0)]])
+    if expected == stock4_none:
+        return 'stock4_none'
+    raise ValueError('Stadium route requires exact boot TIME120 or stock4/ItemsNone declaration')
+
+
+def stadium_three_target(path):
+    from retail_setup_validation import _validate_expected_setup
+    value=json.loads(path.read_text())
+    if set(value)!={'expected_setup'}:raise ValueError('Stadium baseline must use existing expected_setup declaration')
+    expected=_validate_expected_setup(value['expected_setup'])
+    stadium_three_rule_profile(expected)
+    target={'source_expected_setup':expected,'expected_setup':{
+        'stage':3,'teams_enabled':False,'time_limit_seconds':expected['time_limit_seconds'],
+        'disable_pausing':expected['disable_pausing'],
+        'players':[{**p,'team':0,'cpu_level':0} for p in expected['players']]}}
+    return target
+
+
+def join_stadium_allocation_samples(selected, boundaries):
+    if len(selected)!=8:raise ValueError('Native allocation endpoint count differs')
+    labels={('gm_Scene_Vs_OnEnter','enter'):'entry',('gm_Scene_Vs_OnEnter','return'):'setup',
+            ('gm_Scene_Vs_OnExit','enter'):'vs_exit',('gm_Scene_Vs_OnExit','return'):'vs_exit_return'}
+    for i,row in enumerate(selected):
+        machine=row['machine'];label=labels[(row['function'],row['record'])]
+        joined=[r for r in boundaries if r['payload']['boundary']==label and
+            r['payload'].get('match_index')==i//4 and r['payload']['pc']==machine['pc'] and
+            r['source_tick']==machine['scene_frame'] and r['payload']['lr']==machine['lr'] and
+            r['payload']['gprs']==[machine['r'+str(k)] for k in range(32)]]
+        if len(joined)!=1:raise ValueError('Native allocation boundary lacks unique intended Stadium primary owner')
+
+
+def iter_stadium_allocation_jsonl(path):
+    """Yield every parsed allocation row without retaining the whole JSONL file."""
+    with Path(path).open('r', encoding='utf-8') as source:
+        for line in source:
+            yield json.loads(line)
+
+
+def _paired_idle_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('Native paired allocation JSON contains a duplicate key')
+        result[key] = value
+    return result
+
+
+def read_stadium_paired_allocation_rows(path):
+    """Read only the bounded endpoint stream admitted by the paired profile."""
+    rows = []
+    with Path(path).open('rb') as source:
+        while True:
+            line = source.readline(64 * 1024 + 2)
+            if not line:
+                break
+            if len(line) > 64 * 1024 + 1 or not line.endswith(b'\n'):
+                raise ValueError('Native paired allocation row exceeds its line bound')
+            if len(rows) >= 65:
+                raise ValueError('Native paired allocation stream exceeds its exact row bound')
+            try:
+                row = json.loads(line.decode('utf-8'), object_pairs_hook=_paired_idle_json_object)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError('Native paired allocation stream contains invalid JSON') from error
+            if not isinstance(row, dict):
+                raise ValueError('Native paired allocation stream row is not an object')
+            rows.append(row)
+    if not rows:
+        raise ValueError('Native paired allocation stream is empty')
+    return rows
+
+
+def validate_stadium_paired_allocation_inventory(rows, header, footer):
+    """Enforce endpoint-only rows and repeated-stop bounds for the paired profile."""
+    if len(rows) < 10 or len(rows) > 65 or rows[0] is not header or rows[-1] is not footer:
+        raise ValueError('Native paired allocation stream row count or framing differs')
+    if (header.get('record') != 'header' or footer.get('record') != 'end' or
+            header.get('max_events') != 64 or footer.get('max_events') != 64 or
+            header.get('compression') != 'none' or footer.get('compression') != 'none'):
+        raise ValueError('Native paired allocation stream cap, compression, or framing differs')
+    endpoint_by_sequence = {}
+    repeated_by_sequence = {}
+    endpoint_count = 0
+    repeated_count = 0
+    for index, row in enumerate(rows[:-1]):
+        if type(row.get('sequence')) is not int or row.get('sequence') != index:
+            raise ValueError('Native paired allocation event sequence is not contiguous')
+        if index == 0:
+            continue
+        record = row.get('record')
+        if record in ('enter', 'return'):
+            if row.get('function') not in ('gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'):
+                raise ValueError('Native paired allocation stream contains a non-endpoint callback')
+            endpoint_by_sequence[index] = row
+            endpoint_count += 1
+        elif record == 'repeated_stop':
+            original_sequence = row.get('original_sequence')
+            original = endpoint_by_sequence.get(original_sequence)
+            if (type(original_sequence) is not int or original is None or
+                    row.get('function') != original.get('function') or
+                    row.get('phase') != original.get('record') or
+                    row.get('machine') != original.get('machine') or
+                    row.get('observed') != original.get('observed')):
+                raise ValueError('Native paired repeated-stop row differs from its endpoint')
+            repeated_by_sequence[original_sequence] = repeated_by_sequence.get(original_sequence, 0) + 1
+            if repeated_by_sequence[original_sequence] > 32:
+                raise ValueError('Native paired endpoint repeated-stop count exceeds its source bound')
+            repeated_count += 1
+        else:
+            raise ValueError('Native paired allocation stream contains a non-endpoint row')
+    if (endpoint_count != 8 or repeated_count > 55 or
+            type(footer.get('repeated_stops')) is not int or
+            footer.get('repeated_stops') != repeated_count):
+        raise ValueError('Native paired allocation endpoint/repeated-stop inventory differs')
+    if type(footer.get('sequence')) is not int or footer.get('sequence') != len(rows) - 1:
+        raise ValueError('Native paired allocation footer sequence is not contiguous')
+    return {'event_rows': len(rows) - 2, 'endpoint_rows': endpoint_count,
+            'repeated_stop_rows': repeated_count, 'row_limit': 65, 'event_limit': 64}
+
+
+PAIRED_REGISTRATION_PROFILE = 'paired_idle_registration_v1'
+PAIRED_REGISTRATION_PROFILE_V4_SHA256 = 'd4dcc28edcf534586b3953d3235e8880173f6dbcd9ecb384e97991137646756e'
+PAIRED_REGISTRATION_PROFILE_SHA256 = 'b1f4b68f72ba9e0af754c4100845860321cac6b537f3803d6fe41e3d68626e09'
+
+
+PAIRED_REGISTRATION_FILTER = {'profile': 'selected-gobjproc-registration-v1', 'functions': ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit', 'HSD_ObjAlloc', 'HSD_ObjFree', 'HSD_ObjAllocInit', '_HSD_ObjAllocForgetMemory', 'HSD_GObj_SetupProc', 'HSD_GObjProc_8038FAA8', 'HSD_GObjProc_8038FC18', 'HSD_GObjProc_8038FCE4', 'HSD_GObjProc_8038FE24'], 'pools': [{'symbol': 'gobj_alloc_data', 'address': 2152522636, 'size': 44}, {'symbol': 'gobjproc_alloc_data', 'address': 2152522680, 'size': 44}], 'parent_policy': 'selected-parent-or-refuse'}
+
+def exact_stadium_allocation_profile_hash(profile):
+    """Two generated source profiles; no caller-selected hash authority."""
+    expected = ('30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65'
+                if profile.get('version') == 3 else PAIRED_REGISTRATION_PROFILE_SHA256
+                if profile.get('version') == 5 and profile.get('registration_profile') == 'gobjproc-registration-v1' and
+                   profile.get('registration_return_policy') == 'declared-cr0-eq-lr-returns-v1' else
+                   PAIRED_REGISTRATION_PROFILE_V4_SHA256 if profile.get('version') == 4 and
+                   profile.get('registration_profile') == 'gobjproc-registration-v1' else None)
+    actual = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
+    if expected is None or actual != expected:
+        raise ValueError('Native Stadium allocation profile is not an exact generated v3/v4/v5 identity')
+    return expected
+
+
+def validate_stadium_registration_scope(header, footer, profile):
+    """Broad stream identity only; never claims complete registration semantics."""
+    expected = PAIRED_REGISTRATION_PROFILE_SHA256
+    canonical = hashlib.sha256((json.dumps(profile, sort_keys=True, indent=2, allow_nan=False) + '\n').encode()).hexdigest()
+    if (profile.get('version') != 5 or profile.get('registration_profile') != 'gobjproc-registration-v1' or canonical != expected):
+        raise ValueError('Paired registration requires the exact generated v5 profile')
+    for row in (header, footer):
+        if (row.get('scope') != 'selected-gobjproc-registration' or
+                row.get('recording_filter') != PAIRED_REGISTRATION_FILTER or row.get('paired_registration_profile') != PAIRED_REGISTRATION_PROFILE or
+                row.get('profile_version') != 5 or
+                row.get('registration_return_policy') != 'declared-cr0-eq-lr-returns-v1' or row.get('registration_profile') != 'gobjproc-registration-v1' or
+                row.get('profile_sha256') != expected or row.get('scene_endpoint_profile') is not None or
+                row.get('allocation_history_complete') is not False or row.get('registration_lifetime_complete') is not False or
+                row.get('vs_target') != 2 or row.get('stop_at') != 'exit' or
+                row.get('max_events') != 2000000 or row.get('compression') != 'none'):
+            raise ValueError('Paired registration broad scope/profile/target/cap differs')
+    if (footer.get('status') != 'captured' or footer.get('target_complete') is not True or
+            footer.get('vs_entries') != 2 or footer.get('vs_exits') != 2 or
+            footer.get('active_owner') is not False or footer.get('pending_calls') != [] or
+            footer.get('error') is not None):
+        raise ValueError('Paired registration stream lacks its exact complete two exits')
+    if (type(footer.get('calls')) is not int or footer['calls'] < 0 or
+            footer.get('emitted_calls') != footer['calls'] or
+            type(footer.get('filtered_pool_calls')) is not int or footer['filtered_pool_calls'] < 0 or
+            type(footer.get('filtered_pool_repeated_stops')) is not int or footer['filtered_pool_repeated_stops'] < 0):
+        raise ValueError('Paired registration emitted/suppressed call accounting differs')
+    return expected
+
+
+def iter_stadium_registration_rows(path, inventory):
+    """Bounded streaming framing; callback registration semantics are a later reader."""
+    previous = -1; ended = False; counts = {}
+    with Path(path).open('rb') as source:
+        while True:
+            line = source.readline(65538)
+            if not line: break
+            if len(line) > 65537 or not line.endswith(b'\n') or ended:
+                raise ValueError('Paired registration row bound/framing differs')
+            row = json.loads(line.decode('utf-8'), object_pairs_hook=_paired_idle_json_object)
+            if (not isinstance(row, dict) or type(row.get('sequence')) is not int or
+                    row['sequence'] != previous + 1 or row['sequence'] > 2000000):
+                raise ValueError('Paired registration event sequence/cap differs')
+            kind = row.get('record')
+            if kind not in ('header', 'enter', 'return', 'repeated_stop', 'end') or (previous < 0) != (kind == 'header'):
+                raise ValueError('Paired registration record kind/framing differs')
+            previous = row['sequence']; ended = kind == 'end'
+            counts[kind] = counts.get(kind, 0) + 1
+            yield row
+    if not ended: raise ValueError('Paired registration final record missing')
+    inventory.update(row_count=previous + 1, record_counts=counts,
+                     registration_semantics_validated=False, allocation_history_complete=False,
+                     recording_scope='selected-gobjproc-registration')
+
+
+def validate_stadium_paired_allocation_environment(environment):
+    """Join paired primary and allocation profiles before starting the producer."""
+    paired = environment.get('MWRC_STADIUM_WHOLE_PAIRED_IDLE')
+    endpoint = environment.get('MWRC_ALLOCATION_SCENE_ENDPOINT_PROFILE')
+    long_idle = environment.get('MWRC_STADIUM_WHOLE_LONG_IDLE')
+    registration = environment.get('MWRC_ALLOCATION_PAIRED_REGISTRATION_PROFILE')
+    if registration not in (None, '') or paired == PAIRED_REGISTRATION_PROFILE or long_idle == PAIRED_REGISTRATION_PROFILE:
+        if not (registration == paired == long_idle == PAIRED_REGISTRATION_PROFILE and
+                endpoint in (None, '') and environment.get('MWRC_WHOLE_SESSION_MATCHES') == '2' and
+                environment.get('MWRC_STADIUM_WHOLE_FEEDBACK') == '1' and environment.get('MWRC_STADIUM_WHOLE_B_STATE') == '1' and
+                environment.get('MWRC_ALLOCATION_VS_TARGET') == '2' and environment.get('MWRC_ALLOCATION_STOP_AT') == 'exit' and
+                environment.get('MWRC_ALLOCATION_MAX_EVENTS') == '2000000'):
+            raise ValueError('Paired registration requires exact same-profile two-exit broad 2M scope')
+        return {'profile': PAIRED_REGISTRATION_PROFILE, 'match_count': 2, 'max_events': 2000000}
+    if paired == 'paired_idle_scene_endpoints_v1':
+        if (environment.get('MWRC_WHOLE_SESSION_MATCHES') != '2' or
+                endpoint != paired or long_idle != paired or
+                environment.get('MWRC_STADIUM_WHOLE_FEEDBACK') != '1' or
+                environment.get('MWRC_STADIUM_WHOLE_B_STATE') != '1'):
+            raise ValueError('paired primary, allocation endpoint, and long-idle profiles must agree')
+        if (environment.get('MWRC_ALLOCATION_VS_TARGET') != '2' or
+                environment.get('MWRC_ALLOCATION_STOP_AT') != 'exit'):
+            raise ValueError('paired allocation target must be exactly two exits')
+        if environment.get('MWRC_ALLOCATION_MAX_EVENTS') not in (None, '64'):
+            raise ValueError('paired allocation event cap must remain exactly 64')
+        return {'profile': paired, 'match_count': 2, 'max_events': 64}
+    if paired not in (None, ''):
+        raise ValueError('unknown paired primary profile')
+    if endpoint not in (None, '') or long_idle == 'paired_idle_scene_endpoints_v1':
+        raise ValueError('legacy primary route cannot enable paired allocation endpoints')
+    return None
+
+
+def validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256):
+    if (not isinstance(expected_profile_sha256, str) or
+            re.fullmatch(r'[0-9a-f]{64}', expected_profile_sha256) is None):
+        raise ValueError('Native paired allocation expected profile identity is malformed')
+    for row in (header, footer):
+        if (not isinstance(row, dict) or row.get('profile_sha256') != expected_profile_sha256 or
+                row.get('scene_endpoint_profile') != 'paired_idle_scene_endpoints_v1' or
+                row.get('scope') != 'scene-rng-endpoints-only' or
+                row.get('allocation_history_complete') is not False or
+                row.get('registration_lifetime_complete') is not False or
+                row.get('vs_target') != 2 or row.get('stop_at') != 'exit' or
+                row.get('max_events') != 64 or row.get('compression') != 'none'):
+            raise ValueError('Native paired scene endpoint scope/profile differs')
+    if (header.get('original_rng_scene_boundaries_v1') is not True or
+            header.get('selected_functions') != ['gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'] or
+            footer.get('original_rng_scene_boundaries_v1') is not True or
+            footer.get('endpoint_callbacks') != 'gm_Scene_Vs_OnEnter,gm_Scene_Vs_OnExit'):
+        raise ValueError('Native paired endpoint source-function identities differ')
+    return expected_profile_sha256
+
+
+def validate_stadium_three_native(output, profile_path, expected):
+    from whole_session_replay import capture_from_path
+    from reference_observer_stream import iter_records
+    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
+    primary=capture_from_path(output/'native-primary.mwro',output/'native-primary-status.json')
+    if primary['identity']['match_count']!=3 or primary['declared_setups']!=[expected]*3:
+        raise ValueError('Native primary does not contain three declared Stadium matches')
+    profile=json.loads(profile_path.read_text())
+    decoded,header,footer,selected=validate_original_rng_scene_boundaries_stream(
+        profile,iter_stadium_allocation_jsonl(output/'native-allocations.jsonl'))
+    expected_profile = exact_stadium_allocation_profile_hash(profile)
+    if (expected_profile is None or header.get('profile_sha256') != expected_profile or
+            header.get('vs_target')!=2 or header.get('stop_at')!='exit'):
+        raise ValueError('Native allocation scope differs from exact firsttwo exits')
+    if decoded['sample_count']!=8:raise ValueError('Native allocation sample count differs')
+    # Join actual callback CPU identity, never assume allocation ordinal equals
+    # accepted primary match ordinal (opening attract VS would violate this).
+    boundaries=[r for r in iter_records(output/'native-primary.mwro') if r['event']=='boundary']
+    join_stadium_allocation_samples(selected,boundaries)
+    return {'scope':'primary3 natural matches; native allocation first2 only; third natural tail',
+        'primary_identity':primary['identity'],'primary_lifecycle':primary['lifecycle'],
+        'primary_sha256':retail._sha256(output/'native-primary.mwro'),
+        'native_allocations_sha256':retail._sha256(output/'native-allocations.jsonl'),
+        'original_rng_scene_boundaries':decoded,'all_rng_writers_observed':False}
+
+
+def validate_stadium_paired_idle_native(output, profile_path, expected, *, registration=False):
+    """Validate natural lifetimes and endpoints; optional broad stream stays observational."""
+    from whole_session_replay import capture_from_path
+    from reference_observer_stream import iter_records
+    from tools.allocation_lifetime_replay import validate_original_rng_scene_boundaries_stream
+
+    primary_path = Path(output) / 'native-primary.mwro'
+    primary_status_path = Path(output) / 'native-primary-status.json'
+    primary = capture_from_path(primary_path, primary_status_path)
+    if (primary['identity']['match_count'] != 2 or
+            primary['declared_setups'] != [expected, expected]):
+        raise ValueError('Native primary does not contain exactly two declared paired Stadium lifetimes')
+    profile = json.loads(Path(profile_path).read_text())
+    registration_inventory = {}
+    allocation_rows = (iter_stadium_registration_rows(Path(output) / 'native-allocations.jsonl', registration_inventory)
+                       if registration else read_stadium_paired_allocation_rows(Path(output) / 'native-allocations.jsonl'))
+    decoded, header, footer, selected = validate_original_rng_scene_boundaries_stream(
+        profile, allocation_rows)
+    expected_profile_sha256 = exact_stadium_allocation_profile_hash(profile)
+    if registration:
+        validate_stadium_registration_scope(header, footer, profile)
+    else:
+        validate_stadium_paired_allocation_scope(header, footer, expected_profile_sha256)
+    if (footer.get('status') != 'captured' or footer.get('target_complete') is not True or
+            footer.get('vs_entries') != 2 or footer.get('vs_exits') != 2 or
+            footer.get('active_owner') is not False or footer.get('pending_calls') != [] or
+            decoded.get('sample_count') != 8 or len(selected) != 8):
+        raise ValueError('Native paired endpoint stream lacks its exact eight natural callback records')
+    allocation_inventory = (registration_inventory if registration else
+        validate_stadium_paired_allocation_inventory(allocation_rows, header, footer))
+    boundaries = [row for row in iter_records(primary_path) if row.get('event') == 'boundary']
+    join_stadium_allocation_samples(selected, boundaries)
+    return {
+        'scope': ('two natural Stadium lifetimes; selected GObj/GObjProc allocation/registration observation only' if registration else
+                  'two natural Stadium lifetimes; scene RNG endpoints only'),
+        'primary_identity': primary['identity'], 'primary_lifecycle': primary['lifecycle'],
+        'primary_sha256': retail._sha256(primary_path),
+        'native_allocations_sha256': retail._sha256(Path(output) / 'native-allocations.jsonl'),
+        'original_rng_scene_boundaries': decoded,
+        'allocation_inventory': allocation_inventory,
+        'allocation_history_complete': False,
+        'registration_lifetime_complete': False,
+        'all_rng_writers_observed': False,
+        'C3': False,
+    }
+
+
 def capture(args):
     output = args.output.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -1120,22 +1560,33 @@ def capture(args):
                               "first_scheduler_return" if args.boot_only else "fixed_allocation_replay",
                 "candidate_admission": "forbidden",
                 "scope": "original allocation diagnostic; no gameplay or performance admission"}
+    stadium_three = getattr(args, "stadium_three_route", False)
+    operation_deadline = started + 180 if stadium_three else None
     paths = None
     processes = []
     streams = []
     inputs = {}
     try:
+        if stadium_three:
+            if (args.cpu!='JITARM64' or args.timeout!=180 or args.dolphin_manifest is None or
+                    args.setup_receipt is None or args.initial_gci is None or
+                    getattr(args,'stadium_three_target',None) is None or args.capture_images):
+                raise ValueError('Stadium primary3 requires pinned JIT/build/setup/GCI/target,180s and no image-dump mode')
+            if any(k.startswith('MWRC_') for k in os.environ):
+                raise ValueError('Stadium primary3 refuses inherited native observer configuration')
+            metadata.update(route_mode='stadium_primary3_allocation2',native_allocation_lifetimes=2,
+                            natural_primary_tail_matches=1,operation_seconds=180,outer_seconds=210,cleanup_seconds=30)
         if getattr(args, "team_battle", False) and not args.vs_rules_items_round_trip:
             raise ValueError("--team-battle requires --vs-rules-items-round-trip")
         menu_sound_route = getattr(args, "menu_sound_route", False)
         route_flags = sum((args.boot_only, args.menu_round_trip,
-                           args.vs_rules_items_round_trip, menu_sound_route))
+                           args.vs_rules_items_round_trip, menu_sound_route, stadium_three))
         if route_flags > 1:
             raise ValueError("boot-only and original menu routes are separate diagnostic captures")
         if args.vs_rules_items_round_trip and getattr(args, "initial_gci", None) is None:
             raise ValueError("VS Rules/Items retail route requires its declared Everything unlocked GCI baseline")
         plan = scenario = plan_hash = None
-        if not args.boot_only and not args.menu_round_trip and not args.vs_rules_items_round_trip and not menu_sound_route:
+        if not args.boot_only and not args.menu_round_trip and not args.vs_rules_items_round_trip and not menu_sound_route and not stadium_three:
             if args.input_plan is None or args.scenario is None:
                 raise ValueError("fixed allocation replay requires --input-plan and --scenario")
             plan, plan_hash = load_plan(args.input_plan)
@@ -1148,18 +1599,23 @@ def capture(args):
                      args.dolphin_manifest,
                      args.setup_receipt,
                      getattr(args, "initial_gci", None),
+                     getattr(args, "stadium_three_target", None),
                      ROOT / "web/gamecube-save.mjs",
                      ROOT / ".deps/melee/config/GALE01/symbols.txt",
                      Path(__file__), ROOT / "tools/original_boot_context.py",
                      ROOT / "tools/reference_allocation_capture.py",
                      ROOT / "tools/retail_allocation_profile.py",
-                     ROOT / "tools/retail_allocation_menu.py"):
+                     ROOT / "tools/retail_allocation_menu.py",
+                     *([ROOT/"tools/whole_session_replay.py",ROOT/"tools/retail_setup_validation.py",
+                        ROOT/"tools/allocation_lifetime_replay.py",
+                        ROOT/"reference-capture/dolphin/reference_observer_stream.py",
+                        ROOT/"reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationProfile.h"] if stadium_three else [])):
             if path is not None:
                 inputs[str(path.resolve())] = retail._sha256(path)
         route_source_identities = {}
-        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route:
+        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route or stadium_three:
             source_files = (VS_RULES_ITEMS_ROUTE_SOURCE_FILES
-                            if args.vs_rules_items_round_trip else
+                            if args.vs_rules_items_round_trip or stadium_three else
                             MENU_SOUND_ROUTE_SOURCE_FILES if menu_sound_route else
                             MENU_ROUTE_SOURCE_FILES)
             for relative in source_files:
@@ -1209,7 +1665,7 @@ def capture(args):
         boot_context = derive_boot_context(args.dol, args.disc,
             ROOT / ".deps/melee/config/GALE01/symbols.txt", ROOT / ".deps/melee")
         write_json(evidence / "independent-boot-context.json", boot_context)
-        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route:
+        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route or stadium_three:
             route_identity_name = ("vs-rules-items-route-source-identities.json"
                                    if args.vs_rules_items_round_trip else
                                    "menu-sound-route-source-identities.json" if menu_sound_route else
@@ -1225,6 +1681,8 @@ def capture(args):
                 raise ValueError("owned input-plan copy differs from its frozen source")
             shutil.copy2(args.scenario, evidence / "scenario.json")
             target = scenario_target(scenario)
+        elif stadium_three:
+            target=stadium_three_target(args.stadium_three_target)
         elif args.menu_sound_route:
             target = {"route": "Title > Main > Settings > Sound > Settings > Main > Title > Main > VS > CSS",
                 "source_menu_kinds": [0, 4, 20, 4, 0, 2],
@@ -1247,7 +1705,10 @@ def capture(args):
                 "disable_pausing": False, "stage": 32}}
         write_json(evidence / "menu-target.json", target)
         paths["menu_driver"] = evidence / "menu-driver.py"
-        if args.menu_round_trip:
+        if stadium_three:
+            from retail_allocation_menu import render_stadium_three_route_driver
+            paths["menu_driver"].write_text(render_stadium_three_route_driver())
+        elif args.menu_round_trip:
             from retail_allocation_menu import render_menu_round_trip_driver
             paths["menu_driver"].write_text(render_menu_round_trip_driver())
         elif args.vs_rules_items_round_trip:
@@ -1276,7 +1737,7 @@ def capture(args):
         external = tree_hashes(paths["user"] / "GC")
         if external != paths["provenance"].get("external_save_hashes"):
             raise ValueError("external card context differs from pinned provenance")
-        pipe_count = 4 if (args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route) else (plan["active_player_count"] if plan else 0)
+        pipe_count = 4 if (args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route or stadium_three) else (plan["active_player_count"] if plan else 0)
         if pipe_count:
             retail.require_raw_pipe_config(paths["pad_config"], range(1, pipe_count + 1))
         identity = {**paths["identity"], "disc_dol_sha1": retail.verify_disc_dol(args.disc, args.dol),
@@ -1290,8 +1751,11 @@ def capture(args):
         if args.capture_images:
             command = visual_capture_options(command)
         commands = evidence / "gdb-commands.txt"
-        commands.write_text(gdb_script(paths, args.boot_only, args.menu_round_trip,
-                                       args.vs_rules_items_round_trip, menu_sound_route))
+        command_source=gdb_script(paths, args.boot_only, args.menu_round_trip or stadium_three,
+                                  args.vs_rules_items_round_trip, menu_sound_route)
+        if stadium_three:
+            command_source=command_source.replace("menu_round_trip_complete", "stadium_primary3_native_allocation2_complete")
+        commands.write_text(command_source)
         # These owned files are execution inputs even though they live beside
         # the diagnostic outputs. Freeze them before any original process runs.
         for path in evidence.iterdir():
@@ -1309,6 +1773,16 @@ def capture(args):
             "MELEE_REPLAY_COLLECTOR": str(paths["collector"]),
             "MELEE_REPLAY_DRAW_AUDIT": "1",
             "MELEE_CHECKPOINT_TARGET_JSON": str(evidence / "menu-target.json")})
+        if stadium_three:
+            environment={k:v for k,v in environment.items() if not k.startswith('MWRC_')}
+            environment.update(MWRC_ENABLE='1',MWRC_OUTPUT=str(output/'native-primary.mwro'),
+                MWRC_STATUS=str(output/'native-primary-status.json'),MWRC_CPU='JITARM64',
+                MWRC_DOL_SHA256=retail._sha256(args.dol),MWRC_SOURCE_REV='GALE01r2',
+                MWRC_CAPTURE_ID='stadium-'+metadata['run_id'],MWRC_SEQUENCE_ID='primary3-allocation2',
+                MWRC_WHOLE_SESSION_MATCHES='3',MWRC_ALLOCATION_OUTPUT=str(output/'native-allocations.jsonl'),
+                MWRC_ALLOCATION_VS_TARGET='2',MWRC_ALLOCATION_STOP_AT='exit',
+                MWRC_INPUT_RECORD=str(output/'native-inputs.mwri'),MWRC_INPUT_STATUS=str(output/'native-input-status.json'),
+                MELEE_STADIUM_OPERATION_DEADLINE=str(operation_deadline))
         if plan is not None:
             environment["MELEE_REPLAY_INPUT_PLAN"] = str(evidence / "input-plan.json")
         metadata.update({"status": "running", "identity": identity, "owned_run": str(paths["run_root"]),
@@ -1319,13 +1793,17 @@ def capture(args):
                          "frames_requested": len(plan["frames"]) if plan is not None else None,
                          "launch": command, "inputs": inputs,
                          "collector_files": tree_hashes(paths["collector"].parent)})
+        if stadium_three and time.monotonic()>=operation_deadline:
+            raise RuntimeError("Stadium operation expired before process launch")
         write_json(output / "launch.json", metadata)
         dolphin_log = (output / "dolphin.log").open("x"); streams.append(dolphin_log)
         dolphin = subprocess.Popen(command, stdout=dolphin_log, stderr=subprocess.STDOUT,
                                    env=environment, start_new_session=True)
         processes.append((dolphin, "Dolphin"))
         metadata["dolphin_pid"] = dolphin.pid
-        retail.wait_for_socket(paths["socket"], dolphin, 30)
+        if stadium_three and time.monotonic()>=operation_deadline:
+            raise RuntimeError("Stadium operation expired before socket wait")
+        retail.wait_for_socket(paths["socket"], dolphin, min(30, operation_deadline-time.monotonic()) if stadium_three else 30)
         gdb_log = (output / "gdb.log").open("x"); streams.append(gdb_log)
         debugger = subprocess.Popen([str(debugger_path), "--quiet", "--nx", "--batch",
                                      "-x", str(commands)],
@@ -1336,7 +1814,9 @@ def capture(args):
         write_json(output / "processes.json", {"run_id": metadata["run_id"],
                    "started_at": metadata["started_at"], "dolphin_pid": dolphin.pid,
                    "gdb_pid": debugger.pid, "owned_run": str(paths["run_root"])})
-        debugger.wait(timeout=args.timeout)
+        remaining=operation_deadline-time.monotonic() if stadium_three else args.timeout
+        if remaining<=0:raise RuntimeError("Stadium operation expired before debugger wait")
+        debugger.wait(timeout=remaining)
         if debugger.returncode:
             raise RuntimeError("GDB capture failed; preserved gdb.log")
         allocation_path = output / "allocations.jsonl"
@@ -1350,7 +1830,12 @@ def capture(args):
             for line in stream: last = json.loads(line)
         if last is None or last.get("record") != "end" or last.get("status") != "captured":
             raise RuntimeError("allocation capture lacks a successful terminal record")
-        if args.menu_round_trip:
+        if stadium_three:
+            metadata['native_stadium_three']=validate_stadium_three_native(output,profile_path,target['source_expected_setup'])
+            native_input=json.loads((output/'native-input-status.json').read_text())
+            if native_input.get('complete') is not True or native_input.get('error') is not None or native_input.get('invalid') is not False or native_input.get('mode')!='record':
+                raise ValueError('Native input recording did not complete')
+        elif args.menu_round_trip:
             route_path = evidence / "cold-boot-menu-route.jsonl"
             metadata["menu_route"] = verify_menu_route(route_path)
             metadata["menu_route"]["input_commands"] = verify_menu_route_commands(
@@ -1406,7 +1891,22 @@ def capture(args):
         metadata.update({"status": "failed", "error": str(error)})
     finally:
         for process, label in reversed(processes):
-            retail._terminate(process, label)
+            if not stadium_three:
+                retail._terminate(process, label)
+                continue
+            # Reuse existing exact-owned TERM/KILL/reap, then retain factual
+            # absence. The released outer owner remains authoritative fallback.
+            cleanup_error=None
+            try:retail._terminate(process,label)
+            except Exception as error:cleanup_error=str(error)
+            try:
+                os.killpg(process.pid,0);group_absent=False
+            except ProcessLookupError:group_absent=True
+            except PermissionError:group_absent=False
+            metadata.setdefault('owned_cleanup',[]).append({'label':label,'pid':process.pid,
+                'pgid':process.pid,'returncode':process.poll(),'group_absent':group_absent,'error':cleanup_error})
+            if cleanup_error is not None or process.returncode is None or not group_absent:
+                metadata.update(status='failed',error=metadata.get('error') or 'Owned native/GDB cleanup failed')
         for stream in streams: stream.close()
         if paths: paths["socket"].unlink(missing_ok=True)
         metadata["wall_seconds"] = time.monotonic() - started
@@ -1452,6 +1952,10 @@ def main():
                         help="Capture a cold-DOL original Main > Settings > Sound edit, Back, and return through VS to CSS; diagnostic only")
     parser.add_argument("--vs-rules-items-round-trip", action="store_true",
                         help="Capture cold-DOL VS Rules/Items -> SSS -> live match -> Results -> retained CSS; diagnostic only")
+    parser.add_argument("--stadium-three-route",action="store_true",
+                        help="Three natural Stadium routes; native allocation endpoints for firsttwo, third completion tail")
+    parser.add_argument("--stadium-three-target",type=Path,
+                        help="Hash-bound existing source expected_setup declaration; live baseline must match without rule edits")
     parser.add_argument("--team-battle", action="store_true",
                         help="Enable and verify original two-player opposing Teams inside the VS Rules/Items route")
     return capture(parser.parse_args())

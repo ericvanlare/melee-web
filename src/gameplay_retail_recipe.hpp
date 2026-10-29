@@ -62,11 +62,11 @@ struct RetailReplayRecipe {
     std::vector<std::array<uint8_t, 0x138>> match_setups;
     std::vector<MeleeWebMenuMatchSelection> match_selections;
     std::unique_ptr<RetailReplayInitialCssContext> initial_css;
-    // Versions 8, 9, and 10 are opt-in whole-session forms: one continuous pad history
+    // Versions 8 through 11 are opt-in whole-session forms: one continuous pad history
     // with a declared scene span table and copied first-CSS source context. It
     // starts from the fresh prepared CSS owner and retains one source arena
     // across the menu chain and matches. A used source heap is rejected.
-    bool whole_session() const { return version == 8 || version == 9 || version == 10; }
+    bool whole_session() const { return version >= 8 && version <= 11; }
     std::uint32_t diagnostic_source_observations() const {
         return diagnostic_entity_prefix && spans.size() == 3 ?
             spans.back().last_frame - spans.back().first_frame + 1 : 0;
@@ -94,11 +94,15 @@ struct RetailReplayRecipe {
  * CSSData entry object and six-byte KO array, and finally the whole-session
  * span table. V9 replaces the one setup payload with a bounded, ordered setup
  * table so each match selection is independently bound. V10 retains that
- * transport while selecting its distinct fighter-coverage roster. Schema 1 is
- * rejected because it cannot initialize CSS. */
+ * transport while selecting its distinct fighter-coverage roster. V11 is an
+ * exact two-Match profile with an appended canonical per-input-frame draw
+ * closure bitset; the strict producer derives Match bits from DrawReturn/PAD
+ * joins, while non-Match spans explicitly use close-each-step policy because
+ * their draws are unobserved. Schema 1 is rejected because it cannot initialize CSS. */
 constexpr uint32_t kRetailReplayVersion = 9;
 constexpr uint32_t kRetailReplayV8Version = 8;
 constexpr uint32_t kRetailReplayFighterVersion = 10;
+constexpr uint32_t kRetailReplayDrawClosureVersion = 11;
 constexpr uint16_t kRetailReplayContextVersion = 2;
 // Named opt-in: jiggly-ice-mario-fox-v1, one bounded diagnostic prefix.
 constexpr uint16_t kRetailReplayEntityPrefixFlag = 1;
@@ -114,6 +118,7 @@ constexpr size_t kRetailReplayContextBytes = kRetailReplayGameRulesBytes +
 constexpr size_t kRetailReplayMaxSpans = 32;
 constexpr size_t kRetailReplaySpanBytes = 12;
 constexpr size_t kRetailReplayMaxMatchSetups = 3;
+constexpr size_t kRetailReplayDrawClosureHeaderBytes = 4;
 constexpr uint32_t kRetailReplayLegacyMaxFrames = 36000;
 constexpr uint32_t kRetailReplayWholeSessionMaxFrames = 108000;
 constexpr size_t kRetailReplayLegacyMaxBytes = 20 + 8 +
@@ -124,11 +129,14 @@ constexpr size_t kRetailReplayWholeSessionMaxBytes = 16 + 4 +
     kRetailReplayMaxMatchSetups * 0x138 +
     MELEE_WEB_PAD_STATE_BYTES + kRetailReplayWholeSessionMaxFrames * 44 + 2 +
     kRetailReplayMaxSpans * kRetailReplaySpanBytes;
+constexpr size_t kRetailReplayDrawClosureMaxBytes =
+    kRetailReplayWholeSessionMaxBytes + kRetailReplayDrawClosureHeaderBytes +
+    (kRetailReplayWholeSessionMaxFrames + 7) / 8;
 // The browser must admit the largest supported format before the native
 // reader applies its version-specific frame and exact-size checks.
 constexpr size_t kRetailReplayMaxBytes =
-    kRetailReplayWholeSessionMaxBytes > kRetailReplayLegacyMaxBytes
-        ? kRetailReplayWholeSessionMaxBytes : kRetailReplayLegacyMaxBytes;
+    kRetailReplayDrawClosureMaxBytes > kRetailReplayLegacyMaxBytes
+        ? kRetailReplayDrawClosureMaxBytes : kRetailReplayLegacyMaxBytes;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 
 // Diagnostic JSON output; callers must disable this instrumentation for timing

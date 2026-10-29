@@ -21,6 +21,144 @@ from .allocation_history_replay import (
 )
 
 
+def _validate_original_rng_scene_boundary_endpoints(profile: dict, header: dict, end: dict,
+                                                     selected: list[dict], *,
+                                                     selected_count: int,
+                                                     sample_present: bool,
+                                                     outside_sample: bool) -> dict:
+    """Shared exact endpoint checks for legacy-list and bounded-stream callers."""
+    feature = 'original_rng_scene_boundaries_v1'
+    if (not isinstance(profile, dict) or not isinstance(header, dict) or
+            not isinstance(end, dict) or not isinstance(selected, list) or
+            any(not isinstance(row, dict) or
+                not isinstance(row.get('observed', {}), dict) for row in selected)):
+        raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+    if feature not in header and feature not in end:
+        if sample_present:
+            raise ReplayProblem('stream', 'original RNG samples lack their explicit feature marker')
+        return {'observed': False, 'scope': 'historical/non-feature producer'}
+    if header.get(feature) is not True or end.get(feature) is not True:
+        raise ReplayProblem('stream', 'original RNG feature header/end marker differs')
+    if end.get('status') != 'captured':
+        raise ReplayProblem('incomplete', 'original RNG scene endpoint stream is incomplete')
+    globals_value = profile.get('globals', {})
+    slot_value = globals_value.get('seed_ptr', {}) if isinstance(globals_value, dict) else {}
+    slot = slot_value.get('address') if isinstance(slot_value, dict) else None
+    def u32(value): return type(value) is int and 0 <= value <= 0xffffffff
+    def mem1(value): return u32(value) and value % 4 == 0 and 0x80000000 <= value <= 0x81800000 - 4
+    if not mem1(slot):
+        raise ReplayProblem('provenance', 'original RNG pointer slot lacks its pinned MEM1 identity')
+    entries, exits = end.get('vs_entries'), end.get('vs_exits')
+    target, stop = header.get('vs_target'), header.get('stop_at')
+    if (type(target) is not int or not 1 <= target <= 16 or stop not in {'entry', 'exit'} or
+            entries != target or exits != target - (stop == 'entry') or
+            type(entries) is not int or type(exits) is not int):
+        raise ReplayProblem('stream', 'original RNG scene endpoint target/counts differ')
+    expected = []
+    for ordinal in range(entries):
+        expected += [(ordinal + 1, 'gm_Scene_Vs_OnEnter', 'enter'),
+                     (ordinal + 1, 'gm_Scene_Vs_OnEnter', 'return')]
+        if ordinal < exits:
+            expected += [(ordinal + 1, 'gm_Scene_Vs_OnExit', 'enter'),
+                         (ordinal + 1, 'gm_Scene_Vs_OnExit', 'return')]
+    if selected_count != len(expected) or len(selected) != selected_count:
+        raise ReplayProblem('stream', 'original RNG scene endpoint cardinality differs')
+    fields = {'pointer_slot_address', 'pointer_value', 'value_address', 'value',
+              'pointer_bytes', 'value_bytes'}
+    result = []; pending = None; previous_sequence = -1
+    for row, (ordinal, function, phase) in zip(selected, expected):
+        sample = row.get('observed', {}).get('original_rng')
+        machine = row.get('machine', {})
+        if not isinstance(machine, dict):
+            raise ReplayProblem('stream', 'original RNG machine identity shape differs', call=row)
+        key = (row.get('call'), row.get('thread'), machine.get('r1'), machine.get('lr'), function)
+        if (row.get('function') != function or row.get('record') != phase or
+                not all(u32(v) for v in key[:4]) or not u32(row.get('sequence')) or
+                row['sequence'] <= previous_sequence):
+            raise ReplayProblem('stream', 'original RNG scene endpoint order/call identity differs', call=row)
+        if phase == 'enter': pending = key
+        elif pending != key:
+            raise ReplayProblem('stream', 'original RNG scene return lacks its exact entry', call=row)
+        else: pending = None
+        if not isinstance(sample, dict) or set(sample) != fields:
+            raise ReplayProblem('stream', 'original RNG sample fields are missing or unknown', call=row)
+        if (not u32(sample['pointer_slot_address']) or not u32(sample['value_address']) or
+                sample['pointer_slot_address'] != slot or not mem1(sample['pointer_value']) or
+                sample['value_address'] != sample['pointer_value'] or not u32(sample['value'])):
+            raise ReplayProblem('stream', 'original RNG dynamic pointer/value association differs', call=row)
+        for raw_key, value_key in [('pointer_bytes', 'pointer_value'), ('value_bytes', 'value')]:
+            raw = sample[raw_key]
+            if (not isinstance(raw, list) or len(raw) != 4 or
+                    any(type(v) is not int or not 0 <= v <= 255 for v in raw) or
+                    int.from_bytes(bytes(raw), 'big') != sample[value_key]):
+                raise ReplayProblem('stream', 'original RNG raw bytes differ from exact word', call=row)
+        result.append({'lifetime': ordinal, 'function': function, 'phase': phase,
+                       'sequence': row['sequence'], 'call': row['call'], 'thread': row['thread'],
+                       'sp': machine['r1'], 'lr': machine['lr'], **sample})
+        previous_sequence = row['sequence']
+    if outside_sample:
+        raise ReplayProblem('stream', 'original RNG sample occurs outside a declared VS boundary')
+    return {'observed': True, 'scope': 'original VS seed-slot/value endpoints only',
+            'samples': result, 'sample_count': len(result), 'all_writers_observed': False,
+            'port_wrapper_correspondence': 'not claimed'}
+
+
+def validate_original_rng_scene_boundaries(profile: dict, header: dict, end: dict,
+                                           rows: list[dict]) -> dict:
+    """Legacy list API: validate source endpoints, never a port ownership stack."""
+    if (not isinstance(profile, dict) or not isinstance(header, dict) or
+            not isinstance(end, dict) or not isinstance(rows, list) or
+            any(not isinstance(row, dict) or
+                not isinstance(row.get('observed', {}), dict) for row in rows)):
+        raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+    selected = [row for row in rows if row.get('record') in {'enter', 'return'} and
+                row.get('function') in {'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'}]
+    present = any('original_rng' in row.get('observed', {}) for row in rows)
+    outside = any('original_rng' in row.get('observed', {}) and
+                  row.get('record') != 'repeated_stop' and row not in selected for row in rows)
+    return _validate_original_rng_scene_boundary_endpoints(
+        profile, header, end, selected, selected_count=len(selected),
+        sample_present=present, outside_sample=outside)
+
+
+def validate_original_rng_scene_boundaries_stream(profile: dict, rows) -> tuple[dict, dict, dict, list]:
+    """Validate a JSONL stream while retaining only its endpoints and 8 scene rows.
+
+    The input iterator must yield every parsed allocation record in file order.
+    This bounded variant is for the exact Stadium two-exit capture (8 endpoint
+    records); the public list API above remains unchanged for existing callers.
+    """
+    first = last = None
+    selected = []
+    selected_count = 0
+    present = False
+    outside = False
+    for row in rows:
+        if (not isinstance(row, dict) or
+                not isinstance(row.get('observed', {}), dict)):
+            raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+        if first is None:
+            first = row
+        last = row
+        observed = row.get('observed', {})
+        is_endpoint = (row.get('record') in {'enter', 'return'} and
+                       row.get('function') in {'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit'})
+        if is_endpoint:
+            selected_count += 1
+            if len(selected) < 8:
+                selected.append(row)
+        if 'original_rng' in observed:
+            present = True
+            if row.get('record') != 'repeated_stop' and not is_endpoint:
+                outside = True
+    if first is None:
+        raise ReplayProblem('stream', 'original RNG endpoint container shape differs')
+    decoded = _validate_original_rng_scene_boundary_endpoints(
+        profile, first, last, selected, selected_count=selected_count,
+        sample_present=present, outside_sample=outside)
+    return decoded, first, last, selected
+
+
 class StreamModel:
     def __init__(self, *, action_sink=None, output_sink=None):
         self.drivers = []
@@ -1518,6 +1656,12 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     if first_problem is None and cleanup_problem is not None:
         first_problem = cleanup_problem
     end = next((row for row in reversed(rows) if row['record'] == 'end'), {})
+    try:
+        original_rng_boundaries = validate_original_rng_scene_boundaries(profile, header, end, rows)
+    except ReplayProblem as error:
+        original_rng_boundaries = {'observed': False, 'error': str(error)}
+        if first_problem is None:
+            first_problem = {'kind': error.kind, 'reason': str(error), 'call': None, 'sequence': None, 'function': None}
     # ``pending_ids`` is only the replayed prefix in artifact mode: an early
     # model failure leaves later source entries unseen and would otherwise
     # falsely turn a complete captured trace into an incomplete trace.  The
@@ -1754,6 +1898,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         # separate from allocator identities so a captured fighter pointer can
         # never become a model allocation input.
         'ownership_events': ownership_events,
+        'original_rng_scene_boundaries': original_rng_boundaries,
         'ownership_complete': ownership_complete,
         'checked_wasm_matches_native': wasm_matches,
         'checked_wasm_problem': wasm_problem,

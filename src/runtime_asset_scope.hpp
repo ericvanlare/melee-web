@@ -74,7 +74,8 @@ public:
     // Copies one complete file into the staged generation. The active map is
     // untouched until commit() succeeds.
     void put(std::uint32_t generation, std::string_view name,
-             std::span<const std::uint8_t> bytes)
+             std::span<const std::uint8_t> bytes,
+             std::span<const std::uint8_t> transfer_tail = {})
     {
         require_pending(generation);
         if (name.empty()) {
@@ -102,8 +103,9 @@ public:
                                      std::string(name));
         }
 
-        auto [_, inserted] = staged_.emplace(
-            std::string(name), std::vector<std::uint8_t>(bytes.begin(), bytes.end()));
+        RuntimeFileBytes payload(bytes.begin(),bytes.end());
+        payload.set_transfer_tail(transfer_tail); // Refuse before staged state changes.
+        auto [_, inserted] = staged_.emplace(std::string(name),std::move(payload));
         if (!inserted) {
             throw std::runtime_error("Duplicate runtime asset: " +
                                      std::string(name));

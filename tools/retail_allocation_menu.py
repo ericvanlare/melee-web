@@ -1052,6 +1052,88 @@ def render_vs_rules_items_round_trip_driver() -> str:
     return VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE
 
 
+_STADIUM_THREE_ROUTE = r'''
+def _cold_boot_stadium_three_route():
+    import time
+    expected=TARGET['source_expected_setup']
+    if EXPECTED_STAGE!=3 or len(EXPECTED_PLAYERS)!=2:
+        raise RuntimeError('Stadium three-route requires its exact two-player stage3 declaration')
+    _record_menu_route_marker('first_scheduler_return')
+    cold_boot_to_css()
+    baseline=rules_state()
+    # This branch never edits Rules/Items: whole-session primary ownership
+    # begins at this first CSS, so leaving it for a menu detour is forbidden.
+    if (baseline['mode']!=0 or baseline['time_limit']!=EXPECTED_TIMER or
+            baseline['stock_count']!=EXPECTED_STOCKS or baseline['stock_time_limit']!=0 or
+            baseline['pause']!=EXPECTED_PAUSE or baseline['item_frequency']!=expected['item_frequency'] or
+            baseline['item_mask']!=int(expected['item_mask_hex'],16)):
+        raise RuntimeError('Owned GCI rules differ from the declared source baseline; no rule edits allowed')
+    for lifetime in range(3):
+        _record_menu_route_marker(f'stadium_{lifetime+1}_css')
+        _cold_boot_enter_sss()
+        select_stage(3)
+        if selected_stage_kind()!=3 or mem(0x804D6CAE,1)[0]!=18:
+            raise RuntimeError('Stadium source SSS row18/kind3 is absent')
+        _record_menu_route_marker(f'stadium_{lifetime+1}_sss')
+        pulse(0,'A',settle=30)
+        _vs_wait_scene(SCENE_VS,GM_VS)
+        data=_vs_start_data_state()
+        if (data['stage']!=3 or data['time_limit_seconds']!=expected['time_limit_seconds'] or
+                data['item_frequency']!=expected['item_frequency'] or
+                data['item_mask_hex']!=expected['item_mask_hex'] or
+                [(p['character_kind'],p['slot_type'],p['stocks'],p['color']) for p in data['players'][:2]]!=
+                [(p['character_kind'],p['player_type'],p['stocks'],p['costume']) for p in EXPECTED_PLAYERS] or
+                any(p['slot_type']!=3 for p in data['players'][2:])):
+            raise RuntimeError('Stadium source StartMeleeData differs from declared baseline')
+        _record_menu_route_marker(f'stadium_{lifetime+1}_vs')
+        step(180)
+        if scene_kind()!=SCENE_VS or mem(0x80479D30,1)[0]!=GM_VS:
+            raise RuntimeError('Stadium left VS before declared180 source ticks')
+        for button in ('L','R','A','START'):command(0,'PRESS '+button)
+        step(1)
+        for button in ('L','R','A','START'):command(0,'RELEASE '+button)
+        step(1)
+        _vs_wait_scene(SCENE_RESULTS,GM_VS)
+        if mem(VS_RESULTS_DATA_ADDRESS+0x0C,1)[0]!=7:
+            raise RuntimeError('Stadium no-contest did not produce source outcome7')
+        _record_menu_route_marker(f'stadium_{lifetime+1}_results')
+        step(270)
+        for _ in range(8):
+            if scene_kind()==SCENE_CSS and mem(0x80479D30,1)[0]==GM_VS:break
+            if scene_kind()!=SCENE_RESULTS or mem(0x80479D30,1)[0]!=GM_VS:
+                raise RuntimeError('Stadium Results left its checked source owner')
+            pulse(0,'START',settle=90)
+        if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+            raise RuntimeError('Stadium Results did not return naturally to CSS')
+        _record_menu_route_marker(f'stadium_{lifetime+1}_returned_css')
+    # Guest work ends at the existing third ReturnCss primary boundary.
+    # While GDB is paused, wait only for the existing native writer to drain.
+    while True:
+        _check_collector_failure()
+        path=Path(os.environ['MWRC_STATUS'])
+        if path.is_file():
+            status=json.loads(path.read_text())
+            if status.get('invalid'):raise RuntimeError('Native primary observer invalid')
+            if status.get('state')=='completed':
+                if status.get('completed') is not True:raise RuntimeError('Native primary not complete')
+                break
+        time.sleep(.01)
+'''
+
+
+def render_stadium_three_route_driver() -> str:
+    """Three natural Stadium scenes; first two allocation lifetimes only."""
+    source=VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE
+    call='\n_cold_boot_vs_rules_items_round_trip()\n'
+    if source.count(call)!=1:raise ValueError('retained VS route call changed')
+    source=source.replace(call,'\n'+_STADIUM_THREE_ROUTE+'\n_cold_boot_stadium_three_route()\n',1)
+    source=source.replace(VS_RULES_ITEMS_TRACE_NAME,'cold-boot-stadium-three-route.jsonl')
+    guard="    failure=globals().get('_allocation_failed')"
+    if source.count(guard)!=1:raise ValueError('retained controller failure guard changed')
+    source=source.replace(guard,"    import time\n    if time.monotonic()>=float(os.environ['MELEE_STADIUM_OPERATION_DEADLINE']):\n        raise RuntimeError('Stadium180s operation deadline reached')\n"+guard,1)
+    return source
+
+
 def render_menu_sound_route_driver() -> str:
     """Return a fresh-DOL Main > Settings > Sound route driver."""
     return MENU_SOUND_ROUTE_DRIVER_SOURCE

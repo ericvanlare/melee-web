@@ -47,17 +47,31 @@ class AllocationHistoryReplayTests(unittest.TestCase):
 
     def test_profile_versions_accept_legacy_callback_and_demo_coverage_only(self):
         path = self.root / "profile-version.json"
-        for version in (1, 2, 3, 4, 3.0, True, None, "2"):
+        for version in (1, 2, 3, 4, 5, 3.0, True, None, "2"):
             with self.subTest(version=version):
-                path.write_text(json.dumps({
+                profile = {
                     "schema": "melee-web-original-allocation-profile",
                     "version": version, "functions": [],
-                }))
-                if type(version) is int and version in (1, 2, 3):
+                }
+                if version == 4:
+                    profile["registration_profile"] = "gobjproc-registration-v1"
+                path.write_text(json.dumps(profile))
+                if type(version) is int and version in (1, 2, 3, 4):
                     self.assertEqual(load_profile(path)["version"], version)
                 else:
                     with self.assertRaises(ReplayProblem):
                         load_profile(path)
+
+    def test_v4_profile_requires_the_registration_scope_marker(self):
+        path = self.root / "profile-version.json"
+        for value in (
+            {"schema": "melee-web-original-allocation-profile", "version": 4, "functions": []},
+            {"schema": "melee-web-original-allocation-profile", "version": 4,
+             "registration_profile": "other", "functions": []},
+        ):
+            path.write_text(json.dumps(value))
+            with self.assertRaisesRegex(ReplayProblem, "registration scope"):
+                load_profile(path)
 
     def profile(self):
         profile = {

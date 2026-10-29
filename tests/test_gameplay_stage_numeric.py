@@ -24,6 +24,7 @@ class GameplayStageNumericTests(unittest.TestCase):
         result = subprocess.run([str(node_runtime()), str(target), str(asset)],
                                 cwd=ROOT, capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("FD source-stage readiness negative and unchanged-state controls passed", result.stdout)
         self.assertIn("Original FD marker range context loaded/unloaded/restarted twice", result.stdout)
 
 

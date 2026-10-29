@@ -17,6 +17,9 @@
 #include <cstring>
 #include <stdexcept>
 #include <set>
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance_runtime.h"
 #include "gameplay_bootstrap.h"
@@ -25,6 +28,7 @@
 extern "C" {
 #include <melee/gm/types.h>
 #include <melee/gm/gmvsmelee.h>
+#include <melee/mp/forward.h>
 }
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
@@ -55,6 +59,12 @@ struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayKirbyCopyAssets> kirby_copy_assets;
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
+    bool stadium_diagnostic=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    bool first_fire_diagnostic=false,first_water_diagnostic=false;
+    MeleeWebStadiumFirstTransformJournal first_transform_retired{};
+    MeleeWebSourceFileRecordedCompletionStatus first_completion_retired{};
+#endif
     bool mode_owned=false;
     bool profile_owned=false;
     bool sudden_death_claimed=false;
@@ -129,6 +139,19 @@ struct GameplayMatchSession::Storage {
         runtime_files=&files;runtime_cache=archive_cache;selected=selected_input;
         if(selection_uses_kirby(selected_input))
             kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selected_input);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(stadium_diagnostic){
+            check(!opening_demo && !sudden_death && !selected_input.sudden_death &&
+                  player_count==2 && !selected_input.start.rules.is_teams &&
+                  selected_input.start.rules.stkind==St_Kind_PStadium,
+                  "Diagnostic session requires the exact two-Human-Mario Stadium profile");
+            for(unsigned i=0;i<2;++i)
+                check(selected_input.start.players[i].slot_type==Gm_PKind_Human &&
+                      selected_input.start.players[i].ckind==CKIND_MARIO,
+                      "Diagnostic Stadium session requires two Human Mario players");
+            stage=melee_web_stage_content_for_profile(St_Kind_PStadium);
+        }else
+#endif
         stage=melee_web_stage_content(selected_input.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
@@ -170,6 +193,11 @@ struct GameplayMatchSession::Storage {
               "Match source-slot compaction changed its active player count");
         content.begin_source_match=true;
         content.opening_demo=opening_demo;
+        content.stadium_diagnostic=stadium_diagnostic;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        content.stadium_first_transform_diagnostic=first_fire_diagnostic;
+        content.stadium_first_water_diagnostic=first_water_diagnostic;
+#endif
         content.sudden_death=sudden_death;
         content.source_camera_subjects=70;
         content.source_random_seed=selected_input.random_seed;
@@ -303,6 +331,9 @@ struct GameplayMatchSession::Storage {
             MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
             check(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
             check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(stadium_diagnostic)world->prepare_stadium_ready(match);
+#endif
             auto prepare_music=[](void* context,char* message,size_t size)->int{
                 try{static_cast<Storage*>(context)->prepare_music();return 1;}
                 catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
@@ -337,10 +368,25 @@ struct GameplayMatchSession::Storage {
     }
     void end_flow(){
         char error[256]{};
-        if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
+        if(flow){
+            check(world!=nullptr,"Match flow teardown has no source world owner");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if(first_fire_diagnostic||first_water_diagnostic)
+                check(world->diagnostic_stadium_first_transform_can_end(error,sizeof(error)),error);
+#endif
+            world->ensure_source_files_quiescent();
+            check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;
+        }
     }
     void close(){
         char error[256]{};
+        if(world)world->ensure_source_files_quiescent();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(world&&(first_fire_diagnostic||first_water_diagnostic))
+            check(world->diagnostic_stadium_first_transform_can_end(error,sizeof(error)),error);
+        /* Refuse unsupported partial starts before flow/HUD retirement. */
+        if(world&&stadium_diagnostic)world->cancel_prepared_stadium_ready();
+#endif
         end_flow();
         /* The browser's final source draw has completed before close(). Keep
          * the original fighter state resident while publishing MatchEnd, then
@@ -350,6 +396,22 @@ struct GameplayMatchSession::Storage {
             (void)melee_web_match_rules_publish_result();
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        if(world&&(first_fire_diagnostic||first_water_diagnostic)){
+            check(world->diagnostic_stadium_first_transform_snapshot(
+                &first_transform_retired,error,sizeof(error))&&
+                first_transform_retired.armed==2&&!first_transform_retired.failed&&
+                first_transform_retired.selected_form==(first_water_diagnostic?9U:3U)&&
+                first_transform_retired.count==melee_web_stadium_first_transform_event_count(&first_transform_retired),
+                error[0]?error:"First-fire StageLast retirement receipt is incomplete");
+            check(world->diagnostic_stadium_first_transform_completion_status(
+                &first_completion_retired,error,sizeof(error))&&
+                first_completion_retired.armed==1&&!first_completion_retired.failed&&
+                first_completion_retired.request_seen&&first_completion_retired.completed&&
+                first_completion_retired.request_id>0,
+                error[0]?error:"First-fire recorded completion receipt is incomplete");
+        }
+#endif
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
         if(match){
             check_fighter_asset_ownership("before-match-end");
@@ -410,6 +472,29 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
     else
         storage_->start(files,selection,&archive_cache);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+    const MeleeWebMenuMatchSelection& selection,RuntimeArchiveCache& cache,
+    GameplayMatchConstruction construction,const MeleeWebPadState& input,
+    GameplayMatchDiagnostic diagnostic):storage_(std::make_unique<Storage>())
+{
+    check(diagnostic==GameplayMatchDiagnostic::StadiumReady||diagnostic==GameplayMatchDiagnostic::StadiumFirstFireReady||diagnostic==GameplayMatchDiagnostic::StadiumFirstWaterReady,"Unknown diagnostic match boundary");
+    storage_->stadium_diagnostic=true;
+    storage_->first_fire_diagnostic=diagnostic==GameplayMatchDiagnostic::StadiumFirstFireReady;
+    storage_->first_water_diagnostic=diagnostic==GameplayMatchDiagnostic::StadiumFirstWaterReady;
+    first_transform_selected_form_=storage_->first_water_diagnostic?9U:(storage_->first_fire_diagnostic?3U:0U);
+    try{
+        if(construction==GameplayMatchConstruction::Deferred)
+            storage_->begin(files,selection,&cache,&input);
+        else storage_->start(files,selection,&cache,&input);
+    }catch(const std::exception& first){
+        // Preserve the first preparation refusal before the existing checked
+        // Storage destructor attempts retirement of any partial source owners.
+        std::fprintf(stderr,"STADIUM_READY_CONSTRUCTION_FIRST_FAILURE %s\n",first.what());
+        std::fflush(stderr);throw;
+    }
+}
+#endif
 GameplayMatchSession::~GameplayMatchSession()=default;
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
@@ -434,7 +519,12 @@ GameplayMatchSession::GameplayMatchSession(
     else
         storage_->start(files,unused,&archive_cache,&initial_input,host,&continuation);
 }
-void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
+void GameplayMatchSession::close(){if(storage_){storage_->close();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->first_fire_diagnostic||storage_->first_water_diagnostic){first_transform_retained_=storage_->first_transform_retired;
+        first_completion_retained_=storage_->first_completion_retired;}
+#endif
+    storage_.reset();}}
 void GameplayMatchSession::finish_vs(
     uint32_t& seed,uint8_t input[MELEE_WEB_PAD_STATE_BYTES]){
     check(input&&storage_&&storage_->match&&storage_->flow&&
@@ -449,11 +539,21 @@ void GameplayMatchSession::finish_vs(
     check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);
     seed=stats.random_seed;
     melee_web_pad_state_capture(input);
-    storage_->close();storage_.reset();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->stadium_diagnostic&&scene_rng_entry_complete_)
+        check(melee_web_match_scene_rng_snapshot(storage_->match,
+            &scene_rng_retained_,error,sizeof(error))&&scene_rng_retained_.count==4,
+            error[0]?error:"VS scene RNG receipt is incomplete before close");
+#endif
+    storage_->close();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(storage_->first_fire_diagnostic||storage_->first_water_diagnostic){first_transform_retained_=storage_->first_transform_retired;
+        first_completion_retained_=storage_->first_completion_retired;}
+#endif
+    storage_.reset();
 }
 void GameplayMatchSession::finish_sudden_death(
     MeleeWebMenuMatchContinuation& results){
-    std::memset(&results,0,sizeof(results));
     check(storage_&&storage_->selected.sudden_death&&
           storage_->sudden_death_host&&storage_->sudden_death_claimed,
           "Sudden Death Results handoff requires its live typed match owner");
@@ -462,6 +562,7 @@ void GameplayMatchSession::finish_sudden_death(
     // Keep canonical close order through publication while the match-owned
     // RNG/PAD are still live. OnExit may change either; capture afterward.
     storage_->end_flow();
+    std::memset(&results,0,sizeof(results));
     check(melee_web_match_rules_publish_result(),
           "Original Sudden Death could not publish its complete terminal data");
     uint32_t final_seed=0;
@@ -483,10 +584,18 @@ void GameplayMatchSession::finish_sudden_death(
 }
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};
+    check(storage_->world!=nullptr,"Match session has no source world owner");
+    storage_->world->ensure_source_work_allowed();
+    storage_->world->pump_source_files();
+    // A completion callback may have begun a guarded region close while the
+    // transfer pump was running. Refuse to enter the next source tick then.
+    storage_->world->ensure_source_work_allowed();
     check(melee_web_match_step_raw_phased(storage_->match,raw,melee_web_match_flow_renew,melee_web_match_flow_pre,melee_web_match_flow_post,storage_->flow,error,sizeof(error)),error);
 }
 void GameplayMatchSession::draw(){
     check(storage_&&storage_->render,"Match render session is closed");char error[256]{};
+    check(storage_->world!=nullptr,"Match render session has no source world owner");
+    storage_->world->ensure_source_work_allowed();
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
     check(melee_web_match_flow_present(storage_->flow,error,sizeof(error)),error);
 }
@@ -540,6 +649,11 @@ bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow
 bool GameplayMatchSession::opening_demo()const{return storage_&&storage_->selected.opening_demo!=0;}
 bool GameplayMatchSession::sudden_death()const{return storage_&&storage_->selected.sudden_death!=0;}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_pause_observation(MeleeWebMatchPauseObservation& out)const{
+    return storage_&&melee_web_match_flow_pause_observation(storage_->flow,&out);
+}
+#endif
 uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
 int GameplayMatchSession::hud_damage(unsigned player)const{
     if(!storage_||player>=storage_->content.player_count)return -1;
@@ -616,6 +730,272 @@ GameplayWorldStageArenaInventory GameplayMatchSession::diagnostic_stage_arena_al
     }
     return result;
 }
-bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
-bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
+bool GameplayMatchSession::advance_construction(){
+    const bool complete=storage_&&storage_->advance_construction();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(complete&&storage_->stadium_diagnostic&&!scene_rng_entry_complete_){
+        melee_web_match_scene_rng_note(1);
+        scene_rng_entry_complete_=true;
+    }
+#endif
+    return complete;
 }
+bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool GameplayMatchSession::diagnostic_stadium_pad_queue_observation(
+    MeleeWebStadiumPadQueueObservation* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->match&&
+        melee_web_match_stadium_pad_queue_observation(storage_->match,out,error,size);
+}
+bool GameplayMatchSession::diagnostic_toy_owner_preflight()const{
+    return storage_&&storage_->world&&storage_->world->diagnostic_toy_owner_preflight();
+}
+void GameplayMatchSession::diagnostic_stadium_go_alignment_arm(
+    int expected_branch,char* error,size_t size){
+    check(storage_&&construction_complete()&&storage_->world,
+          "Stadium GO trace requires a complete live source match owner");
+    storage_->world->diagnostic_stadium_go_alignment_arm(expected_branch,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_go_alignment_snapshot(
+    MeleeWebStadiumGoAlignmentSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_go_alignment_snapshot(out,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_first_transform_completion_status(
+    MeleeWebSourceFileRecordedCompletionStatus* out,char* error,size_t size)const{
+    if(!out)return false;
+    if(storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world)
+        return storage_->world->diagnostic_stadium_first_transform_completion_status(out,error,size);
+    if(!storage_&&first_completion_retained_.armed==1&&!first_completion_retained_.failed&&
+       first_completion_retained_.completed&&first_completion_retained_.request_seen&&
+       first_completion_retained_.request_id>0){*out=first_completion_retained_;return true;}
+    if(error&&size)std::snprintf(error,size,"First-fire completion has no exact live or retained owner");
+    return false;
+}
+bool GameplayMatchSession::diagnostic_stadium_first_transform_schedule(
+    uint32_t request_tick,uint32_t callback_tick,uint32_t last_tick,char* error,size_t size){
+    return storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world&&
+        storage_->world->diagnostic_stadium_first_transform_schedule(request_tick,callback_tick,last_tick,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_first_transform_snapshot(
+    MeleeWebStadiumFirstTransformJournal* out,char* error,size_t size)const{
+    if(!out)return false;
+    if(storage_&&(storage_->first_fire_diagnostic||storage_->first_water_diagnostic)&&storage_->world)
+        return storage_->world->diagnostic_stadium_first_transform_snapshot(out,error,size);
+    if(!storage_&&first_transform_retained_.armed==2&&!first_transform_retained_.failed&&
+       (first_transform_selected_form_==3||first_transform_selected_form_==9)&&
+       first_transform_retained_.selected_form==first_transform_selected_form_&&
+       first_transform_retained_.count==melee_web_stadium_first_transform_event_count(&first_transform_retained_)){
+        *out=first_transform_retained_;return true;
+    }
+    if(error&&size)std::snprintf(error,size,"First-fire snapshot has no exact live or sealed owner");
+    return false;
+}
+bool GameplayMatchSession::diagnostic_stadium_water_collision_probe(
+    uint64_t source_tick,GameplayStadiumWaterCollisionProbe* out,char* error,size_t size)const{
+    auto fail=[&](const char* message){if(error&&size)std::snprintf(error,size,"%s",message);return false;};
+    auto fail_api=[&](const char* message){return error&&size&&*error?false:fail(message);};
+    if(error&&size)*error='\0';
+    if(!out)return fail("Water collision probe output is missing");
+    if(!storage_||!storage_->stadium_diagnostic||!storage_->first_water_diagnostic||
+       storage_->first_fire_diagnostic||!construction_complete()||!storage_->match||
+       !storage_->world||!storage_->flow)
+        return fail("Water collision probe requires its complete live first-Water session");
+    if(paused()||ending()||complete()||source_tick==std::numeric_limits<uint64_t>::max())
+        return fail("Water collision probe requires an active completed source tick");
+
+    MeleeWebStadiumFirstTransformJournal journal{};
+    if(!storage_->world->diagnostic_stadium_first_transform_snapshot(&journal,error,size))
+        return fail_api("Water collision probe has no live graph journal");
+    if(journal.armed!=1||journal.failed||journal.selected_form!=9||journal.phase!=0||
+       journal.form!=9||journal.pending!=0||journal.count!=5||journal.buffer_uses!=2||
+       !journal.scalar_sample_valid||journal.scalar_world_ticks!=source_tick+1||
+       !journal.world_generation)
+        return fail("Water collision probe is outside the settled live Water graph boundary");
+    MeleeWebMatchPauseObservation pause{};
+    if(!melee_web_match_flow_pause_observation(storage_->flow,&pause)||pause.paused||pause.complete||
+       pause.generation!=journal.world_generation||pause.result!=OUTCOME_NONE)
+        return fail_api("Water collision probe lost its active source match owner");
+    const uint32_t seed_before=random_seed();
+    const uint32_t frame_before=melee_web_match_flow_frames(storage_->flow);
+    if(pause.frame!=frame_before)
+        return fail("Water collision probe did not begin at the completed source clock");
+    auto state_from=[&](const MeleeWebStadiumFirstTransformJournal& j,uint32_t frame,uint32_t seed){
+        GameplayStadiumWaterCollisionProbe::State state{};
+        state.world_generation=j.world_generation;state.world_ticks=j.scalar_world_ticks;
+        state.source_frame=frame;state.random_seed=seed;
+        state.journal_armed=j.armed;state.selected_form=j.selected_form;
+        state.journal_failed=j.failed;state.event_count=j.count;
+        state.map2_gate=j.map2_gate;state.countdown=j.countdown;state.phase=j.phase;state.form=j.form;
+        state.history_e0=j.history_e0;state.history_e2=j.history_e2;state.pending=j.pending;
+        state.display_mode=j.display_mode;state.display_e6=j.display_e6;state.display_e8=j.display_e8;
+        state.display_previous_mode=j.display_previous_mode;state.display_selected_player=j.display_selected_player;
+        state.display_f2=j.display_f2;state.buffer_uses=j.buffer_uses;state.display_flags=j.display_flags;
+        state.scalar_sample_valid=j.scalar_sample_valid;return state;
+    };
+
+    MeleeWebCollision* collision=storage_->world->collision();
+    MeleeWebCollisionReadiness readiness{};
+    if(!collision||!melee_web_collision_readiness(collision,&readiness,error,size))
+        return fail_api("Water collision storage is not ready");
+    if(!readiness.storage_owned||!readiness.original_indices_initialized||
+       !readiness.stage_joint_bindings_ready||!readiness.stage_callbacks_ready||
+       !readiness.lines||readiness.lines>static_cast<uint32_t>(std::numeric_limits<int32_t>::max())||
+       !readiness.joints)
+        return fail("Water collision probe requires the bound source collision owner");
+
+    auto read_line=[&](int32_t index,MeleeWebCollisionLineResult& line){
+        return melee_web_collision_line(collision,index,&line,error,size)!=0;
+    };
+    auto valid_line=[](const MeleeWebCollisionLineResult& line){
+        for(float value:line.v0)if(!std::isfinite(value))return false;
+        for(float value:line.v1)if(!std::isfinite(value))return false;
+        for(float value:line.normal)if(!std::isfinite(value))return false;
+        return line.has_normal==1&&line.v0[0]<line.v1[0];
+    };
+    GameplayStadiumWaterCollisionProbe result{};
+    result.world_generation=journal.world_generation;
+    result.source_tick=source_tick;
+    result.state_before=state_from(journal,frame_before,seed_before);
+    result.readiness_before=readiness;
+    for(uint32_t index=0;index<readiness.lines;++index){
+        MeleeWebCollisionLineResult line{};
+        if(!read_line(static_cast<int32_t>(index),line))
+            return fail_api("Water collision line observation failed");
+        if(line.joint!=0||(line.kind&CollLine_Floor)==0||
+           (line.runtime_flags&LINE_FLAG_ENABLED)==0||(line.runtime_flags&LINE_FLAG_EMPTY))continue;
+        if(!valid_line(line))return fail("Water joint-zero floor line has invalid source geometry");
+        result.line_index=static_cast<int32_t>(index);result.line=line;break;
+    }
+    if(result.line_index<0)
+        return fail("Water collision has no enabled authored joint-zero floor line");
+    result.chain_min_x=result.line.v0[0];result.chain_max_x=result.line.v1[0];
+    auto extend_chain=[&](int direction){
+        MeleeWebCollisionLineResult current=result.line;
+        for(uint32_t step=0;step<readiness.lines;++step){
+            const int32_t adjacent=direction<0?current.previous:current.next;
+            if(adjacent==-1)return true;
+            if(adjacent<0||static_cast<uint32_t>(adjacent)>=readiness.lines)
+                return fail("Water floor chain escaped its loaded collision owner");
+            MeleeWebCollisionLineResult next{};
+            if(!read_line(adjacent,next))
+                return fail_api("Water floor-chain observation failed");
+            if((next.kind&CollLine_Floor)==0)return true;
+            if((next.runtime_flags&LINE_FLAG_ENABLED)==0||(next.runtime_flags&LINE_FLAG_EMPTY)||
+               !valid_line(next))
+                return fail("Water connected floor chain contains a disabled or invalid source line");
+            if(direction<0)result.chain_min_x=std::min(result.chain_min_x,next.v0[0]);
+            else result.chain_max_x=std::max(result.chain_max_x,next.v1[0]);
+            current=next;
+        }
+        return fail("Water floor chain is cyclic or exceeds the bounded line count");
+    };
+    if(!extend_chain(-1)||!extend_chain(1))return false;
+    result.hit_x=result.line.v0[0]+(result.line.v1[0]-result.line.v0[0])*0.5F;
+    result.query_y=result.line.v0[1]+(result.line.v1[1]-result.line.v0[1])*0.5F;
+    result.left_miss_x=result.chain_min_x-1.0F;
+    result.right_miss_x=result.chain_max_x+1.0F;
+    if(!std::isfinite(result.hit_x)||!std::isfinite(result.query_y)||
+       !std::isfinite(result.left_miss_x)||!std::isfinite(result.right_miss_x)||
+       !(result.left_miss_x<result.chain_min_x-0.1F)||
+       !(result.right_miss_x>result.chain_max_x+0.1F))
+        return fail("Water source floor bounds cannot represent the declared hit/miss probes");
+    if(!melee_web_collision_floor(collision,result.line_index,result.hit_x,result.query_y,&result.hit,error,size)||
+       result.hit.line!=result.line_index)
+        return fail_api("Water midpoint floor query did not hit its selected source line");
+    if(!melee_web_collision_floor(collision,result.line_index,result.left_miss_x,result.query_y,&result.left_miss,error,size)||
+       result.left_miss.line!=-1)
+        return fail_api("Water left-of-chain floor query did not miss");
+    if(!melee_web_collision_floor(collision,result.line_index,result.right_miss_x,result.query_y,&result.right_miss,error,size)||
+       result.right_miss.line!=-1)
+        return fail_api("Water right-of-chain floor query did not miss");
+    const MeleeWebCollisionFloorResult* queries[]={&result.hit,&result.left_miss,&result.right_miss};
+    for(const MeleeWebCollisionFloorResult* query:queries){
+        if(!std::isfinite(query->displacement_y))return fail("Water floor query returned nonfinite displacement");
+        for(float value:query->normal)if(!std::isfinite(value))return fail("Water floor query returned nonfinite normal");
+    }
+    MeleeWebStadiumFirstTransformJournal after{};
+    if(!storage_->world->diagnostic_stadium_first_transform_snapshot(&after,error,size))
+        return fail_api("Water collision probe lost its live graph journal");
+    MeleeWebMatchPauseObservation pause_after{};
+    if(!melee_web_match_flow_pause_observation(storage_->flow,&pause_after))
+        return fail_api("Water collision probe lost its post-query source clock");
+    MeleeWebCollisionReadiness readiness_after{};
+    if(storage_->world->collision()!=collision||
+       !melee_web_collision_readiness(collision,&readiness_after,error,size))
+        return fail_api("Water collision probe changed or lost its collision owner");
+    const uint32_t frame_after=melee_web_match_flow_frames(storage_->flow);
+    const uint32_t seed_after=random_seed();
+    result.state_after=state_from(after,frame_after,seed_after);
+    result.readiness_after=readiness_after;
+    const auto same_state=[](const GameplayStadiumWaterCollisionProbe::State& a,
+                             const GameplayStadiumWaterCollisionProbe::State& b){
+        return a.world_generation==b.world_generation&&a.world_ticks==b.world_ticks&&
+            a.source_frame==b.source_frame&&a.random_seed==b.random_seed&&
+            a.journal_armed==b.journal_armed&&a.selected_form==b.selected_form&&
+            a.journal_failed==b.journal_failed&&a.event_count==b.event_count&&a.map2_gate==b.map2_gate&&
+            a.countdown==b.countdown&&a.phase==b.phase&&a.form==b.form&&a.history_e0==b.history_e0&&
+            a.history_e2==b.history_e2&&a.pending==b.pending&&a.display_mode==b.display_mode&&
+            a.display_e6==b.display_e6&&a.display_e8==b.display_e8&&
+            a.display_previous_mode==b.display_previous_mode&&
+            a.display_selected_player==b.display_selected_player&&a.display_f2==b.display_f2&&
+            a.buffer_uses==b.buffer_uses&&a.display_flags==b.display_flags&&
+            a.scalar_sample_valid==b.scalar_sample_valid;
+    };
+    bool same_events=journal.count==after.count;
+    for(unsigned i=0;same_events&&i<journal.count;++i)
+        same_events=journal.events[i].kind==after.events[i].kind&&
+            journal.events[i].map_id==after.events[i].map_id&&journal.events[i].object==after.events[i].object;
+    const bool same_graph_owners=journal.initial_map5==after.initial_map5&&journal.fire_map3==after.fire_map3&&
+        journal.water_map9==after.water_map9&&journal.water_child7==after.water_child7&&
+        journal.water_child8==after.water_child8&&journal.water_map9_proc==after.water_map9_proc&&
+        journal.water_child7_proc==after.water_child7_proc&&journal.water_child8_proc==after.water_child8_proc&&
+        journal.source_slot==after.source_slot;
+    const bool same_readiness=readiness.vertices==readiness_after.vertices&&readiness.lines==readiness_after.lines&&
+        readiness.joints==readiness_after.joints&&readiness.floor_islands==readiness_after.floor_islands&&
+        readiness.ceiling_islands==readiness_after.ceiling_islands&&readiness.empty_lines==readiness_after.empty_lines&&
+        readiness.storage_owned==readiness_after.storage_owned&&
+        readiness.original_indices_initialized==readiness_after.original_indices_initialized&&
+        readiness.stage_joint_bindings_ready==readiness_after.stage_joint_bindings_ready&&
+        readiness.stage_callbacks_ready==readiness_after.stage_callbacks_ready;
+    if(!same_state(result.state_before,result.state_after)||!same_events||!same_graph_owners||!same_readiness||
+       pause_after.paused||pause_after.complete||pause_after.result!=OUTCOME_NONE||
+       pause_after.generation!=journal.world_generation||pause_after.frame!=frame_after||
+       frame_after!=frame_before||seed_after!=seed_before||
+       after.armed!=journal.armed||after.failed||after.selected_form!=9||after.phase!=0||after.form!=9||
+       after.pending!=0||after.count!=5||after.buffer_uses!=2||!after.scalar_sample_valid||
+       after.scalar_world_ticks!=source_tick+1||after.world_generation!=journal.world_generation)
+        return fail("Water collision observations changed source owner, scalar state, seed, or clock");
+    *out=result;
+    if(error&&size)*error='\0';
+    return true;
+}
+bool GameplayMatchSession::diagnostic_stadium_idle_snapshot(
+    MeleeWebStadiumIdleSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_idle_snapshot(out,error,size);
+}
+bool GameplayMatchSession::diagnostic_stadium_setup_snapshot(
+    MeleeWebStadiumSetupSnapshot* out,char* error,size_t size)const{
+    return storage_&&construction_complete()&&storage_->world&&
+        storage_->world->diagnostic_stadium_setup_snapshot(out,error,size);
+}
+#endif
+}
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+namespace melee_web {
+bool GameplayMatchSession::diagnostic_stadium_scene_rng_snapshot(
+    MeleeWebMatchSceneRngSnapshot* out,char* error,size_t size) const
+{
+    if(!out)return false;
+    if(storage_&&storage_->stadium_diagnostic&&storage_->match)
+        return melee_web_match_scene_rng_snapshot(storage_->match,out,error,size)!=0;
+    if(!storage_&&scene_rng_retained_.count==4&&!scene_rng_retained_.invalid){
+        *out=scene_rng_retained_;return true;
+    }
+    if(error&&size)std::snprintf(error,size,"Stadium scene RNG receipt has no checked owner");
+    return false;
+}
+}
+#endif

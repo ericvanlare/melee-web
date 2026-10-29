@@ -43,6 +43,16 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
+**October 28 priority:** The owner has directed autonomous work toward working
+rollback and parked the next Stadium experiment. The browser restore boundary
+in #341 remains open; previously rejected renderer-owner and UCF reference
+follow-ups remain frozen. [#356](https://github.com/ericvanlare/melee-web/issues/356)
+advances the independent bounded match input timeline, reusing the existing PAD
+format and synchronous source-only fixture. Its
+[scoped correction evidence](status/2026-10-28-match-input-timeline.md) does not
+admit a live restore adapter or satisfy A3/A4. Keep integration and full
+validation at the milestone boundary.
+
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
 and remains the accuracy reference. Both profiles use the player's unmodified
@@ -120,8 +130,9 @@ need explicit ownership. The owner has authorized profile implementation in the
 isolated GPL scope; complete semantics and reference coverage remain open under
 #9. Keep component measurements separate from browser acceptance.
 
-After this bounded measurement checkpoint, investigate first-use respawn-platform
-and common-effect pipeline preparation under H1/#116. Preparation must not consume
+The first-use respawn preparation component merged in [#322](https://github.com/ericvanlare/melee-web/pull/322).
+Continue broader common-effect and sustained-play work under H1/#116, using the
+[existing H1 boundary](status/2026-10-13-h1-first-use-respawn.md). Preparation must not consume
 hidden gameplay ticks/RNG, change draw order or relax timing guards. Keep H1
 incident recording on for combat and simulated-network runs; a forced pause is
 retained H1 evidence. The owner identifies the #316 respawn preparation stall as
@@ -187,12 +198,33 @@ delay the Mario/FD milestone. The rejected #339 reference follow-up stays
 checkpointed; it is not retried or substituted for browser-state engineering.
 
 Pokémon Stadium C3 [#251](https://github.com/ericvanlare/melee-web/issues/251) /
-[draft #301](https://github.com/ericvanlare/melee-web/pull/301) remains the next
-Track B milestone. Ranked/Unranked use unfrozen Stadium, so transformations
-remain in scope. Reuse the retained PadPoll/draw-order reduction and original
-owner evidence; no duplicate capture. Track A has first claim on the shared
-capture lane. Physical controllers, foreground timing, audible output and a
-two-machine human session remain separate unrun gates.
+[#301](https://github.com/ericvanlare/melee-web/pull/301) merged after independent
+review, full regression, affected builds and complete publication-head CI. The
+[C3 boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md) retains exact
+identities, raw failures and coverage limits. C4 original request/callback
+observations remain scoped under [#343](https://github.com/ericvanlare/melee-web/issues/343)
+and its [evidence boundary](status/2026-10-27-stadium-first-form-latency.md).
+The conditional first-Fire runtime component belongs to
+[#349](https://github.com/ericvanlare/melee-web/issues/349). The separate first-Water
+route under [#351](https://github.com/ericvanlare/melee-web/issues/351) has a
+scoped recorded-callback browser result, independent raw review, final regression,
+and merged [PR #353](https://github.com/ericvanlare/melee-web/pull/353)
+with exact-head CI passed; see the
+[C5 boundary](status/2026-10-27-stadium-archive-service.md). Issue
+[#354](https://github.com/ericvanlare/melee-web/issues/354) has one completed
+default-off native Water collision-query component. The existing route comparator
+and native query validator replay, independent raw review and full regression
+passed; see its [scoped evidence boundary](status/2026-10-27-stadium-water-collision.md).
+No original collision-query counterpart is available, so original collision-query
+parity remains unobserved and outside #354. This component does not extend the
+#351 browser comparison. Neither route establishes per-owner RNG parity or a
+general completion schedule; ordinary/public transformations and general loading
+remain unadmitted. Exact-head CI for the publication containing the #354 docs is
+tracked on that PR.
+Ranked/Unranked use unfrozen Stadium, so C4–C8 transformations remain in scope.
+Track A retains first claim on the shared capture lane. Physical controllers,
+foreground timing, audible output and a two-machine human session remain separate
+unrun gates.
 
 ### Track B: competitive-rules Melee before the whole game
 
@@ -246,20 +278,34 @@ FMA diagnostic above also leaves the target unresolved and has reached its
 stopping rule. The failed reconstruction and both bounded investigations remain
 retained; further fighter work follows the breadth-first queue.
 
-**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Stadium C3 under [#251](https://github.com/ericvanlare/melee-web/issues/251) remains checkpointed while #318 rollback feasibility has first claim on the capture lane. Its existing [CSS/SSS preparation status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md) records the route boundary; current C3 receipts remain in #251. Public #288 now uses the owner-cleared isolated staging relay.
+**Current #304 boundary.** The bounded original Zelda-to-Sheik owner-prefix milestone is complete for [issue #304](https://github.com/ericvanlare/melee-web/issues/304), with evidence in the [scoped lineup status](status/2026-10-09-weaker-fighter-comparison-lineup.md); strict two-human browser comparison remains separate. Public #288 uses the owner-cleared isolated staging relay.
 
-The next Stadium milestone is [C3 idle in-match lifetime #251](https://github.com/ericvanlare/melee-web/issues/251),
-with its remaining prerequisites counted and tracked inside that issue and PR.
-First reduce the retained PadPoll-inside-draw mismatch against original source
-ordering. Complete the actual original input/draw/state/RNG reference through
-3,500 post-GO ticks, counted from the observed GO event, then compare runtime
-lifetime A, checked retirement/recreation and lifetime B with per-owner RNG.
-Historical no-draw lifetimes remain separate; do not invent neutral rows or
-hardcode the historical GO tick. Prerequisite fixes are commits within C3,
-not isolated ownership PRs. Transformations, broader rendering, browser
-admission and whole-stage acceptance remain separate. Source-only
-and documentation work may overlap when ownership permits; Track A retains
-priority for shared capture resources.
+**Stadium C3 → C4.** The defined C3 idle, selected owner/RNG lifetime, natural
+stockout/mode9 and natural mode14 functional comparisons are complete at their
+declared scopes, including checked Results/CSS and retirement. Independent raw
+and scoped gate review support those outcomes; #301 is merged. The scoped receipt
+records the integration validation. Broader allocator/arbitrary-writer coverage is a limit,
+not a newly waived gate; full allocator journaling remains separate. Whole-stage
+accuracy, public Stadium admission and C4–C8 are not accepted by C3.
+
+The first **C4 (#343)** original recording and its fixed-input repeatability
+step pass at the declared scope. The [C4 receipt](status/2026-10-27-stadium-first-form-latency.md)
+tracks observed forms, retained failures and remaining coverage. Resolve the
+general scheduling rule and missing form samples before runtime transformation
+release; stop at the first changed loading latency under fixed inputs/settings.
+The archive-service milestone [#345](https://github.com/ericvanlare/melee-web/issues/345)
+composes exact disc tails, owned destinations and quiescent teardown; its
+[component receipt](status/2026-10-27-stadium-archive-service.md) records the
+merged service evidence and current source-slot boundary. The [#347 follow-up](https://github.com/ericvanlare/melee-web/issues/347) adds
+owned form catalogs, exact source-slot/header/buffer binding, original file-entry
+metadata and checked retirement. The component receipt owns its review and
+validation results. The selected first-Fire and first-Water diagnostic routes
+exercise World integration and checked graph retirement only for their declared
+profiles. Ordinary/public transformations remain disabled pending a justified
+general completion schedule and remaining-form coverage. Reuse the existing
+route and retained evidence; do not repeat accepted functional captures or
+invent neutral rows/GO coordinates.
+Track A retains priority for shared capture resources.
 
 ### Standing rules and baselines
 

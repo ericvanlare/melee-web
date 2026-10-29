@@ -207,6 +207,8 @@ export async function openNativeGameDiscSession(file) {
       return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;
     },
     readFile: (path, offset, size) => session.readFile(path, offset, size),
+    fileTransferInfo: path => session.fileTransferInfo(path),
+    readFileTransfer: (path, offset, size) => session.readFileTransfer(path, offset, size),
     async *streamScope(names, report = () => {}) {
       const paths = Object.create(null), seen = new Set();
       for (const name of names) {
@@ -223,6 +225,7 @@ export async function openNativeGameDiscSession(file) {
       const total = names.length;
       report({phase: 'validate', complete: 0, total});
       yield* session.streamScope(paths, {
+        dvdTransfer: true,
         beforeRead: ({name, index}) =>
           report({phase: 'read', file: name, complete: index, total}),
       });

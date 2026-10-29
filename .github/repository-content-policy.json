@@ -24,6 +24,30 @@
       "rule": "encoded_payload",
       "sha256": "9e5e539b52114569fe8e12debb2d728dc084480806c50e810721960ff0ded446",
       "reason": "Reviewed H1 respawn renderer metadata: exactly six source-observed type-1 descriptors appended to the unchanged 884-row Results/Prize seed (890 total records). See docs/evidence/h1-first-use-respawn-v1.json for byte identities, recovery incident and independent content review. No Dawn driver cache is included. This exception is not licensing clearance; documented provenance uncertainty remains."
+    },
+    {
+      "path": "tests/fixtures/fresh-sss-expected-pair.json",
+      "rule": "encoded_payload",
+      "sha256": "d6949ad5577d2b594e5d098f030d763f36da761f2171b2b1b629e35ab75cf451",
+      "reason": "Exact observer-derived runtime state only. The 822-byte PAD projection and raw source slices are from original observer records 1570 and 1594 in the pinned 4,479,614-byte stream; tag 21 is source PAD state, tag 32 is the observed 0xf0 prefix of CSSData.vs.start (rules and four player rows; slots 4\u20135 excluded), and tag 33 is the 64-byte cur_hps_stem path buffer, not HPS media. The pinned strict decoder and layout sources are recorded in the independent content review. No disc, archive, audio, image, or executable bytes. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json."
+    },
+    {
+      "path": "tests/stadium_first_css_stream_compare.mjs",
+      "rule": "encoded_payload",
+      "sha256": "cf1fa78ab6bf836c342a93bb68b34f59747081f123ca509ec814805456b2fafd",
+      "reason": "Exact comparator constants duplicate the fixture\u2019s independently hash-pinned source runtime slices at original observer sequences 1570 and 1594. The long values are PAD state, the 0xf0 CSSData.vs.start prefix (not the unobserved slots 4\u20135), and the cur_hps_stem path buffer, not game media or executable bytes. Keep strict byte comparisons; see the independent content review for observer, decoder, and source-layout pins. Provenance and the retained CI failure are recorded in docs/evidence/issue251-stadium-profile-oninit-v1.json. Reviewed 2026-10-23 for Fresh132 Setup-to-GO+2: only validation/comparison code was added; every pre-existing encoded literal is byte-identical to the prior reviewed file and fixture, with no new encoded payload, credential, media or executable bytes. Reviewed 2026-10-23 for the constructor entry-count projection: only schema/count validation and callback-unit comparison changed; every encoded runtime-slice literal remains byte-identical, with no new encoded payload, credential, media or executable bytes. Reviewed 2026-10-25 for the Fresh132 full-A Setup comparator: only reusable validation/comparison code changed; every encoded runtime-slice literal remains byte-identical to the prior reviewed comparator, with no new encoded payload, credentials, media or executable bytes. Reviewed 2026-10-25 for data-URL browser import repair: preserve every prior encoded literal; add only the exact 312-byte selected Start runtime slice from pinned Fresh132 Entry2544/Setup2584, SHA-256 918a23d68a3b5024f94baf1f5e26e6c0db56c5fbbbffdc79c5e620e82af3b728, for synchronous exact-byte admission. The public Node producer retains independent raw SHA validation. This is observer-derived runtime state, not media, archive, executable or credentials; no broader rule/path exemption."
+    },
+    {
+      "path": "tests/fixtures/fresh-sss-initial-input-tick-expected.json",
+      "rule": "encoded_payload",
+      "sha256": "15e49d5a9f6d810936faef6f6ae7ff6aa1603362516f13624ce460d089c21259",
+      "reason": "Exact observer-derived runtime state from original sequence(s) 1599 in the pinned 4fd54b4a stream. Long values are the 856-byte source PAD state and its established 822-byte projection; the remaining source slices are poll counts, scene routing/frame/kind, RNG pointer/value and input-call counters. Root independently replayed the strict original decoder derivation and compared the complete fixture. No disc, archive, audio, image or executable bytes. Preserve strict byte comparisons and source identities; see docs/evidence/issue251-stadium-profile-oninit-v1.json."
+    },
+    {
+      "path": "tests/fixtures/fresh-sss-initial-draw-expected.json",
+      "rule": "encoded_payload",
+      "sha256": "94e64043c4d62bddb6060568efbaeead703a9b06db87214967ba44d5c1af5d28",
+      "reason": "Exact observer-derived runtime state from original sequence(s) 1600 and 1601 in the pinned 4fd54b4a stream. Long values are the 856-byte source PAD state and its established 822-byte projection; the remaining source slices are poll counts, scene routing/frame/kind, RNG pointer/value and input-call counters. Root independently replayed the strict original decoder derivation and compared the complete fixture. No disc, archive, audio, image or executable bytes. Preserve strict byte comparisons and source identities; see docs/evidence/issue251-stadium-profile-oninit-v1.json."
     }
   ],
   "synthetic_secrets": [

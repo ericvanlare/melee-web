@@ -13,13 +13,191 @@
 #include <melee/ft/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_stadium_start.h"
+#include "gameplay_hud.h"
+#include "gameplay_source_memory_runtime.h"
+#include "gameplay_source_files.h"
+#include <melee/gr/grpstadium.h>
+#include <melee/gm/gm_1879.h>
+#include <melee/if/if_2F6E.h>
+#include <melee/if/if_2F72.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/memory.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 extern int melee_web_stage_selection_begin(int);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern int melee_web_stage_selection_preflight(int);
+#endif
 extern int melee_web_stage_selection_end(void);
 extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static const HSD_GObjEvent stadium_pending_callbacks[]={fn_801D13C8,fn_801D11E4};
+extern uint32_t melee_web_match_source_frames(void);
+extern int melee_web_stadium_c1_grdatfiles_copy(UnkArchiveStruct slots[4],
+        UnkArchiveStruct** ordinary_table, void** native_table,
+        UnkArchiveStruct** effective_table);
+static int stadium_c1_grdatfiles_lifetime_ordinal = -1;
+void melee_web_stadium_c1_grdatfiles_set_lifetime_ordinal(int ordinal)
+{
+    stadium_c1_grdatfiles_lifetime_ordinal = ordinal;
+}
+static int stadium_c1_grdatfiles_first_nonzero(
+        const UnkArchiveStruct slots[4], unsigned* slot, unsigned* field)
+{
+    for (unsigned i = 0; i < 4; ++i) {
+        if (slots[i].unk0) { *slot = i; *field = 0; return 1; }
+        if (slots[i].unk4) { *slot = i; *field = 1; return 1; }
+        if (slots[i].unk8) { *slot = i; *field = 2; return 1; }
+    }
+    return 0;
+}
+int melee_web_stadium_c1_grdatfiles_snapshot_control(void)
+{
+    UnkArchiveStruct slots[4] = {{0}};
+    unsigned slot = 99, field = 99;
+    if (stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field)) return 0;
+    slots[2].unk0 = (HSD_Archive*) -1;
+    if (!stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) ||
+        slot != 2 || field != 0) return 0;
+    slots[2].unk0 = NULL;
+    slots[2].unk4 = (UnkStageDat*) -1;
+    if (!stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) ||
+        slot != 2 || field != 1) return 0;
+    slots[2].unk4 = NULL;
+    slots[3].unk8 = 1;
+    return stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field) &&
+           slot == 3 && field == 2;
+}
+int melee_web_stadium_c1_grdatfiles_trace_snapshot(
+        const char* boundary, unsigned long long world_generation)
+{
+    if (stadium_c1_grdatfiles_lifetime_ordinal < 0) return 1;
+    UnkArchiveStruct slots[4] = {{0}};
+    UnkArchiveStruct* ordinary_table = NULL;
+    UnkArchiveStruct* effective_table = NULL;
+    void* native_table = NULL;
+    if (!boundary || !melee_web_stadium_c1_grdatfiles_copy(
+            slots, &ordinary_table, &native_table, &effective_table)) {
+        fprintf(stderr, "STADIUM_GRDATFILES snapshot=unavailable boundary=%s\n",
+                boundary ? boundary : "null");
+        fflush(stderr);
+        return 0;
+    }
+    fprintf(stderr,
+        "STADIUM_GRDATFILES_META boundary=%s ordinal=%d world_generation=%llu ordinary_table=%p native_table=%p effective_table=%p\n",
+        boundary, stadium_c1_grdatfiles_lifetime_ordinal, world_generation,
+        (void*) ordinary_table, native_table, (void*) effective_table);
+    for (unsigned i = 0; i < 4; ++i) {
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_SLOT boundary=%s ordinal=%d slot=%u unk0=%p unk4=%p unk8=%u\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal, i,
+            (void*) slots[i].unk0, (void*) slots[i].unk4,
+            (unsigned) slots[i].unk8);
+    }
+    unsigned slot = 0, field = 0;
+    if (stadium_c1_grdatfiles_first_nonzero(slots, &slot, &field)) {
+        static const char* const names[] = {"unk0", "unk4", "unk8"};
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_FIRST_NONZERO boundary=%s ordinal=%d nonzero=1 slot=%u field=%s\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal, slot, names[field]);
+    } else {
+        fprintf(stderr,
+            "STADIUM_GRDATFILES_FIRST_NONZERO boundary=%s ordinal=%d nonzero=0\n",
+            boundary, stadium_c1_grdatfiles_lifetime_ordinal);
+    }
+    fflush(stderr);
+    return 1;
+}
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Exact source fallback storage, not a generic writable preload allowance. */
+typedef struct MeleeWebStadiumMap2WritableRegion {
+    MeleeWebSourceFileScope* scope;
+    void* buffer;
+    MeleeWebSourceMemoryAllocation lease;
+    int registered;
+    int closing;
+} MeleeWebStadiumMap2WritableRegion;
+
+static int stadium_map2_region_lease_matches(
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation)
+{
+ MeleeWebSourceMemoryAllocation current={0};
+ MeleeWebSourceMemoryContext context={0};
+ const MeleeWebSourceMemoryAllocation* saved=&maps->buffer_allocation_lease;
+ return maps->captured==1&&maps->buffer&&
+     maps->origin==MELEE_WEB_STADIUM_MAP2_BUFFER_ORIGIN_OWNED_FALLBACK&&
+     maps->buffer_allocation_lease_captured==1&&saved->live==1&&
+     saved->requested_bytes==0x50000&&saved->allocation_generation!=0&&
+     saved->world_generation==generation&&
+     melee_web_source_memory_context_read(&context)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+     context.world_generation==generation&&context.source_heap_handle==saved->source_heap_handle&&
+     melee_web_source_memory_allocation_read(maps->buffer,&current)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+     current.live==1&&current.requested_bytes==saved->requested_bytes&&
+     current.world_generation==saved->world_generation&&
+     current.source_heap_handle==saved->source_heap_handle&&
+     current.allocation_generation==saved->allocation_generation;
+}
+static int stadium_map2_region_bind(MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(region->registered||region->closing||region->scope||region->buffer||
+    !stadium_map2_region_lease_matches(maps,generation)){
+  if(e&&n)snprintf(e,n,"Stadium writable map-2 region lacks its exact live fallback lease");
+  return 0;
+ }
+ MeleeWebSourceFileScope* scope=melee_web_source_files_current_scope();
+ if(!scope||!melee_web_source_files_quiescent_for(scope,e,n))return 0;
+ if(!melee_web_source_file_region_register(maps->buffer,0x50000,e,n))return 0;
+ region->scope=scope;region->buffer=maps->buffer;
+ region->lease=maps->buffer_allocation_lease;region->registered=1;
+ return 1;
+}
+static int stadium_map2_region_preflight(const MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(region->closing){
+  if(e&&n)snprintf(e,n,"Stadium map-2 partial retirement cannot resume source work");
+  return 0;
+ }
+ if(!region->registered){
+  if(region->scope||region->buffer){
+   if(e&&n)snprintf(e,n,"Stadium writable map-2 region lost its registration state");
+   return 0;
+  }
+  return 1; /* Earlier preparation refused before this new owner existed. */
+ }
+ if(region->registered!=1||!region->scope||region->buffer!=maps->buffer||
+    !stadium_map2_region_lease_matches(maps,generation)||
+    region->lease.source_heap_handle!=maps->buffer_allocation_lease.source_heap_handle||
+    region->lease.world_generation!=maps->buffer_allocation_lease.world_generation||
+    region->lease.allocation_generation!=maps->buffer_allocation_lease.allocation_generation||
+    region->lease.requested_bytes!=0x50000||region->lease.live!=1||
+    melee_web_source_files_current_scope()!=region->scope){
+  if(e&&n)snprintf(e,n,"Stadium writable map-2 region changed owner before retirement");
+  return 0;
+ }
+ /* Pending requests remain owned across Asyncify; pumping includes callback
+  * execution. Both must be idle before any display/Ground destruction. */
+ return melee_web_source_files_quiescent_for(region->scope,e,n);
+}
+static int stadium_map2_region_unregister(MeleeWebStadiumMap2WritableRegion* region,
+        const MeleeWebStadiumMap2BufferOwner* maps,uint64_t generation,char* e,size_t n)
+{
+ if(!region->registered)return 1;
+ if(!stadium_map2_region_preflight(region,maps,generation,e,n))return 0;
+ if(!melee_web_source_file_region_unregister(region->buffer,0x50000,e,n))return 0;
+ /* No operation after this point may resume source work, even if an existing
+  * destructor subsequently refuses. Keep identities for retained diagnosis. */
+ region->registered=0;region->closing=1;
+ return 1;
+}
+#endif
 struct MeleeWebStageLast {
     StageInfo saved;
     struct ftDeviceUnk3 device1[1],device3[1];
@@ -27,6 +205,9 @@ struct MeleeWebStageLast {
     struct ftDeviceUnk4 device4;
     int count1,count2;
     void* yaku;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    const void* source_yakumono;
+#endif
     const MeleeWebStageProfile* definition;
     HSD_GObj* manager;
     HSD_GObj* map_lights;
@@ -34,13 +215,110 @@ struct MeleeWebStageLast {
     int source_ordered;
     int lights_adopted;
     const void* collision_map;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebStadiumDisplayOwner* stadium_display_owner;
+    uint64_t stadium_cancel_transfer_token;
+    MeleeWebStadiumGenerator* stadium_generator;
+    MeleeWebMatchContext* stadium_camera_owner;
+    CmSubject* stadium_subject;
+    int stadium_started;
+    int stadium_ready_route,stadium_ready_armed,stadium_loaded;
+    void* stadium_ready_object;
+    void* stadium_ready_proc;
+    void* stadium_headers[ARRAY_SIZE(stadium_pending_callbacks)];
+    MeleeWebSourceMemoryAllocation stadium_header_leases[ARRAY_SIZE(stadium_pending_callbacks)];
+    MeleeWebSourceMemoryContext stadium_start_context;
+    MeleeWebStadiumManagerView stadium_manager;
+    MeleeWebSourceMemoryAllocation stadium_manager_lease;
+    MeleeWebSourceMemoryAllocation stadium_manager_proc_lease;
+    MeleeWebStadiumMap2BufferOwner stadium_map2_buffer_owner;
+    MeleeWebStadiumMap2WritableRegion stadium_map2_region;
+    MeleeWebStadiumFirstTransformJournal stadium_first_transform;
+    MeleeWebStadiumFirstTransformJournal* stadium_first_transform_terminal_out;
+    MeleeWebStadiumGoAlignmentSnapshot stadium_go_alignment;
+    struct {
+        unsigned seen,finished,failure,call_observed,bound_valid,result_valid;
+        unsigned seed_before_valid,seed_after_valid,phase_count;
+        HSD_GObj* object;
+        Ground* ground;
+        MeleeWebSourceMemoryAllocation object_lease,ground_lease;
+        int32_t parameter_x0,parameter_x4,initial_countdown;
+        int32_t random_bound,random_result;
+        uint32_t seed_before,seed_after;
+        MeleeWebStadiumSetupConstructorPhaseEvent phases[
+            MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY];
+    } stadium_setup;
+#endif
 };
 static MeleeWebStageLast* active;
+int melee_web_stage_last_source_work_allowed(const MeleeWebStageLast* h){
+ if(!h)return 1;
+ if(h!=active||h->generation!=melee_web_gameplay_stats().generation)return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ return !h->stadium_map2_region.closing&&!h->stadium_first_transform.failed;
+#else
+ return 1;
+#endif
+}
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
-static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,char* e,size_t n){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int stage_report_on_init_bind_failure(MeleeWebStageLast* h,
+        MeleeWebStageLast** retained_owner,const char* bind_error,char* e,size_t n){
+ char cleanup_error[160]={0};
+ if(!melee_web_stage_last_end(h,cleanup_error,sizeof(cleanup_error))){
+  if(retained_owner)*retained_owner=h;
+  if(e&&n){
+   const int each=(int)(n>33?(n-33)/2:0);
+   snprintf(e,n,"bind failed: %.*s; cleanup refused: %.*s",each,
+            bind_error?bind_error:"Stadium source SIS bind failed",each,
+            cleanup_error);
+  }
+  return 0;
+ }
+ fail(e,n,bind_error?bind_error:"Stadium source SIS bind failed");
+ return 1;
+}
+
+int melee_web_stage_last_on_init_bind_refusal_controls(void){
+ MeleeWebStageLast* h;
+ MeleeWebStageLast* retained=NULL;
+ char error[256]={0};
+ uint64_t generation=melee_web_gameplay_generation();
+ if(active||!generation||!HSD_GObj_Entities||HSD_GObj_804D781C||
+    HSD_GObj_804D7814)return 0;
+ h=calloc(1,sizeof(*h));if(!h)return 0;
+ h->generation=generation;
+ h->definition=melee_web_stage_profile(St_Kind_PStadium);
+ h->source_ordered=1;
+ if(!h->definition||!h->definition->diagnostic_only||
+    !melee_web_stadium_display_owner_prepare(&h->stadium_display_owner,
+                                             error,sizeof(error))||
+    !melee_web_stadium_display_owner_arm_source_journal(
+        h->stadium_display_owner,error,sizeof(error))){
+  free(h);return 0;
+ }
+ active=h;
+ melee_web_stadium_display_owner_note_source_event(
+     MELEE_WEB_STADIUM_SOURCE_EVENT_STAGE_E8,-1,NULL);
+ if(stage_report_on_init_bind_failure(
+        h,&retained,"Synthetic asset-free SIS bind refusal",error,
+        sizeof(error))||retained!=h||active!=h||
+    h->stadium_display_owner==NULL||
+    strstr(error,"Synthetic asset-free SIS bind refusal")==NULL||
+    strstr(error,"Partial Stadium display ownership must remain reachable")==NULL)
+  return 0;
+ /* The retained h and opaque display owner intentionally remain rooted by
+  * active until this isolated control process exits. */
+ return 1;
+}
+#endif
+static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,int on_init_diagnostic,MeleeWebStageLast** retained_owner,char* e,size_t n){
  MeleeWebEffectBankStats bank;
+ if(retained_owner&&*retained_owner!=NULL){fail(e,n,"Stage retained-owner output slot must be empty");return NULL;}
  if(!definition){fail(e,n,"Stage has no complete source callback profile");return NULL;}
+ if(definition->diagnostic_only&&!on_init_diagnostic){fail(e,n,"Diagnostic-only stage profile requires its explicit OnInit boundary");return NULL;}
+ if(on_init_diagnostic&&(!definition->diagnostic_only||!source_ordered||definition->stage_kind!=St_Kind_PStadium)){fail(e,n,"OnInit-only stage boundary requires the diagnostic source-ordered Stadium profile");return NULL;}
  if(!map_bank&&!definition->allow_absent_particle_bank){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(map_bank&&!melee_web_effect_bank_stats(map_bank,&bank,e,n)||map_bank&&(bank.bank!=64||!bank.particle_bank_ready)){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||(!source_ordered&&(!stage_info.param||stage_info.grkind!=definition->ground_kind))){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
@@ -55,12 +333,58 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
  memcpy(h->device1,ft_80459A68,sizeof(h->device1));memcpy(h->device2,ftDevice_BuryThings,sizeof(h->device2));memcpy(h->device3,ft_80459A8C,sizeof(h->device3));h->device4=ft_804D6578;h->count1=ft_804D6570;h->count2=ftDevice_BuryThingCount;
  if(!melee_web_ground_map_storage_begin()){free(h);fail(e,n,"Original Ground collision-state storage is already owned");return NULL;}
  if(!melee_web_stage_selection_begin(definition->stage_kind)){melee_web_ground_map_storage_end();free(h);fail(e,n,"Original selected stage is already owned");return NULL;}
- h->yaku=definition->exchange_yakumono?definition->exchange_yakumono(yaku):NULL;stage_info.yakumono_param=yaku;active=h;
+ h->yaku=definition->exchange_yakumono?definition->exchange_yakumono(yaku):NULL;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(on_init_diagnostic)h->source_yakumono=yaku;
+#endif
+ stage_info.yakumono_param=yaku;active=h;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(on_init_diagnostic&&!melee_web_stadium_display_owner_prepare(&h->stadium_display_owner,e,n)){
+  char prepare_error[160];snprintf(prepare_error,sizeof(prepare_error),"%s",e&&n?e:"Stadium display owner preparation failed");
+  if(!melee_web_stage_last_end(h,e,n)){if(retained_owner)*retained_owner=h;return NULL;}
+  fail(e,n,prepare_error);return NULL;
+ }
+ if(on_init_diagnostic&&!melee_web_stadium_display_owner_arm_source_journal(h->stadium_display_owner,e,n)){
+  char journal_error[160];snprintf(journal_error,sizeof(journal_error),"%s",e&&n?e:"Stadium source journal could not be armed");
+  if(!melee_web_stage_last_end(h,e,n)){if(retained_owner)*retained_owner=h;return NULL;}
+  fail(e,n,journal_error);return NULL;
+ }
+#endif
  if(source_ordered){
   /* The retail scene enters Ground's state buffer and stage archive before
    * Ground_801C0800 loads collision, lights and the stage callback. */
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic)
+   melee_web_stadium_c1_grdatfiles_trace_snapshot(
+       "before-Stage_802251E8", (unsigned long long)h->generation);
+#endif
   Stage_802251E8((StKind)definition->stage_kind,NULL);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic)
+   melee_web_stadium_c1_grdatfiles_trace_snapshot(
+       "after-Stage_802251E8", (unsigned long long)h->generation);
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic&&!melee_web_stadium_display_owner_bind_source(h->stadium_display_owner,e,n)){
+   char bind_error[160];snprintf(bind_error,sizeof(bind_error),"%s",e&&n?e:"Stadium source SIS bind failed");
+   stage_report_on_init_bind_failure(h,retained_owner,bind_error,e,n);
+   return NULL;
+  }
+#endif
   Stage_8022524C();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(on_init_diagnostic&&!melee_web_stadium_display_owner_capture(
+       h->stadium_display_owner,Ground_GetMapGObj(1),
+       &h->stadium_map2_buffer_owner,e,n)){
+   if(retained_owner)*retained_owner=h;
+   return NULL;
+  }
+  if(on_init_diagnostic&&!stadium_map2_region_bind(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n)){
+   if(retained_owner)*retained_owner=h;
+   return NULL;
+  }
+#endif
   h->collision_map=stage_info.coll_data;
  }else{
   /* Isolated native-stage probes already own collision and item setup. */
@@ -68,33 +392,1084 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
   melee_web_ground_load_map_lights();
  }
  h->map_lights=Ground_801C498C();
- if(!h->map_lights){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original selected map-light owner was not created");return NULL;}
+ if(!h->map_lights){if(on_init_diagnostic){if(retained_owner)*retained_owner=h;fail(e,n,"Original selected map-light owner was not created");return NULL;}melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original selected map-light owner was not created");return NULL;}
  if(source_ordered){
-  if(!melee_web_stage_lights_adopt_source(h->map_lights,e,n)){melee_web_stage_last_end(h,NULL,0);return NULL;}
+  if(!melee_web_stage_lights_adopt_source(h->map_lights,e,n)){if(on_init_diagnostic){if(retained_owner)*retained_owner=h;return NULL;}melee_web_stage_last_end(h,NULL,0);return NULL;}
   h->lights_adopted=1;
  }else definition->source->on_init();
- for(unsigned i=0;i<definition->required_map_count;i++)if(definition->required_map_ids[i]>=sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0])||!stage_info.map_gobjs[definition->required_map_ids[i]]){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original stage initializer did not create every required map object");return NULL;}
+ for(unsigned i=0;i<definition->required_map_count;i++)if(definition->required_map_ids[i]>=sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0])||!stage_info.map_gobjs[definition->required_map_ids[i]]){if(on_init_diagnostic){if(retained_owner)*retained_owner=h;fail(e,n,"Original stage initializer did not create every required map object");return NULL;}melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original stage initializer did not create every required map object");return NULL;}
+ if(on_init_diagnostic){if(retained_owner)*retained_owner=h;ok(e,n);return h;}
  Stage_80225298();
  if(!defer_start)Stage_802252E4((StKind)definition->stage_kind,NULL);
  ok(e,n);return h;
 }
 MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind,void* yaku,MeleeWebEffectBank* bank,int defer_start,int source_ordered,char* e,size_t n){
  const MeleeWebStageProfile* definition=melee_web_stage_profile(stage_kind);
- return begin_stage(definition,yaku,bank,defer_start,source_ordered,e,n);
+ return begin_stage(definition,yaku,bank,defer_start,source_ordered,0,NULL,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+MeleeWebStageLast* melee_web_stage_begin_kind_on_init_diagnostic(int stage_kind,void* yaku,MeleeWebEffectBank* bank,MeleeWebStageLast** owner_out,char* e,size_t n){
+ if(owner_out==NULL){fail(e,n,"OnInit-only boundary requires a retained-owner output slot");return NULL;}
+ if(*owner_out!=NULL){fail(e,n,"OnInit-only retained-owner output slot must be empty");return NULL;}
+ if(stage_kind!=St_Kind_PStadium){fail(e,n,"OnInit-only stage boundary is limited to the diagnostic Stadium profile");return NULL;}
+ const MeleeWebStageProfile* definition=melee_web_stage_profile(stage_kind);
+ if(!definition||!definition->diagnostic_only){fail(e,n,"Diagnostic Stadium source profile is unavailable");return NULL;}
+ return begin_stage(definition,yaku,bank,1,1,1,owner_out,e,n);
+}
+/* A GObj is a borrowed identity here: verify its live source registry before
+ * reading Ground or comparing the authored display/queued callback fields. */
+static int stadium_maps_live(MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(h->stadium_first_transform.armed==1&&h->stadium_started==2)
+  return melee_web_stadium_display_owner_first_transform_graph(h->stadium_display_owner,0,e,n);
+ MeleeWebStadiumMap2BufferOwner* maps=&h->stadium_map2_buffer_owner;
+ const struct {int id;HSD_GObj* object;} expected[]={
+  {0,maps->map0_ground},{1,maps->display_ground},
+  {2,maps->map2_ground},{5,maps->nested_map5_ground}};
+ if(!maps->captured||!HSD_GObj_Entities)return fail(e,n,"Stadium OnInit map owner is incomplete");
+ for(size_t i=0;i<ARRAY_SIZE(expected);++i){
+  HSD_GObj* found=NULL;
+  for(HSD_GObj* g=((HSD_GObj**)HSD_GObj_Entities)[5];g;g=g->next)
+   if(g==expected[i].object){found=g;break;}
+  if(!found||found!=stage_info.map_gobjs[expected[i].id]||
+     found->classifier!=HSD_GOBJ_CLASS_STAGE||!found->user_data||
+     ((Ground*)found->user_data)->map_id!=expected[i].id)
+   return fail(e,n,"Stadium original map identity changed before callback/retirement");
+ }
+ return 1;
+}
+static int stadium_first_transform_arm_form(MeleeWebStageLast* h,uint32_t form,
+        char* e,size_t n)
+{
+ if(form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM&&
+    form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+  return fail(e,n,"First-transform arm requires exact supported authored form");
+ if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
+    !h->definition||!h->definition->diagnostic_only||h->stadium_loaded||h->stadium_started||
+    !melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
+    !stadium_map2_region_preflight(&h->stadium_map2_region,&h->stadium_map2_buffer_owner,h->generation,e,n))
+  return fail(e,n,"First-transform policy requires untouched checked OnInit owner before OnLoad");
+ return melee_web_stadium_display_owner_first_transform_arm_form(
+          h->stadium_display_owner,&h->stadium_first_transform,form,e,n);
+}
+int melee_web_stage_last_stadium_first_transform_arm(MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_arm_form(h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM,e,n); }
+int melee_web_stage_last_stadium_water_graph_arm(MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_arm_form(h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM,e,n); }
+int melee_web_stage_last_stadium_first_transform_status(const MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
+    !melee_web_stage_last_source_work_allowed(h)||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM)
+  return fail(e,n,"First-fire status lost exact selected source owner");
+ if(h->stadium_started==2&&!melee_web_stadium_display_owner_first_transform_graph(
+      h->stadium_display_owner,0,e,n))return 0;
+ return melee_web_stadium_display_owner_first_transform_status(&h->stadium_first_transform,out,e,n);
+}
+int melee_web_stage_last_stadium_water_graph_status(const MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
+    !melee_web_stage_last_source_work_allowed(h)||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM)
+  return fail(e,n,"Water graph status lost exact selected source owner");
+ if(h->stadium_started==2&&!melee_web_stadium_display_owner_first_transform_graph(
+      h->stadium_display_owner,0,e,n))return 0;
+ return melee_web_stadium_display_owner_first_transform_status(&h->stadium_first_transform,out,e,n);
+}
+
+/* SDK leases describe backing storage; source-journal/proc/root checks
+ * independently identify the original manager's logical lifetime. */
+static int stadium_manager_storage_preflight(MeleeWebStageLast* h,char* e,size_t n){
+ MeleeWebSourceMemoryAllocation object={0},proc={0};
+ MeleeWebSourceMemoryContext context;
+ if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
+  return fail(e,n,"Stadium manager source context is unavailable");
+ MeleeWebSourceMemoryReadStatus os=melee_web_source_memory_allocation_read(h->stadium_manager.object,&object);
+ MeleeWebSourceMemoryReadStatus ps=melee_web_source_memory_allocation_read(h->stadium_manager.proc,&proc);
+ fprintf(stderr,"STADIUM_MANAGER_LEASE object=%p proc=%p object_status=%d proc_status=%d "
+  "object_live=%u proc_live=%u world=%llu/%llu heap=%d/%d requested=%u/%u generation=%llu/%llu "
+  "expected_world=%llu expected_heap=%d expected_requested=%u/%u expected_generation=%llu/%llu\n",
+  (void*)h->stadium_manager.object,(void*)h->stadium_manager.proc,os,ps,object.live,proc.live,
+  (unsigned long long)object.world_generation,(unsigned long long)proc.world_generation,
+  object.source_heap_handle,proc.source_heap_handle,object.requested_bytes,proc.requested_bytes,
+  (unsigned long long)object.allocation_generation,(unsigned long long)proc.allocation_generation,
+  (unsigned long long)h->stadium_manager_lease.world_generation,h->stadium_manager_lease.source_heap_handle,
+  h->stadium_manager_lease.requested_bytes,h->stadium_manager_proc_lease.requested_bytes,
+  (unsigned long long)h->stadium_manager_lease.allocation_generation,
+  (unsigned long long)h->stadium_manager_proc_lease.allocation_generation);
+ if(os!=MELEE_WEB_SOURCE_MEMORY_READ_OK||ps!=MELEE_WEB_SOURCE_MEMORY_READ_OK||!object.live||!proc.live||
+    object.requested_bytes!=sizeof(HSD_GObj)||proc.requested_bytes!=sizeof(HSD_GObjProc)||
+    object.world_generation!=context.world_generation||proc.world_generation!=context.world_generation||
+    object.source_heap_handle!=context.source_heap_handle||proc.source_heap_handle!=context.source_heap_handle||
+    object.world_generation!=h->stadium_manager_lease.world_generation||
+    proc.world_generation!=h->stadium_manager_proc_lease.world_generation||
+    object.source_heap_handle!=h->stadium_manager_lease.source_heap_handle||
+    proc.source_heap_handle!=h->stadium_manager_proc_lease.source_heap_handle||
+    object.requested_bytes!=h->stadium_manager_lease.requested_bytes||
+    proc.requested_bytes!=h->stadium_manager_proc_lease.requested_bytes||
+    object.allocation_generation!=h->stadium_manager_lease.allocation_generation||
+    proc.allocation_generation!=h->stadium_manager_proc_lease.allocation_generation)
+  return fail(e,n,"Original Stadium manager storage lease changed");
+ return melee_web_stadium_manager_view_preflight(&h->stadium_manager,e,n);
+}
+static void stadium_go_alignment_fail(MeleeWebStageLast* h,unsigned reason)
+{
+ if(h && h->stadium_go_alignment.armed && !h->stadium_go_alignment.failure)
+  h->stadium_go_alignment.failure=reason;
+}
+static void stadium_go_alignment_stamp(MeleeWebStageLast* h,
+        MeleeWebStadiumGoAlignmentEvent* event,int callback_index,int source_branch,
+        int gate,int mode,int remap,int callback_identity,int hud_enabled,
+        void* object,void* proc)
+{
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ event->generation=stats.generation;event->world_ticks=stats.ticks;
+ event->source_frame=melee_web_match_source_frames();
+ event->sequence=++h->stadium_go_alignment.next_sequence;
+ event->object_identity=(uintptr_t)object;event->proc_identity=(uintptr_t)proc;
+ event->callback_index=callback_index;event->source_branch=source_branch;
+ event->map2_gate=gate;event->display_mode=mode;event->remap_branch=remap;
+ event->callback_identity=callback_identity;event->hud_enabled=hud_enabled;
+}
+static int stadium_go_alignment_has_no_events(const MeleeWebStageLast* h)
+{
+ return h && !h->stadium_go_alignment.stage_before.sequence &&
+        !h->stadium_go_alignment.stage_after.sequence &&
+        !h->stadium_go_alignment.go_after.sequence &&
+        !h->stadium_go_alignment.hud_after.sequence;
+}
+static int stadium_go_alignment_live(const MeleeWebStageLast* h)
+{
+ if(!h||h!=active||!h->stadium_go_alignment.armed||
+    h->generation!=melee_web_gameplay_stats().generation||
+    h->stadium_go_alignment.generation!=h->generation||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered)return 0;
+ /* Before the first Ready callback, a completed tick may legitimately leave
+  * the exact OnInit owner unstarted. Keep that partial/zero-latch state
+  * observable; after original OnStart, require its captured owner phase. */
+ return (h->stadium_started==1&&h->stadium_ready_armed==1&&
+         stadium_go_alignment_has_no_events(h))||
+        (h->stadium_started==2&&h->stadium_ready_armed==0);
+}
+static int stadium_go_alignment_source_owner_live(
+        const MeleeWebStageLast* h,int source_started)
+{
+ MeleeWebSourceMemoryContext context={0};
+ MeleeWebSourceMemoryAllocation object={0},proc={0};
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!melee_web_gameplay_world_exists()||
+    !melee_web_source_memory_healthy()||
+    melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=stats.generation||context.world_generation!=h->generation||
+    context.world_generation!=h->stadium_start_context.world_generation||
+    context.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+  return 0;
+ if(!source_started){
+  return h->stadium_started==1&&!h->stadium_manager.object&&
+         !h->stadium_manager.proc&&!h->stadium_manager_lease.live&&
+         !h->stadium_manager_proc_lease.live;
+ }
+ if(h->stadium_started!=2||
+    melee_web_source_memory_allocation_read(h->stadium_manager.object,&object)!=
+        MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    melee_web_source_memory_allocation_read(h->stadium_manager.proc,&proc)!=
+        MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !object.live||!proc.live||
+    object.world_generation!=context.world_generation||
+    proc.world_generation!=context.world_generation||
+    object.world_generation!=h->stadium_manager_lease.world_generation||
+    proc.world_generation!=h->stadium_manager_proc_lease.world_generation||
+    object.source_heap_handle!=context.source_heap_handle||
+    proc.source_heap_handle!=context.source_heap_handle||
+    object.source_heap_handle!=h->stadium_manager_lease.source_heap_handle||
+    proc.source_heap_handle!=h->stadium_manager_proc_lease.source_heap_handle||
+    object.requested_bytes!=h->stadium_manager_lease.requested_bytes||
+    proc.requested_bytes!=h->stadium_manager_proc_lease.requested_bytes||
+    object.allocation_generation!=h->stadium_manager_lease.allocation_generation||
+    proc.allocation_generation!=h->stadium_manager_proc_lease.allocation_generation)
+  return 0;
+ return 1;
+}
+static int stadium_go_alignment_stage_note(MeleeWebStageLast* h,int after,
+        char* e,size_t n)
+{
+ if(!h)return fail(e,n,"Stadium GO trace lost its StageLast owner");
+ if(!h->stadium_go_alignment.armed)return 1;
+ MeleeWebStadiumGoAlignmentEvent* event=after?&h->stadium_go_alignment.stage_after:
+                                                    &h->stadium_go_alignment.stage_before;
+ const unsigned required_armed=after?2U:1U;
+ if(event->sequence||!h||h!=active||
+    h->generation!=melee_web_gameplay_stats().generation||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    h->stadium_started!=(after?2:1)||h->stadium_ready_armed!=required_armed||
+    !h->stadium_ready_object||!h->stadium_ready_proc||
+    !melee_web_hud_stadium_ready_context(h->stadium_ready_object,h->stadium_ready_proc)||
+    !stadium_maps_live(h,e,n)){
+  stadium_go_alignment_fail(h,1);
+  if(e&&n&&!*e)snprintf(e,n,"Stadium GO trace lost its exact Stage Ready callback");
+  return 0;
+ }
+ const int gate=((Ground*)h->stadium_map2_buffer_owner.map2_ground->user_data)->u.stadium.xC4_b0;
+ if(gate!=(after?0:1)){
+  stadium_go_alignment_fail(h,2);
+  return fail(e,n,"Stadium GO trace did not observe the authored map-2 gate transition");
+ }
+ stadium_go_alignment_stamp(h,event,3,-1,gate,-1,-1,1,-1,
+                            h->stadium_ready_object,h->stadium_ready_proc);
+ return 1;
+}
+static int stadium_go_alignment_current_display(const MeleeWebStageLast* h,
+        int* gate,int* mode,int* remap)
+{
+ if(!stadium_go_alignment_source_owner_live(h,h&&h->stadium_started==2)||
+    !h->stadium_ready_route||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !melee_web_stadium_display_owner_go_alignment_view(
+        h->stadium_display_owner,&h->stadium_map2_buffer_owner,
+        h->stadium_started==2,gate,mode))return 0;
+ *remap=gm_8018841C()?1:0;
+ return 1;
+}
+extern int melee_web_grpstadium_cached_yakumono_matches(const void*);
+extern int melee_web_grpstadium_cached_yakumono_snapshot(
+        const void*,int32_t*,int32_t*);
+extern int melee_web_match_rng_seed_owner_read(uint32_t*);
+static void stadium_setup_fail(MeleeWebStageLast* h,unsigned reason)
+{
+ if(h&&!h->stadium_setup.failure)h->stadium_setup.failure=reason?reason:1;
+}
+static int stadium_setup_owner_phase(const MeleeWebStageLast* h)
+{
+ return h&&h==active&&h->generation==melee_web_gameplay_stats().generation&&
+    h->definition&&h->definition->diagnostic_only&&
+    h->definition->stage_kind==St_Kind_PStadium&&
+    stage_info.grkind==h->definition->ground_kind&&h->source_ordered&&
+    h->source_yakumono&&stage_info.yakumono_param==h->source_yakumono;
+}
+static int stadium_setup_same_lease(const MeleeWebSourceMemoryAllocation* a,
+                                    const MeleeWebSourceMemoryAllocation* b)
+{
+ return a&&b&&a->live&&b->live&&
+    a->requested_bytes==b->requested_bytes&&
+    a->world_generation==b->world_generation&&
+    a->source_heap_handle==b->source_heap_handle&&
+    a->allocation_generation==b->allocation_generation;
+}
+static void stadium_setup_phase_append(MeleeWebStageLast* h,uint32_t phase,
+        int parameter_values_valid,int32_t parameter_x0,int32_t parameter_x4,
+        int scalar_value_valid,int32_t scalar_value,uint32_t source_seed)
+{
+ if(!h||!h->stadium_setup.seen||h->stadium_setup.failure)return;
+ if(h->stadium_setup.phase_count>=MELEE_WEB_STADIUM_SETUP_CONSTRUCTOR_PHASE_CAPACITY){
+  stadium_setup_fail(h,6);return;
+ }
+ MeleeWebStadiumSetupConstructorPhaseEvent* event=
+     &h->stadium_setup.phases[h->stadium_setup.phase_count];
+ memset(event,0,sizeof(*event));
+ event->ordinal=h->stadium_setup.phase_count+1;
+ event->phase=phase;
+ event->parameter_values_valid=parameter_values_valid?1U:0U;
+ event->parameter_x0=parameter_x0;event->parameter_x4=parameter_x4;
+ event->scalar_value_valid=scalar_value_valid?1U:0U;
+ event->scalar_value=scalar_value;
+ event->source_seed_valid=1;event->source_seed=source_seed;
+ ++h->stadium_setup.phase_count;
+}
+static int stadium_setup_phase_receipt_matches(const MeleeWebStageLast* h,
+        int32_t x0,int32_t x4,int32_t countdown,int call_observed,
+        int32_t bound,int32_t result,uint32_t seed_before,uint32_t seed_after)
+{
+ if(!h)return 0;
+ const unsigned count=call_observed?5U:3U;
+ if(h->stadium_setup.phase_count!=count)return 0;
+ const MeleeWebStadiumSetupConstructorPhaseEvent* p=h->stadium_setup.phases;
+ if(p[0].ordinal!=1||p[0].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY||
+    p[0].parameter_values_valid||p[0].scalar_value_valid||!p[0].source_seed_valid||
+    p[0].source_seed!=seed_before||
+    p[1].ordinal!=2||p[1].phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS||
+    !p[1].parameter_values_valid||p[1].parameter_x0!=x0||p[1].parameter_x4!=x4||
+    p[1].scalar_value_valid||!p[1].source_seed_valid||p[1].source_seed!=seed_before)
+  return 0;
+ unsigned commit_index=2;
+ if(call_observed){
+  const uint32_t call_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:
+                                      MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL;
+  const uint32_t return_phase=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN:
+                                         MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+  if(p[2].ordinal!=3||p[2].phase!=call_phase||!p[2].parameter_values_valid||
+     p[2].parameter_x0!=x0||p[2].parameter_x4!=x4||!p[2].scalar_value_valid||
+     p[2].scalar_value!=bound||!p[2].source_seed_valid||p[2].source_seed!=seed_before||
+     p[3].ordinal!=4||p[3].phase!=return_phase||!p[3].parameter_values_valid||
+     p[3].parameter_x0!=x0||p[3].parameter_x4!=x4||!p[3].scalar_value_valid||
+     p[3].scalar_value!=result||!p[3].source_seed_valid||p[3].source_seed!=seed_after)
+   return 0;
+  commit_index=4;
+ }else if(x0!=x4)return 0;
+ const MeleeWebStadiumSetupConstructorPhaseEvent* commit=&p[commit_index];
+ return commit->ordinal==commit_index+1&&
+    commit->phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT&&
+    commit->parameter_values_valid&&commit->parameter_x0==x0&&commit->parameter_x4==x4&&
+    commit->scalar_value_valid&&commit->scalar_value==countdown&&
+    commit->source_seed_valid&&commit->source_seed==seed_after;
+}
+static int stadium_setup_live_map2(const MeleeWebStageLast* h,HSD_GObj* object,
+        Ground* expected_ground,const MeleeWebSourceMemoryAllocation* saved_object,
+        const MeleeWebSourceMemoryAllocation* saved_ground,
+        MeleeWebSourceMemoryAllocation* current_object,
+        MeleeWebSourceMemoryAllocation* current_ground,int* map_id,int* countdown)
+{
+ MeleeWebSourceMemoryContext context={0};
+ if(!h||!object||!expected_ground||!current_object||!current_ground||
+    !melee_web_gameplay_world_exists()||!melee_web_source_memory_healthy()||
+    melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=h->generation||
+    stage_info.map_gobjs[2]!=object||
+    Ground_GetMapGObj(2)!=object||
+    melee_web_source_memory_allocation_read(object,current_object)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !current_object->live||current_object->requested_bytes!=sizeof(HSD_GObj)||
+    current_object->world_generation!=context.world_generation||
+    current_object->source_heap_handle!=context.source_heap_handle||
+    (saved_object&&!stadium_setup_same_lease(current_object,saved_object)))
+  return 0;
+ /* The HSD_GObj allocation is proven before reading its user_data. */
+ if(object->user_data!=expected_ground||
+    melee_web_source_memory_allocation_read(expected_ground,current_ground)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !current_ground->live||current_ground->requested_bytes!=sizeof(Ground)||
+    current_ground->world_generation!=context.world_generation||
+    current_ground->source_heap_handle!=context.source_heap_handle||
+    (saved_ground&&!stadium_setup_same_lease(current_ground,saved_ground)))
+  return 0;
+ /* Ground storage is proven before map_id and Stadium callback fields are read. */
+ Ground* ground=expected_ground;
+ if(ground->gobj!=object||ground->map_id!=2)return 0;
+ if(map_id)*map_id=ground->map_id;
+ if(countdown)*countdown=ground->u.stadium.xD8;
+ return 1;
+}
+int melee_web_stage_last_stadium_setup_constructor_begin(void* raw_object)
+{
+ MeleeWebStageLast* h=active;
+ uint32_t seed_owner_check=0;
+ if(!h||!h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered)return 0;
+ if(h->stadium_setup.seen){stadium_setup_fail(h,1);return 0;}
+ h->stadium_setup.seen=1;
+ HSD_GObj* object=(HSD_GObj*)raw_object;
+ MeleeWebSourceMemoryContext context={0};
+ MeleeWebSourceMemoryAllocation object_lease={0},ground_lease={0};
+ if(!stadium_setup_owner_phase(h)||h->stadium_started!=0||
+    h->stadium_ready_route||h->stadium_ready_armed||!object||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    !melee_web_source_memory_healthy()||
+    melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=h->generation||
+    stage_info.map_gobjs[2]!=object||
+    Ground_GetMapGObj(2)!=object||
+    melee_web_source_memory_allocation_read(object,&object_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !object_lease.live||object_lease.requested_bytes!=sizeof(HSD_GObj)||
+    object_lease.world_generation!=context.world_generation||
+    object_lease.source_heap_handle!=context.source_heap_handle){
+  stadium_setup_fail(h,2);return 0;
+ }
+ /* Only after the exact object lease is established may user_data be read. */
+ Ground* ground=(Ground*)object->user_data;
+ if(!ground||melee_web_source_memory_allocation_read(ground,&ground_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !ground_lease.live||ground_lease.requested_bytes!=sizeof(Ground)||
+    ground_lease.world_generation!=context.world_generation||
+    ground_lease.source_heap_handle!=context.source_heap_handle||
+    ground->gobj!=object||ground->map_id!=2){
+  stadium_setup_fail(h,3);return 0;
+ }
+ if(h->source_yakumono!=stage_info.yakumono_param||
+    !melee_web_grpstadium_cached_yakumono_matches(h->source_yakumono)||
+    !melee_web_match_rng_seed_owner_read(&seed_owner_check)){
+  stadium_setup_fail(h,4);return 0;
+ }
+ h->stadium_setup.object=object;h->stadium_setup.ground=ground;
+ h->stadium_setup.object_lease=object_lease;h->stadium_setup.ground_lease=ground_lease;
+ stadium_setup_phase_append(h,MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY,0,0,0,0,0,seed_owner_check);
+ return 1;
+}
+void melee_web_stage_last_stadium_setup_constructor_phase(
+        void* raw_object,uint32_t phase,int32_t x0,int32_t x4,
+        int scalar_valid,int32_t scalar_value)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_setup.seen)return;
+ if(h->stadium_setup.failure)return;
+ if(h->stadium_setup.finished||raw_object!=h->stadium_setup.object){
+  stadium_setup_fail(h,6);return;
+ }
+ uint32_t expected=0;
+ const unsigned count=h->stadium_setup.phase_count;
+ if(count==1)expected=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS;
+ else if(count==2)expected=x4>x0?MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL:
+       x4<x0?MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL:MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT;
+ else if(count==3&&h->stadium_setup.phases[2].phase==MELEE_WEB_STADIUM_SETUP_PHASE_UP_CALL)
+  expected=MELEE_WEB_STADIUM_SETUP_PHASE_UP_RETURN;
+ else if(count==3&&h->stadium_setup.phases[2].phase==MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_CALL)
+  expected=MELEE_WEB_STADIUM_SETUP_PHASE_DOWN_RETURN;
+ else if(count==4)expected=MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT;
+ if(!expected||phase!=expected||
+    (phase==MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&(scalar_valid||scalar_value))||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&!scalar_valid)){
+  stadium_setup_fail(h,6);return;
+ }
+ HSD_GObj* object=(HSD_GObj*)raw_object;
+ MeleeWebSourceMemoryAllocation current_object={0},current_ground={0};
+ int map_id=-1,current_countdown=0;
+ int32_t cached_x0=0,cached_x4=0;
+ uint32_t seed=0;
+ if(!stadium_setup_owner_phase(h)||h->stadium_started!=0||h->stadium_ready_route||
+    h->stadium_ready_armed||!melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    !stadium_setup_live_map2(h,object,h->stadium_setup.ground,
+       &h->stadium_setup.object_lease,&h->stadium_setup.ground_lease,
+       &current_object,&current_ground,&map_id,
+       phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT?&current_countdown:NULL)||map_id!=2||
+    !melee_web_grpstadium_cached_yakumono_snapshot(h->source_yakumono,&cached_x0,&cached_x4)||
+    !melee_web_match_rng_seed_owner_read(&seed)||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_PARAMETERS&&
+     (x0!=h->stadium_setup.phases[1].parameter_x0||
+      x4!=h->stadium_setup.phases[1].parameter_x4))||
+    (phase!=MELEE_WEB_STADIUM_SETUP_PHASE_ENTRY&&(x0!=cached_x0||x4!=cached_x4))||
+    (phase==MELEE_WEB_STADIUM_SETUP_PHASE_COMMIT&&current_countdown!=scalar_value)){
+  stadium_setup_fail(h,6);return;
+ }
+ stadium_setup_phase_append(h,phase,1,x0,x4,scalar_valid,scalar_value,seed);
+}
+void melee_web_stage_last_stadium_setup_constructor_finish(
+        void* raw_object,int32_t observed_x0,int32_t observed_x4,
+        int32_t observed_countdown,int call_observed,int32_t bound,int32_t result,int result_valid,
+        uint32_t seed_before,int seed_before_valid,uint32_t seed_after,int seed_after_valid)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_setup.seen)return;
+ if(h->stadium_setup.finished){stadium_setup_fail(h,1);return;}
+ HSD_GObj* object=(HSD_GObj*)raw_object;
+ MeleeWebSourceMemoryAllocation current_object={0},current_ground={0};
+ int map_id=-1,countdown=0;
+ if(!stadium_setup_owner_phase(h)||h->stadium_started!=0||
+    h->stadium_ready_route||h->stadium_ready_armed||object!=h->stadium_setup.object||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    !stadium_setup_live_map2(h,object,h->stadium_setup.ground,
+       &h->stadium_setup.object_lease,&h->stadium_setup.ground_lease,
+       &current_object,&current_ground,&map_id,&countdown)||map_id!=2||
+    !melee_web_grpstadium_cached_yakumono_matches(h->source_yakumono)||
+    countdown!=observed_countdown||
+    call_observed!=(observed_x0!=observed_x4)||
+    (call_observed&&!result_valid)||
+    (!call_observed&&(result_valid||bound||result))||
+    !seed_before_valid||!seed_after_valid||
+    (!call_observed&&seed_after!=seed_before)){
+  stadium_setup_fail(h,5);return;
+ }
+ if(!stadium_setup_phase_receipt_matches(h,observed_x0,observed_x4,
+       observed_countdown,call_observed,bound,result,seed_before,seed_after)){
+  stadium_setup_fail(h,6);return;
+ }
+ h->stadium_setup.initial_countdown=countdown;
+ h->stadium_setup.parameter_x0=observed_x0;
+ h->stadium_setup.parameter_x4=observed_x4;
+ h->stadium_setup.call_observed=call_observed?1U:0U;
+ h->stadium_setup.bound_valid=call_observed?1U:0U;
+ h->stadium_setup.random_bound=bound;
+ h->stadium_setup.result_valid=result_valid?1U:0U;
+ h->stadium_setup.random_result=result;
+ h->stadium_setup.seed_before=seed_before;
+ h->stadium_setup.seed_before_valid=1;
+ h->stadium_setup.seed_after=seed_after;
+ h->stadium_setup.seed_after_valid=1;
+ h->stadium_setup.finished=1;
+}
+int melee_web_stage_last_stadium_setup_snapshot(
+        const MeleeWebStageLast* h,const void* expected_yakumono,
+        MeleeWebStadiumSetupSnapshot* out,char* e,size_t n)
+{
+ MeleeWebStadiumSetupSnapshot candidate;
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ MeleeWebSourceMemoryAllocation object_lease={0},ground_lease={0};
+ int map_id=-1,countdown=0;
+ int32_t x0=0,x4=0;
+ if(!h||h!=active||!out||!stadium_setup_owner_phase(h)||
+    !expected_yakumono||expected_yakumono!=h->source_yakumono||
+    expected_yakumono!=stage_info.yakumono_param||
+    h->stadium_started!=1||h->stadium_ready_route!=1||h->stadium_ready_armed!=1||
+    stats.generation!=h->generation||stats.ticks!=0||
+    melee_web_match_source_frames()!=0||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+    HSD_GObj_804D7814||HSD_GObj_804D7818||
+    h->stadium_ready_object||h->stadium_ready_proc||
+    h->stadium_go_alignment.armed||!stadium_go_alignment_has_no_events(h)||
+    h->stadium_manager.object||h->stadium_manager.proc||
+    h->stadium_manager_lease.live||h->stadium_manager_proc_lease.live)
+  return fail(e,n,"Stadium Setup receipt requires its completed zero-tick prepared Ready owner");
+ if(!h->stadium_setup.seen)
+  return fail(e,n,"Stadium constructor receipt is absent");
+ if(h->stadium_setup.failure){
+  static const char* const reasons[]={"none","duplicate map-2 constructor callback",
+   "map-2 GObj/root/source lease changed","map-2 Ground allocation lease changed",
+   "source-local parameter roots or owned seed unavailable",
+   "constructor call/result/owner receipt changed",
+   "constructor phase trace order, values, or owner changed"};
+  unsigned reason=h->stadium_setup.failure;
+  return fail(e,n,reason<sizeof(reasons)/sizeof(reasons[0])?reasons[reason]:
+      "Stadium constructor receipt failed closed");
+ }
+ if(!h->stadium_setup.finished)
+  return fail(e,n,"Stadium constructor callback did not finish its receipt");
+ if(!h->stadium_map2_buffer_owner.captured||
+    h->stadium_map2_buffer_owner.map2_ground!=h->stadium_setup.object||
+    !stadium_setup_live_map2(h,h->stadium_setup.object,
+       h->stadium_setup.ground,&h->stadium_setup.object_lease,
+       &h->stadium_setup.ground_lease,&object_lease,&ground_lease,&map_id,&countdown)||
+    map_id!=2||countdown!=h->stadium_setup.initial_countdown)
+  return fail(e,n,"Stadium Setup map-2 Ground owner or constructor countdown changed");
+ if(!melee_web_grpstadium_cached_yakumono_snapshot(
+       expected_yakumono,&x0,&x4)||
+    x0!=h->stadium_setup.parameter_x0||x4!=h->stadium_setup.parameter_x4||
+    !h->stadium_setup.seed_before_valid||!h->stadium_setup.seed_after_valid)
+  return fail(e,n,"Stadium Setup source parameter or constructor seed receipt changed");
+ memset(&candidate,0,sizeof(candidate));
+ candidate.version=MELEE_WEB_STADIUM_SETUP_SNAPSHOT_VERSION;
+ candidate.world_generation=stats.generation;candidate.world_ticks=stats.ticks;
+ candidate.source_frame=melee_web_match_source_frames();candidate.map_id=map_id;
+ candidate.initial_countdown=h->stadium_setup.initial_countdown;
+ candidate.current_countdown=countdown;candidate.parameter_x0=x0;candidate.parameter_x4=x4;
+ candidate.constructor_randi_call_count=h->stadium_setup.call_observed;
+ candidate.constructor_random_bound_valid=h->stadium_setup.bound_valid;
+ candidate.constructor_random_bound=h->stadium_setup.random_bound;
+ candidate.constructor_random_result_valid=h->stadium_setup.result_valid;
+ candidate.constructor_random_result=h->stadium_setup.random_result;
+ candidate.source_seed_before=h->stadium_setup.seed_before;
+ candidate.source_seed_after=h->stadium_setup.seed_after;
+ candidate.ground_source_heap_handle=ground_lease.source_heap_handle;
+ candidate.ground_requested_bytes=ground_lease.requested_bytes;
+ candidate.ground_allocation_generation=ground_lease.allocation_generation;
+ candidate.object_source_heap_handle=object_lease.source_heap_handle;
+ candidate.object_requested_bytes=object_lease.requested_bytes;
+ candidate.object_allocation_generation=object_lease.allocation_generation;
+ candidate.constructor_callback_count=h->stadium_setup.seen;
+ candidate.source_parameter_roots_agree=1;
+ candidate.constructor_phase_count=h->stadium_setup.phase_count;
+ memcpy(candidate.constructor_phases,h->stadium_setup.phases,
+        sizeof(candidate.constructor_phases));
+ *out=candidate;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_idle_snapshot(
+        const MeleeWebStageLast* h, MeleeWebStadiumIdleSnapshot* out,
+        char* e, size_t n)
+{
+ MeleeWebStadiumIdleSnapshot candidate;
+ const MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!out||h->generation!=stats.generation||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !h->stadium_ready_route||h->stadium_started!=2||h->stadium_ready_armed!=0||
+    HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+    HSD_GObj_804D7814||HSD_GObj_804D7818)
+  return fail(e,n,"Stadium idle snapshot requires its active started source owner");
+ if(!melee_web_gameplay_world_exists()||!melee_web_source_memory_healthy()||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_source_owner_live(h,1))
+  return fail(e,n,"Stadium idle snapshot lost its exact source world or StageLast owner");
+ memset(&candidate,0,sizeof(candidate));
+ if(!melee_web_stadium_display_owner_idle_snapshot(
+       h->stadium_display_owner,&h->stadium_map2_buffer_owner,1,
+       stats.generation,stats.ticks,melee_web_match_source_frames(),&candidate))
+  return fail(e,n,"Stadium idle snapshot lost its checked display/map/SIS owner");
+ *out=candidate;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_go_alignment_arm(
+        MeleeWebStageLast* h,int expected_branch,char* e,size_t n)
+{
+ if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    !h->stadium_ready_route||h->stadium_ready_armed!=1||h->stadium_started!=1||
+    h->stadium_go_alignment.armed||expected_branch<0||expected_branch>1||
+    HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+    HSD_GObj_804D7814||HSD_GObj_804D7818)
+  return fail(e,n,"Stadium GO trace arm requires the idle, started Ready owner");
+ MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(stats.ticks!=0||stats.generation!=h->generation||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_source_owner_live(h,0))
+  return fail(e,n,"Stadium GO trace arm requires its zero-tick original map owner");
+ int gate=-1,mode=-1,remap=-1;
+ if(!stadium_go_alignment_current_display(h,&gate,&mode,&remap))
+  return fail(e,n,"Stadium GO trace arm requires its exact live display owner");
+ if(gate!=1)return fail(e,n,"Stadium GO trace arm requires the original closed map-2 gate");
+ memset(&h->stadium_go_alignment,0,sizeof(h->stadium_go_alignment));
+ h->stadium_go_alignment.armed=1;
+ h->stadium_go_alignment.generation=stats.generation;
+ h->stadium_go_alignment.armed_world_ticks=stats.ticks;
+ h->stadium_go_alignment.armed_source_frame=melee_web_match_source_frames();
+ h->stadium_go_alignment.expected_branch=(uint32_t)expected_branch;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_go_alignment_snapshot(
+        const MeleeWebStageLast* h,MeleeWebStadiumGoAlignmentSnapshot* out,
+        char* e,size_t n)
+{
+ int gate=-1,mode=-1,remap=-1;
+ const MeleeWebGameplayStats stats=melee_web_gameplay_stats();
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||
+    !h->stadium_go_alignment.armed||
+    (HSD_GObj_804D781C||HSD_GObj_804D7838||HSD_GObj_804D7830||
+     HSD_GObj_804D7814||HSD_GObj_804D7818))
+  return fail(e,n,"Stadium GO trace snapshot requires its live armed StageLast owner");
+ if(!stadium_go_alignment_live(h)||
+    stats.ticks<h->stadium_go_alignment.armed_world_ticks||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap))
+  return fail(e,n,"Stadium GO trace snapshot lost its live idle Stadium owner/world phase");
+ if(h->stadium_go_alignment.failure){
+  static const char* const failures[]={"none","Stage Ready callback identity changed",
+   "map-2 gate phase changed","GO owner/display/mode changed","GO branch differed from the selected rules",
+   "HUD callback branch differed from GO","HUD owner/callback identity changed",
+   "HUD did not enable its original display","GO source RNG owner could not be copied"};
+  unsigned code=h->stadium_go_alignment.failure;
+  return fail(e,n,code<sizeof(failures)/sizeof(failures[0])?failures[code]:"Stadium GO trace failed");
+ }
+ *out=h->stadium_go_alignment;return ok(e,n);
+}
+void melee_web_stage_last_stadium_go_alignment_note_go(int source_branch)
+{
+ MeleeWebStageLast* h=active;
+ uint32_t source_seed=0;
+ if(!h||!h->stadium_go_alignment.armed)return;
+ MeleeWebStadiumGoAlignmentEvent* event=&h->stadium_go_alignment.go_after;
+ void* object=HSD_GObj_804D781C;void* proc=HSD_GObj_804D7838;
+ int gate=-1,mode=-1,remap=-1;
+ if(event->sequence||!stadium_go_alignment_live(h)||
+    !h->stadium_go_alignment.stage_before.sequence||
+    !h->stadium_go_alignment.stage_after.sequence||
+    !object||!proc||!melee_web_hud_stadium_ready_context(object,proc)||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap)){
+  stadium_go_alignment_fail(h,3);return;
+ }
+ if(source_branch!=(int)h->stadium_go_alignment.expected_branch){
+  stadium_go_alignment_fail(h,4);return;
+ }
+ if(gate!=0||mode!=0xB||remap!=0){
+  stadium_go_alignment_fail(h,3);return;
+ }
+ /* The original GO marker has its own tag-19/20 scalar. Copy it only through
+  * the live generation-checked RNG owner; this read does not advance RNG. */
+ if(!melee_web_match_rng_seed_owner_read(&source_seed)){
+  stadium_go_alignment_fail(h,8);return;
+ }
+ stadium_go_alignment_stamp(h,event,3,source_branch,gate,mode,remap,1,-1,object,proc);
+ event->source_seed=source_seed;event->source_seed_valid=1;
+}
+void melee_web_stage_last_stadium_go_alignment_note_hud(
+        int callback_index,MeleeWebStadiumGoAlignmentHudCallback callback,
+        int hud_enabled)
+{
+ MeleeWebStageLast* h=active;
+ if(!h||!h->stadium_go_alignment.armed)return;
+ MeleeWebStadiumGoAlignmentEvent* event=&h->stadium_go_alignment.hud_after;
+ void* object=HSD_GObj_804D781C;void* proc=HSD_GObj_804D7838;
+ int gate=-1,mode=-1,remap=-1,identity=0;
+ if(event->sequence||!stadium_go_alignment_live(h)||
+    !h->stadium_go_alignment.go_after.sequence||!callback||
+    !stadium_go_alignment_current_display(h,&gate,&mode,&remap)){
+  stadium_go_alignment_fail(h,5);return;
+ }
+ if(callback_index==-1 && h->stadium_go_alignment.go_after.source_branch==1){
+  identity=melee_web_hud_stadium_ready_context(object,proc);
+ }else if(callback_index==4 && h->stadium_go_alignment.go_after.source_branch==0){
+  const Element_803F9628* row=&ifStatus_803F9628[4];
+  HSD_GObj* current_object=HSD_GObj_804D781C;
+  HSD_GObjProc* current_proc=HSD_GObj_804D7838;
+  identity=current_object&&current_proc&&!HSD_GObj_804D7814&&
+      row->x0==current_object&&row->x8==if_802F73C4&&row->x1C==callback&&
+      current_object->proc==current_proc&&!current_proc->child&&
+      current_proc->gobj==current_object&&current_proc->on_invoke==if_802F73C4;
+ }else{
+  stadium_go_alignment_fail(h,5);return;
+ }
+ if(!identity||!object||!proc||gate!=0||mode!=1||remap!=0||hud_enabled!=1){
+  stadium_go_alignment_fail(h,6);return;
+ }
+ stadium_go_alignment_stamp(h,event,callback_index,
+      h->stadium_go_alignment.go_after.source_branch,gate,mode,remap,
+      identity,hud_enabled,object,proc);
+}
+static int stadium_prepare_start(MeleeWebStageLast* h,
+        MeleeWebMatchContext* camera_owner,char* e,size_t n)
+{
+ if(!h||h!=active||h->generation!=melee_web_gameplay_generation()||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    h->stadium_started||HSD_GObj_804D781C||HSD_GObj_804D7814)
+  return fail(e,n,"Stadium continuation requires its idle, unstarted diagnostic owner");
+ if(!melee_web_stage_selection_preflight(h->definition->stage_kind)||
+    stage_info.grkind!=h->definition->ground_kind)
+  return fail(e,n,"Stadium selected source dispatch pair changed");
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
+    !melee_web_match_camera_available(camera_owner,e,n))return 0;
+ Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
+ if(display->u.display.xF4)return fail(e,n,"Stadium display already borrows a camera subject");
+ /* Exact two source enqueue sites; Ground prepends, so drain is map2,map1.
+  * Map2 creates nested map5 but enqueues its original map2 GObj.
+  * Header ownership is independent of its borrowed object/callback fields. */
+ const struct {HSD_GObj* object;HSD_GObjEvent callback;} expected[]={
+  {h->stadium_map2_buffer_owner.map2_ground,fn_801D13C8},
+  {h->stadium_map2_buffer_owner.display_ground,fn_801D11E4}};
+ struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
+ void** headers=h->stadium_headers;
+ MeleeWebSourceMemoryAllocation* leases=h->stadium_header_leases;
+ MeleeWebSourceMemoryContext context;
+ if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
+  return fail(e,n,"Stadium pending queue source heap is unavailable");
+ void* node=stage_info.x6A4;
+ for(size_t i=0;i<ARRAY_SIZE(expected);++i){
+  if(!node||melee_web_source_memory_allocation_read(node,&leases[i])!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+     !leases[i].live||leases[i].requested_bytes!=sizeof(struct Pending)||
+     leases[i].world_generation!=context.world_generation||
+     leases[i].source_heap_handle!=context.source_heap_handle)
+   return fail(e,n,"Stadium pending callback header lost its exact source lease");
+  struct Pending* p=node;
+  if(p->object!=expected[i].object||p->callback!=expected[i].callback)
+   return fail(e,n,"Stadium pending callback source order/borrower changed");
+  headers[i]=node;node=p->next;
+ }
+ if(node)return fail(e,n,"Stadium pending callback queue has a foreign owner");
+ h->stadium_generator=melee_web_stadium_generator_prepare(e,n);
+ if(!h->stadium_generator)return 0;
+ h->stadium_camera_owner=camera_owner;h->stadium_started=1;
+ h->stadium_start_context=context;
+ if(!h->stadium_loaded){Stage_80225298();h->stadium_loaded=1;}
+ return ok(e,n);
+}
+static int stadium_capture_start(MeleeWebStageLast* h,int ready,char* e,size_t n)
+{
+ Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
+ MeleeWebMatchContext* camera_owner=h->stadium_camera_owner;
+ const MeleeWebSourceMemoryContext context=h->stadium_start_context;
+ h->stadium_subject=display->u.display.xF4;
+ if(!(ready?melee_web_stadium_generator_capture_ready(h->stadium_generator,e,n):
+            melee_web_stadium_generator_capture(h->stadium_generator,e,n))||
+    !(ready?melee_web_match_camera_subject_preflight_ready(camera_owner,h->stadium_subject,e,n):
+            melee_web_match_camera_subject_preflight(camera_owner,h->stadium_subject,e,n)))return 0;
+ if(stage_info.x6A4)return fail(e,n,"Original Stadium OnStart did not drain the pending queue");
+ /* The established tracker erases freed records. A reused address instead
+  * has a live allocation newer than the context captured before OnStart. */
+ for(size_t i=0;i<ARRAY_SIZE(h->stadium_headers);++i){
+  MeleeWebSourceMemoryAllocation after;
+  if(melee_web_source_memory_allocation_read(h->stadium_headers[i],&after)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+     after.world_generation!=context.world_generation||after.source_heap_handle!=context.source_heap_handle||
+     (!after.live&&(after.requested_bytes||after.allocation_generation))||
+     (after.live&&after.allocation_generation<=context.allocation_generation_watermark))
+   return fail(e,n,"Original Stadium OnStart did not retire its exact pending header lease");
+ }
+ if(!melee_web_stadium_display_owner_capture_manager(h->stadium_display_owner,&h->stadium_manager,e,n))return 0;
+ if(melee_web_source_memory_allocation_read(h->stadium_manager.object,&h->stadium_manager_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    melee_web_source_memory_allocation_read(h->stadium_manager.proc,&h->stadium_manager_proc_lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    !stadium_manager_storage_preflight(h,e,n))return 0;
+ h->stadium_started=2;return ok(e,n);
+}
+int melee_web_stage_last_stadium_start(MeleeWebStageLast* h,
+        MeleeWebMatchContext* camera_owner,char* e,size_t n)
+{
+ if(!stadium_prepare_start(h,camera_owner,e,n))return 0;
+ Stage_802252E4(St_Kind_PStadium,NULL);
+ return stadium_capture_start(h,0,e,n);
+}
+int melee_web_stage_last_stadium_on_load(MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(!h || h!=active || h->generation!=melee_web_gameplay_generation() ||
+    !h->definition || !h->definition->diagnostic_only || !h->source_ordered ||
+    !melee_web_stage_last_source_work_allowed(h) ||
+    h->stadium_loaded || h->stadium_started || HSD_GObj_804D781C || HSD_GObj_804D7814 ||
+    !melee_web_stage_selection_preflight(St_Kind_PStadium))
+  return fail(e,n,"Diagnostic Stadium OnLoad requires its exact unstarted owner");
+ Stage_80225298();h->stadium_loaded=1;return ok(e,n);
+}
+int melee_web_stage_last_stadium_prepare_ready(MeleeWebStageLast* h,
+        MeleeWebMatchContext* camera_owner,char* e,size_t n)
+{
+ if(!stadium_prepare_start(h,camera_owner,e,n))return 0;
+ h->stadium_ready_route=1;h->stadium_ready_armed=1;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_cancel_prepared_ready(MeleeWebStageLast* h,char* e,size_t n)
+{
+ uint64_t sis_transfer_token=0;
+ if(!h||h!=active||h->generation!=melee_web_gameplay_generation()||
+    !h->definition||!h->definition->diagnostic_only||!h->source_ordered||
+    h->definition->stage_kind!=St_Kind_PStadium||HSD_GObj_804D781C||
+    HSD_GObj_804D7814||HSD_GObj_804D7818||HSD_GObj_804D7830||HSD_GObj_804D7838)
+  return fail(e,n,"Prepared Stadium cancellation lost its idle source owner");
+ if(!stadium_map2_region_preflight(&h->stadium_map2_region,
+      &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
+ /* Completed starts retain their existing teardown. Unprepared scopes have
+  * no continuation lease to cancel; a partial immediate start is not one. */
+ if(!h->stadium_started&&!h->stadium_ready_route&&!h->stadium_generator)
+  return ok(e,n);
+ if(h->stadium_started==2&&h->stadium_ready_armed==0)
+  return ok(e,n);
+ if(h->stadium_started!=1||h->stadium_ready_route!=1||h->stadium_ready_armed!=1||
+    h->stadium_ready_object||h->stadium_ready_proc||h->stadium_subject||
+    h->stadium_manager.object||h->stadium_manager.proc||
+    h->stadium_manager_lease.live||h->stadium_manager_proc_lease.live||
+    !h->stadium_camera_owner||!h->stadium_generator)
+  return fail(e,n,"Stadium cancellation requires untouched pre-Ready ownership");
+ if(!melee_web_stage_selection_preflight(St_Kind_PStadium)||
+    stage_info.grkind!=h->definition->ground_kind)
+  return fail(e,n,"Prepared Stadium selection/dispatch changed");
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
+    !melee_web_match_camera_available(h->stadium_camera_owner,e,n))return 0;
+ int map2_gate,display_mode;
+ if(!melee_web_stadium_display_owner_go_alignment_view(h->stadium_display_owner,
+       &h->stadium_map2_buffer_owner,0,&map2_gate,&display_mode))
+  return fail(e,n,"Prepared Stadium display/map borrower changed");
+ Ground* display=h->stadium_map2_buffer_owner.display_ground->user_data;
+ if(display->u.display.xF4)
+  return fail(e,n,"Prepared Stadium display acquired a camera borrower");
+ MeleeWebSourceMemoryContext context;
+ if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+    context.world_generation!=h->stadium_start_context.world_generation||
+    context.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+  return fail(e,n,"Prepared Stadium source heap changed");
+ struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
+ const HSD_GObj* objects[]={h->stadium_map2_buffer_owner.map2_ground,
+                          h->stadium_map2_buffer_owner.display_ground};
+ void* node=stage_info.x6A4;
+ for(size_t i=0;i<ARRAY_SIZE(stadium_pending_callbacks);++i){
+  MeleeWebSourceMemoryAllocation lease;
+  if(node!=h->stadium_headers[i]||
+     melee_web_source_memory_allocation_read(node,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+     !lease.live||lease.requested_bytes!=sizeof(struct Pending)||
+     lease.requested_bytes!=h->stadium_header_leases[i].requested_bytes||
+     lease.world_generation!=h->stadium_header_leases[i].world_generation||
+     lease.source_heap_handle!=h->stadium_header_leases[i].source_heap_handle||
+     lease.allocation_generation!=h->stadium_header_leases[i].allocation_generation||
+     lease.world_generation!=context.world_generation||lease.source_heap_handle!=context.source_heap_handle)
+   return fail(e,n,"Prepared Stadium pending header lease changed");
+  const struct Pending* p=node;
+  if(p->object!=objects[i]||p->callback!=stadium_pending_callbacks[i])
+   return fail(e,n,"Prepared Stadium pending callback borrower changed");
+  node=p->next;
+ }
+ if(node)return fail(e,n,"Prepared Stadium pending queue has a foreign tail");
+ /* Capture exact live SIS/watch dependencies before cancellation. Pending
+  * transfer state is non-authorizing until the infallible publish below. */
+ if(!melee_web_stadium_display_owner_prepare_cancel_transfer(
+       h->stadium_display_owner,h,h->generation,&sis_transfer_token,e,n))return 0;
+ /* No source root or header is released until every prospective owner has
+  * passed. Generator cancellation may refuse before mutation; abort only the
+  * pending display receipt in that case. No fallible validation follows it. */
+ if(!melee_web_stadium_generator_cancel_prepared(h->stadium_generator,e,n)){
+  melee_web_stadium_display_owner_abort_cancel_transfer(
+      h->stadium_display_owner,h,h->generation,sis_transfer_token);
+  return 0;
+ }
+ h->stadium_generator=NULL;stage_info.x6A4=NULL;
+ for(size_t i=0;i<ARRAY_SIZE(h->stadium_headers);++i){
+  HSD_Free(h->stadium_headers[i]);h->stadium_headers[i]=NULL;
+  memset(&h->stadium_header_leases[i],0,sizeof(h->stadium_header_leases[i]));
+ }
+ h->stadium_camera_owner=NULL;h->stadium_started=0;
+ h->stadium_ready_route=0;h->stadium_ready_armed=0;
+ h->stadium_cancel_transfer_token=sis_transfer_token;
+ melee_web_stadium_display_owner_publish_cancel_transfer(
+     h->stadium_display_owner,sis_transfer_token);
+ return ok(e,n);
+}
+/* Hooks surround only the untouched original Stage OnStart dispatch. Ordinary
+ * stages and the historical immediate diagnostic continuation are unchanged. */
+static int stadium_ready_phase(MeleeWebStageLast* h,int stage_kind,int armed)
+{
+ return h && h==active && h->generation==melee_web_gameplay_generation() &&
+        h->stadium_ready_route && h->definition && h->definition->diagnostic_only &&
+        h->definition->stage_kind==St_Kind_PStadium && h->source_ordered &&
+        stage_kind==St_Kind_PStadium && melee_web_stage_last_source_work_allowed(h) && h->stadium_started==1 && h->stadium_ready_armed==armed;
+}
+int melee_web_stage_last_stadium_ready_before(int stage_kind,char* e,size_t n)
+{
+ MeleeWebStageLast* h=active;
+ if(!h || !h->stadium_ready_route)return ok(e,n);
+ if(!stadium_ready_phase(h,stage_kind,1) ||
+    !melee_web_stage_selection_preflight(stage_kind) ||
+    stage_info.grkind!=h->definition->ground_kind ||
+    !melee_web_hud_stadium_ready_snapshot(&h->stadium_ready_object,&h->stadium_ready_proc))
+  return fail(e,n,"Diagnostic Stadium OnStart requires its exact original HUD Ready callback");
+ if(!melee_web_stage_last_source_work_allowed(h)||!stadium_maps_live(h,e,n)||
+    !melee_web_match_camera_available_ready(h->stadium_camera_owner,e,n))return 0;
+ /* Other original setup allocations can occur between OnLoad and Ready. The
+  * exact original header leases remain owned; address reuse must be newer than
+  * the actual pre-OnStart construction watermark. */
+ if(melee_web_source_memory_context_read(&h->stadium_start_context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK)
+  return fail(e,n,"Diagnostic Stadium Ready source heap is unavailable");
+ struct Pending {void* next;HSD_GObj* object;HSD_GObjEvent callback;};
+ const HSD_GObj* objects[]={h->stadium_map2_buffer_owner.map2_ground,
+                          h->stadium_map2_buffer_owner.display_ground};
+ void* node=stage_info.x6A4;
+ for(size_t i=0;i<ARRAY_SIZE(stadium_pending_callbacks);++i){
+  MeleeWebSourceMemoryAllocation lease;
+  if(node!=h->stadium_headers[i] ||
+     melee_web_source_memory_allocation_read(node,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+     !lease.live || lease.requested_bytes!=h->stadium_header_leases[i].requested_bytes ||
+     lease.world_generation!=h->stadium_header_leases[i].world_generation ||
+     lease.source_heap_handle!=h->stadium_header_leases[i].source_heap_handle ||
+     lease.allocation_generation!=h->stadium_header_leases[i].allocation_generation ||
+     lease.world_generation!=h->stadium_start_context.world_generation ||
+     lease.source_heap_handle!=h->stadium_start_context.source_heap_handle)
+   return fail(e,n,"Diagnostic Stadium Ready pending header lease changed");
+  const struct Pending* p=node;
+  if(p->object!=objects[i] || p->callback!=stadium_pending_callbacks[i])
+   return fail(e,n,"Diagnostic Stadium Ready callback borrower changed");
+  node=p->next;
+ }
+ if(node)return fail(e,n,"Diagnostic Stadium Ready pending queue has a foreign owner");
+ if(h->stadium_go_alignment.armed &&
+    !stadium_go_alignment_stage_note(h,0,e,n))return 0;
+ h->stadium_ready_armed=2;return ok(e,n);
+}
+int melee_web_stage_last_stadium_ready_after(int stage_kind,char* e,size_t n)
+{
+ MeleeWebStageLast* h=active;
+ if(!h || !h->stadium_ready_route)return ok(e,n);
+ if(!stadium_ready_phase(h,stage_kind,2) ||
+    !melee_web_hud_stadium_ready_context(h->stadium_ready_object,h->stadium_ready_proc))
+  return fail(e,n,"Diagnostic Stadium original OnStart changed its HUD callback identity");
+ if(!stadium_capture_start(h,1,e,n))return 0;
+ if(h->stadium_go_alignment.armed &&
+    !stadium_go_alignment_stage_note(h,1,e,n))return 0;
+ h->stadium_ready_armed=0;h->stadium_ready_object=NULL;h->stadium_ready_proc=NULL;
+ return ok(e,n);
+}
+int melee_web_stage_last_stadium_map2_buffer_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumMap2BufferOwner* out){
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_map2_buffer_owner.captured)return 0;
+ *out=h->stadium_map2_buffer_owner;return 1;
+}
+int melee_web_stage_last_stadium_source_journal_snapshot(const MeleeWebStageLast* h,MeleeWebStadiumSourceJournal* out){
+ if(!h||h!=active||!out||h->generation!=melee_web_gameplay_stats().generation||!h->definition||!h->definition->diagnostic_only||!h->stadium_display_owner)return 0;
+ return melee_web_stadium_display_owner_source_journal_snapshot(h->stadium_display_owner,out);
+}
+#endif
 MeleeWebStageLast* melee_web_stage_last_begin(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,0,0,e,n);
+ return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,0,0,0,NULL,e,n);
 }
 MeleeWebStageLast* melee_web_stage_last_begin_intro(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,1,0,e,n);
+ return begin_stage(melee_web_stage_profile(St_Kind_Last),yaku,bank,1,0,0,NULL,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Same read-only owner preflight used by the selected-form end. The World
+ * must call this before clearing numeric quakes or any other source borrower.
+ * Diagnostic last-live scalar caching is allowed; no source object is changed. */
+static int stadium_first_transform_can_end_form(
+        const MeleeWebStageLast* h,uint32_t form,char* e,size_t n)
+{
+ if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation||
+    !h->definition||!h->definition->diagnostic_only||
+    h->definition->stage_kind!=St_Kind_PStadium||!h->source_ordered||
+    h->stadium_first_transform.armed!=1||h->stadium_first_transform.failed||
+    h->stadium_first_transform.selected_form!=form||
+    h->stadium_started!=2||HSD_GObj_804D781C||HSD_GObj_804D7814)
+  return fail(e,n,"First-transform close requires its settled idle source owner");
+ if(!stadium_map2_region_preflight(&h->stadium_map2_region,
+      &h->stadium_map2_buffer_owner,h->generation,e,n)||
+    !melee_web_stage_selection_preflight(h->definition->stage_kind)||
+    stage_info.grkind!=h->definition->ground_kind||
+    !melee_web_stadium_display_owner_first_transform_graph(h->stadium_display_owner,1,e,n))
+  return fail(e,n,"First-transform close lost its exact quiescent settled graph");
+ if(((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4!=h->stadium_subject)
+  return fail(e,n,"First-fire display camera borrower changed before retirement");
+ if(!stadium_manager_storage_preflight((MeleeWebStageLast*)h,e,n)||
+    !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n)||
+    !melee_web_stadium_generator_preflight(h->stadium_generator,e,n)||
+    !melee_web_match_camera_subject_preflight(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
+ return ok(e,n);
+}
+static int stadium_first_transform_can_end_selected(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{
+ if(!h)return fail(e,n,"First-transform close lost its stage owner");
+ return stadium_first_transform_can_end_form(h,h->stadium_first_transform.selected_form,e,n);
+}
+int melee_web_stage_last_stadium_first_transform_can_end(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_can_end_form(
+      h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_FIRE_FORM,e,n); }
+int melee_web_stage_last_stadium_water_graph_can_end(
+        const MeleeWebStageLast* h,char* e,size_t n)
+{ return stadium_first_transform_can_end_form(
+      h,MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM,e,n); }
+#endif
 int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(!h)return ok(e,n);
  if(h!=active||h->generation!=melee_web_gameplay_stats().generation)return fail(e,n,"Stage scope lost its original world ownership");
  if(HSD_GObj_804D781C||HSD_GObj_804D7814)return fail(e,n,"Stage teardown must run outside source object callbacks");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_first_transform.armed==1&&!h->stadium_first_transform_terminal_out)
+  return fail(e,n,"First-transform close requires its checked terminal receipt destination");
+ if(h->stadium_first_transform.armed==1&&
+    !stadium_first_transform_can_end_selected(h,e,n))return 0;
+ if(!stadium_map2_region_preflight(&h->stadium_map2_region,
+      &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
+ /* Validate every new owner and map borrower before any destructive release.
+  * A partial original start retains its graph for reduction, never cancellation. */
+ if(h->stadium_started){
+  if(h->stadium_started!=2)return fail(e,n,"Partial Stadium OnStart ownership must remain reachable");
+  if(!melee_web_stage_selection_preflight(h->definition->stage_kind)||
+     stage_info.grkind!=h->definition->ground_kind)
+   return fail(e,n,"Stadium selected source dispatch pair changed before retirement");
+  if(!stadium_maps_live(h,e,n))return 0;
+  if(((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4!=h->stadium_subject)
+   return fail(e,n,"Stadium display camera borrower changed before retirement");
+  if(!stadium_manager_storage_preflight(h,e,n)||
+     !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n))return 0;
+  if(!melee_web_stadium_generator_preflight(h->stadium_generator,e,n)||
+     !melee_web_match_camera_subject_preflight(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
+  if(!stadium_map2_region_unregister(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
+  if(!melee_web_stadium_generator_end(h->stadium_generator,e,n))return 0;
+  h->stadium_generator=NULL;
+  if(!melee_web_match_camera_subject_return(h->stadium_camera_owner,h->stadium_subject,e,n))return 0;
+  ((Ground*)h->stadium_map2_buffer_owner.display_ground->user_data)->u.display.xF4=NULL;
+  h->stadium_subject=NULL;h->stadium_camera_owner=NULL;h->stadium_started=0;
+ }
+ if(h->stadium_cancel_transfer_token&&!h->stadium_display_owner)
+  return fail(e,n,"Prepared Stadium SIS transfer lost its exact display owner");
+ if(h->stadium_display_owner){
+  if(h->stadium_cancel_transfer_token&&
+     !melee_web_stadium_display_owner_consume_cancel_transfer(
+         h->stadium_display_owner,h,h->generation,
+         h->stadium_cancel_transfer_token,e,n))return 0;
+  if(h->stadium_map2_region.registered&&
+     !melee_web_stadium_display_owner_preflight(h->stadium_display_owner,e,n))return 0;
+  if(!stadium_map2_region_unregister(&h->stadium_map2_region,
+       &h->stadium_map2_buffer_owner,h->generation,e,n))return 0;
+  if(!melee_web_stadium_display_owner_end(h->stadium_display_owner,e,n))return 0;
+  h->stadium_display_owner=NULL;h->stadium_cancel_transfer_token=0;
+ }
+ if(h->stadium_map2_region.registered)
+  return fail(e,n,"Stadium map-2 writable region lost its display retirement owner");
+#endif
  /* Ready completion owns creation of this source scheduler. Early unload
   * before Ready is allowed to have none; multiple schedulers are an error. */
  h->manager=NULL;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_manager.object){
+  if(!stadium_manager_storage_preflight(h,e,n))return 0;
+  h->manager=h->stadium_manager.object;
+ }else
+#endif
  for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next){
   if(obj->classifier==HSD_GOBJ_CLASS_STAGE&&!obj->user_data){
    if(h->manager)return fail(e,n,"Original stage started more than once");
@@ -102,6 +1477,15 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   }
  }
  if(h->manager){HSD_GObjPLink_80390228(h->manager);h->manager=NULL;}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_manager.object){
+  for(HSD_GObj* object=((HSD_GObj**)HSD_GObj_Entities)[5];object;object=object->next)
+   if(object==h->stadium_manager.object)return fail(e,n,"Original Stadium manager remained in its object root");
+  for(HSD_GObjProc* proc=HSD_GObj_804D7840[10];proc;proc=proc->next)
+   if(proc==h->stadium_manager.proc)return fail(e,n,"Original Stadium manager remained in its process root");
+ }
+ memset(&h->stadium_manager,0,sizeof(h->stadium_manager));
+#endif
  /* x18 is a shared camera reference on some stages: Fountain's two
   * platforms and reflection surface all reference the same camera. End its
   * lifetime once after all consumers; never let per-map removal free it
@@ -139,6 +1523,13 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   if(!found)break;
   if(!melee_web_ground_remove_unmapped(found))return fail(e,n,"Unexpected source stage object remains during teardown");
  }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_first_transform.armed==1&&
+    !melee_web_stadium_display_owner_first_transform_end(&h->stadium_first_transform,
+        &h->stadium_map2_buffer_owner,e,n))return 0;
+ if(h->stadium_map2_buffer_owner.captured&&
+    !melee_web_stadium_map2_buffer_owner_end(&h->stadium_map2_buffer_owner,e,n))return 0;
+#endif
  for(size_t i=0;i<camera_count;i++)melee_web_ground_remove_camera(cameras[i]);
  if(h->map_lights){
   if(Ground_801C498C()!=h->map_lights)return fail(e,n,"Original selected map-light owner was replaced");
@@ -151,5 +1542,44 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  memcpy(ft_80459A68,h->device1,sizeof(h->device1));memcpy(ftDevice_BuryThings,h->device2,sizeof(h->device2));memcpy(ft_80459A8C,h->device3,sizeof(h->device3));ft_804D6578=h->device4;ft_804D6570=h->count1;ftDevice_BuryThingCount=h->count2;
  if(h->definition&&h->definition->exchange_yakumono)h->definition->exchange_yakumono(h->yaku);
  if(!melee_web_stage_selection_end())return fail(e,n,"Original selected stage lost ownership");
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(h->stadium_first_transform_terminal_out){
+  if(h->stadium_first_transform.armed!=2||h->stadium_first_transform.failed||
+     h->stadium_first_transform.count!=
+       melee_web_stadium_first_transform_event_count(&h->stadium_first_transform))
+   return fail(e,n,"First-transform successful teardown lacks its exact completed source journal");
+  *h->stadium_first_transform_terminal_out=h->stadium_first_transform;
+ }
+#endif
  stage_info=h->saved;active=NULL;free(h);return ok(e,n);
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_stage_last_stadium_first_transform_end(MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->stadium_first_transform.armed!=1||
+    h->stadium_first_transform_terminal_out)
+  return fail(e,n,"First-fire close requires its exact live StageLast and output owner");
+ if(!melee_web_stage_last_stadium_first_transform_can_end(h,e,n))return 0;
+ h->stadium_first_transform_terminal_out=out;
+ if(!melee_web_stage_last_end(h,e,n)){
+  h->stadium_first_transform_terminal_out=NULL;return 0;
+ }
+ return 1; /* h is freed; only the copied terminal receipt remains valid. */
+}
+int melee_web_stage_last_stadium_water_graph_end(MeleeWebStageLast* h,
+        MeleeWebStadiumFirstTransformJournal* out,char* e,size_t n)
+{
+ if(!h||h!=active||!out||h->stadium_first_transform.armed!=1||
+    h->stadium_first_transform.selected_form!=MELEE_WEB_STADIUM_FIRST_TRANSFORM_WATER_FORM||
+    h->stadium_first_transform_terminal_out)
+  return fail(e,n,"Water graph close requires its exact live StageLast and output owner");
+ if(!melee_web_stage_last_stadium_water_graph_can_end(h,e,n))return 0;
+ h->stadium_first_transform_terminal_out=out;
+ if(!melee_web_stage_last_end(h,e,n)){
+  h->stadium_first_transform_terminal_out=NULL;return 0;
+ }
+ return 1; /* h is freed; only the copied terminal receipt remains valid. */
+}
+#endif

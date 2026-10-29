@@ -52,6 +52,60 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-28 — Owner and Codex: prioritize working rollback
+
+**Ask:** Continue autonomously until working rollback or an owner stop, and
+reassess when a roadblock or validation overhead stops useful progress.
+
+**Status:** Accepted. Park the next Stadium geometry experiment. Preserve the
+one-tick browser proof, the unresolved longer restore boundary and both
+previous automatic-review blocks; do not retry or transfer the rejected
+renderer-owner diagnostic or UCF reference experiment. Advance the independent
+match input timeline in one bounded milestone: saved local input, remote
+prediction, earliest correction, confirmation and bounded history. Reuse the
+existing PAD format and exercise it against the existing synchronous source-only
+fixture after independent review. Keep the component separate from live runtime
+admission. Neither a scheduler test nor a source-only correction establishes
+browser restoration or working online rollback.
+
+**Links:** [input timeline #356](https://github.com/ericvanlare/melee-web/issues/356),
+[browser restore #341](https://github.com/ericvanlare/melee-web/issues/341),
+[priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
+
+**October 28 initialization follow-up:** The owner requested a fresh bounded attempt at the renderer failure. Inspection found a historical subagent rejection; the later permanent no-retry wording was a lead-authored checkpoint, not a verified repository or account restriction. The new attempt changed no safeguards and completed without a new rejection. A reduced Node reproducer identified canonical Shadow and Reflection texture-role initialization defects. Their reviewed repair passes scoped source controls and zero-tick initialization; repaired browser restoration remains unrun. The separate UCF reference gate is unchanged. The owner also requested triage of brief loading panels between scenes; source triage is recorded for the next short transition-presentation milestone without displacing rollback. Detailed results remain in the existing rollback status boundary.
+
+### 2026-10-26 — Owner and Codex: fix the first failure before broad validation
+
+**Ask:** Proceed autonomously, but step back when stuck or when validation is consuming more effort than the fix.
+
+**Status:** Accepted. Continue the checkpointed Stadium prerequisite with short diagnostic runs and actual-source controls for the first failure. Reuse unchanged build/evidence identities, review each coherent repair, and run the full regression once at the final integration boundary. After two experiments at one boundary, require a smaller reproducer or bounded review before another run. Keep prior failures and acceptance limits explicit; do not turn each diagnostic into another milestone or PR.
+
+**Follow-up:** The long second-lifetime state/input and selected per-owner RNG comparisons now pass with checked retirement. The integrated regression passes after targeted fixture repairs. Original and browser producers remain separately pinned in the existing boundary; partial-GO guard events and detailed constructor phases remain explicitly unpaired. Continue with an explicit two-natural-lifetime reference profile using the existing route and scene seed endpoints. Full allocator journaling remains a separate scope. C3 remains open; C4–C8 transformations remain later gates.
+
+**October 27 follow-up:** The defined C3 functional/selected-ledger comparisons now have independent support: native no-draw lifetimes, original-matched drawn idle lifetimes and selected owner/RNG correspondence, natural stockout/mode9 and natural mode14, with checked Results/CSS and retirement. Preserve the original supervisor/report failures and separate literal cleanup-order FAIL; semantic lifetime correspondence does not establish arbitrary allocator/writer coverage. The integration review accepts the separately reviewed selected-owner active-lifetime semantic correspondence for C3 only; original pool/root retirement and native post-lifetime checked destructor cleanup remain distinct, with no removal of safety cleanup or claim of observed B dynamic free rows. Full allocator journaling remains separate. The failed final suite is retained; reviewed fixture-only `90ba7a51` preserves runtime/capture `afb141c7`, and full regression v2 passes. Final regression v2 passes; publication-head CI and final integration review are required before merge; no self-head CI result is asserted. Next C4 obtains one complete first-form original reference, then repeats its exact completed input for original latency measurement, without releasing a runtime transformation port. C4–C8 and whole-stage/public admission remain open; transformation-service candidates stay parked at end-flow/quiescence HOLD.
+
+**Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251), [draft PR #301](https://github.com/ericvanlare/melee-web/pull/301), [current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+
+### 2026-10-25 — Owner and Codex: bounded completion sprint
+
+**Ask:** Close the prior sprint, review why small prerequisites kept expanding,
+and choose a short sprint that produces a concrete useful outcome before
+broadening work.
+
+**Status:** Accepted. Focus this sprint on the second Stadium match through
+actual GO and its declared 96-state comparison. Use one implementer and one
+reviewer, a three-hour limit, first capture within one hour, and at most an
+initial capture plus one changed-hypothesis retry. Keep rollback work
+checkpointed. Publish one coherent code/docs batch in the existing milestone;
+if the target fails, preserve the first failure and stop the sprint without
+turning component progress into milestone completion. Further experiments need
+a concrete hypothesis and a smaller reproducer; no timeout or comparator
+changes.
+
+**Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
+[draft PR #301](https://github.com/ericvanlare/melee-web/pull/301),
+[current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+
 ### 2026-10-22 — Owner: proceed with the browser rollback sprint
 
 **Ask:** Execute the next sprint toward working browser rollback and Stadium.
@@ -153,7 +207,7 @@ and resolve the profile's licensing policy before behavior implementation.
 Add a match-only restore/repeat/checksum synctest to rollback feasibility.
 
 **Status:** Accepted. The Stadium observation projection is checkpointed in the
-[draft Stadium boundary](https://github.com/ericvanlare/melee-web/blob/d977f777156148d97f07bf03366efd3b2909cfa2/docs/status/2026-10-07-pokemon-stadium-profile-oninit.md).
+[existing boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
 The [original-site arithmetic diagnostic](status/2026-10-08-b4-inner-geometry-boundary.md)
 leaves the first Bowser divergence unchanged and has reached its stopping rule.
 It remains default-off; the Falcon candidate's activation is unobserved.
@@ -195,6 +249,12 @@ ownership. The settings toggle and rollback runtime remain implementation goals.
   A separate self-KO prefix now records a source-bound respawn preparation
   event. Its complete diagnostic remains refused at the input-witness boundary. Continue under [#320](https://github.com/ericvanlare/melee-web/issues/320);
   current evidence does not justify descriptor prewarming.
+
+- 2026-10-13, Codex: the preparation component has since merged in
+  [#322](https://github.com/ericvanlare/melee-web/pull/322); the earlier refusal
+  stays historical. The [same H1 boundary](status/2026-10-13-h1-first-use-respawn.md)
+  owns the updated evidence and limits. Work returns to Stadium C3 in draft
+  #301. Broader H1, rollback ownership and the rules profile remain open.
 
 **Links:** [Feasibility #318](https://github.com/ericvanlare/melee-web/issues/318),
 [state ownership #115](https://github.com/ericvanlare/melee-web/issues/115),
@@ -328,6 +388,23 @@ the existing weaker-fighter status entry.
   under [#251](https://github.com/ericvanlare/melee-web/issues/251); existing
   [Stadium CSS/SSS status](status/2026-10-06-pokemon-stadium-c1a-css-sss-preparation.md)
   records the route boundary. No human or physical-input result is inferred.
+
+- **2026-10-11, Codex:** The smaller local room milestones and original Sheik
+  prefix are integrated. Continue the existing Stadium C3 milestone with an
+  original idle-reference prerequisite, followed by two matched lifetimes and
+  retirement/recreation. Keep its earlier no-draw functional result separate
+  from original-schedule agreement. Preserve the deployed relay blocker and
+  resume Track A when service facts change; do not repeat unavailable provider
+  queries or request unavailable owner testing.
+
+- **2026-10-11, owner return:** The owner resumed oversight and requested removal
+  of the recurring automation; it is deleted. The next instruction authorized
+  one bounded original Stadium reference attempt, with a first-failure stop.
+  The attempted recording failed and is checkpointed in the
+  [same Stadium boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md)
+  after independent review. No retry or broader autonomous campaign is running.
+  The next proposed step is a small retained-fragment/source-authority reduction,
+  keeping the lifetime reference and C3 acceptance open.
 
 **Links:** [Owner-requested execution change](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6112686789),
 [A3 #288](https://github.com/ericvanlare/melee-web/issues/288),

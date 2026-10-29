@@ -8,6 +8,11 @@ import {LOCKSTEP_DELAY, LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep
 
 const roomId = 'a'.repeat(32);
 const ROOT = new URL('../', import.meta.url);
+const runtimeSource = await readFile(new URL('web/runtime-development.mjs', ROOT), 'utf8');
+const transferGuards = runtimeSource.split('\n').filter(line =>
+  /^(?:const laterBReplayNativeSuspended=|function assertLaterBReplayNativeAccess\()/.test(line)).join('\n');
+assert.equal(transferGuards.split('\n').length, 2, 'both actual native access guards are extracted');
+
 const encodeObject = value => ROOM_INVITE_PREFIX + Buffer.from(JSON.stringify(value)).toString('base64url');
 const valid = () => parseRoomInvite(encodeRoomInvite({url: 'wss://relay.example:9443', roomId, seed: 0xdeadbeef}));
 
@@ -37,6 +42,7 @@ function roomUiFixture() {
     owner: {handle: {async unload() { calls.push(['unload']); }}},
     ready: true, fatal: false, bundle: true, retailRun: null, replayLoading: false, stockCheckActive: false};
   vm.createContext(scope);
+  vm.runInContext(transferGuards, scope, {filename: 'runtime-development-native-access-guards.mjs'});
   return {scope, elements, calls, clipboard,
     setHealth(value) { health = value; }, setHealthFailure(value) { healthFailure = value; },
     setCloseFailure(value) { closeFailure = value; }, setBeginFailure(value) { beginFailure = value; },
@@ -267,4 +273,22 @@ test('late start rejection preserves Leave and unload outcomes; synchronous star
   failedStart.elements['lockstep-join'].onclick();
   assert.match(failedStart.elements['lockstep-status'].textContent, /start refused synchronously/);
   assert.ok(failedStart.clearedIntervals.length, 'a synchronous start refusal retires its allocated interval');
+});
+
+
+test('actual manual unload guard retains suspended room owner without native unload', async () => {
+  const run = roomUiFixture();
+  assert.equal(vm.runInContext('laterBReplayNativeSuspended()', run.scope), false);
+  const finishes = [];
+  run.scope.finishRetailReplay = async reason => { finishes.push(reason); };
+  run.scope.owner.laterBReplayTransfer = {suspended: () => true};
+  assert.throws(() => vm.runInContext('assertLaterBReplayNativeAccess()', run.scope),
+    /Private replay continuation forbids ordinary native diagnostics/);
+  const start = runtimeSource.indexOf("$('unload').onclick=async()=>");
+  const end = runtimeSource.indexOf('\ncontrollerSettings =', start);
+  assert.ok(start >= 0 && end > start, 'actual unload handler range is present');
+  vm.runInContext(runtimeSource.slice(start, end), run.scope);
+  await run.elements.unload.onclick();
+  assert.deepEqual(finishes, ['Manual unload refused during private replay transfer']);
+  assert.deepEqual(run.calls, [], 'guard performs no native unload, configure, begin or room-close call');
 });

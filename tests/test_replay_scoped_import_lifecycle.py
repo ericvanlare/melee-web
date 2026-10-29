@@ -1,11 +1,14 @@
 """Execute the native scoped-import boundaries used by single-match replay."""
 from pathlib import Path
 import shutil
+import os
+import json
 import subprocess
-import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("MELEE_FINITE_CSS_SOURCE_ROOT",Path(__file__).resolve().parents[1]))
+CANDIDATE = Path(__file__).resolve().parents[1]
 
 
 def block(source, marker):
@@ -19,21 +22,28 @@ def block(source, marker):
     raise AssertionError(marker)
 
 
-class ReplayScopedImportLifecycleTests(unittest.TestCase):
+class ReplayScopedImportLifecycleTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, 'replay-scoped-import-')
+
     def test_native_import_mode_and_replay_asset_route(self):
         compiler = shutil.which('c++')
         if not compiler:
             self.skipTest('C++ compiler unavailable')
-        core = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
-        menu = (ROOT / 'src/gameplay_menu_browser_menu.cpp').read_text()
-        replay = (ROOT / 'src/gameplay_menu_browser_match.cpp').read_text()
+        core = (CANDIDATE / 'src/gameplay_menu_browser.cpp').read_text()
+        menu = (CANDIDATE / 'src/gameplay_menu_browser_menu.cpp').read_text()
+        replay = (CANDIDATE / 'src/gameplay_menu_browser_match.cpp').read_text()
         close_assets = block(block(core, 'void close()'), 'if(scoped_assets)')
         replay_close = block(replay, 'if(!candidate->whole_session())')
         advance_replay = block(core, 'if(scoped_assets){request_assets(AssetDestination::Replay')
+        diagnostic_enum = core[core.index('enum class FirstCssBrowserMode : unsigned {'):core.index('struct FirstCssDrawSample {')]
+        prepared_active = block(core, 'bool stadium_first_css_prepared_diagnostic_active()')
         begin = block(menu, 'unsigned melee_web_native_asset_begin()')
         clear = block(menu, 'int melee_web_native_source_files_external_clear()')
         file = block(menu, 'int melee_web_native_menu_file(')
         source = r'''
+#define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 #include <cassert>
 #include <cstring>
 #include <map>
@@ -43,6 +53,14 @@ class ReplayScopedImportLifecycleTests(unittest.TestCase):
 #include <string_view>
 #include <vector>
 #include <cstdint>
+// Constructor lifecycle remains covered by its native owner controls. Supply
+// its explicit predicate double plus the fresh-mode state consumed by the
+// actual shared diagnostic predicate extracted below.
+bool constructor_owned=false;
+bool stadium_first_css_constructor_return_active(){return constructor_owned;}
+''' + diagnostic_enum + r'''
+struct {FirstCssBrowserMode mode=FirstCssBrowserMode::None;} first_css_browser_draw;
+''' + prepared_active + r'''
 bool scoped_disc_import=false, scoped_assets=false, asset_committed=false;
 bool world=false,match=false,results=false,prize=false,host_entered=false;
 bool asset_selection_valid=false,asset_opening_preview_valid=false;
@@ -110,15 +128,51 @@ int main(){
  auto releases=asset_scope.releases;select_replay(&whole);
  assert(world&&host_entered&&scoped_assets&&scoped_disc_import);
  assert(asset_scope.releases==releases);
+ // The actual shared predicate rejects both private diagnostic owners before
+ // close(), request_assets(), or any protected owner/scope mutation.
+ assert(!stadium_first_css_prepared_diagnostic_active());
+ for(unsigned diagnostic_owner:{0u,1u,2u}){
+ constructor_owned=diagnostic_owner==0;
+ first_css_browser_draw.mode=diagnostic_owner==1?
+     FirstCssBrowserMode::FreshConsumedTickDrawV3:diagnostic_owner==2?
+     FirstCssBrowserMode::FreshFiniteCssPrefixV4:FirstCssBrowserMode::None;
+ const bool protected_constructor_owned=constructor_owned;
+ const auto protected_diagnostic_mode=first_css_browser_draw.mode;
+ assert(stadium_first_css_prepared_diagnostic_active());
+ const auto protected_files=files;
+ auto* const protected_cache=archive_cache.get();
+ const auto protected_destination=asset_destination;
+ const auto protected_generation=asset_generation;
+ const auto protected_pending=asset_scope.pending;
+ const auto protected_releases=asset_scope.releases;
+ const auto protected_aborts=asset_scope.aborts;
+ const auto protected_requests=requested_assets;
+ assert(!melee_web_native_asset_begin());
+ assert(message=="CSS constructor-return diagnostic refuses a second asset import");
+ assert(constructor_owned==protected_constructor_owned&&
+        first_css_browser_draw.mode==protected_diagnostic_mode);
+ assert(stadium_first_css_prepared_diagnostic_active()&&
+        world&&host_entered&&scoped_assets&&scoped_disc_import);
+ assert(files==protected_files&&archive_cache.get()==protected_cache);
+ assert(asset_destination==protected_destination&&asset_generation==protected_generation);
+ assert(asset_scope.pending==protected_pending&&asset_scope.releases==protected_releases&&
+        asset_scope.aborts==protected_aborts&&requested_assets==protected_requests);
+ }
 }
 '''
-        with tempfile.TemporaryDirectory(prefix='melee-replay-scope-') as directory:
-            cpp = Path(directory) / 'test.cpp'
-            exe = Path(directory) / 'test'
-            cpp.write_text(source)
-            subprocess.run([compiler, '-std=c++20', str(cpp), '-o', str(exe)], check=True,
-                           capture_output=True, text=True)
-            subprocess.run([str(exe)], check=True, capture_output=True, text=True)
+        cpp = self.scratch / 'test.cpp'
+        exe = self.scratch / 'test'
+        cpp.write_text(source)
+        command = [compiler, '-std=c++20', str(cpp), '-o', str(exe)]
+        (self.scratch / 'compile-command.json').write_text(json.dumps(command) + '\n')
+        compiled = subprocess.run(command, capture_output=True, text=True)
+        (self.scratch / 'compile.stdout').write_text(compiled.stdout)
+        (self.scratch / 'compile.stderr').write_text(compiled.stderr)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        result = subprocess.run([str(exe)], capture_output=True, text=True)
+        (self.scratch / 'run.stdout').write_text(result.stdout)
+        (self.scratch / 'run.stderr').write_text(result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':

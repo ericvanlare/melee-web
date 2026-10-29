@@ -44,6 +44,14 @@ int main(void){
     char error[256];
     MeleeWebPadState* snapshot=melee_web_pad_state_decode(bytes,sizeof(bytes),error,sizeof(error));
     assert(snapshot);
+    memset(restored,0x5a,sizeof restored);
+    assert(!melee_web_pad_state_encode(NULL,restored,sizeof restored));
+    assert(restored[0]==0x5a);
+    assert(!melee_web_pad_state_encode(snapshot,NULL,sizeof restored));
+    assert(!melee_web_pad_state_encode(snapshot,restored,sizeof restored-1));
+    assert(restored[0]==0x5a);
+    assert(melee_web_pad_state_encode(snapshot,restored,sizeof restored));
+    assert(!memcmp(bytes,restored,sizeof bytes));
     const PadLibData saved=HSD_PadLibData;
     HSD_PadLibData.repeat_start=99;
     for(unsigned b=0;b<3;b++)memset(banks[b],0,sizeof(HSD_PadStatus)*4);

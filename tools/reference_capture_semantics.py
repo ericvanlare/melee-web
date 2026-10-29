@@ -1086,13 +1086,48 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
     start = starts[0]["payload"]
     if start.get("whole_session") is not True:
         raise WholeSessionSemanticError("observer stream was not declared whole-session")
-    match_count = start.get("match_count")
-    if type(match_count) is not int or not 3 <= match_count <= 64:
-        raise WholeSessionSemanticError("observer stream has an invalid declared match_count")
     handshakes = [row for row in records if row.get("event") == "handshake"]
     if len(handshakes) != 1:
         raise WholeSessionSemanticError("whole-session observer stream must contain one handshake")
     handshake = handshakes[0]["payload"]
+    match_count = start.get("match_count")
+    paired_idle_profile = {
+        "profile": "paired_idle_scene_endpoints_v1",
+        "selected_matches": [0, 1],
+        "match_count": 2,
+        "comparison_post_go_ticks": 3500,
+        "natural_tail_max": 4,
+        "raw_omission_kinds": ["draw_enter", "draw_return"],
+    }
+    def declares_paired_idle_two_match(announcement):
+        profile = announcement.get("stadium_whole_long_idle")
+        receipt = announcement.get("setup_receipt_sha256")
+        return (
+            announcement.get("whole_session") is True and
+            announcement.get("match_count") == 2 and
+            announcement.get("stadium_whole_feedback") is True and
+            announcement.get("stadium_whole_b_state") is True and
+            announcement.get("stadium_observed_matches") == [0, 1] and
+            isinstance(profile, dict) and profile in (paired_idle_profile,
+                {**paired_idle_profile, "profile": "paired_idle_registration_v1"}) and
+            isinstance(receipt, str) and len(receipt) == 64 and
+            all(character in "0123456789abcdef" for character in receipt) and
+            receipt != "0" * 64 and
+            "entity_profile" not in announcement
+        )
+    if type(match_count) is not int or not (
+            3 <= match_count <= 64 or
+            (match_count == 2 and declares_paired_idle_two_match(start) and
+             declares_paired_idle_two_match(handshake))):
+        raise WholeSessionSemanticError(
+            "observer stream has an invalid declared match_count or lacks the exact paired-idle profile")
+    if match_count == 2:
+        for field in ("stadium_whole_long_idle", "setup_receipt_sha256",
+                      "stadium_whole_feedback", "stadium_whole_b_state",
+                      "stadium_observed_matches"):
+            if handshake.get(field) != start.get(field):
+                raise WholeSessionSemanticError(
+                    f"paired-idle {field} disagrees between handshake and start")
     capture_id = start.get("capture_id")
     sequence_id = start.get("sequence_id")
     if not isinstance(capture_id, str) or not capture_id or not isinstance(sequence_id, str) or not sequence_id:

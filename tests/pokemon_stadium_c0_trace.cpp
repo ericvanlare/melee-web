@@ -6,6 +6,8 @@
 #include "dat_effect_banks.hpp"
 #include "dat_lights.hpp"
 #include "dat_native_stage.hpp"
+#include "stadium_form_archive_contract.hpp"
+#include "gameplay_stadium_form_assets.hpp"
 #include "dat_native_joint.hpp"
 #include "dat_scene.hpp"
 #include "dat_sis.hpp"
@@ -247,66 +249,7 @@ std::vector<std::string> public_symbols_at(const DatArchive& archive,
     return result;
 }
 
-struct AnimationSlotExpectation {
-    // -1 means absent in every archive; -2 means local in every archive.
-    // Otherwise the value is the ordinal of the archive that owns the root.
-    int owner;
-    const char* external_identity;
-    std::size_t target_bytes;
-    bool pointer_list;
-};
-
-constexpr std::array<const char*, 10> joint_external_identities{
-    nullptr,
-    "GrdPStadiumBG_TopN_joint",
-    "GrdPStadiumField_TopN_joint",
-    "GrdPStadiumFire_TopN_joint",
-    "GrdPStadiumGrass_TopN_joint",
-    "GrdPStadiumNormal_TopN_joint",
-    "GrdPStadiumRock_TopN_joint",
-    "GrdPStadiumWaterFunsuiA_TopN_joint",
-    "GrdPStadiumWaterFunsuiB_TopN_joint",
-    "GrdPStadiumWater_TopN_joint",
-};
-constexpr std::array<int, 10> joint_owners{-2, 0, 0, 1, 2, 0, 4, 3, 3, 3};
-constexpr std::array<const char*, 10> joint_animation_external_identities{
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-    "GrdPStadiumRock_TopN_animjoint_list",
-    "GrdPStadiumWaterFunsuiA_TopN_animjoint_list",
-    "GrdPStadiumWaterFunsuiB_TopN_animjoint_list",
-    nullptr,
-};
-constexpr std::array<int, 10> joint_animation_owners{
-    -1, -1, -1, -1, -1, -1, 4, 3, 3, -1};
-constexpr std::array<const char*, 10> material_animation_external_identities{
-    nullptr,
-    "GrdPStadiumBG_TopN_matanim_joint_list",
-    "GrdPStadiumField_TopN_matanim_joint_list",
-    "GrdPStadiumFire_TopN_matanim_joint_list",
-    "GrdPStadiumGrass_TopN_matanim_joint_list",
-    "GrdPStadiumNormal_TopN_matanim_joint_list",
-    nullptr,
-    "GrdPStadiumWaterFunsuiA_TopN_matanim_joint_list",
-    "GrdPStadiumWaterFunsuiB_TopN_matanim_joint_list",
-    "GrdPStadiumWater_TopN_matanim_joint_list",
-};
-constexpr std::array<int, 10> material_animation_owners{
-    -1, 0, 0, 1, 2, 0, -1, 3, 3, 3};
-
-AnimationSlotExpectation animation_expectation(std::size_t entry,
-                                               std::uint32_t field_offset)
-{
-    if (field_offset == 0)
-        return {joint_owners[entry], joint_external_identities[entry], 64, false};
-    if (field_offset == 4)
-        return {joint_animation_owners[entry], joint_animation_external_identities[entry],
-                4, true};
-    if (field_offset == 8)
-        return {material_animation_owners[entry],
-                material_animation_external_identities[entry], 4, true};
-    check(field_offset == 12, "unknown Stadium animation slot offset");
-    return {-1, nullptr, 0, false};
-}
+using namespace melee_web::stadium_form_contract;
 
 void validate_animation_slot(const ArchiveRecord& record,
                              std::size_t archive_ordinal,
@@ -1301,8 +1244,10 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
                   "catalog Stadium yakumono owner differs from the typed source ABI");
 
             melee_web::DatStage map_metadata(*archive);
+            auto stadium_contract =
+                melee_web::test::stadium_contract_data(*archive, map_metadata);
             melee_web::DatNativeMap map_owner(
-                archive, melee_web::test::stadium_contract);
+                archive, stadium_contract.view());
             check(map_owner.map_head() && map_owner.collision(),
                   "catalog map_head/coll_data owners are incomplete");
             const auto source_light_counts =
@@ -1372,6 +1317,69 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
         }
         check(melee_web_gameplay_shutdown(error, sizeof(error)),
               std::string("source world teardown failed: ") + error);
+        return 0;
+    }
+    if (probe == "form-assets") {
+        char error[256]{};
+        check(melee_web_gameplay_startup(32U*1024U*1024U,error,sizeof(error)),error);
+        check(melee_web_native_world_enable(error,sizeof(error)),error);
+        {
+            const auto base_bytes=read_file(path/"GrPs.usd");
+            auto base=std::make_shared<DatArchive>(base_bytes,DatExternalPolicy::ResolveNull);
+            DatStage metadata(*base);
+            auto contract=melee_web::test::stadium_contract_data(*base,metadata);
+            melee_web::DatNativeMap base_owner(base,contract.view());
+            melee_web::StadiumFormAssets::Archives archives;
+            const std::array<const char*,4> names={"GrPs1.dat","GrPs2.dat","GrPs3.dat","GrPs4.dat"};
+            std::array<std::vector<uint8_t>,4> before;
+            for(unsigned i=0;i<4;i++){
+                const auto bytes=read_file(path/names[i]);
+                archives[i]=std::make_shared<DatArchive>(bytes,DatExternalPolicy::ResolveNull);
+                before[i].assign(archives[i]->data().begin(),archives[i]->data().end());
+                ArchiveRecord record;
+                record.name=names[i];record.archive=archives[i];
+                record.stage=std::make_unique<DatStage>(*archives[i]);
+                validate_archive_contract(record,i+1);
+                bool rejected=false;
+                try{(void)melee_web::stadium_form_map_contract(*archives[i],i==3?1:i+2);}
+                catch(const DatError&){rejected=true;}
+                check(rejected,"Form contract admitted another archive ordinal");
+            }
+            melee_web::StadiumFormAssets forms(archives,base_owner.light_overrides(),base_owner.source_light_counts());
+            check(forms.public_symbols().size()==123,"Form public catalog extent changed");
+            unsigned hydrated=0;
+            for(const auto& symbol:forms.public_symbols()){
+                if(std::string_view(symbol.symbol)=="map_head"){
+                    check(symbol.native_data!=nullptr,"Actual form map_head was not hydrated");hydrated++;
+                }else check(symbol.native_data==nullptr,"Unhydrated form symbol gained authority");
+            }
+            check(hydrated==4&&forms.source_light_counts().size()==10,"Form owner inventory changed");
+            // Exercise base97 plus all123 real form names under the unchanged
+            // registry budget. Remaining World scopes are integration coverage.
+            std::vector<MeleeWebArchiveSymbol> base_catalog;
+            for(const auto& pub:base->public_symbols())
+                base_catalog.push_back({"GrPs.usd",pub.name.c_str(),
+                    pub.name=="map_head"?base_owner.map_head():nullptr});
+            auto* base_scope=melee_web_archive_sections_register(base_catalog.data(),base_catalog.size(),error,sizeof(error));
+            check(base_scope!=nullptr,error);
+            forms.publish();
+            void* handle=melee_web_archive_sections_open("GrPs3.dat");
+            check(melee_web_archive_sections_public(handle,"map_head")==forms.map(3).map_head(),
+                  "Source archive did not resolve the exact form map owner");
+            bool refused=false;try{forms.close();}catch(const DatError&){refused=true;}
+            check(refused,"Form scope closed while a source handle remained live");
+            check(melee_web_archive_sections_public(handle,"map_head")==forms.map(3).map_head(),
+                  "Refused form close destroyed the retained native owner");
+            melee_web_archive_sections_release(handle);forms.close();
+            check(melee_web_archive_sections_close(base_scope,error,sizeof(error)),error);
+            for(unsigned i=0;i<4;i++)check(std::equal(before[i].begin(),before[i].end(),archives[i]->data().begin()),
+                "Form hydration mutated source archive data");
+            std::cout << "{\"probe\":\"form-assets\",\"archives\":4,\"public_names\":123,"
+                         "\"hydrated_map_heads\":4,\"wrong_ordinal_refused\":true,"
+                         "\"live_handle_close_refused\":true,\"immutable_data\":true,"
+                         "\"source_transform_executed\":false,\"C3\":false}\n";
+        }
+        check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
         return 0;
     }
     if (probe == "sis") return run_sis_probe(path);

@@ -2,6 +2,9 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_source_memory_runtime.h"
+#endif
 #include "fighter_binding.h"
 #include "hsd_native_joint.h"
 #include <melee/cm/camera.h>
@@ -53,6 +56,16 @@ struct MeleeWebMatchContext {
     HSD_RumbleData saved_rumble[4];
     HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    MeleeWebMatchSceneRngSnapshot scene_rng;
+    MeleeWebMatchRecordedPreconsume recorded_preconsume;
+    void* recorded_preconsume_context;
+    uint64_t recorded_preconsume_generation;
+    int recorded_preconsume_active,recorded_preconsume_failed;
+    MeleeWebSourceMemoryAllocation camera_lease;
+    MeleeWebStadiumPadQueueObservation pad_queue_observation;
+    int pad_queue_observation_candidate, pad_queue_observation_complete;
+#endif
     uint8_t start_published[MELEE_WEB_MATCH_MAX_PLAYERS];
     int crowd_started,input_restored;
 };
@@ -90,6 +103,102 @@ static int owned(MeleeWebMatchContext* h,char* e,size_t n)
         return fail(e,n,"Match source RNG or camera ownership changed");
     return 1;
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "gameplay_hud.h"
+int melee_web_match_rng_seed_owner_read(uint32_t* seed)
+{
+    char error[96];
+    if(!seed||!owned(owner,error,sizeof(error)))return 0;
+    *seed=owner->seed;
+    return 1;
+}
+int melee_web_match_stadium_pad_queue_observation(
+    MeleeWebMatchContext* h,MeleeWebStadiumPadQueueObservation* out,char* e,size_t n)
+{
+    if(!out)return fail(e,n,"Stadium PAD queue observation output is required");
+    if(!owned(h,e,n))return 0;
+    if(!h->pad_queue_observation_complete||
+       h->pad_queue_observation.source_generation!=h->generation||
+       h->pad_queue_observation.source_tick_after!=h->ticks||
+       h->pad_queue_observation.source_tick_after!=
+           h->pad_queue_observation.source_tick_before+1||
+       h->pad_queue_observation.qnum_before!=1||
+       h->pad_queue_observation.qread_before!=0||
+       h->pad_queue_observation.qcount_before!=1||
+       h->pad_queue_observation.qcount_after_hsd!=0||
+       !h->pad_queue_observation.player_count||
+       h->pad_queue_observation.player_count>MELEE_WEB_MATCH_MAX_PLAYERS)
+        return fail(e,n,"Stadium PAD queue observation is stale or incomplete");
+    *out=h->pad_queue_observation;
+    return ok(e,n);
+}
+static int camera_index(MeleeWebMatchContext* h,const CmSubject* p)
+{
+    uintptr_t base=(uintptr_t)h->pool, address=(uintptr_t)p;
+    if(!p||address<base||address-base>=h->camera_count*sizeof(*h->pool)||
+       (address-base)%sizeof(*h->pool))return -1;
+    return (int)((address-base)/sizeof(*h->pool));
+}
+static int camera_partition(MeleeWebMatchContext* h,const CmSubject* subject,
+                            int need_free,int ready,char* e,size_t n)
+{
+    MeleeWebSourceMemoryAllocation lease;
+    MeleeWebSourceMemoryContext context;
+    if(!owned(h,e,n))return 0;
+    if(ready ? !melee_web_hud_stadium_ready_context(NULL,NULL) :
+       (HSD_GObj_804D781C||HSD_GObj_804D7814))
+        return fail(e,n,"Camera subject ownership requires its exact source callback boundary");
+    if(melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+       melee_web_source_memory_allocation_read(h->pool,&lease)!=MELEE_WEB_SOURCE_MEMORY_READ_OK||
+       !lease.live||!h->camera_lease.live||
+       lease.allocation_generation!=h->camera_lease.allocation_generation||
+       lease.world_generation!=h->camera_lease.world_generation||
+       lease.source_heap_handle!=h->camera_lease.source_heap_handle||
+       lease.world_generation!=context.world_generation||
+       lease.source_heap_handle!=context.source_heap_handle||
+       lease.requested_bytes!=h->camera_count*sizeof(*h->pool))
+        return fail(e,n,"Match camera pool lost its exact source allocation");
+    /* Match begin already checks the source maximum (70); this count follows
+     * the owned allocation, not a guessed traversal allowance. */
+    unsigned char seen[h->camera_count];memset(seen,0,sizeof(seen));
+    CmSubject* previous=NULL;int found=0;uint32_t count=0;
+    for(CmSubject* p=cm_804D6460;p;p=p->next){
+        int i=camera_index(h,p);
+        if(i<0||seen[i]||p->prev!=previous)
+            return fail(e,n,"Match active camera partition changed");
+        seen[i]=1;++count;if(p==subject)found=1;previous=p;
+    }
+    if(previous!=cm_804D6468)return fail(e,n,"Match active camera tail changed");
+    for(CmSubject* p=cm_804D6458;p;p=p->prev){
+        int i=camera_index(h,p);
+        if(i<0||seen[i])return fail(e,n,"Match free camera partition changed");
+        seen[i]=1;++count;
+    }
+    if(count!=h->camera_count)return fail(e,n,"Match camera pool partition lost a subject");
+    if(need_free&&!cm_804D6458)return fail(e,n,"Stadium OnStart needs an owned free camera subject");
+    if(subject&&!found)return fail(e,n,"Stadium camera subject is not active in its borrowed pool");
+    return ok(e,n);
+}
+int melee_web_match_camera_available(MeleeWebMatchContext* h,char* e,size_t n)
+{return camera_partition(h,NULL,1,0,e,n);}
+int melee_web_match_camera_subject_preflight(MeleeWebMatchContext* h,const void* p,char* e,size_t n)
+{
+    if(!p)return fail(e,n,"Stadium camera subject is missing");
+    return camera_partition(h,p,0,0,e,n);
+}
+int melee_web_match_camera_available_ready(MeleeWebMatchContext* h,char* e,size_t n)
+{return camera_partition(h,NULL,1,1,e,n);}
+int melee_web_match_camera_subject_preflight_ready(MeleeWebMatchContext* h,const void* p,char* e,size_t n)
+{
+    if(!p)return fail(e,n,"Stadium camera subject is missing");
+    return camera_partition(h,p,0,1,e,n);
+}
+int melee_web_match_camera_subject_return(MeleeWebMatchContext* h,void* p,char* e,size_t n)
+{
+    if(!melee_web_match_camera_subject_preflight(h,p,e,n))return 0;
+    Camera_800290D4(p);return ok(e,n);
+}
+#endif
 MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
     MeleeWebCollision* collision,char* e,size_t n)
 {
@@ -161,12 +270,22 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
         HSD_PadGameStatus[i]=default_status_data;
     }
     seed_ptr=&h->seed;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    /* First installed match seed, before any source startup operation. owner
+     * is committed after camera setup; this local allocation is already exact. */
+    h->scene_rng.points[0]=(MeleeWebMatchSceneRngPoint){
+        h->generation,(uintptr_t)seed_ptr,*seed_ptr};
+    h->scene_rng.count=1;
+#endif
     plStale_InitAttackInstance();plAttack_80037590();
     /* Source match reset; these are per-query collision callbacks and an unused
      * event field. No prior fighters may survive into this exclusive context. */
     mpColl_80041C78();
     Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
     if (++owner_epoch == 0) ++owner_epoch;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    melee_web_source_memory_allocation_read(h->pool,&h->camera_lease);
+#endif
     owner=h;ok(e,n);return h;
 }
 int melee_web_match_attach_collision(MeleeWebMatchContext* h,MeleeWebCollision* collision,char* e,size_t n)
@@ -261,11 +380,32 @@ int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char
 {
     return melee_web_match_step_raw_phased(h,raw,NULL,NULL,NULL,NULL,e,n);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_match_recorded_preconsume_arm(MeleeWebMatchContext* h,
+    MeleeWebMatchRecordedPreconsume callback,void* context,char* e,size_t n) {
+    if(!owned(h,e,n))return 0;
+    if(!callback||!context||h->ticks||h->recorded_preconsume||
+       HSD_GObj_804D781C||HSD_GObj_804D7814||
+       HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qcount)
+        return fail(e,n,"Recorded pre-consume registration requires untouched exact Match");
+    h->recorded_preconsume=callback;h->recorded_preconsume_context=context;
+    h->recorded_preconsume_generation=h->generation;
+    return ok(e,n);
+}
+#endif
 int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[4],
     MeleeWebMatchTickPhase renew,MeleeWebMatchTickPhase before,
     MeleeWebMatchTickPhase after,void* context,char* e,size_t n)
 {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h&&h==owner){h->pad_queue_observation_candidate=0;h->pad_queue_observation_complete=0;}
+#endif
     if(!live(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume_active||h->recorded_preconsume_failed){
+        h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume reentry/failed boundary");
+    }
+#endif
     if(!raw)return fail(e,n,"Four raw controller samples are required");
     if(HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||HSD_PadLibData.qcount)
         return fail(e,n,"Owned source PAD queue changed or has an unconsumed sample");
@@ -278,7 +418,49 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     /* Raw replay samples replace PADRead, not the source rumble interpreter
      * that precedes it in HSD_PadRenewRawStatus. One sample is supplied per tick. */
     HSD_PadRumbleInterpret();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    memset(&h->pad_queue_observation,0,sizeof(h->pad_queue_observation));
+    h->pad_queue_observation.source_generation=h->generation;
+    h->pad_queue_observation.source_tick_before=h->ticks;
+    h->pad_queue_observation.qnum_before=HSD_PadLibData.qnum;
+    h->pad_queue_observation.qread_before=HSD_PadLibData.qread;
+    h->pad_queue_observation.qcount_before=HSD_PadLibData.qcount;
+    h->pad_queue_observation.player_count=h->player_count;
+    for(uint32_t i=0;i<h->player_count&&i<MELEE_WEB_MATCH_MAX_PLAYERS;i++){
+        h->pad_queue_observation.slots[i]=h->slots[i];
+        h->pad_queue_observation.controllers[i]=h->controllers[i];
+    }
+    if(HSD_PadLibData.queue==&h->input_queue&&HSD_PadLibData.qnum==1&&
+       HSD_PadLibData.qread==0&&HSD_PadLibData.qcount==1){
+        memcpy(h->pad_queue_observation.queue_slots,h->input_queue.stat,
+               sizeof(h->pad_queue_observation.queue_slots));
+        h->pad_queue_observation_candidate=1;
+    }
+#endif
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume){
+        if(h->recorded_preconsume_generation!=h->generation||
+           HSD_GObj_804D781C||HSD_GObj_804D7814){
+            h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume generation/source callback changed");
+        }
+        h->recorded_preconsume_active=1;
+        int admitted=h->recorded_preconsume(h->recorded_preconsume_context,h->ticks,e,n);
+        if(h!=owner||h->generation!=melee_web_gameplay_generation())
+            return fail(e,n,"Recorded pre-consume replaced Match owner");
+        h->recorded_preconsume_active=0;
+        if(!admitted||h->recorded_preconsume_failed||
+           HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||
+           HSD_PadLibData.qread!=0||HSD_PadLibData.qcount!=1||
+           memcmp(h->pad_queue_observation.queue_slots,h->input_queue.stat,sizeof(h->input_queue.stat))){
+            h->recorded_preconsume_failed=1;return fail(e,n,"Recorded pre-consume callback/queued input refused");
+        }
+    }
+#endif
     HSD_PadRenewMasterStatus();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    h->pad_queue_observation.qcount_after_hsd=HSD_PadLibData.qcount;
+    if(h->pad_queue_observation.qcount_after_hsd!=0)h->pad_queue_observation_candidate=0;
+#endif
     if(renew){if(!renew(context,e,n))return 0;}
     else{HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();}
     if(HSD_PadLibData.qcount)return fail(e,n,"Original controller processing did not consume raw sample");
@@ -286,11 +468,23 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     if(!melee_web_gameplay_step(e,n))return 0;
     h->ticks++;
     if(after&&!after(context,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h==owner&&h->pad_queue_observation_candidate&&h->generation==melee_web_gameplay_generation()&&
+       h->pad_queue_observation.source_generation==h->generation&&
+       h->ticks==h->pad_queue_observation.source_tick_before+1){
+        h->pad_queue_observation.source_tick_after=h->ticks;
+        h->pad_queue_observation_complete=1;
+    }
+#endif
     return ok(e,n);
 }
 int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebControllerSample samples[4],char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume)
+        return fail(e,n,"Recorded pre-consume plan requires exact raw PAD stepping");
+#endif
     if(!samples)return fail(e,n,"Four controller samples are required");
     for(unsigned i=0;i<4;i++)if(!sample_valid(&samples[i]))return fail(e,n,"Controller axes/triggers must be finite and within normalized ranges");
     for(uint32_t i=0;i<h->player_count;i++)if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])
@@ -579,6 +773,10 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     /* A source-ordered startup can fail after camera creation but before
      * Ground attaches collision; still retire the scoped player/camera owner. */
     if(!owned(h,e,n))return 0;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if(h->recorded_preconsume_active||h->recorded_preconsume_failed)
+        return fail(e,n,"Recorded pre-consume owner cannot retire during/after failed boundary");
+#endif
     /* Items may retain their fighter owner during source destruction. */
     while(((HSD_GObj**)HSD_GObj_Entities)[9])Item_8026A8EC(((HSD_GObj**)HSD_GObj_Entities)[9]);
     if(h->crowd_started){
@@ -610,7 +808,6 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     memcpy(HSD_Rumble_804C22E0,h->saved_rumble,sizeof(h->saved_rumble));
     owner=NULL;free(h);return ok(e,n);
 }
-
 
 struct MeleeWebMatchContextSnapshot {
     MeleeWebMatchContext* identity;
@@ -719,3 +916,28 @@ void melee_web_match_context_snapshot_destroy(MeleeWebMatchContextSnapshot* snap
         melee_web_player_context_guard_destroy(snapshot->players[i]);
     free(snapshot);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void melee_web_match_scene_rng_note(unsigned phase)
+{
+    MeleeWebMatchContext* h=owner;
+    if(!h)return;
+    /* Observation failure is retained; it never changes source RNG or flow. */
+    if(h->scene_rng.invalid || phase>=4 || h->scene_rng.count!=phase ||
+       !live(h,NULL,0) || !seed_ptr){h->scene_rng.invalid=1;return;}
+    h->scene_rng.points[phase]=(MeleeWebMatchSceneRngPoint){
+        h->generation,(uintptr_t)seed_ptr,*seed_ptr};
+    h->scene_rng.count++;
+}
+int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext* h,
+    MeleeWebMatchSceneRngSnapshot* out,char* e,size_t n)
+{
+    if(!out||!live(h,e,n))return 0;
+    if(h->scene_rng.invalid||h->scene_rng.count<2||h->scene_rng.count>4)
+        return fail(e,n,"Match scene RNG observation lost exact phase order");
+    for(unsigned i=0;i<h->scene_rng.count;i++)
+        if(h->scene_rng.points[i].world_generation!=h->generation||
+           h->scene_rng.points[i].seed_pointer!=(uintptr_t)seed_ptr)
+            return fail(e,n,"Match scene RNG observation changed its seed owner");
+    *out=h->scene_rng;return ok(e,n);
+}
+#endif

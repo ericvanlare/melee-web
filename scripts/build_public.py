@@ -149,6 +149,7 @@ RUNTIME_REQUIRED_EXPORTS = (
     "_melee_web_native_asset_count",
     "_melee_web_native_asset_name",
     "_melee_web_native_asset_file",
+    "_melee_web_native_asset_file_transfer",
     "_melee_web_native_asset_commit",
     "_melee_web_native_asset_abort",
     "_melee_web_native_menu_file",

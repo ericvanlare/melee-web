@@ -149,6 +149,8 @@ constexpr std::array<std::string_view,278> route_asset_keys={
 }
 extern "C" {
 unsigned melee_web_native_asset_begin(){try{
+ check(!stadium_first_css_prepared_diagnostic_active(),
+       "CSS constructor-return diagnostic refuses a second asset import");
  close();scoped_disc_import=true;scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);
  return asset_generation;
@@ -164,6 +166,12 @@ int melee_web_native_asset_file(unsigned generation,const char* name,const uint8
  check(scoped_assets&&!world&&!match&&!archive_cache&&name&&data,
        "Native asset transfer requires closed source owners");
  asset_scope.put(generation,name,{data,size});return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_asset_file_transfer(unsigned generation,const char* name,
+        const uint8_t* data,unsigned size,const uint8_t* tail,unsigned tail_size){try{
+ check(scoped_assets&&!world&&!match&&!archive_cache&&name&&data&&
+       (tail_size==0||tail),"Native DVD asset transfer requires closed source owners and actual bytes");
+ asset_scope.put(generation,name,{data,size},{tail,tail_size});return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_asset_commit(unsigned generation){try{
  check(scoped_assets&&!world&&!match&&!results&&!prize&&!archive_cache,
@@ -253,7 +261,7 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
  for(auto key:zelda_sheik_keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
- files[name]={data,data+size};scoped_disc_import=false;return 1;
+ files[name]=std::vector<uint8_t>(data,data+size);scoped_disc_import=false;return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_source_file_external_set(const char* name,unsigned size){try{
  if(world||match||results||prize||host_entered)
@@ -272,7 +280,12 @@ int melee_web_native_source_files_external_clear(){try{
  scoped_disc_import=false;
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
-int melee_web_native_menu_prepare(){try{
+int melee_web_native_menu_prepare(){
+ if(stadium_first_css_prepared_diagnostic_active()){
+  message="CSS constructor-return diagnostic refuses menu re-preparation";
+  return 0;
+ }
+ try{
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
 #endif
@@ -313,6 +326,10 @@ int melee_web_native_menu_prepare(){try{
  message=e.what();return 0;
 }}
 int melee_web_native_menu_launch(){try{
+ const bool constructor_return=stadium_first_css_prepared_diagnostic_active();
+ if(constructor_return)
+  check(stadium_first_css_prepared_diagnostic_consume_launch(),
+        "CSS constructor-return diagnostic permits exactly one prepared owner launch");
  if(preparation.busy()||pending)
   throw std::runtime_error("Native menu transition is still preparing");
  if(match||results||prize||host_entered||(host&&!world))close();
@@ -322,17 +339,24 @@ int melee_web_native_menu_launch(){try{
      configured_save_mode,configured_save_profile.empty()?nullptr:configured_save_profile.data(),
      configured_save_profile.size(),error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();
+ if(constructor_return)
+  check(stadium_first_css_prepared_diagnostic_entry_succeeded(),
+        "CSS constructor-return entry did not produce its checked source-free terminal");
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  // The initial owner has entered but has not advanced a source tick. Settle
  // its certified union through the same draw/submission gate as transitions.
- check(preparation.request_render_settle(),"Initial pipeline preparation is already active");
- preparation_profile.begin(true,emscripten_get_now());
- running=false;menu_clock.reset();
- message="Preparing original character select...";
- EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
+ if(!constructor_return){
+  check(preparation.request_render_settle(),"Initial pipeline preparation is already active");
+  preparation_profile.begin(true,emscripten_get_now());
+  running=false;menu_clock.reset();
+  message="Preparing original character select...";
+  EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
+ }
 #endif
  return 1;
-}catch(const std::exception& e){diagnostic_incident(4);message=e.what();running=false;return 0;}}
+}catch(const std::exception& e){
+ stadium_first_css_prepared_diagnostic_fail(e.what());
+ diagnostic_incident(4);message=e.what();running=false;return 0;}}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 int melee_web_native_menu_stadium_c1a_arm(){try{
  check(!stadium_c1a_armed&&scoped_assets&&
@@ -350,8 +374,10 @@ int melee_web_native_menu_stadium_c1a_arm(){try{
 int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation){
  if(!generation||generation!=asset_generation||
     generation!=asset_scope.pending_generation()||
-    !stadium_c1a_armed||!scoped_assets||asset_committed||
-    asset_destination!=AssetDestination::StadiumC1a||
+    !scoped_assets||asset_committed||
+    !((stadium_c1a_armed&&asset_destination==AssetDestination::StadiumC1a)||
+      first_sss_vs_setup_asset_pending(generation)||later_sss_asset_pending(generation)||
+      stadium_paired_v11_asset_pending(generation))||
     !asset_selection_valid||world||match||results||prize||host_entered)
   return 0;
  try{

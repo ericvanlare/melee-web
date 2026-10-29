@@ -1,0 +1,1348 @@
+{
+  "schema": "melee-web-stadium-archive-service-v1",
+  "issue": 345,
+  "state": "PR346_348_350_352_353_MERGED; FIRE_AND_FIRST_WATER_CONDITIONAL_COMPONENTS_REVIEWED; WATER_QUERY_NATIVE_COMPONENT_AND_STRICT_ROUTE_REPLAY_PASS; FULL_REGRESSION_PASS; ORIGINAL_COLLISION_QUERY_UNOBSERVED; C5_AND_WHOLE_STAGE_ACCEPTANCE_OPEN",
+  "checkpoint5_complete": false,
+  "browser_transformations_enabled": false,
+  "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+  "base": "3ddc98b759b225faec080b2b15419e555f31667c",
+  "prior_build_source": "91bcf57e863f4accd6a4b0fc6aaa2e6170e637d3",
+  "source_reviews": [
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v1/independent-review-v1.json",
+      "bytes": 2964,
+      "sha256": "7806d93f697430793ee223d72b77f208e6ec6e2dd55e881a6f7a129e56bf7840"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-integration-review-v1/source-review.json",
+      "bytes": 2353,
+      "sha256": "661d7ae227e35792d0ddae8b5973b96f2f745f666b8cc2767de0bcd25d686e1e"
+    }
+  ],
+  "candidate_freezes": [
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v1/freeze-v1.json",
+      "bytes": 12466,
+      "sha256": "e86de2138573b0b3215f6b6838987632851c7db84e6c3711d4706be48faf03ee"
+    },
+    {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-file-service-composed-v2/freeze-v2.json",
+      "bytes": 9904,
+      "sha256": "4b3d8ace7c7bc7bbb1eecdd349b1299bf0152d9bb0926518c5eb72b6a997c8d0"
+    }
+  ],
+  "focused": {
+    "initial_applied": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-focused-v1/result.json",
+      "bytes": 7473,
+      "sha256": "8f3be677c1de3747eaada47cef01712261e03df112b62b86e375297e3cc4ae91"
+    },
+    "initial_scope": "end-flow, transaction/adapter and map2 controls pass; cancellation fixture fails and stops batch",
+    "cancellation_repair": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json",
+      "bytes": 3561,
+      "sha256": "9eecb68560e024eb10c7484435b5ab1c5a0ca70c6ca112357c62c5106312c6c1"
+    },
+    "remaining_disc_controls": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-remaining-v2/result.json",
+      "bytes": 5802,
+      "sha256": "e6159eadbdf3f818bf51d4f619e7294db394e159e718e5ac5b10346ec488ab89"
+    },
+    "native_trace": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-native-service-trace-v2/result.json",
+      "bytes": 2591,
+      "sha256": "c9cdb077da26cf8bbca41aa86e0ce8fd035dc5b0c6905a7b4a3c2535c50207f0"
+    }
+  },
+  "builds": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-composed-build-v3/result.json",
+    "bytes": 7234,
+    "sha256": "abcc450156a5c40cfb996df1d12d82fc165dfcff08cb1201106af6b452d1c863"
+  },
+  "artifacts": {
+    "source": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "files": [
+      {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 301443,
+        "sha256": "0827d88cb9bda97f51efb4b69b54ff69ff68f08ed7fd91d24b7378a902cc6f4d"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15944851,
+        "sha256": "d6a22b452a1f4e34c3767a9b721807ab850f82a2cc91c6c3d1ec723dc339ab57"
+      },
+      {
+        "path": "build/browser-stadium-c1a-release/gameplay_menu_browser.js",
+        "bytes": 324922,
+        "sha256": "73a9743dce7f3daf57cbf727cd77800da36f6174e9ac969b0a0c4d9276247c6c"
+      },
+      {
+        "path": "build/browser-stadium-c1a-release/gameplay_menu_browser.wasm",
+        "bytes": 16957431,
+        "sha256": "38426fd638586d4eabe0c57dc69ddeb1fccdf7e4ea1ddcbc37dc695fa7bf9a0d"
+      }
+    ]
+  },
+  "full_regression": "FIRST_FIRE_V3_PASS_AT_57714AF; FIRST_WATER_V1_PASS_3000_TESTS_211_SKIPS_AT_26F; PRIOR_FAILED_AND_STOPPED_RUNS_RETAINED_BELOW",
+  "exact_head_ci": "PR346_PR348_PR350_PR352_PR353_MERGED_EXACT_HEAD_CI_PASSED",
+  "retained_failures": [
+    "c5-archive-service-full-regression-v1/full-regression.stderr: four full-suite fixture/export failures at 9d9d53b, before the reviewed compatibility repair",
+    "c5-composed-focused-v1/test_stadium_pre_ready_cancel.stderr and work/stadium-pre-ready-i6tizcdk",
+    "work/stadium-pre-ready-vr868vua",
+    "c5-native-service-trace-v1/compile.stderr",
+    "Earlier receipt source attribution correction remains preserved in c5-cancellation-fixture-repair-v1/root-producer-correction-v2.json",
+    "c5-slots-focused-v1/test_gameplay_lbfile_source_entry.result.json: initial metadata fixture failed; the corrected focused control passes in c5-slots-focused-v2",
+    "c5-slots-regression-v2/root-stop-known-defect.json: e487 full regression stopped at 232.290s after review found shared base map0 was misattributed as a form-slot consumer; the owned process group was absent afterward.",
+    "c5-slots-regression-v3: 2,975 tests / 211 skips / one failure in test_gameplay_patch_canonical; canonicalization and its 15-test control passed, but the full suite was not rerun after the representation-only patch change.",
+    "c5-first-fire-browser-capture-v1/root-first-failure.json: default-off Fire graph run failed at B world tick 4349; strict retained prefix had no mismatch but B did not retire or reach Results/CSS; owned cleanup passed.",
+    "c5-first-fire-browser-capture-v1 remains a retained failed runtime result. The v2 route completed conditionally on 38ecb6b1 and passed independent raw review; see first_fire_browser_capture_v2.",
+    "c5-first-fire-full-regression-v1/root-early-stop.json: prior 38ec full-suite run stopped at 106.60s on the known stale textual callback assertion; no runtime failure inferred. The reviewed two-case fixture repair passes, and the later test-only 57714af full regression passed.",
+    "c4-water-request-clocks-replay-v1/independent-review-v1/run-v1/independent-water-raw-review.stderr: reviewer preparation stopped before decoding because the workspace was busy; run-v2 stopped because validator metadata operands were omitted. run-v3 completed successfully; these are review-invocation failures, not original or browser divergences.",
+    "c5-first-fire-full-regression-v2: 2,990 tests / 211 skips / eight stale fixture failures. The seven-file fixture batch and final v3 full-suite pass are recorded separately; all failed evidence remains retained.",
+    "c5-first-water-browser-packet-v1/root-preparer-review-v2.json records two packet-preparation defects in v1 (missing BUILD_DIR and the canonical patch digest binding); prepare-v2 corrected both before the actual browser run.",
+    "c5-first-water-projection-candidate-v1/draft-freeze-v1.json was unreleased. c5-first-water-projection-candidate-v2/focused-v1.log preserves an interrupted focused projection control; focused-v2.log and export-v1/result.json record the corrected passing controls/export. These are pre-capture preparation records, not a failed browser capture."
+  ],
+  "scope": [
+    "Actual disc/asset/C adapter and native/WebAssembly source-service controls",
+    "Exact source-owned writable-region lifetime and pre-mutation teardown checks",
+    "No source arithmetic/input/RNG/order change",
+    "The first default-off Fire browser attempt stopped before completing the route; no accepted transformed gameplay run.",
+    "No general all-form completion or retirement rule; the selected first-Fire graph retired in the conditional v2 route. C5 acceptance and whole-stage acceptance remain open.",
+    "Four-form asset probe reports four hydrated map_head records and 123 public names; it executes no source transformation.",
+    "Source-slot and private-entry metadata focused runs were executed on the staged 35b50ab composition; their nine source/test hashes match the corresponding e4879796 files. Ordinary and diagnostic Release builds passed at e4879796.",
+    "The e4879796 full regression was stopped at 232.290s on the independently reviewed shared-map0 consumer defect; it is not a full pass. That historical review was HOLD; the later first-provider repair and its closure are recorded below.",
+    "At the 3e0a source checkpoint, World wiring had not yet been added. The later default-off first-Fire path at cffe173a failed its graph guard; after the reviewed three-process repair, the v2 route completed conditionally on 38ecb6b1 and passed independent raw review. This does not establish C5 acceptance.",
+    "At 3e0a533c, the shared-map0 source HOLD closed with the reviewed first-provider repair. Its local full regression retained one patch-representation failure and was not rerun after canonicalization. Later PR #348 and PR #350 exact-head CI passed on their own merge heads; those CI runs do not claim a rerun of the local 3e0a suite.",
+    "The separate default-off first-Water recorded-callback route completed both declared lifetimes through Results/CSS with checked retirement. Independent raw review returned scoped GO after verifying 219 pins, 22,318 native diagnostic rows, 9,024 actions, 4,223 B states, eight scene endpoints and an 11-event graph lifecycle journal; the final regression passed 3,000 tests with 211 skips at runtime producer 26f0a0d2; PR #353 publishes the docs/EOF-cleanup update, and its exact-head CI passed all 14 checks (12 successes, two expected skips). No per-owner RNG, general DVD/timing, other-form, C5 or public acceptance claim."
+  ],
+  "service_source_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+  "compatibility_repair": {
+    "commit": "3639903a7d664c0816afc421ea3c32eb8721b887",
+    "patch_sha256": "b0266505e32e28e1936d454c68ca38b5849ed41be374761e301cee244140f157",
+    "review_and_apply": {
+      "path": "c5-compatibility-repair-v1/root-review-and-apply-v1.json",
+      "bytes": 642,
+      "sha256": "26805a72e6c271c251a56f7c3ff35f0a50364ab8b7eb37f1e005dc54b52fdbc2"
+    },
+    "focused_controls": {
+      "path": "c5-compatibility-focused-v1/compatibility-controls.result.json",
+      "bytes": 1264,
+      "sha256": "d00f2689346704fae4d48719b4edbef02be9c0d7b9c9209dcc0c9aa74747caf0"
+    },
+    "focused_test_count": 23,
+    "focused_passed": true,
+    "full_regression_status": "RERUN_AND_PASS_AT_3639903A; E4879796_RUN_STOPPED_ON_KNOWN_DEFECT",
+    "focused_run_head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "focused_run_note": "23 focused tests passed against the reviewed repair before it was committed as 3639903a; the receipt records the pre-commit base head.",
+    "current_head_ci": "HISTORICAL_AT_3E0A_CANONICALIZATION_STAGE: EXACT_HEAD_CI_PENDING; LATER_PR348_AND_PR350_MERGED_EXACT_HEAD_CI_PASSED_ON_THEIR_OWN_HEADS",
+    "public_audio_builds_passed": true,
+    "builds_scope_note": "Public/audio builds passed at 3639903a; separate ordinary/diagnostic e4879796 builds also passed, before the shared-map0 repair."
+  },
+  "full_regression_v1": {
+    "state": "FAILED_RETAINED_BEFORE_COMPATIBILITY_REPAIR",
+    "head": "9d9d53b6a320caf0fd90fdc37c208951cc5fe8a3",
+    "tree": "ead8af96dd6756e3a078befea4edbbc1f4e4e2c9",
+    "tests": 2973,
+    "skipped": 211,
+    "failures": 4,
+    "elapsed_seconds": 616.3367588329129,
+    "result": {
+      "path": "c5-archive-service-full-regression-v1/result.json",
+      "bytes": 1180,
+      "sha256": "413f5ac1ba480e6722e4a68f289e719e0e18e53a32a73be42fe42f96b547eae7"
+    },
+    "stderr": {
+      "path": "c5-archive-service-full-regression-v1/full-regression.stderr",
+      "bytes": 551839,
+      "sha256": "6e244c216c311632367f5cf92d4d85804d3e0712b2f9e2ab1afea86a71933203"
+    },
+    "failed_cases": [
+      "test_audio_preview_build.AudioPreviewBuildTests.test_release_preview_exports_the_scoped_public_asset_api",
+      "test_gameplay_browser_sd_continuation.BrowserSuddenDeathContinuationTests.test_actual_finish_vs_publishes_before_capture_and_rejects_other_owners",
+      "test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_ready_rules_and_callback_owner_controls",
+      "test_gameplay_sd_handoff_order.SuddenDeathHandoffOrderTests.test_actual_public_finish_captures_after_publication_before_teardown"
+    ]
+  },
+  "merged_pr346": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/346",
+    "merge_commit": "3fd2ed878bbb9a149b79e830701762887410a0a2",
+    "reviewed_head": "713b2fba1c156654f546943afeded36cd557f203",
+    "tree": "88ac98b1c482b7062c33bc490eeba11cf8e95481",
+    "reviewed_tree": "88ac98b1c482b7062c33bc490eeba11cf8e95481",
+    "tree_match": true,
+    "ci": {
+      "run": 40540770417,
+      "attempt": 1,
+      "completed": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success"
+    },
+    "receipts": [
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/merged-tree.json",
+        "sha256": "e201c3889bff959d9b871b4b7e0fa001eee85a0ca7ad1e9f5ec9b234257f7447"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/independent-review.json",
+        "sha256": "0320e9b8862ef896320e8b7820e943d6da77ad43573fdc37c3c7d212df99ccb7"
+      },
+      {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-merge-gate-v1/ci-final.json",
+        "sha256": "ed7b6415cb27e2aca2dbd2f9b3109f448b1ffdb6a6392b2b38393b8baadab6fd"
+      }
+    ]
+  },
+  "form_assets_probe": {
+    "state": "PASS_SOURCE_DATA_PROBE_ONLY",
+    "source_head": "c56161ea073cfeff543df6f83c8eee4f23d6ef18",
+    "result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-probe-v1/result.json",
+      "sha256": "2bc58186201b8c7880dcb4d5848b38ff5843e4fac7362ad09fba27f5d85d37ad"
+    },
+    "observed": {
+      "archives": 4,
+      "public_names": 123,
+      "hydrated_map_heads": 4,
+      "wrong_ordinal_refused": true,
+      "live_handle_close_refused": true,
+      "immutable_data": true
+    },
+    "source_transform_executed": false,
+    "C3": false,
+    "scope_note": "Validates imported form archive data and catalog lookup only; no source lifecycle, World wiring, active transformation, or browser behavior.",
+    "source_identity": {
+      "base_head": "c56161ea073cfeff543df6f83c8eee4f23d6ef18",
+      "note": "The probe was not a clean c56161ea checkout. It used the exact five-file overlay pinned below; result.json records the five source_before hashes.",
+      "five_file_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-reduced-v1/freeze-v1.json",
+        "sha256": "b789fad24a8be1a533617984ff124834e340ac593964923accdb049b552d9ad6"
+      }
+    },
+    "composed_followup": {
+      "state": "PASS_SOURCE_DATA_PROBE_ONLY",
+      "source_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-form-assets-probe-v2/result.json",
+        "sha256": "d839a487d2ef10e230dd1f010eb9407509c54dc552fb66b6272408fa1a9c63b2"
+      },
+      "build_seconds": 16.908317708875984,
+      "probe_seconds": 0.3242075829766691,
+      "artifacts": {
+        "pokemon_stadium_c0_trace.js": "8a8d28a2d3907c93206455750e9a0104a87b9199fd5141e1e0263b00349efcc1",
+        "pokemon_stadium_c0_trace.wasm": "63519b6453b5358efa9c6e5d22359a2aac46a90313146784fdd6cb23c2bdcb5f"
+      },
+      "passed": true,
+      "source_unchanged": true,
+      "observed": {
+        "archives": 4,
+        "public_names": 123,
+        "hydrated_map_heads": 4,
+        "wrong_ordinal_refused": true,
+        "live_handle_close_refused": true
+      },
+      "source_transform_executed": false,
+      "source_identity_note": "Built with canonical patch bytes db35d73d…; source HEAD 3e0a533c, non-patch sources unchanged. This remains a data/ownership probe only."
+    }
+  },
+  "c5_source_slot_and_entry_metadata": {
+    "implementation_head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+    "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+    "state": "HISTORICAL_3E0A_SOURCE_HOLD_CLOSED; REPAIRED_ACTUAL_SOURCE_CONTROL_PASS; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; FULL_REGRESSION_ONE_CANONICAL_REPRESENTATION_FAILURE_RETAINED; CANONICAL_PATCH_CONTROL_15_PASS; LATER_PR348_AND_PR350_EXACT_HEAD_CI_PASS",
+    "source_slot_candidate": {
+      "production_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-stadium-source-slot-candidate-v2/freeze-v2.json",
+        "sha256": "7f3536df2e9a5156b130aae7e405e63b4c3ed7d19934c7f8e5fd9d7f1209bf56"
+      },
+      "test_successor": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-stadium-source-slot-candidate-v3/freeze-v3.json",
+        "sha256": "d6c7ed00cded48124e09550f607ef5d2cf96d0d3018760e1e66bae6ffd050f7a"
+      },
+      "focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/result.json",
+        "sha256": "05274765b1c951aa7f29e5cffab196b6f48df6251a3cec1d8fc91a389c6394f3"
+      },
+      "focused_test": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/test_stadium_source_slot_ownership.result.json",
+        "sha256": "cffe34055e3cdc66363204586a2f047f1d759e99b7e25043584f5ba57220ae52",
+        "passed": true
+      },
+      "scope": "Binds an exact source slot/header/buffer/allocation lease to a selected form and retains the corresponding native archive-section handle. These source-slot controls are component evidence; the conditional World route is recorded separately. Ordinary source header retirement and raw phase-6 buffer clearing remain distinct."
+    },
+    "source_entry_metadata": {
+      "candidate_freeze": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-entry-metadata-candidate-v3/freeze-v3.json",
+        "sha256": "7d45dc05994e69d3cc6b9abe33428f8960bbb82314c57614dee593a821433ee5"
+      },
+      "source_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-source-entry-metadata-candidate-v3/independent-review.json",
+        "sha256": "ab59b0e3857be54a2607dff5794d0b5ecc34c6d5815cfda204cfc99b9fe11912"
+      },
+      "focused_first_attempt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/test_gameplay_lbfile_source_entry.result.json",
+        "sha256": "15f90239ca44b519d7c19cd03292ed030b2c98c0f087cbf7cfd4a50e45ca766a",
+        "passed": false,
+        "retained": true
+      },
+      "focused_repaired": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/test_gameplay_lbfile_source_entry.result.json",
+        "sha256": "f9a86361853fd5b871aa3435476bfc4be34806c3e04fff94801e62b425172500",
+        "passed": true
+      },
+      "focused_run": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/result.json",
+        "sha256": "0043f68c6e3b133871ed89f2514926646c6ba9cc60ede2e81f5a18768918b49d"
+      },
+      "scope": "Private source-entry IDs resolve logical length through the active source registry. The test exercises extracted original lbFile bodies with modeled memory/service leaves; it is not a live disc read or gameplay transformation."
+    },
+    "unvalidated": [
+      "exact-head CI, including its regression job, after patch canonicalization",
+      "general multi-form live World transformation and transformed graph retirement",
+      "C5 and whole-stage acceptance"
+    ],
+    "transformations_enabled": false,
+    "execution_identity": {
+      "focused_execution_head": "35b50ab26073be283f4361024fcece8f545508cc",
+      "focused_execution_note": "Both focused runs were performed on the staged 35b50ab composition before rebasing. The exact nine tracked source/test hashes in the result source inventory match the corresponding committed e4879796 files; this is source-byte equivalence, not a claim the runs executed at the e487 commit.",
+      "slot_focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v1/result.json",
+        "sha256": "05274765b1c951aa7f29e5cffab196b6f48df6251a3cec1d8fc91a389c6394f3"
+      },
+      "metadata_focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v2/result.json",
+        "sha256": "0043f68c6e3b133871ed89f2514926646c6ba9cc60ede2e81f5a18768918b49d"
+      },
+      "exact_source_hashes": {
+        "patches/melee-gameplay.patch": "d1ceea6f2f8b6f024152502a627a91dfc2d8468c73deab7f859df6ed05a08fa1",
+        "src/gameplay_archive_sections.c": "629f32e5cfb92fdf2df11df0f49839e474de47d23722d05ce0f5dbaa05cfb42c",
+        "src/gameplay_archive_sections.h": "ae0a460985c8827aac11bca19057f6228a84e23418a234223c8de382c84d8824",
+        "src/gameplay_stage_map.c": "5f48f2fd4019d81d914eea4edcc3f190123cb5ba8aa61cb5aa22488c6da95809",
+        "src/gameplay_stage_map.h": "751260496c900fa4cbe33f9fd8ee6c1bd8dba1b8f771f3bdd299b2431e57c691",
+        "tests/test_stadium_source_slot_ownership.py": "eeedf687b6ab8e0014c5d60889f101955b88725b32323a3537a714214374ce4e",
+        "src/gameplay_source_files.c": "0bd453b2de3ed41e5edd6ac3d910a898bf5d9e01e80d88c09763e4fcee944b30",
+        "src/gameplay_source_files.h": "8231cd789c6062725dae48aff0734424789455d0a64ae15ca855115882cc7e58",
+        "tests/test_gameplay_lbfile_source_entry.py": "5b7ce1c2fa9db4c9659145a8dc1e4e9b776e2bbdcf5d2391a3d7b33f04a43010"
+      },
+      "canonicalized_patch_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad"
+    },
+    "builds": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
+      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "ordinary_release_passed": true,
+      "diagnostic_release_passed": true,
+      "source_unchanged": true,
+      "scope_note": "Both builds passed before patch-only canonicalization; non-patch source and applied dependency tree are unchanged."
+    },
+    "source_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/final-source-signoff-v1.json",
+      "sha256": "8d5bddc795149bd1ac9416d75adb57bd68bbaa00269ff975d90df2844b782585",
+      "disposition": "GO_REVIEWED_EXECUTABLE_TREE_CANONICAL_REPRESENTATION_ONLY",
+      "closure_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+      "closure_sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+      "historical_hold_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/final-source-signoff-v1.json",
+        "sha256": "8d5bddc795149bd1ac9416d75adb57bd68bbaa00269ff975d90df2844b782585",
+        "disposition": "GO_REVIEWED_EXECUTABLE_TREE_CANONICAL_REPRESENTATION_ONLY",
+        "closure_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+        "closure_sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+        "historical_finding": "The original HOLD identified incorrect attribution of base-provided shared map0 to form-slot consumers. It is closed by the reviewed checked first-provider repair."
+      },
+      "historical_finding": "The original HOLD identified incorrect attribution of base-provided shared map0 to form-slot consumers. The reviewed checked first-provider repair closes it."
+    },
+    "repaired_source_validation": {
+      "focused_result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
+        "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
+        "passed": true,
+        "head": "3e0a533c376dbfe613d3084802297c372b40cb01"
+      },
+      "old_source_reproduction": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-shared-provider-old-source-v1/result.json",
+        "sha256": "8ab268aa92c6339844197d5e5e1644d7685bdce93104e58ff3452284d81af44a",
+        "expected_refusal_reproduced": true,
+        "old_source": "e4879796cde679543890f19a99b9108e5425ae99"
+      },
+      "closure": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slot-final-review-v1/closure-v1.json",
+        "sha256": "5bedc52d9871ea81199e4994e1881e22c65cd2007b0b989d48a5393afea24b93",
+        "disposition": "SOURCE_HOLD_CLOSED"
+      }
+    },
+    "latest_full_regression": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
+      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+      "tests": 2975,
+      "skipped": 211,
+      "failures": 1,
+      "failed_case": "test_gameplay_patch_canonical",
+      "exit_code": 1,
+      "source_unchanged": true,
+      "disposition": "FAILED_RETAINED_CANONICAL_PATCH_REPRESENTATION_ONLY; FULL_SUITE_NOT_RERUN_AFTER_PATCH_ONLY_NORMALIZATION"
+    },
+    "canonicalization": {
+      "result": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
+        "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
+        "passed": true
+      },
+      "canonical_test": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/canonical-test.stderr",
+        "sha256": "4866311a9efee7403021c0a160174e5ae63d18b5d562040629a3f3d125819f92",
+        "tests": 15,
+        "passed": true
+      },
+      "patch_before_sha256": "d1ceea6f2f8b6f024152502a627a91dfc2d8468c73deab7f859df6ed05a08fa1",
+      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
+      "non_patch_source_unchanged": true,
+      "exact_head_ci": "PENDING_AT_HISTORICAL_3E0A_STAGE; LATER_PR348_AND_PR350_MERGED_EXACT_HEAD_CI_PASSED",
+      "full_regression_rerun": false
+    },
+    "historical_e487_regression": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v2/result.json",
+      "sha256": "ab2f58a0fc8bd9337265a140673906212711ac4424b9fd7168617b63578d775e",
+      "state": "STOPPED_KNOWN_DEFECT_NOT_A_TEST_FAILURE_SUMMARY",
+      "elapsed_seconds": 232.29042941704392,
+      "exit_code": -15,
+      "root_stop_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v2/root-stop-known-defect.json",
+        "sha256": "563f7503271d007824b52ace4340546cb3b3046f0e61572eea0b63d671e52735",
+        "reason": "Stop validation of known source defect: shared base map0 falsely treated as transformed-slot consumer. Repair and reduced control before new full regression.",
+        "owned_pgid": 42819
+      },
+      "stopped_by_root": true,
+      "full_suite_completed": false,
+      "group_absent_after_stop": true
+    }
+  },
+  "source_tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
+  "pr348_linux_fixture": {
+    "failed_head": "e71533c6886d4baced4d291b23a7364530ae18e9",
+    "failed_run": 40552013069,
+    "failed_job": 122358154734,
+    "log": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-unit1-failed.log",
+      "sha256": "64bd727f7d9bd09e4eec5c23cc79de675e4a87eb12219662f558a22bce5bb26e"
+    },
+    "cause": "New fixture strict C11 lacks POSIX strnlen declaration on Linux; production runtime builds pass.",
+    "repair": "Fixture compiler feature macro _POSIX_C_SOURCE=200809L; no production or assertion change.",
+    "review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/review.json",
+      "sha256": "ba74dc776d5f96e127ab35fc8a22f330a3d81994ceb8338d25efdcccd5eba0c7"
+    },
+    "focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-posix-fixture-repair-v1/result.json",
+      "sha256": "3d8cfaa87380cf3c0980b3b2f1c742af040ba744b37af4955ecc62e7afdf3042",
+      "passed": true
+    },
+    "current_head_ci": "PR348_MERGED_EXACT_HEAD_CI_PASSED: 12_SUCCESS_2_EXPECTED_SKIP"
+  },
+  "transformed_archive_merge": {
+    "pr": 348,
+    "issue": 347,
+    "merged_commit": "b10ef03bb73595a06c36991d6c354bc7ba4b080b",
+    "reviewed_head": "bd4a025c432a983395cb308efd6d02242521066c",
+    "tree": "816d55adda1b4a1696ff4025f0dfacdbb6148882",
+    "reviewed_tree_matches": true,
+    "ci_run": 40554121745,
+    "checks": 14,
+    "success": 12,
+    "expected_skips": 2,
+    "gate": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-merge-gate-v1/gate.json",
+      "bytes": 439,
+      "sha256": "e8e218fc560aaec0f1fe22e4581fbea40d5d0a2da712e0d8bdd088d30bdf90b2"
+    },
+    "tree_verification": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr348-merge-gate-v1/tree-verification.json",
+      "bytes": 270,
+      "sha256": "17a10054703754178865ef5212ee041d2bba33f716c043bad531b3899d2a1ac1"
+    },
+    "scope": "Source metadata and four-form archive/slot ownership. The later selected first-Fire route is conditional; a general completion model and other-form retirement remain unproved."
+  },
+  "merged_pr350": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/350",
+    "issue": 349,
+    "merge_commit": "3ddc98b759b225faec080b2b15419e555f31667c",
+    "reviewed_head": "a1aebaa22ed2c5bd7857bfda1887d469bf3312d1",
+    "tree": "6ba7897a6338c44c899dc53aeabec660ca4cea31",
+    "reviewed_tree_matches": true,
+    "ci": {
+      "run": 40559928170,
+      "checks": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success",
+      "gate": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr350-merge-gate-v1/gate.json",
+        "bytes": 969,
+        "sha256": "1a1f15732f89753c27bfab4843bede221ccfb88c0642ceb359523eaab46a7c23"
+      },
+      "merged_commit_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr350-merge-gate-v1/merged-commit.json",
+        "bytes": 3559,
+        "sha256": "0d2a2bb82e14740fc4d1b777e6b44ab7c51e56281cfe46719a854db0f07f85da"
+      }
+    },
+    "scope": "Passive original request/callback/loaded-pending-poll clock observation; no general completion rule or C4 acceptance."
+  },
+  "first_fire_browser_attempt": {
+    "state": "FAILED_FIRST_GRAPH_GUARD; COMPLETE_ROUTE_FAILED; RETAINED",
+    "profile": "selected_b_first_fire_recorded_callback_v1",
+    "original_recording": {
+      "source_head": "c389eded70f3f09efafb8cc7f2a7a8f35f49ef94",
+      "report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-request-clocks-original-v1/report.json",
+        "bytes": 7442885,
+        "sha256": "964eab483b087180f8c87f60c075f0e9e9e17527c7c46282b66cf2a1bf9049ef"
+      },
+      "independent_raw_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-request-clocks-original-v1/independent-review-v1/review.json",
+        "bytes": 8938,
+        "sha256": "ac67a8e27fcf68bffa918447d6b851d5307098be187bdc333a4ffe52d68f2b21"
+      }
+    },
+    "browser_source_head": "cffe173adf484ee937f19fa93e2dcfe845fdd977",
+    "elapsed_seconds": 103.86104200035334,
+    "first_failure": "First-fire phase/slot/source graph proof failed at B world tick 4349.",
+    "exact_pins_and_cleanup": {
+      "source_runtime_input_pins_exact": true,
+      "cleanup_passed": true,
+      "capture_process_group_absent": true,
+      "server_process_group_absent": true,
+      "owner_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/owner.json",
+        "bytes": 112253,
+        "sha256": "46e0d95d625284f5816b8272a1df9e6bd8d8f35f14b6634612d00b7c4fee708e"
+      }
+    },
+    "strict_retained_prefix": {
+      "rows_compared": 22446,
+      "actions": 9078,
+      "first_mismatch": null,
+      "whole_route": false,
+      "receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/retained-prefix-comparison.json",
+        "bytes": 1064,
+        "sha256": "52b1ec954c4d4c262f3c05d3a8444b05a9ba89359fe70fb3807016ee8fa18d4a"
+      }
+    },
+    "last_b_status": {
+      "world_generation": 7,
+      "ticks": 4349,
+      "draws": 4345,
+      "actions": 8694,
+      "state_samples": 4264,
+      "window_closed": false,
+      "native_retired": false,
+      "results_entered": false,
+      "css_returned": false,
+      "whole_session_complete": false,
+      "per_owner_rng_comparison": false
+    },
+    "first_failure_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/root-first-failure.json",
+      "bytes": 3518,
+      "sha256": "f68972e5a2823ec5de3a1ca2aeaddebb9afd1a4969793387295d651862155ffc"
+    },
+    "browser_report": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v1/browser-run/report.json",
+      "bytes": 271725,
+      "sha256": "6a8413b694079f9fb3bcf2bea883b786b2508097946109cee43ee4152956124d"
+    },
+    "source_reviews": [
+      {
+        "decision": "GO_SOURCE_COMPOSITION_ONLY",
+        "scope": "runner composition, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-runner-candidate-v3/root-independent-review-v1.json",
+        "sha256": "ef308d152d8aa08ed0a505aebbd2828876731933f9528849d9cb732a215aba04"
+      },
+      {
+        "decision": "GO_SOURCE_INTEGRATION_ONLY",
+        "scope": "first-Fire owner lifecycle source review, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-transform-owner-candidate-v1/independent-review-v1.json",
+        "sha256": "e71d572338989b0d1034b7eef7c04ba40cd3e2ae80abcdf6f4e589a3d3363780"
+      },
+      {
+        "decision": "GO_SOURCE_COMPOSITION_ONLY",
+        "scope": "World composition source review, not runtime proof",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-world-first-fire-composition-v3/root-independent-review-v1.json",
+        "sha256": "a9fad922c5521f8512577ee07d91bb3dc7aa88bf6727263defaaf84b26ed15c7"
+      }
+    ],
+    "limitations": [
+      "A completed its CSS terminal; B did not complete its window, retirement, Results or CSS return.",
+      "The 22,446-row comparison is only the retained incomplete prefix and does not pass the full route.",
+      "No per-owner RNG parity, C5 acceptance, transformation acceptance or whole-stage acceptance is established."
+    ],
+    "followup_source_repair": {
+      "state": "APPLIED_AFTER_INDEPENDENT_SOURCE_REVIEW; ORDINARY_AND_DIAGNOSTIC_RELEASE_BUILDS_PASS; INTEGRATED_ACTUAL_SOURCE_CONTROL_PASS; CONDITIONAL_FIRST_FIRE_ROUTE_PASS_INDEPENDENT_RAW_REVIEW_GO",
+      "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+      "tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
+      "base": "3ddc98b759b225faec080b2b15419e555f31667c",
+      "pre_parent_rebase_source": "133eeb2f066d17ab53efd4f565c5749605af4035",
+      "tree_unchanged_by_parent_rebase": true,
+      "finding": "Ground_GetStageGObj installs two authored Ground processes and Stadium Fire adds a third. The previous guard incorrectly required one node; the repair validates the exact three-node chain including callback, priority, GObj ownership and terminating tail.",
+      "patch_sha256": "c9ab98e7bf38fce371b5ec9f3f841378d14f19a837dad08f87a04efb5df760de",
+      "applied_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/applied-current-main.json",
+        "bytes": 512,
+        "sha256": "c9db6a6be41cdcd4644a7c1f2ebb7a3ede19b2ec73e3700aece149a5c1ebc5c8"
+      },
+      "independent_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/root-independent-review-v1.json",
+        "bytes": 1078,
+        "sha256": "c74c5fd3523e301715ebfcfc2e078284abb4ed101939604fc980b29e9946c75e",
+        "decision": "GO",
+        "capture_released": false
+      },
+      "candidate_control": "Integrated actual-source three-process chain control PASS (1 test, 0 skips); ordinary and diagnostic Release builds PASS. Guard validation only; route outcome is recorded separately under first_fire_browser_capture_v2.",
+      "builds": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-build-v1/build-summary.json",
+        "bytes": 3623,
+        "sha256": "c1a81b9837a4133c2bcf636be230a7413244a128b39ab469323a28312bc91826",
+        "ordinary_release_passed": true,
+        "diagnostic_release_passed": true
+      },
+      "integrated_actual_source_control": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-proc-chain-repair-v1/focused-v1/actual-first-fire-three-proc-chain.result.json",
+        "bytes": 1302,
+        "sha256": "e7de14b59b9361efc09483febbf23e6c1b0fa4a064fa319c7ba06f46448674b8",
+        "passed": true,
+        "tests": 1,
+        "skips": 0
+      }
+    }
+  },
+  "first_fire_browser_capture_v2": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/",
+    "state": "PASS_CONDITIONAL_FIRST_FIRE_ROUTE_INDEPENDENT_RAW_REVIEW_GO",
+    "decision": "GO_SCOPED_CONDITIONAL_FIRST_FIRE_COMPONENT",
+    "source_head": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "elapsed_seconds": 106.842971208971,
+    "source_rows": 23129,
+    "actions": 9348,
+    "state_samples": 4387,
+    "scene_endpoints": 8,
+    "results_and_css_returned": true,
+    "native_retired": true,
+    "pins_exact": true,
+    "owned_cleanup_passed": true,
+    "h1_timing_pause_observed": false,
+    "profile": "selected_b_first_fire_recorded_callback_v1",
+    "comparison_scope": "Declared 14 source fields plus seed, four-port PAD, action order, and native-local checked graph lifetime; conditional recorded callback phase.",
+    "exclusions": [
+      "No per-owner RNG comparison.",
+      "No general timing or remaining-form claim.",
+      "No C5 or whole-stage acceptance."
+    ],
+    "root_result_summary": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/root-result-summary.json",
+      "bytes": 972,
+      "sha256": "51dfd37781486d948ea447b88366300f4b1dcd6a20e3816af443b368a1ec3fb0"
+    },
+    "browser_report": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/report.json",
+      "bytes": 333085,
+      "sha256": "8a48c1516bea7f02afb11aa427d70212b1b1a9aedc7961c250831889b09b0071"
+    },
+    "owner_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/owner.json",
+      "bytes": 83355,
+      "sha256": "ecf5cd34326b8b15e6aba6229717bcdf2ab377e849eb00447f23982996c7f534",
+      "cleanup_passed": true
+    },
+    "independent_raw_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/independent-review.json",
+      "bytes": 36188,
+      "sha256": "7c484b2f5d841f5c8a9890535836f7b3c436433d2ad584cf6f0f5253e5098606",
+      "decision": "GO_SCOPED_CONDITIONAL_FIRST_FIRE_COMPONENT",
+      "all_manifest_pins_verified": 106,
+      "source": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+      "tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5"
+    },
+    "capture_command": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/command.json",
+      "bytes": 5923,
+      "sha256": "f01b27597af42a5e5a694933be89812a774febe76174e6c73abdc951497fd520"
+    },
+    "retained_rows": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/paired-v11-full-rows.jsonl",
+      "bytes": 14056698,
+      "sha256": "f3515cabba48cde85e3b3eb9dec827b199c00273aa86899163cbcc7b1ad64c09"
+    },
+    "retained_rng_trace": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-browser-capture-v2/browser-run/paired-v11-full-rng.jsonl",
+      "bytes": 36004940,
+      "sha256": "0164e84c7425b5bf3f41a07718384f261edc05c2f6018d2e8cfa44257d1f98bc",
+      "comparison": "retained only; no per-owner RNG parity claim"
+    },
+    "component_comparison": {
+      "pass": true,
+      "actions": 9348,
+      "source_rows": 23129,
+      "source_state_samples": 4387,
+      "scene_endpoints": 8,
+      "native_phase": 0,
+      "native_running": 0,
+      "native_retired": true,
+      "whole_session_complete": true,
+      "per_owner_rng_comparison": false
+    }
+  },
+  "current_test_head": "57714af2c35e3485b16b5c7865691302636ae356",
+  "source_fixture_repair": {
+    "state": "TEST_ONLY_REPAIR_REVIEWED_AND_APPLIED; TWO_FOCUSED_CASES_PASS; FULL_V2_FINISHED_WITH_EIGHT_OTHER_FIXTURE_FAILURES",
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/",
+    "test_head": "58d705a10fa131022e855e69cdbb226e9c63f496",
+    "runtime_producer": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "test_only": true,
+    "production_unchanged": true,
+    "old_assertion_reproduced": true,
+    "candidate_two_focused_cases_pass": true,
+    "focused_result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/focused-result.json",
+      "bytes": 2603,
+      "sha256": "4e7bf69c0c30c014088706364d74f9607d403b91651b6923faf61812a86637f8"
+    },
+    "independent_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/independent-review.json",
+      "bytes": 495,
+      "sha256": "0507cac9a687c251003a3e73e5670eac8c26391a52adf35c8cb322c704a041bb",
+      "decision": "GO"
+    },
+    "applied_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-source-fixture-repair-v1/applied.json",
+      "bytes": 154,
+      "sha256": "f225970218c053bd0d8567353a99956cce39e0a0d6c07e002ad78bae309b5ac4"
+    },
+    "prior_full_regression_stop": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v1/root-early-stop.json",
+      "bytes": 1352,
+      "sha256": "88116565793229ff3588cbf2a36af9b9f95d526dce907a8fb2b22ee5685f2ecf",
+      "elapsed_seconds": 106.6,
+      "reason": "Known stale textual fixture assertion; no runtime failure inferred."
+    },
+    "current_full_regression": "COMPLETED_WITH_EIGHT_OTHER_FIXTURE_FAILURES",
+    "current_exact_head_ci": "HISTORICAL_58D_HEAD_NOT_SUBMITTED; FINAL_PR_HEAD_CI_PENDING"
+  },
+  "historical_source_slot_context": {
+    "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+    "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+    "base": "b041dcefff1f96a73f5b4afc9972e48250d4ba91",
+    "parent_only_rebase": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-current-main-rebase.json",
+      "bytes": 388,
+      "sha256": "1f08c5014a10b3e097ef0ec6e43f12bd66c41ae1cb2ebe59510d81a64391eb28"
+    },
+    "note": "Historical source-slot milestone only, not the current Fire runtime producer."
+  },
+  "archive_and_slot_validation": {
+    "full_regression_v2": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/result.json",
+      "bytes": 1181,
+      "sha256": "7a3c36c80d83bfb969de82735b24bab42af0c2481ffac084c148d4217234ae60",
+      "stderr": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stderr",
+        "bytes": 545978,
+        "sha256": "86e7d27cc50684c9ab9fb0414d1a927277b57d7f00c60c004e272b2947aabf3e"
+      },
+      "stdout": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-archive-service-full-regression-v2/full-regression.stdout",
+        "bytes": 35292,
+        "sha256": "86f606a216be9c5d37d8151b9b8a6757d544a6dc808be7d3e74999a3c1c205c8"
+      },
+      "head": "3639903a7d664c0816afc421ea3c32eb8721b887",
+      "tree": "9ed490cba1819aea4b0e169e0fd96ee3c6fac5b6",
+      "tests": 2973,
+      "skipped": 211,
+      "elapsed_seconds": 620.6380092906766,
+      "raw_unittest_seconds": 619.938,
+      "exit_code": 0,
+      "group_absent": true,
+      "source_unchanged": true,
+      "scope_note": "The four v1 fixture/export failures are retained; the reviewed compatibility repair passed the v2 regression. No browser gameplay or transformation run was performed."
+    },
+    "public_runtime_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "audio_preview_release": {
+      "path": "c5-compatibility-build-v1/result.json",
+      "bytes": 5471,
+      "sha256": "26a1692771ec11974f8a53d6cbb76c2b7c9188f096d342109d612db603302ca0"
+    },
+    "build_artifacts": {
+      "path": "c5-compatibility-build-v1/artifacts.json",
+      "bytes": 1202,
+      "sha256": "88a90bc62f6c7be350f95673d07d85a9ffcade361237a90d9e20d8df7bd292f0"
+    },
+    "public_audio_builds_passed": true,
+    "full_regression_v3": {
+      "state": "FAIL_ONE_CANONICAL_REPRESENTATION_TEST; RETAINED",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-regression-v3/result.json",
+      "sha256": "8269d2e06ea8f6dc42645597413e30e67a21f421941a7e3a9a52b4d25eeb8ee8",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "tree": "196ddd3e7cf5b48a26d4e2d4e1cd3ccb84f203eb",
+      "tests": 2975,
+      "skipped": 211,
+      "failures": 1,
+      "exit_code": 1,
+      "group_absent": true,
+      "scope_note": "Sole failure was patch canonicalization. Patch normalization preserved applied dependency tree; full suite not rerun after this representation-only change."
+    },
+    "repaired_focused": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-focused-v3/result.json",
+      "sha256": "e65ba18e7cd80395e3e986919ec4ce0a5816ddc5bea4aed34097ff3655feb6d2",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "group_absent": true,
+      "scope_note": "Actual-source first-provider repair control keeps base Ground0 live and refuses a real form Ground9 consumer."
+    },
+    "canonicalization": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-canonical-v1/result.json",
+      "sha256": "db321829744ba2b8e8fcc43d5e7f536992bd1288ba80bf4847c48860f32eb608",
+      "passed": true,
+      "canonical_test_count": 15,
+      "canonical_test_passed": true,
+      "patch_after_sha256": "db35d73df152b157fec7fc381b2342e6a8d0fa7ac8bc1b97cee088814e78a4b1",
+      "applied_dependency_tree": "13ef3f889b0e3a6ffd5c52feffefe47bfd5c92ad",
+      "full_regression_rerun": false
+    },
+    "repaired_builds": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-slots-build-v3/result.json",
+      "sha256": "c8a247b4b131ad2636cde0e5be6c938c8c41badc5ef8b3ca16dac6c03deb0dc1",
+      "head": "3e0a533c376dbfe613d3084802297c372b40cb01",
+      "passed": true,
+      "ordinary_release": true,
+      "diagnostic_release": true,
+      "source_unchanged": true
+    },
+    "scope": "Historical archive/slot validations at their explicit heads; current Fire validation is recorded separately."
+  },
+  "first_fire_full_regression_v2": {
+    "head": "58d705a10fa131022e855e69cdbb226e9c63f496",
+    "tests": 2990,
+    "skipped": 211,
+    "failures": 8,
+    "elapsed_seconds": 626.0194787499495,
+    "state": "FAIL_RETAINED",
+    "source_unchanged": true,
+    "group_absent": true,
+    "note": "Missing modeled fields/scheduler declarations in extracted native fixtures and stale exact Node pass-count expectation. Runtime bytes unchanged.",
+    "result_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v2/result.json",
+      "bytes": 3769,
+      "sha256": "833b6efb1275e3884d9221970eb1089d1cbeae1bbf5050252b51ceb3b5d4fe20"
+    },
+    "failures_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v2/failures-only.txt",
+      "bytes": 13220,
+      "sha256": "5aa3d699f41d8b07597e513963fd7846ab4528a7293b125526f1659f615cb57a"
+    }
+  },
+  "runtime_tree": "2077bb4c08112a1624820d7dbbc4a5c10effa7f5",
+  "current_test_tree": "c4828bc64194e2dd5ae3a0c2480bc521ea20972a",
+  "first_fire_regression_fixture_batch": {
+    "state": "TEST_ONLY_REVIEWED_APPLIED; FULL_V3_PASS",
+    "head": "57714af2c35e3485b16b5c7865691302636ae356",
+    "runtime_producer": "38ecb6b1c1344d6a6900c70dce92bbff7944b4da",
+    "production_unchanged": true,
+    "review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/root-review-v1.json",
+      "bytes": 661,
+      "sha256": "c3a1636a95680135ca982e9b2e464bc519d7e0273e786266ea9c075e37b2472e"
+    },
+    "freeze": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/freeze-v1.json",
+      "bytes": 10358,
+      "sha256": "dde47b19beb71d682878ef72fe2021ff1748a03c029859bd5b48c36ef44025e3"
+    },
+    "applied": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/applied.json",
+      "bytes": 3640,
+      "sha256": "a3e1233a5ab1a101d50baa0865a732b475c2b5914630b420a93ed0dae2b7da25"
+    },
+    "focused_v1": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/focused-result-v1.json",
+      "bytes": 2149,
+      "sha256": "2875433d6b46356d8b44368b8dc841beb6abe3548935c25b65fedccfa99b1465"
+    },
+    "focused_v2": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-regression-fixture-batch-v1/focused-result-v2.json",
+      "bytes": 675,
+      "sha256": "4557036eacade962154e9fee7cca5701dd7b155301050e7ee9f4fcb53865d3fc"
+    },
+    "focused_scope": "Initial eight-case batch: seven passed, one failed on a fixture newline. After that fix the single failed case passed. These are separate runs; final integrated suite follows. Exact Node counts and original runtime assertions remain enforced."
+  },
+  "first_fire_full_regression_v3": {
+    "state": "PASS",
+    "head": "57714af2c35e3485b16b5c7865691302636ae356",
+    "tests": 2990,
+    "skipped": 211,
+    "failures": 0,
+    "raw_unittest_seconds": 623.445,
+    "elapsed_seconds": 624.1135070407763,
+    "source_unchanged": true,
+    "group_absent": true,
+    "cleanup_signals": [],
+    "result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v3/result.json",
+      "bytes": 4572,
+      "sha256": "14dc4edad4faee77625395dbb493e1ce1da715f0c06f146e305fd91394289d70"
+    },
+    "stderr": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-fire-full-regression-v3/regression.stderr",
+      "bytes": 548919,
+      "sha256": "8575370a9a800d91cae9f2e2aefd1f27ffa506915767ee1eb26258687e075d1b"
+    },
+    "scope": "Full regression at the final test-only source; production matches runtime/capture producer38ecb6b1. Later docs-only changes do not imply another runtime capture."
+  },
+  "merged_pr352": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/352",
+    "issue": 349,
+    "merge_commit": "bb996c90dbd32c9fdf469abd7b7f9dcbec31e17e",
+    "reviewed_head": "3a1fc303b343b190c3585712cf4bfe6f4cb7295d",
+    "tree": "c5ac97daf1494776bc1807d694bacb1d98a56b8b",
+    "reviewed_tree_matches": true,
+    "ci": {
+      "run": 40569226938,
+      "checks": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success",
+      "gate": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr352-merge-gate-v1/ci-final.json",
+        "bytes": 50164,
+        "sha256": "dc6ae43fce6b93bac9332121bc51238bcc9a26a9727121224b0f0052f0c95c5b"
+      },
+      "merged_commit_receipt": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr352-merge-gate-v1/merged-commit.json",
+        "bytes": 3445,
+        "sha256": "1768a33083fa1494cd48c51bd012ec28ca1e1a50aa31f9fe9d3d776457b7d322"
+      },
+      "tree_verification": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr352-merge-gate-v1/tree-verification.json",
+        "bytes": 267,
+        "sha256": "c3c72613c4181180b954dc79ace74e864743a2b740021f89faf22aee9f72a48e"
+      }
+    },
+    "scope": "Default-off conditional first-Fire route; C5 and public transformation acceptance remain open."
+  },
+  "first_water_browser_capture_v1": {
+    "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/",
+    "state": "PASS_CONDITIONAL_FIRST_WATER_ROUTE; INDEPENDENT_BROWSER_RAW_REVIEW_GO; FINAL_REGRESSION_PASS_AT_26F",
+    "profile": "selected_b_first_water_recorded_callback_v1",
+    "runtime_producer": "26f0a0d263e10c6bde8a6391b0ca8661eb9a3c67",
+    "runtime_tree": "bfed211e7ac56f4b523181fe846006a3e1362850",
+    "original_producer": "b1dc76874537a17282c4023d9438047f00f89624",
+    "elapsed_seconds": 106.62986329197884,
+    "comparison": {
+      "pass": true,
+      "actions": 9024,
+      "lifetimes": 2,
+      "state_samples_b": 4223,
+      "scene_endpoints": 8,
+      "results_and_css_returned": true,
+      "native_retired": true,
+      "all_pins_exact": true,
+      "owned_process_groups_absent": true,
+      "H1_timing_pause_observed": false,
+      "per_owner_rng_comparison": false,
+      "C3": false,
+      "C4_complete": false,
+      "lifetime_rows": [
+        {
+          "match_index": 0,
+          "generation": 3,
+          "setup": true,
+          "go": false,
+          "state_samples": 0,
+          "actions": 384,
+          "terminal": true,
+          "retired": true,
+          "results": true,
+          "css": true,
+          "scene_endpoints": 4
+        },
+        {
+          "match_index": 1,
+          "generation": 7,
+          "setup": true,
+          "go": true,
+          "state_samples": 4223,
+          "actions": 8640,
+          "terminal": true,
+          "retired": true,
+          "results": true,
+          "css": true,
+          "scene_endpoints": 4
+        }
+      ],
+      "reviewer_verified_pins": 219,
+      "native_diagnostic_rows": 22318,
+      "original_primary_rows": 29344,
+      "graph_lifecycle_events": 11
+    },
+    "original_callback_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-water-request-clocks-replay-v1/independent-review-v1/review.json",
+      "bytes": 8570,
+      "sha256": "17c28e934d5836dbef3b74edd6e44fb89893bbd8a075bf9d48cc8356288a66bf",
+      "decision": "GO_ORIGINAL_WATER_REQUEST_CALLBACK_REFERENCE_ONLY"
+    },
+    "source_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-graph-candidate-v1/independent-review-v2.json",
+      "sha256": "4d6e375300fa4cc79aa3014dd6075cb2d5ee9d0c6525ada2c478814d19a1b147",
+      "decision": "GO_SOURCE_INTEGRATION_ONLY"
+    },
+    "projection_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-projection-candidate-v2/independent-review-v2.json",
+      "bytes": 4909,
+      "sha256": "04d6bb0ef0fbd05c0d081e9f046ba32feebe40c59ca9adb33d78f035a6902431",
+      "decision": "GO_SOURCE_PROJECTION_AND_ACTUAL_ADMISSION_ONLY"
+    },
+    "projection": {
+      "schema": "melee-web-stadium-first-water-pair-projection-v1",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-projection-candidate-v2/export-v1/projection.json",
+      "bytes": 12570739,
+      "sha256": "c3c64749a0eaa3b05813244bb5f374b43980dbcdfd246f695b38aae705fca7ab",
+      "recipe_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-projection-candidate-v2/export-v1/recipe.mwrc",
+      "recipe_sha256": "4fab2fe9916bd58baf1e031c746b7e236b893f620dbce7dd6d456679f2c04000",
+      "export_result_sha256": "e14f1ce35a8f65fe2330561350a20703d2cb88fe11ed25c4661571c439633b53"
+    },
+    "runtime_validation": {
+      "head": "26f0a0d263e10c6bde8a6391b0ca8661eb9a3c67",
+      "tree": "bfed211e7ac56f4b523181fe846006a3e1362850",
+      "builds": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-integration-v1/build-summary.json",
+        "bytes": 3569,
+        "sha256": "1e6d3546f37fd9051c1cdc986f61adb59e9c43491bdc14edeb98618b9f945c5f",
+        "passed": true,
+        "ordinary_release": true,
+        "diagnostic_release": true
+      },
+      "focused": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-integration-v1/focused-summary.json",
+        "bytes": 4686,
+        "sha256": "3f25045958c2de495ade5918dbc7c0dc71675958660f6c6c6e0abe93edeb4beb",
+        "passed": true
+      }
+    },
+    "browser_report": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/browser-run/report.json",
+      "bytes": 333557,
+      "sha256": "a7f2ce774cbb8ab97b564d14d78c6eba223538fa944b6beff9faf8dd8b8e3cdc",
+      "result": "pass"
+    },
+    "owner_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/owner.json",
+      "bytes": 112435,
+      "sha256": "d130f854d24f435f8d05eb9f94c2308475ab19a2745a03e50c140938ec887b00",
+      "cleanup_passed": true,
+      "capture_process_group_absent": true,
+      "server_process_group_absent": true
+    },
+    "launcher_result": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/launcher-result.json",
+      "bytes": 215,
+      "sha256": "99f8703559f11b35d1aedaa1efc5ae41384030fb6acba60367284dd86776eb71",
+      "exit_code": 0,
+      "elapsed_seconds": 106.62986329197884,
+      "all_source_runtime_input_pins_exact": true
+    },
+    "root_summary": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/root-result-summary.json",
+      "bytes": 2043,
+      "sha256": "4b7d3bc80f6396441ed73a57a29d38ee4c4260e673a4be2eb0b08129929f5ebf"
+    },
+    "manifest_sha256": "a80bf982fee96bc4eb5255a1b741e7ecd39765ae014dddb13994d85495c6fdb4",
+    "independent_browser_raw_review": {
+      "state": "PASS_SCOPED_CONDITIONAL_FIRST_WATER_COMPONENT",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-browser-capture-v1/independent-review.json",
+      "bytes": 67570,
+      "sha256": "6f822438f86c796e28cde232f42aeee33c4022a9c577dda9972cd95a17628a7d",
+      "decision": "GO_SCOPED_CONDITIONAL_FIRST_WATER_COMPONENT",
+      "verified_manifest_pins": 219,
+      "native_rows": 22318,
+      "actions": 9024,
+      "state_samples_b": 4223,
+      "scene_endpoints": 8,
+      "route_completed_A_B_Results_CSS": true,
+      "checked_native_retirement": true,
+      "owned_cleanup_verified": true,
+      "H1_timing_pause_observed": false,
+      "per_owner_rng_comparison": false,
+      "C5_complete": false,
+      "original_primary_rows": 29344,
+      "graph_lifecycle_events": 11
+    },
+    "final_regression": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-full-regression-v1/result.json",
+      "bytes": 3983,
+      "sha256": "034f5d0e207dd7666274a3bd23d677603c28c89b17785a695c59f32757a6f538",
+      "source_head": "26f0a0d263e10c6bde8a6391b0ca8661eb9a3c67",
+      "tests": 3000,
+      "skips": 211,
+      "unittest_seconds": 632.315,
+      "owned_seconds": 633.0457849581726,
+      "source_unchanged": true,
+      "owned_process_group_absent": true,
+      "cleanup_signals": [],
+      "owned_scratch_removed": true
+    },
+    "exclusions": [
+      "No per-owner RNG parity.",
+      "No general DVD completion or general timing rule.",
+      "No other-form coverage, C3/C4 completion, C5 acceptance, or public transformation acceptance."
+    ],
+    "combined_source_review": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-final-review-v1/source-review.json",
+      "bytes": 11512,
+      "sha256": "fb00ab749176683325dca23686f65d9bb6afcfbd87c3222c398638a2c9775b2b",
+      "decision": "GO_SOURCE_INTEGRATION_FULL_REGRESSION_AND_PUBLICATION_CI_PENDING"
+    }
+  },
+  "merged_pr353": {
+    "url": "https://github.com/ericvanlare/melee-web/pull/353",
+    "issue": 351,
+    "reviewed_head": "8df7048ab17f6e66b81adedab327356118538511",
+    "merge_commit": "6d20fd8c7a2cab0f63c1718d0f3fde4842ffd92c",
+    "tree": "4afb1056c8216424d104aed6b9744235985d5958",
+    "reviewed_tree_matches": true,
+    "ci": {
+      "run": 40577707016,
+      "checks": 14,
+      "success": 12,
+      "expected_skips": 2,
+      "conclusion": "success",
+      "gate": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr353-merge-gate-v1/ci-final.json",
+        "bytes": 28800,
+        "sha256": "34c079afb4455d6bdec8278c6d949b12a21cc4166e91a74cef443890ecdfd0f0"
+      }
+    },
+    "merged_commit_receipt": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr353-merge-gate-v1/merged-commit.json",
+      "bytes": 3224,
+      "sha256": "cd0bf6c4b5f34ede8b1cd0dcd9eac9d26bcbafd25bbdd9fc54ed8410fa0a2103"
+    },
+    "tree_verification": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/pr353-merge-gate-v1/tree-verification.json",
+      "bytes": 322,
+      "sha256": "986fae518434dc36c5d9e0dbd806d170d368b1158100d92972278162c0860f8c"
+    },
+    "scope": "Publishes the reviewed #351 default-off recorded-callback first-Water runtime implementation and final documentation. Runtime evidence remains bound to producer26f0a0d2; C5 and public transformation acceptance remain open."
+  },
+  "next_milestone_354": {
+    "url": "https://github.com/ericvanlare/melee-web/issues/354",
+    "state": "NATIVE_WATER_QUERY_CAPTURE_AND_STRICT_ROUTE_COMPARATOR_QUERY_VALIDATOR_REPLAY_PASS; INDEPENDENT_RAW_REVIEW_PASS; FULL_REGRESSION_PASS; ORIGINAL_COLLISION_QUERY_UNOBSERVED",
+    "scope": "One explicitly requested default-off native collision-query observation on the selected first-Water route. The existing route comparator and native query validator replay passed. No original collision-query counterpart is available, so original collision-query parity is unobserved and outside #354; this is not per-owner RNG, C5, whole-stage or public acceptance. Exact-head CI for the publication containing these docs is tracked on that PR."
+  },
+  "water_collision_component_354": {
+    "state": "PASS_NATIVE_CONDITIONAL_QUERY_COMPONENT; STRICT_ROUTE_COMPARATOR_AND_NATIVE_QUERY_VALIDATOR_REPLAY_PASS; INDEPENDENT_RAW_REVIEW_PASS; FULL_REGRESSION_PASS; ORIGINAL_COLLISION_QUERY_UNOBSERVED",
+    "profile": "selected_b_first_water_recorded_callback_v1 + explicit water_collision_probe",
+    "runtime": {
+      "head": "3d533ec3944b3b95d842c15fbfe2c98fef93d1d2",
+      "tree": "8f5026c9fb791c076eb55089b664270e4e544c08",
+      "focused": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/focused-final.json",
+        "sha256": "98d788d815fafc90cfd825c0bb5af8bb3e423714b22ef8df607a67b77c6e6ed8",
+        "passed": true
+      },
+      "builds": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/build-summary.json",
+        "sha256": "2b8840a656bb0e7c938fc8ca33cf0f94977e41a6260e4e25e4e3a87381552ebe",
+        "ordinary_release": true,
+        "diagnostic_release": true
+      },
+      "source_review": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/independent-final-source-review.json",
+        "sha256": "b4324e3eab2c61ca421e38fc8b57eac943bbbb516dbc97c93841bdb4bf6844d5",
+        "decision": "GO_COMMIT_AND_AFFECTED_BUILD"
+      }
+    },
+    "original_reference": {
+      "producer": "b1dc76874537a17282c4023d9438047f00f89624",
+      "callback_report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c4-water-request-clocks-replay-v1/report.json",
+        "sha256": "d75418f6410c0b45c7d32242a68464548e6f85fe64509cb9f5041bae44b04ddf"
+      },
+      "water_projection": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c5-first-water-projection-candidate-v2/export-v1/projection.json",
+        "sha256": "c3c64749a0eaa3b05813244bb5f374b43980dbcdfd246f695b38aae705fca7ab",
+        "recipe_sha256": "4fab2fe9916bd58baf1e031c746b7e236b893f620dbce7dd6d456679f2c04000"
+      },
+      "limitation": "The existing route comparator and native query validator replay passed. The retained original callback trace contains no original collision-query counterpart; original collision-query parity is unobserved and outside #354."
+    },
+    "capture": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/",
+      "elapsed_seconds": 103.37609529076144,
+      "manifest_sha256": "de2f7e41bae31421502f7cf99b64e18da831a67f26d2d298d5dc9ec7556d3c37",
+      "pin_count": 235,
+      "all_source_runtime_input_pins_exact": true,
+      "report": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/browser-run/report.json",
+        "sha256": "50f9614068deee794fa8ff8eb5e9db451890edad23395b44d9cb4d86c6dd7f1d",
+        "result": "pass"
+      },
+      "owner": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/owner.json",
+        "sha256": "036cd5c999b4053edd9b7bafa32ad1f492dc26d34386f3d914e0fb60f60eb36f",
+        "cleanup_passed": true,
+        "owned_process_groups_absent": true
+      },
+      "launcher": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/launcher-result.json",
+        "sha256": "c428106a0b2c70562d12b2fe7fa98f5fd0598dd9e87373881ad6d0fa08fea9e1",
+        "exit_code": 0
+      },
+      "root_summary": {
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/root-result-summary.json",
+        "sha256": "24490a20dc8ff3622cd759d86355487de0c59730a0a52ce5aaef79a5533dea0d",
+        "h1_timing_pause_observed": false
+      },
+      "observed": {
+        "lifetimes": 2,
+        "actions": 9024,
+        "native_diagnostic_rows": 22319,
+        "water_state_samples": 4223,
+        "scene_endpoints": 8,
+        "water_collision_query_rows": 1,
+        "results_and_css_returned": true,
+        "native_retired": true,
+        "h1_pauses": 0
+      }
+    },
+    "query": {
+      "payload_source_tick": 4306,
+      "wrapper_source_tick": 4307,
+      "match_index": 1,
+      "world_generation": 7,
+      "line_index": 113,
+      "joint": 0,
+      "kind": "floor",
+      "chain_x_bounds": {
+        "min": -64.96515655517578,
+        "min_bits": "0xc281ee29",
+        "max": -63.20751953125,
+        "max_bits": "0xc27cd480"
+      },
+      "midpoint_hit": {
+        "x": -64.08633422851562,
+        "x_bits": "0xc2802c34",
+        "y": 86.15269470214844,
+        "y_bits": "0x42ac4e2e",
+        "line": 113,
+        "displacement_y": 9.999999747378752e-05,
+        "displacement_y_bits": "0x38d1b717",
+        "normal_bits": [
+          "0xbef44df4",
+          "0x3f60fa35",
+          "0x00000000"
+        ]
+      },
+      "outside_chain_misses": {
+        "left": {
+          "x_bits": "0xc283ee29",
+          "line": -1
+        },
+        "right": {
+          "x_bits": "0xc278d480",
+          "line": -1
+        }
+      },
+      "sampled_world_state_unchanged": true,
+      "collision_readiness_unchanged": true,
+      "raw_input_order_and_rng_comparison": "The existing route comparator replay passed for the declared route/input/action scope. No original collision-query counterpart is available, so query parity itself remains unobserved and outside #354."
+    },
+    "pure_raw_inspection": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/pure-raw-inspection.json",
+      "sha256": "d0e2c0a5d474af211a0c4789576dafa021ee8c095dab510bf286885bda189941",
+      "decision": "PASS_RAW_INSPECTION; ROUTE_REPLAY_COMPLETED_IN_SEPARATE_INDEPENDENT_REVIEW"
+    },
+    "full_regression": {
+      "state": "PASS",
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/regression-summary.json",
+      "sha256": "ae0ac6047937b6f9420e3cade8add365dcf01f889d140da14e3dc2a3767cd80a",
+      "result_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-integration-v1/regression.result.json",
+      "result_sha256": "59c9616558217538456476cac73ffb2f64574eddc5bab9ad3411d2c0c169ca20",
+      "tests": 3001,
+      "skipped": 211,
+      "failures": 0,
+      "owned_process_group_absent": true,
+      "cleanup_signals": [],
+      "source_unchanged": true,
+      "elapsed_seconds_unittest": 629.643,
+      "elapsed_seconds_owned": 630.401973125
+    },
+    "retained_fixture_and_reviewer_failures": [
+      {
+        "kind": "reviewer_preparation_fixture",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/pure-review-preparation-error-v1.json",
+        "sha256": "37a4240e5d351c892a38881ccb900ad6113bd3b9231295dfa25efe8d94aa1302",
+        "disposition": "The reviewer adapter expected more than 30 float fields; this raw schema has 29 exact bit-tagged scalars. It was a preflight assertion failure, not a runtime mismatch."
+      },
+      {
+        "kind": "reviewer_invocation",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review-run-v1/actual-water-query-raw-review.result.json",
+        "sha256": "a96c8aaba67b7011efb331cc3d6718153f289d0ee0376ac818c343dfe6bc3720",
+        "stderr_path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review-run-v1/actual-water-query-raw-review.stderr",
+        "stderr_sha256": "7dc27a345a7bd0eb3235a03cdd8d94c48046ea896c68f916e91eb477f267312f",
+        "disposition": "A reviewer invocation exited 1 during preparation; later pure raw inspection passed. This was not browser gameplay failure."
+      },
+      {
+        "kind": "source_fixture_review_finding",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/independent-review-v3.json",
+        "sha256": "33cf353272cc51133f9ed69b270dc6bfc05fdd62b8443be4664481dac1cabc75",
+        "disposition": "An extracted C++ fixture lacked namespace qualification; the modeled actual-method control was repaired and its final focused module passed. This did not indicate runtime divergence."
+      },
+      {
+        "kind": "source_fixture_closure",
+        "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-component-v1/fixture-source-closure-v7.json",
+        "sha256": "583795e32fb11e90105aa88a4640a134345cbe1b3d5416c372abd105c01079e7",
+        "decision": "COMPLETE_FOR_MODELED_ACTUAL_METHOD_CONTROL"
+      }
+    ],
+    "limitations": [
+      "Native-only query component; no original query counterpart or parity claim.",
+      "No per-owner RNG comparison, general timing/Grass/Rock completion, repeated-form coverage, C5/C6 acceptance, or public transformation admission.",
+      "Original rotated Water vertices and source-side query/normal behavior remain unobserved."
+    ],
+    "strict_route_and_native_query_validator_replay": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review.json",
+      "sha256": "5425dbaa29f44e1ce9887acb6d2c623313d11d7df6e235efaa17ef49f6e0e15f",
+      "decision": "GO_SCOPED_NATIVE_WATER_QUERY_COMPONENT",
+      "elapsed_seconds": 1.768,
+      "pass": true,
+      "actions": 9024,
+      "states": 4223,
+      "scene_endpoints": 8,
+      "probe_rows": 9024,
+      "native_diagnostic_rows": 22319,
+      "collision_query_rows": 1,
+      "world_generations": [
+        3,
+        7
+      ],
+      "water_graph_lifecycle_events": 11,
+      "current_immutable_manifest_pins_verified": 234,
+      "capture_time_pins_verified_by_prior_raw_inspection": 235,
+      "source_unchanged": true
+    },
+    "reviewer_environment_drift": {
+      "path": "runs/stadium-owner-parity-20261026-150215-d5a0bac0/c6-water-query-browser-capture-v1/independent-review.json",
+      "review_sha256": "5425dbaa29f44e1ce9887acb6d2c623313d11d7df6e235efaa17ef49f6e0e15f",
+      "captured_chrome_sha256": "4f71e9dbe725fec1110977b6a6dd0708fb32fbde9c905b4b461cef880ac08288",
+      "current_chrome_sha256_at_review": "0d8e033c06b6dfecb6595e41ff98db9555fb48de6abda0052aac9b48bf688d9c",
+      "scope": "Post-capture installed-app drift only; capture-time pin verification remains valid and the offline comparator did not launch a browser."
+    }
+  }
+}

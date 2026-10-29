@@ -63,11 +63,10 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
                 "void PutU16", source.index("constexpr u32 ReadBE32")
             )
         ]
-        points = source[
-            source.index("struct CpuProbePoint") : source.index(
-                "bool ParseBoundedDecimal", source.index("struct CpuProbePoint")
-            )
-        ]
+        # Keep the production RNG-selection helpers alongside the point table.
+        # The lifecycle fixture compiles RecordCpuProbe's selected-return path verbatim.
+        points_start = source.index("bool SelectedRngReturn(")
+        points = source[points_start : source.index("bool ParseBoundedDecimal", points_start)]
         json_escape = _method(source, "std::string JsonEscape", "std::string Env")
         bounded_helpers = "\n".join(
             [
@@ -185,6 +184,16 @@ struct ProbeHarness {
   u32 cpu_probe_first_tick = 100;
   u32 cpu_probe_last_tick = 103;
   u32 cpu_probe_rng_return_pc = 0;
+  bool cpu_probe_rng_returns = false;
+  bool cpu_probe_rng_updates = false;
+  // Legacy cases keep the newer GO-relative selector inactive but retain its
+  // production state because adjacent extracted helpers compile verbatim.
+  bool cpu_probe_whole_go_relative = false;
+  bool cpu_probe_go_latched = false;
+  u32 cpu_probe_first_offset = 0;
+  u32 cpu_probe_last_offset = 0;
+  u32 cpu_probe_go_tick = 0;
+  u64 cpu_probe_go_sequence = 0;
   u64 cpu_probe_rng_return_callback_count = 0;
   u32 cpu_probe_rng_return_callback_pc = 0;
   u32 cpu_probe_rng_return_callback_tick = 0;
@@ -206,6 +215,8 @@ struct ProbeHarness {
   u32 match_index = 2;
   u32 whole_session_matches = 0;
   u32 whole_phase = 0;
+  u64 next_sequence = 0;
+  u32 draw_ordinal = 0;
   bool whole_session_enabled() const { return whole_session_matches != 0; }
   std::string capture_id = "capture";
   std::string sequence_id = "sequence";
@@ -228,7 +239,15 @@ static const ReferenceCapture::CpuProbePoint& ProbePoint() {
 }
 
 static const ReferenceCapture::CpuProbePoint& RngReturnProbePoint() {
-  return ReferenceCapture::CPU_PROBE_POINTS.back();
+  const auto* point = ReferenceCapture::FindCpuProbePoint(0x80380524);
+  assert(point != nullptr);
+  return *point;
+}
+
+static const ReferenceCapture::CpuProbePoint& RandiReturnProbePoint() {
+  const auto* point = ReferenceCapture::FindCpuProbePoint(0x803805b8);
+  assert(point != nullptr);
+  return *point;
 }
 
 static const ReferenceCapture::CpuProbePoint& SamusEffectProbePoint() {
@@ -266,6 +285,10 @@ static void Prepare(ReferenceCapture::ProbeHarness* harness, Core::System* syste
 
 int main() {
   using ReferenceCapture::ProbeHarness;
+  const auto& randi_point = RandiReturnProbePoint();
+  assert(randi_point.expected_word == 0x4e800020);
+  assert(ReferenceCapture::SelectedRngReturn(0, true, randi_point.address, true));
+  assert(!ReferenceCapture::SelectedRngReturn(0, true, randi_point.address, false));
 
   // The window is inert until all three production predicates hold.
   {

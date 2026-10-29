@@ -33,9 +33,15 @@ class SuddenDeathHandoffOrderTests(OwnedWorkspaceTests):
             self.skipTest("Native clang++ unavailable")
         source = (ROOT / "src/gameplay_match_session.cpp").read_text()
         end_flow = function(source, "    void end_flow()")
+        world = (ROOT / "src/gameplay_world.cpp").read_text()
+        service = (ROOT / "src/gameplay_source_files.c").read_text()
+        quiescent = function(service, "int melee_web_source_files_quiescent_for(")
+        ensure = function(world, "void GameplayWorld::ensure_source_files_quiescent()const{")
         finish = function(source, "void GameplayMatchSession::finish_sudden_death(")
         harness = r'''
 #include <cstdint>
+#include <cstdio>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
@@ -53,6 +59,15 @@ static uint8_t live_pad=0;
 static bool published=false,publication_ok=true;
 static uint32_t delivered_seed=0;static uint8_t delivered_pad=0;
 static void check(bool value,const char* error){if(!value)throw std::runtime_error(error);}
+// Only ownership fields are modeled; predicate and World wrapper below are actual source.
+using DatError=std::runtime_error;
+struct MeleeWebSourceFileScope {int pumping=0;void* requests=nullptr;size_t request_count=0;};
+static MeleeWebSourceFileScope* active_scope=nullptr;
+static int fail(char* e,size_t n,const char* message){if(e&&n)std::snprintf(e,n,"%s",message);return 0;}
+''' + quiescent + r'''
+struct WorldStorage {MeleeWebSourceFileScope* source_files=nullptr;};
+struct GameplayWorld {WorldStorage* storage_=nullptr;void ensure_source_files_quiescent()const;};
+''' + ensure + r'''
 static int melee_web_match_flow_end(int*,char*,std::size_t){events.push_back("flow_end");*seed_ptr+=2;live_pad=2;return 1;}
 static int melee_web_match_rules_publish_result(){
  if(!publication_ok){events.push_back("publish_failed");return 0;}
@@ -67,11 +82,12 @@ static int melee_web_menu_host_sudden_death_finish(MeleeWebMenuHost*,uint64_t,
  delivered_seed=seed;delivered_pad=input[0];result->kind=1;return 1;
 }
 struct Storage {
+ MeleeWebSourceFileScope scope;WorldStorage world_storage{&scope};GameplayWorld owned_world{&world_storage};GameplayWorld* world=&owned_world;
  struct {bool sudden_death=true;} selected;
  MeleeWebMenuHost host;MeleeWebMenuHost* sudden_death_host=&host;
  bool sudden_death_claimed=true;uint64_t sudden_death_owner_id=1;
  uint32_t seed=17;int flow_value=1;int* flow=&flow_value;
- Storage(){seed_ptr=&seed;live_pad=1;}
+ Storage(){seed_ptr=&seed;live_pad=1;active_scope=&scope;}
 ''' + end_flow + r'''
  void close(){end_flow();melee_web_match_rules_publish_result();events.push_back("teardown");seed_ptr=&host_seed;live_pad=0;}
  ~Storage(){seed_ptr=&host_seed;}
@@ -95,8 +111,15 @@ int main(){
  {
  GameplayMatchSession session;session.completed=false;MeleeWebMenuMatchContinuation result;result.kind=99;
  bool refused=false;try{session.finish_sudden_death(result);}catch(const std::runtime_error&){refused=true;}
- assert(refused&&result.kind==0&&events.empty()&&session.storage_->flow!=nullptr);
+ assert(refused&&result.kind==99&&events.empty()&&session.storage_->flow!=nullptr);
  }
+ // Actual quiescence and World wrapper refuse before clearing caller Results.
+ for(unsigned busy=0;busy<4;++busy){events.clear();published=false;GameplayMatchSession session;
+ if(busy==0)session.storage_->scope.requests=&session;if(busy==1)session.storage_->scope.pumping=1;
+ if(busy==2)active_scope=nullptr;if(busy==3)session.storage_->world=nullptr;
+ MeleeWebMenuMatchContinuation result;result.kind=99;bool refused=false;
+ try{session.finish_sudden_death(result);}catch(const std::exception&){refused=true;}
+ assert(refused&&result.kind==99&&events.empty()&&session.storage_&&session.storage_->flow);}
  events.clear();publication_ok=false;
  {
  GameplayMatchSession session;MeleeWebMenuMatchContinuation result;

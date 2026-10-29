@@ -5,6 +5,10 @@
 #include <melee/gm/gm_1A45.h>
 #include <melee/gm/forward.h>
 #include <sysdolphin/baselib/gobj.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include <melee/gm/gm_16AE.h>
+#include <melee/gm/types.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -154,7 +158,6 @@ int melee_web_match_flow_result(const MeleeWebMatchFlow* flow)
     return live(flow) ? melee_web_match_source_result() : OUTCOME_NONE;
 }
 
-
 struct MeleeWebMatchFlowSnapshot {
     MeleeWebMatchFlow* identity;
     uint64_t epoch;
@@ -289,3 +292,18 @@ void melee_web_match_flow_cpu_snapshot_destroy(MeleeWebMatchFlowCpuSnapshot* sna
     melee_web_source_cadence_snapshot_destroy(snapshot->cadence);
     free(snapshot);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_match_flow_pause_observation(const MeleeWebMatchFlow* flow,
+                                         MeleeWebMatchPauseObservation* out)
+{
+    if (!out || !live(flow)) return 0;
+    const lbl_8046B6A0_t* clock = gm_16AE_GetUnkData_0();
+    if (!clock) return 0;
+    const MeleeWebMatchPauseObservation observed = {
+        flow->generation, melee_web_match_source_frames(), clock->pause_timer,
+        melee_web_match_flow_paused(flow), clock->match_result, flow->complete
+    };
+    *out = observed;
+    return 1;
+}
+#endif
