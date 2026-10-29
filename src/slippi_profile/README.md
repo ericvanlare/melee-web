@@ -214,8 +214,10 @@ child ownership ends before original shadow teardown. Camera/WObj values and the
 direct shadow texture matrix stay visible through the complete original draw,
 including late texture consumers, before canonical values are restored. Original
 arithmetic, draw order, list/refcount operations and GPU output remain in place.
-Ownership pointers are not value snapshots. Unsupported child, image, membership
-or inverse-cache transitions must refuse explicitly. This is not authority over
+Ownership pointers are not value snapshots. Unsupported child, image and
+inverse-cache transitions must refuse explicitly. Original list/active preparation
+may evolve before a checkpoint; membership/active stability is required throughout
+the existing armed CPU interval, including the final draw. This is not authority over
 the main camera's independent inverse cache or complete Slippi compatibility.
 The private build requires the existing CPU provenance configuration; V11
 manifests/snapshots are refused by V12. Ordinary profiles remain unchanged.

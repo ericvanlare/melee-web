@@ -25,6 +25,13 @@ class FighterProjectionTests(unittest.TestCase):
             stubs = scratch/'include'
             for name in ['melee/ft','sysdolphin/baselib']:
                 (stubs/name).mkdir(parents=True,exist_ok=True)
+            (stubs/'dolphin').mkdir(parents=True,exist_ok=True)
+            (stubs/'dolphin/pad.h').write_text('''
+#ifndef FIXTURE_DOLPHIN_PAD
+#define FIXTURE_DOLPHIN_PAD
+void PADControlMotor(unsigned int, unsigned int);
+#endif
+''')
             (stubs/'profile_shadow_types.h').write_text('''
 #ifndef FIXTURE_SHADOW_TYPES
 #define FIXTURE_SHADOW_TYPES
@@ -117,12 +124,21 @@ extern FixtureEntities* HSD_GObj_Entities;
             fixture=(ROOT/'src/slippi_profile/tests/fighter_projection_control.c.in').read_text()
             (scratch/'control.c').write_text(fixture.replace('ORIGINAL_FUNCTIONS',leaves))
             cmd=[os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror',
-                 '-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1','-I'+str(stubs),
-                 '-I'+str(ROOT/'src'),str(ROOT/'src/slippi_profile/fighter_projection.c'),
+                 '-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1',
+                 '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-I'+str(stubs),
+                 '-I'+str(ROOT/'src'),str(ROOT/'src/gameplay_cpu_interval.c'),
+                 str(ROOT/'src/slippi_profile/fighter_projection.c'),
                  str(scratch/'control.c'),'-o',str(scratch/'control')]
             for name,command in [('compile',cmd),('run',[str(scratch/'control')])]:
                 with (scratch/(name+'.stdout')).open('w') as out, (scratch/(name+'.stderr')).open('w') as err:
                     subprocess.run(command,check=True,stdout=out,stderr=err)
+            for mode in ['active-topology','failed-active','active-rebuilt','inactive-rebuilt',
+                         'active-order','arm-mid-draw','disarm-mid-draw','tuple-active',
+                         'image-active','inverse-active']:
+                result=subprocess.run([str(scratch/'control'),mode],capture_output=True,
+                                      text=True,timeout=30)
+                (scratch/(mode+'.log')).write_text(result.stdout+result.stderr)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         except BaseException:
             print('Retained Fighter projection control:',scratch,flush=True)
             raise

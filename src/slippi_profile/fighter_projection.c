@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "fighter_projection.h"
+#include "gameplay_cpu_interval.h"
 #include "gameplay_source_memory_runtime.h"
 #include <melee/ft/types.h>
 #include <sysdolphin/baselib/cobj.h>
@@ -60,6 +61,7 @@ typedef enum ProjectionFailure {
     PROJECTION_FAILURE_NONE,
     PROJECTION_FAILURE_CONTRACT,
     PROJECTION_FAILURE_DRAW_STATE,
+    PROJECTION_FAILURE_CPU_INTERVAL_CHANGED,
     PROJECTION_FAILURE_FIGHTER_IDENTITY,
     PROJECTION_FAILURE_SHADOW_OWNER,
     PROJECTION_FAILURE_SHADOW_OBJECT,
@@ -100,7 +102,7 @@ typedef struct Projection {
 } Projection;
 static Projection* owners;
 static uint64_t world;
-static int drawing, failed;
+static int drawing, failed, draw_interval_active;
 static ProjectionFailure first_failure;
 static unsigned failure_members_before, failure_members_after;
 static unsigned char failure_active_before, failure_active_after;
@@ -122,6 +124,7 @@ static const char* failure_name(ProjectionFailure reason)
 {
     switch (reason) {
     case PROJECTION_FAILURE_DRAW_STATE: return "draw interval state changed";
+    case PROJECTION_FAILURE_CPU_INTERVAL_CHANGED: return "CPU interval armed state changed during draw";
     case PROJECTION_FAILURE_FIGHTER_IDENTITY: return "fighter lifetime identity changed";
     case PROJECTION_FAILURE_SHADOW_OWNER: return "shadow owner tuple changed";
     case PROJECTION_FAILURE_SHADOW_OBJECT: return "shadow object changed";
@@ -425,6 +428,7 @@ int slippi_fighter_projection_require(void* object)
 int slippi_fighter_projection_draw_begin(void)
 {
     if (!world || failed || drawing) return refuse();
+    const int interval_active = melee_web_cpu_interval_active();
     /* Complete provenance preflight before any source field is swapped. Stale
      * lifetime receipts are inert, never dereferenced or adopted. */
     for(Projection* p=owners;p;p=p->next) {
@@ -454,6 +458,7 @@ int slippi_fighter_projection_draw_begin(void)
         p->fp->x221F_b0=p->flag;
         write_shadow_values(p, &p->shadow_values);
     }
+    draw_interval_active = interval_active;
     drawing=1; return 1;
 }
 int slippi_fighter_projection_draw_end(void)
@@ -466,6 +471,8 @@ int slippi_fighter_projection_draw_end(void)
         ProjectionFailure reason = shadow_tuple_failure(p);
         if (reason != PROJECTION_FAILURE_NONE) return refuse_with(reason);
     }
+    if (melee_web_cpu_interval_active() != draw_interval_active)
+        return refuse_with(PROJECTION_FAILURE_CPU_INTERVAL_CHANGED);
     ProjectionFailure topology_failure = PROJECTION_FAILURE_NONE;
     Projection* topology_owner = NULL;
     unsigned topology_final_count = 0;
@@ -475,8 +482,12 @@ int slippi_fighter_projection_draw_end(void)
         read_shadow_values(p, &p->shadow_values);
         unsigned final_count = 0;
         ProjectionFailure reason = shadow_members_failure(p, &final_count);
+        /* Source preparation may rebuild its bounded list and active bit while
+         * no restore interval owns that topology. During an armed interval,
+         * retain the strict comparison; never write topology back here. */
         if (topology_failure == PROJECTION_FAILURE_NONE &&
-            reason != PROJECTION_FAILURE_NONE) {
+            reason != PROJECTION_FAILURE_NONE &&
+            (draw_interval_active || final_count > SHADOW_MEMBER_LIMIT)) {
             topology_failure = reason;
             topology_owner = p;
             topology_final_count = final_count;

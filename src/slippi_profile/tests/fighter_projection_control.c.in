@@ -3,6 +3,7 @@
 #include <string.h>
 #include <melee/ft/types.h>
 #include <sysdolphin/baselib/gobj.h>
+#include "gameplay_cpu_interval.h"
 #include "slippi_profile/fighter_projection.h"
 #include "gameplay_source_memory_runtime.h"
 typedef int32_t s32;
@@ -11,6 +12,8 @@ typedef uint16_t u16;
 #define GET_COBJ(g) ((HSD_CObj*)(g)->hsd_obj)
 #define PAD_STACK(n)
 #define HSD_ASSERT(line, condition) assert(condition)
+void PADControlMotor(unsigned int channel,unsigned int command)
+{(void)channel;(void)command;}
 static Scissor fixture_scissor={0,640,0,480};
 static HSD_CObj camera, other_camera;
 static HSD_WObj shadow_eye, shadow_interest;
@@ -125,10 +128,118 @@ static void init_fixture(Fighter* fp, HSD_GObj* fighter)
  init_shadow(fp);fighter->next=0;fighter->user_data=fp;fighter->hsd_obj=&fighter_model;
  entities.fighters=fighter;
 }
-int main(void)
+static int run_topology_mode(const char* mode)
+{
+ Fighter fp={0};HSD_GObj fighter={0};int descriptor=1;uint64_t token=0;
+ const uint64_t world_id=20;
+ const int failed_interval=strcmp(mode,"failed-active")==0;
+ if(strcmp(mode,"active-topology")!=0&&!failed_interval&&
+    strcmp(mode,"active-rebuilt")!=0&&strcmp(mode,"inactive-rebuilt")!=0&&
+    strcmp(mode,"active-order")!=0&&strcmp(mode,"arm-mid-draw")!=0&&
+    strcmp(mode,"disarm-mid-draw")!=0&&strcmp(mode,"tuple-active")!=0&&
+    strcmp(mode,"image-active")!=0&&strcmp(mode,"inverse-active")!=0)
+  return 0;
+ identity.world=world_id;identity.fighter=20;
+ assert(slippi_fighter_projection_world_begin(world_id));
+ init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
+ camera.flags&=~0xC0000000u; /* Match the source fixture's normalized entry state. */
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+
+ if(strcmp(mode,"active-topology")==0||failed_interval) {
+  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  if(failed_interval) {
+   assert(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_SOURCE_FILE));
+   assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_SOURCE_FILE);
+   assert(melee_web_cpu_interval_active());
+  }
+  assert(slippi_fighter_projection_draw_begin());
+  shadow.objects=NULL;shadow.active=0;
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),
+                "shadow member count changed (members 1->0; active 1->0)")==0);
+  assert(shadow.objects==NULL&&shadow.active==0);
+  assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_world_end(world_id));
+  return 1;
+ }
+ if(strcmp(mode,"active-rebuilt")==0||strcmp(mode,"inactive-rebuilt")==0) {
+  HSD_SList replacement={0};
+  if(strcmp(mode,"active-rebuilt")==0) {
+   token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  }
+  assert(slippi_fighter_projection_draw_begin());
+  replacement.data=&fighter_model;shadow.objects=&replacement;
+  assert(slippi_fighter_projection_draw_end());
+  assert(shadow.objects==&replacement&&shadow.active==1);
+  assert_shadow_values(&fp,0);
+  if(token) {assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());}
+  assert(slippi_fighter_projection_world_end(world_id));
+  return 1;
+ }
+ if(strcmp(mode,"active-order")==0) {
+  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_draw_begin());
+  shadow_object.data=&other_model;
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),
+                "shadow member order changed (members 1->1; active 1->1)")==0);
+  assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_world_end(world_id));
+  return 1;
+ }
+ if(strcmp(mode,"arm-mid-draw")==0||strcmp(mode,"disarm-mid-draw")==0) {
+  const int arm=strcmp(mode,"arm-mid-draw")==0;
+  if(!arm) {token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());}
+  assert(slippi_fighter_projection_draw_begin());
+  if(arm) {token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());}
+  else {assert(melee_web_cpu_interval_end(token));token=0;assert(!melee_web_cpu_interval_active());}
+  shadow.objects=NULL;shadow.active=0;
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),
+                "CPU interval armed state changed during draw")==0);
+  assert(shadow.objects==NULL&&shadow.active==0);
+  if(token) assert(melee_web_cpu_interval_end(token));
+  assert(!melee_web_cpu_interval_active());
+  /* Terminal refusal leaves the active draw owned until process exit. */
+  return 1;
+ }
+ if(strcmp(mode,"tuple-active")==0) {
+  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  camera.eyepos=&other_eye;
+  assert(!slippi_fighter_projection_draw_begin());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),
+                "shadow camera WObj tuple changed")==0);
+  assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_world_end(world_id));
+  return 1;
+ }
+ if(strcmp(mode,"image-active")==0) {
+  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  shadow_image.width=128;
+  assert(!slippi_fighter_projection_draw_begin());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow image layout changed")==0);
+  assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_world_end(world_id));
+  return 1;
+ }
+ if(strcmp(mode,"inverse-active")==0) {
+  Mtx late_inverse={{0}};
+  token=melee_web_cpu_interval_begin();assert(token&&melee_web_cpu_interval_active());
+  assert(slippi_fighter_projection_draw_begin());camera.proj_mtx=&late_inverse;
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow camera inverse appeared")==0);
+  assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+  /* Terminal refusal leaves drawing state owned until process exit. */
+  return 1;
+ }
+ return 0;
+}
+int main(int argc,char** argv)
 {
  Fighter fp={0}; CmSubject subject={0}; HSD_GObj fighter={0};
- HSD_SList rebuilt_shadow_node={0}, extra_shadow_node={0};
+ HSD_SList extra_shadow_node={0};
+ assert(!melee_web_cpu_interval_active());
+ if(argc>1) {assert(run_topology_mode(argv[1]));return 0;}
  init_fixture(&fp,&fighter);fp.x890_cameraBox=&subject;
  fp.x2188=(S32Vec2){123,456};fp.neighbor=1;
  set_shadow_values(&fp,0);camera.flags&=~0xC0000000u;
@@ -141,8 +252,7 @@ int main(void)
  assert(late.x==10&&late.y==20&&!ftLib_80086B64(&fighter));
  fp.neighbor=0;
  set_shadow_values(&fp,2); /* Pinned setter leaves; remaining matrix/TObj writes modeled. */
- rebuilt_shadow_node.data=&fighter_model;
- shadow.objects=&rebuilt_shadow_node; /* Source may recreate nodes with same ordered JObjs. */
+ shadow.objects=NULL;shadow.active=0; /* Original inactive preparation removes both. */
  assert(shadow_texture.mtx[0][0]==2.4f);
  assert(slippi_fighter_projection_draw_end());
  assert(fp.x2188.x==123&&fp.x2188.y==456&&!fp.x221F_b0&&!fp.neighbor);
@@ -151,12 +261,13 @@ int main(void)
  assert(shadow_eye.flags==0x102&&shadow_interest.flags==0x206);
  assert(camera.flags==0x1235);
  assert(shadow_texture.flags==(0x540103u|0x00400000u));
- assert(shadow.objects==&rebuilt_shadow_node);
- /* Next draw sees the previous presentation; current authored values return after it. */
+ assert(shadow.objects==NULL&&shadow.active==0);
+ /* The next draw consumes prior presentation values with the evolved topology. */
  set_shadow_values(&fp,3);
  assert(slippi_fighter_projection_draw_begin());assert_shadow_values(&fp,2);
  set_shadow_values(&fp,4);
  assert(slippi_fighter_projection_draw_end());assert_shadow_values(&fp,3);
+ assert(shadow.objects==NULL&&shadow.active==0);
  /* Original no-write failure retains the last presented coordinate pair. */
  project_ready=0;
  assert(slippi_fighter_projection_draw_begin());
@@ -214,6 +325,8 @@ int main(void)
  assert(slippi_fighter_projection_world_begin(5));
  init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
  assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ uint64_t topology_token=melee_web_cpu_interval_begin();
+ assert(topology_token&&melee_web_cpu_interval_active());
  assert(slippi_fighter_projection_draw_begin());
  shadow.active=0;
  assert(!slippi_fighter_projection_draw_end());
@@ -224,6 +337,7 @@ int main(void)
  assert(strcmp(slippi_fighter_projection_failure_reason(),
                "shadow active state changed (members 1->1; active 1->0)")==0);
  assert(shadow.active==0&&shadow.objects==&shadow_object);
+ assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
  assert(slippi_fighter_projection_world_end(5));
 
  /* The ordered JObj value list is checked without constraining node identity. */
@@ -231,12 +345,14 @@ int main(void)
  assert(slippi_fighter_projection_world_begin(6));
  init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
  assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ topology_token=melee_web_cpu_interval_begin();assert(topology_token);
  assert(slippi_fighter_projection_draw_begin());
  shadow_object.data=&other_model;
  assert(!slippi_fighter_projection_draw_end());
  assert(strcmp(slippi_fighter_projection_failure_reason(),
                "shadow member order changed (members 1->1; active 1->1)")==0);
  assert(shadow.objects==&shadow_object&&shadow_object.data==&other_model);
+ assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
  assert(slippi_fighter_projection_world_end(6));
 
  /* A source-valid second accessory member is reported with exact bounded count. */
@@ -244,6 +360,7 @@ int main(void)
  assert(slippi_fighter_projection_world_begin(7));
  init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
  assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ topology_token=melee_web_cpu_interval_begin();assert(topology_token);
  assert(slippi_fighter_projection_draw_begin());
  extra_shadow_node.data=&other_model;extra_shadow_node.next=&shadow_object;
  shadow.objects=&extra_shadow_node;
@@ -251,6 +368,7 @@ int main(void)
  assert(strcmp(slippi_fighter_projection_failure_reason(),
                "shadow member count changed (members 1->2; active 1->1)")==0);
  assert(shadow.objects==&extra_shadow_node&&extra_shadow_node.next==&shadow_object);
+ assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
  assert(slippi_fighter_projection_world_end(7));
 
  /* Image layout mismatch is reported before draw admission mutates any values. */

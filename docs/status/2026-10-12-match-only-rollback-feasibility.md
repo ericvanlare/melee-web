@@ -1196,12 +1196,16 @@ main-camera ownership is inferred from this shadow proof.
 
 V12 at `db077477` passes focused controls and the affected browser build, but its
 first browser run stops at original draw 0: the new presentation restoration guard
-refuses before any warm sample or rollback command completes. The exact refused
-condition is not yet identified. Its snapshot close also traps on the terminal
-refusal; renderer shutdown succeeds and all owned browser processes are absent.
-The producer and failed run are retained. The next step is a precise first-failure
-reason and one reduced first-draw check, with every guard unchanged. V11's later
-two-tick results remain historical and cannot be attributed to this candidate.
+refuses before any warm sample or rollback command completes. The reduced
+first-draw diagnostic at `39ebb96e` identifies the actual condition: original
+shadow membership changes from one object to zero, and active changes from one
+to zero. This is normal source preparation before any checkpoint. Snapshot close
+also traps on the terminal refusal; renderer shutdown succeeds and all owned
+browser processes are absent. Both producers and failed runs are retained. The
+reviewed repair reuses the existing CPU interval authority to allow original
+preparation while preserving strict topology checks during the armed interval,
+as well as all child/image/inverse guards. V11's later two-tick results remain
+historical and cannot be attributed to this candidate.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The
