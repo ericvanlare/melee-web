@@ -7,7 +7,9 @@
 #include "jobj_diagnostic.h"
 #endif
 
-static void refresh_subtree(HSD_JObj *jobj, HSD_JObj *root)
+static void refresh_subtree(HSD_JObj *jobj, HSD_JObj *root);
+
+static void refresh_one(HSD_JObj *jobj, HSD_JObj *root)
 {
     if (jobj == NULL) {
         return;
@@ -26,10 +28,23 @@ static void refresh_subtree(HSD_JObj *jobj, HSD_JObj *root)
     }
 
     refresh_subtree(jobj->child, root);
-    refresh_subtree(jobj->next, root);
+}
+
+static void refresh_subtree(HSD_JObj *jobj, HSD_JObj *root)
+{
+    for (; jobj != NULL; jobj = jobj->next) {
+        refresh_one(jobj, root);
+    }
 }
 
 void slippi_profile_refresh_fighter_matrices(HSD_JObj *root)
 {
     refresh_subtree(root, root);
+}
+
+void slippi_profile_refresh_ground_matrices(HSD_JObj *root)
+{
+    /* HSD_JObjDispAll starts at the Ground GObj root and follows children;
+     * its top-level next sibling is outside this GObj's display traversal. */
+    refresh_one(root, root);
 }

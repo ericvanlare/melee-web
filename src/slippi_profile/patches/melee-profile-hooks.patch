@@ -1290,3 +1290,28 @@ diff --git a/src/melee/gr/grizumi.c b/src/melee/gr/grizumi.c
  }
  
  void HSD_JObjSetMtxDirtySub(HSD_JObj* jobj)
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -1,5 +1,9 @@
+ #include "ground.h"
+ 
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/dynamics_fix.h>
++#endif
++
+ #ifdef TARGET_PC
+ #include "gameplay_effect_banks.h"
+ #include "gameplay_stage_map.h"
+@@ -1102,6 +1106,11 @@ static void Ground_801C1D38(HSD_GObj* gobj)
+ {
+     Ground* gp = gobj->user_data;
+     if (gp->xC_callback != NULL) {
+         gp->xC_callback(gobj);
+     }
++#if defined(MELEE_WEB_SLIPPI_PROFILE) && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
++    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_profile_refresh_ground_matrices((HSD_JObj *) gobj->hsd_obj);
++#endif
+ }

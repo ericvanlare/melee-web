@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <assert.h>
+#include <stddef.h>
+
+#include "slippi_profile/dynamics_fix.h"
+
+typedef struct HSD_GObj {
+    HSD_JObj *hsd_obj;
+    void *user_data;
+} HSD_GObj;
+
+typedef void (*GroundCallback)(HSD_GObj *);
+typedef struct Ground {
+    GroundCallback xC_callback;
+} Ground;
+
+/* Exact Ground_801C1D38 body from the source-composed Ground module. */
+GROUND_FUNCTION
+
+enum { EVENT_CALLBACK = 1, EVENT_SETUP = 2, MAX_EVENTS = 16 };
+static int events[MAX_EVENTS];
+static HSD_JObj *event_jobjs[MAX_EVENTS];
+static HSD_JObj *expected_parents[MAX_EVENTS];
+static size_t event_count;
+static HSD_JObj *authored_dirty;
+static HSD_JObj *expected_root;
+static unsigned callback_count;
+
+/* A call-order seam only; real browser validation exercises original setup. */
+void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
+{
+    assert(event_count < MAX_EVENTS);
+    assert(jobj->parent == expected_parents[event_count]);
+    events[event_count] = EVENT_SETUP;
+    event_jobjs[event_count++] = jobj;
+    jobj->flags &= ~JOBJ_MTX_DIRTY;
+}
+
+static void authored_ground_callback(HSD_GObj *gobj)
+{
+    assert(gobj->hsd_obj == expected_root);
+    assert(event_count < MAX_EVENTS);
+    events[event_count] = EVENT_CALLBACK;
+    event_jobjs[event_count++] = gobj->hsd_obj;
+    callback_count++;
+    authored_dirty->flags |= JOBJ_MTX_DIRTY;
+}
+
+int main(void)
+{
+    HSD_JObj root = { 0 }, animated_child = { 0 }, authored_sibling = { 0 };
+    HSD_JObj user_defined = { 0 }, nested = { 0 };
+    HSD_JObj decoy_root = { 0 };
+    root.child = &animated_child;
+    animated_child.parent = &root;
+    animated_child.next = &authored_sibling;
+    authored_sibling.parent = &root;
+    authored_sibling.next = &user_defined;
+    authored_sibling.child = &nested;
+    nested.parent = &authored_sibling;
+    user_defined.parent = &root;
+    root.next = &decoy_root;
+
+    /* Fixture enters the Ground proc after the priority-1 phase has dirtied
+     * these source nodes; this control exercises the actual priority-4 body. */
+    root.flags |= JOBJ_MTX_DIRTY;
+    animated_child.flags |= JOBJ_MTX_DIRTY;
+    nested.flags |= JOBJ_MTX_DIRTY;
+    user_defined.flags |= JOBJ_MTX_DIRTY | JOBJ_USER_DEF_MTX;
+    decoy_root.flags |= JOBJ_MTX_DIRTY;
+    authored_dirty = &authored_sibling;
+    expected_root = &root;
+    expected_parents[1] = NULL;
+    expected_parents[2] = &root;
+    expected_parents[3] = &root;
+    expected_parents[4] = &authored_sibling;
+
+    Ground ground = { authored_ground_callback };
+    HSD_GObj gobj = { &root, &ground };
+    Ground_801C1D38(&gobj);
+
+    assert(callback_count == 1);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    assert(event_count == 5);
+    assert(events[0] == EVENT_CALLBACK && event_jobjs[0] == &root);
+    assert(events[1] == EVENT_SETUP && event_jobjs[1] == &root);
+    assert(events[2] == EVENT_SETUP && event_jobjs[2] == &animated_child);
+    assert(events[3] == EVENT_SETUP && event_jobjs[3] == &authored_sibling);
+    assert(events[4] == EVENT_SETUP && event_jobjs[4] == &nested);
+    assert((root.flags & JOBJ_MTX_DIRTY) == 0);
+    assert((animated_child.flags & JOBJ_MTX_DIRTY) == 0);
+    assert((authored_sibling.flags & JOBJ_MTX_DIRTY) == 0);
+#else
+    assert(event_count == 1);
+    assert(events[0] == EVENT_CALLBACK && event_jobjs[0] == &root);
+    assert((root.flags & JOBJ_MTX_DIRTY) != 0);
+    assert((animated_child.flags & JOBJ_MTX_DIRTY) != 0);
+    assert((authored_sibling.flags & JOBJ_MTX_DIRTY) != 0);
+#endif
+    assert((user_defined.flags & JOBJ_MTX_DIRTY) != 0);
+    assert((decoy_root.flags & JOBJ_MTX_DIRTY) != 0);
+    return 0;
+}

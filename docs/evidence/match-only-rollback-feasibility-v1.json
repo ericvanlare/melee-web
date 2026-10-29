@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "V9 performs actual restore and both no-draw corrections, then strict owned-payload equality refuses row128 offset900. Map the captured136-byte class object/field and reduce its actual writer before another browser experiment. Final present, seven browser ticks and network rollback remain open.",
+    "current_next_boundary": "Observed Ground display lazy JObj matrix writer. Review a profile-only refresh after the original Ground priority4 update, keeping strict typed payload comparison and owner/lifetime exclusions.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8678,6 +8678,78 @@
         "scope": "Fixed two-tick same-instance browser interval. Does not establish accepted typed equality, seven-tick browser correction, online rollback or whole-profile correctness."
       },
       "browser_outcome_review": "GO_SCOPED_RESULT_AND_DOCS; strict owned payload remains unequal, final present unrun"
+    },
+    "jobj_ground_writer_reduction_20261028": {
+      "status": "GROUND_DISPLAY_MATRIX_WRITER_OBSERVED_REPAIR_PENDING",
+      "producer_head": "dc9de7324f977bd7c1d41a80017ad25b1db085d8",
+      "deeper_stack_harness_head": "550f4619f2f47e19d41fa0dbfda4440c6f84f857",
+      "observed": "Canonical HSD_JObj at source0x80c2d680, matrix offset0x44: draw300 MakeMatrix under Setup/Disp/DispAll changes BF7FFFF8 to BF7FFD0B, exactly matching the retained CPU payload mismatch. The deeper stack positively names HSD_GObj_JObjCallback and grDisplay_801C5DB0 before GameplayMatchSession::draw.",
+      "scope": "Fixed two ticks only; original arithmetic and strict comparisons unchanged. Both raw-five pairs agree but strict1216 remains. No final present. Current allocation-row mapping is not continuous class-piece lifetime proof or exact Ground map/process identity.",
+      "next_candidate": "Profile-only Ground matrix refresh after original priority4 callback; source/control review before one changed-hypothesis browser run.",
+      "retained_failure": "Initial observer TU failed on original header typedef compatibility; one-line reuse of existing compatibility header fixed compilation. Both diagnostic captures retain strict1216. Deeper stack truncated after the positively observed Ground display caller and session draw.",
+      "cleanup": "Both captures have independent recorded-PID absence and unchanged producer pins; native CPU CLOSE preserves1216, snapshot and renderer shutdown return1.",
+      "references": {
+        "jobj-observer-source-review-v1.json": {
+          "sha256": "742a666814fa1ffe4948778224c9fbcf916410d947a5e16c512b050fa281fca1",
+          "bytes": 4579
+        },
+        "jobj-observer-compile-repair-review-v1.json": {
+          "sha256": "fcc373867256b77216a226dd752dc7dfa534dbf5f253882ef01fb38e1a877774",
+          "bytes": 1918
+        },
+        "browser-build-jobj-observer-v1/result.json": {
+          "sha256": "c437f8732e710255d2e454ca723ecd7a3ba0b53126cbf6c04d0f003801313fe0",
+          "bytes": 1380
+        },
+        "browser-build-jobj-observer-v2/result.json": {
+          "sha256": "e21ec1cb0163a986e576ca348ecd9d97066fd08862dd1100ea8a1254e80aac4b",
+          "bytes": 1873
+        },
+        "browser-build-jobj-observer-v2/artifact-inventory.json": {
+          "sha256": "a3fc554b64d86330e80697563ecbda4566874d96ee7cd39ad2c5e18e445bfc1b",
+          "bytes": 1609
+        },
+        "linked-config-jobj-observer-v1/row-review.json": {
+          "sha256": "52034c638bf21a535b65dc913e7190dc367a3db25597e8a086ae35c99c433383",
+          "bytes": 1387
+        },
+        "linked-config-jobj-observer-v1/validation-result.json": {
+          "sha256": "0c32a83e5bc345cc980ce07d04a8c1bc0e26f48a655c718634beececc95cfc60",
+          "bytes": 682
+        },
+        "browser-two-tick-jobj-observer-v1/first-writer-receipt.json": {
+          "sha256": "72ac4db20db03ae12a0e11aa9de3c7f6dd776dc61f9344355e35751376b9432c",
+          "bytes": 55345
+        },
+        "browser-two-tick-jobj-observer-v1/runner/evidence.json": {
+          "sha256": "2e04824fc85a183e94b3cb0b0fedb651836c4363609ff497c196a9e1f2d9c4fa",
+          "bytes": 1221128
+        },
+        "browser-two-tick-jobj-observer-v1/independent-postflight.json": {
+          "sha256": "9ebefc85f5f376842999ab129091d3b21195ccd656baad7818da22c4c5d61314",
+          "bytes": 2577
+        },
+        "jobj-deeper-stack-review-v1.json": {
+          "sha256": "34aed646c7c649fa2712fecc4b7915c28f529970102a8567d195d504954c1658",
+          "bytes": 1297
+        },
+        "browser-two-tick-jobj-owner-v2/owner-attribution-receipt.json": {
+          "sha256": "4222007b3eda9ab3c887aae907490ceec736505b461224c431b8084a871ac368",
+          "bytes": 2051
+        },
+        "browser-two-tick-jobj-owner-v2/runner/evidence.json": {
+          "sha256": "2b8ea51676b73c068ad63f97a5654e8313eb4c7504ab93f54652c7c01116eb7a",
+          "bytes": 1225351
+        },
+        "browser-two-tick-jobj-owner-v2/independent-postflight.json": {
+          "sha256": "bc58ac3c950169f8ec1b846c736aa258939704d47d3e269e618db1777abb8574",
+          "bytes": 2577
+        },
+        "pre-ground-refresh-observer-browser-archive/inventory.json": {
+          "sha256": "a3fc554b64d86330e80697563ecbda4566874d96ee7cd39ad2c5e18e445bfc1b",
+          "bytes": 1609
+        }
+      }
     }
   }
 }

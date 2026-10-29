@@ -1858,19 +1858,21 @@ test('canonical LObj v7 route is explicit and cannot silently accept v6 or other
 });
 
 
-test('stateless TObj v9 identity requires explicit light owner and two-tick route, and refuses v8', () => {
+test('ground matrix v10 identity requires explicit light owner and two-tick route, and refuses v8/v9', () => {
   const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};
-  const v9={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9'};
-  assert.equal(validateBrowserProfileForRoute(v9,true,exports,true,true),v9.profile);
+  const v10={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10'};
+  assert.equal(validateBrowserProfileForRoute(v10,true,exports,true,true),v10.profile);
   for(const profile of ['slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7'])
     assert.throws(()=>validateBrowserProfileForRoute({profile},true,exports,true,true),/Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v9,true,exports,false,true),/v9 stateless TObj presentation lane requires/);
-  assert.throws(()=>validateBrowserProfileForRoute(v9,false,exports,true,true),/requires/);
-  assert.throws(()=>validateBrowserProfileForRoute(v9,true,exports,true,false),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v10,true,exports,false,true),/v10 ground matrix lane requires/);
+  assert.throws(()=>validateBrowserProfileForRoute(v10,false,exports,true,true),/requires/);
+  assert.throws(()=>validateBrowserProfileForRoute(v10,true,exports,true,false),/Unexpected profile identity/);
+  const v9={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9'};
+  assert.throws(()=>validateBrowserProfileForRoute(v9,true,exports,true,true),/Unexpected profile identity/);
   const v8={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-v8'};
   assert.throws(()=>validateBrowserProfileForRoute(v8,true,exports,true,true),/Unexpected profile identity/);
-  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-tobj-presentation-cache':true}),/v9 stateless/);
-  assert.throws(()=>validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,'--aggregate-cpu-restore-config':'config','--slippi-tobj-presentation-cache':true}),/v9 stateless/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-tobj-presentation-cache':true}),/v10 ground matrix/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,'--aggregate-cpu-restore-config':'config','--slippi-tobj-presentation-cache':true}),/v10 ground matrix/);
   assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,'--aggregate-cpu-restore-config':'config','--slippi-lobj-presentation-cache':true,'--slippi-tobj-presentation-cache':true}),'drawn-reference-no-draw-two-tick-v1');
 });
 
@@ -1880,17 +1882,17 @@ test('actual initialized profile assignment retains writer scope, not zero-count
   const initial=source.match(/profile: (\{identity: null, sourceIdentity: null,[\s\S]*?\}),\n    input:/)?.[1];
   const initialized=source.match(/report\.profile = \{\.\.\.report\.profile, identity: init\.profile,[\s\S]*?\};/)?.[0];
   assert.ok(initial,'actual initial profile object is extracted');assert.ok(initialized,'actual post-initialization profile assignment is extracted');
-  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9'];
+  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10'];
   for(let i=0;i<profiles.length;i++) {
     const context={init:{profile:profiles[i],source:'actual-source',rngHelper:'rng',stageBridge:'stage'},SOURCE_SEED:7,
-      SYNCTEST_PROFILE:profiles[0],LOGICAL_FRAME_V6_PROFILE:profiles[1],LOBJ_PRESENTATION_V7_PROFILE:profiles[2],TOBJ_PRESENTATION_STATELESS_V9_PROFILE:profiles[3],
+      SYNCTEST_PROFILE:profiles[0],LOGICAL_FRAME_V6_PROFILE:profiles[1],LOBJ_PRESENTATION_V7_PROFILE:profiles[2],TOBJ_GROUND_MATRIX_V10_PROFILE:profiles[3],
       twoTickDrawnReference:i>0,lobjPresentationCache:i>1,tobjPresentationCache:i>2};
     context.report={profile:vm.runInNewContext('('+initial+')',context)};
     const prior=context.report.profile.sourceTextureMatrixWriterDiagnostic;
     vm.runInNewContext(initialized,context);
     assert.equal(context.report.profile.identity,profiles[i]);assert.equal(context.report.profile.sourceIdentity,'actual-source');
     assert.equal(context.report.profile.name,profiles[i]);assert.equal(context.report.profile.sourceTextureMatrixWriterDiagnostic,prior);
-    assert.equal(prior,i===3?'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V9':'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN');
+    assert.equal(prior,i===3?'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V10':'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN');
     assert.notEqual(prior,0);assert.notEqual(prior,'PASS');
   }
 });

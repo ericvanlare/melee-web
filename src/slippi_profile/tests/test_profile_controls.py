@@ -38,6 +38,22 @@ def _source_statement(source, marker, label):
     return source[start:end]
 
 
+def _source_function(source, signature):
+    if source.count(signature) != 1:
+        raise AssertionError(f"expected one source function {signature!r}")
+    start = source.index(signature)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1] + "\n"
+    raise AssertionError(f"unterminated source function {signature!r}")
+
+
 class ProfileControlsTests(unittest.TestCase):
     def test_profile_policy_and_dependency_controls(self):
         work_root = ROOT / "work"
@@ -75,11 +91,96 @@ class ProfileControlsTests(unittest.TestCase):
             str(ROOT / "scripts/agent_workspace.py"),
             "run", "--", *command,
         ]
+        v10_command = list(command)
+        v10_command.insert(v10_command.index("-o"),
+                           "-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1")
+        v10_command[v10_command.index("-o") + 1] = str(output / "profile-controls-v10")
+        wrapped_v10 = [
+            os.environ.get("PYTHON", "python3"),
+            str(ROOT / "scripts/agent_workspace.py"),
+            "run", "--", *v10_command,
+        ]
         try:
             subprocess.run(wrapped, cwd=ROOT, check=True)
             subprocess.run([str(executable)], cwd=ROOT, check=True)
+            subprocess.run(wrapped_v10, cwd=ROOT, check=True)
+            subprocess.run([str(output / "profile-controls-v10")], cwd=ROOT, check=True)
         except Exception as error:
             self.fail(f"Profile controls failed: {error}; retained reproducer directory: {output}")
+        else:
+            shutil.rmtree(output)
+
+    def test_actual_ground_proc_refreshes_after_authored_callback(self):
+        work_root = ROOT / "work"
+        work_root.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(
+            prefix="ground-matrix-source-control-", dir=work_root))
+        source_tree = output / "source"
+        ground_path = source_tree / "src/melee/gr/ground.c"
+        ground_path.parent.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q"], cwd=source_tree, check=True)
+        actual_pin = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=MELEE, text=True).strip()
+        self.assertEqual(actual_pin, MELEE_SOURCE_PIN)
+        ground_source = subprocess.check_output(
+            ["git", "show", f"{MELEE_SOURCE_PIN}:src/melee/gr/ground.c"],
+            cwd=MELEE, text=True,
+        )
+        ground_path.write_text(ground_source, encoding="utf-8")
+
+        try:
+            for patch_path in (
+                ROOT / "patches/melee-gameplay.patch",
+                ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch",
+            ):
+                subprocess.run([
+                    "git", "apply", "--check",
+                    "--include=src/melee/gr/ground.c", str(patch_path),
+                ], cwd=source_tree, check=True)
+                subprocess.run([
+                    "git", "apply",
+                    "--include=src/melee/gr/ground.c", str(patch_path),
+                ], cwd=source_tree, check=True)
+
+            composed_ground = ground_path.read_text(encoding="utf-8")
+            function = _source_function(
+                composed_ground, "static void Ground_801C1D38(HSD_GObj* gobj)")
+            template = (ROOT / "src/slippi_profile/tests/"
+                        "ground_matrix_refresh_control.c.in").read_text(
+                            encoding="utf-8")
+            self.assertEqual(template.count("GROUND_FUNCTION"), 1)
+            fixture = output / "ground-control.c"
+            fixture.write_text(template.replace("GROUND_FUNCTION", function),
+                               encoding="utf-8")
+            common = [
+                *shlex.split(os.environ.get("CC", "cc")),
+                "-std=c11", "-DTARGET_PC", "-Wall", "-Wextra", "-Werror",
+                "-DMELEE_WEB_SLIPPI_PROFILE=1",
+                "-I", str(ROOT / "src/slippi_profile/tests/stubs"),
+                "-I", str(ROOT / "src"),
+                "-I", str(MELEE / "src"),
+                "-I", str(ROOT / ".deps/aurora/include"),
+                "-I", str(MELEE / "extern/dolphin/include"),
+                "-include", str(ROOT / "src/gameplay_compat.h"),
+                str(ROOT / "src/slippi_profile/dynamics_fix.c"),
+                str(fixture),
+            ]
+            for lane, extra_defines in (
+                ("v10", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1"]),
+                ("legacy", []),
+            ):
+                executable = output / ("ground-control-" + lane)
+                command = [*common, *extra_defines, "-o", str(executable)]
+                wrapped = [
+                    os.environ.get("PYTHON", "python3"),
+                    str(ROOT / "scripts/agent_workspace.py"),
+                    "run", "--", *command,
+                ]
+                subprocess.run(wrapped, cwd=ROOT, check=True)
+                subprocess.run([str(executable)], cwd=ROOT, check=True)
+        except Exception as error:
+            self.fail(
+                f"Ground source control failed: {error}; retained reproducer: {output}")
         else:
             shutil.rmtree(output)
 

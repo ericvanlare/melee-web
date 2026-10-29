@@ -47,10 +47,23 @@ void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
 
 static void test_draw_policy(void)
 {
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    const SlippiProfileIdentity profile =
+        SLIPPI_PROFILE_IDENTITY_TOBJ_GROUND_MATRIX_V10;
+    assert(strcmp(slippi_profile_identity_name(profile),
+                  SLIPPI_PROFILE_TOBJ_GROUND_MATRIX_V10_ID) == 0);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+#else
     const SlippiProfileIdentity profile =
         SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5;
     assert(strcmp(slippi_profile_identity_name(profile),
                   "slippi-render-dependencies-dbooc-shield-drop-v5") == 0);
+#endif
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ALLOW);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_CORRECTION) ==

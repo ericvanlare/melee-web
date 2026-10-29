@@ -1123,6 +1123,26 @@ review, raw report and first-failure receipt. Browser rollback remains incomplet
 full regression and publication-head CI remain pending.
 
 
+The read-only joint diagnostic at producer `dc9de732` reproduces the same
+strict mismatch and directly observes the matrix writer. The selected canonical
+joint's first matrix word changes from `0xbf7ffff8` to `0xbf7ffd0b` during the
+first reference draw, exactly matching actual versus expected bytes at the failed
+CPU boundary. A harness-only follow-up retains more JavaScript stack frames and
+positively identifies `grDisplay_801C5DB0` through the original GObj/JObj display
+path. Its stack truncates later, after the observed session draw call. This
+attributes a Ground display dependency; it does not prove the exact Ground
+instance or continuous class-piece lifetime. Both diagnostic runs retain raw
+sample agreement, strict refusal and final-present exclusion. Their owned
+processes are independently absent and exact producer bytes are retained.
+
+The next candidate moves this derived-matrix refresh into the actual Ground
+update path for the private profile, after its authored priority-four callback.
+It must preserve original math, traversal and callback order, and pass the
+unchanged strict comparison. No fix is yet claimed. The structured
+`jobj_ground_writer_reduction_20261028` receipt preserves the initial observer
+compile failure, its compatibility repair, both captures and their reviews.
+
+
 ## Stage decision dependencies, issue #333
 
 The next incomplete profile revision, `slippi-render-dependencies-v3`, adds two
