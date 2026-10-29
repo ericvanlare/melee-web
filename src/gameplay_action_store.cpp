@@ -610,10 +610,22 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     std::span<const uint8_t> container, std::shared_ptr<const DatArchive> result_motion,
     std::shared_ptr<const DatArchive> nana_popo_archive,
     const FighterCostume* nana_popo_identity,
-    std::span<const uint8_t> nana_popo_container)
+    std::span<const uint8_t> nana_popo_container,
+    GameplayActionStorePolicy policy)
     : runtime_(std::make_shared<const DatFighterRuntime>(archive, costume)), store_(runtime_, container),
-      rows_(nullptr, melee_web_action_rows_destroy), result_motion_(std::move(result_motion))
+      policy_(policy), rows_(nullptr, melee_web_action_rows_destroy), result_motion_(std::move(result_motion))
 {
+    if (policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions) {
+        require(!active_interval,
+                "Resident action catalog cannot be prepared during an active ActionStore interval");
+        require(costume.fighter_kind != 11,
+                "Resident action catalog does not admit Nana/Popo fallback actions");
+        require(!result_motion_,
+                "Resident action catalog does not admit a Results motion domain");
+        require(!nana_popo_archive && !nana_popo_identity && nana_popo_container.empty(),
+                "Resident action catalog does not admit Nana/Popo fallback ownership");
+        store_.prepare_resident_native_actions();
+    }
     store_.set_interval_owner(this);
     store_.set_interval_cache_hooks({action_interval_cache_hit_hook,
         action_interval_cache_miss_replay_hook, action_interval_cache_miss_record_hook});
@@ -848,6 +860,37 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
         require(!nana_popo_archive && !nana_popo_identity && nana_popo_container.empty(),
                 "Popo animation fallback was supplied to a non-Nana fighter");
     }
+    if (policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions) {
+        using AliasKey = std::tuple<std::uint32_t, std::uint32_t, std::string>;
+        std::map<AliasKey, std::shared_ptr<Clip>> representatives;
+        resident_clips_.reserve(runtime_->actions().size());
+        for (std::uint32_t motion = 0; motion < runtime_->actions().size(); ++motion) {
+            auto selected = store_.resident_native_action(motion);
+            require(selected.action.motion_id == motion,
+                    "Resident action catalog selection changed authored row identity");
+            require(!selected.action.command_offset ||
+                        (selected.commands &&
+                         selected.commands->offset() == *selected.action.command_offset),
+                    "Resident action row command provenance is inconsistent");
+            const AliasKey key{selected.action.container_offset,
+                               selected.action.archive_bytes,
+                               selected.action.symbol};
+            auto found = representatives.find(key);
+            if (found == representatives.end()) {
+                auto clip = std::make_shared<Clip>(std::move(selected));
+                clip->identity_rows = rows_;
+                clip->command_owner = commands_;
+                found = representatives.emplace(key, std::move(clip)).first;
+            } else {
+                require(found->second->identity_rows.get() == rows_.get() &&
+                            found->second->command_owner.get() == commands_.get() &&
+                            found->second->selected.animation.get() == selected.animation.get(),
+                        "Resident action alias has conflicting source or animation provenance");
+            }
+            resident_clips_.push_back(found->second);
+        }
+        resident_catalog_ready_ = true;
+    }
 }
 GameplayActionStore::~GameplayActionStore()
 {
@@ -872,6 +915,8 @@ void GameplayActionStore::interval_test_restore_cache_owner()
 void GameplayActionStore::bind(Fighter* fighter)
 {
     require(!fighter_, "Action store is already bound");
+    require(policy_ != GameplayActionStorePolicy::ResidentOrdinaryActions || resident_catalog_ready_,
+            "Resident action catalog must be complete before binding");
     require(melee_web_action_bind(fighter, this, select, transfer), "Fighter action binding is unavailable");
     MeleeWebActionBindingSnapshot binding{};
     if (!melee_web_action_binding_for_context(this, &binding) || binding.fighter != fighter ||
@@ -903,6 +948,22 @@ void* GameplayActionStore::demo_blend_rows() const
 { return result_rows_ ? melee_web_action_blends(result_rows_.get()) : nullptr; }
 void* GameplayActionStore::wait_choices() const { return melee_web_action_waits(rows_.get()); }
 uint32_t GameplayActionStore::selected_motion(unsigned slot) const { return motions_.at(slot); }
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+bool GameplayActionStore::interval_test_resident_catalog_ready() const noexcept
+{ return resident_catalog_ready_; }
+bool GameplayActionStore::interval_test_resident_catalog_row(
+    std::uint32_t motion, ResidentCatalogTestRow* out) const noexcept
+{
+    if (!out || !resident_catalog_ready_ || motion >= resident_clips_.size()) return false;
+    const auto& clip = resident_clips_[motion];
+    if (!clip) return false;
+    out->representative_motion = clip->selected.action.motion_id;
+    out->clip = clip.get();
+    out->animation = clip->selected.animation.get();
+    out->tree = melee_web_native_clip_tree(clip->native.get());
+    return true;
+}
+#endif
 int GameplayActionStore::select(void* context, int motion, unsigned slot, FigaTree** tree, void** identity,
     char* error, size_t error_size)
 {
@@ -953,8 +1014,16 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     const bool result_domain = source.result_rows_ &&
         source_table == melee_web_action_rows(source.result_rows_.get());
     const bool ordinary_domain = source_table == melee_web_action_rows(source.rows_.get());
+    require(!(result_domain &&
+              (policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions ||
+               source.policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions)),
+            "Resident action catalog refuses Results-domain selection");
     require(result_domain || ordinary_domain,
             "Fighter action table identity is not owned by its action store");
+    require(!(policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions &&
+              &source != this &&
+              source.policy_ != GameplayActionStorePolicy::ResidentOrdinaryActions),
+            "Resident action selection requires a resident source catalog");
     const auto& source_rows = result_domain ? source.result_rows_ : source.rows_;
     require(uint32_t(motion) < melee_web_action_row_count(source_rows.get()),
             "Fighter action ID is outside its selected source table");
@@ -968,10 +1037,24 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     // same numeric ID.
     const auto& row = selected.action;
     std::shared_ptr<Clip> clip;
-    for (const auto& active : active_) if (active &&
-        active->identity_rows.get() == identity_rows.get() &&
-        active->selected.action.container_offset == row.container_offset &&
-        active->selected.action.archive_bytes == row.archive_bytes && active->selected.action.symbol == row.symbol) clip = active;
+    if (source.policy_ == GameplayActionStorePolicy::ResidentOrdinaryActions) {
+        require(source.resident_catalog_ready_ && motion < source.resident_clips_.size(),
+                "Resident source action catalog is incomplete");
+        clip = source.resident_clips_[motion];
+        require(clip && clip->identity_rows.get() == identity_rows.get() &&
+                    clip->selected.action.container_offset == row.container_offset &&
+                    clip->selected.action.archive_bytes == row.archive_bytes &&
+                    clip->selected.action.symbol == row.symbol &&
+                    clip->selected.animation.get() == selected.animation.get() &&
+                    clip->command_owner.get() == command_owner.get(),
+                "Resident source Clip provenance differs from the selected authored row");
+    } else {
+        for (const auto& active : active_) if (active &&
+            active->identity_rows.get() == identity_rows.get() &&
+            active->selected.action.container_offset == row.container_offset &&
+            active->selected.action.archive_bytes == row.archive_bytes &&
+            active->selected.action.symbol == row.symbol) clip = active;
+    }
     if (active_interval && active_interval->phase == MeleeWebActionInterval::Phase::Replaying) {
         clip = active_interval->replay_selection(this, &source, source_table, result_domain,
             uint32_t(motion), slot, identity_rows, row, selected, command_owner, clip);

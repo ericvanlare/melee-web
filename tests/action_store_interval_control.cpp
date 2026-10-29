@@ -2,10 +2,14 @@
 #include "fighter_runtime_fixture.hpp"
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/ft/kinds/ftMario/forward.h>
+#include <melee/lb/lbanim.h>
 #include <array>
 #include <atomic>
+#include <bit>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <new>
 
@@ -62,11 +66,14 @@ struct Harness {
     Fighter* p2 = p2_storage.fighter();
     melee_web::GameplayActionStore store1, store2;
 
-    Harness()
+    explicit Harness(melee_web::GameplayActionStorePolicy policy =
+                         melee_web::GameplayActionStorePolicy::Legacy)
         : fixture(make_fixture()),
           archive(std::make_shared<const melee_web::DatArchive>(fixture.file())),
-          store1(archive, fighter_runtime_test::mario(), fixture.container),
-          store2(archive, fighter_runtime_test::mario(), fixture.container)
+          store1(archive, fighter_runtime_test::mario(), fixture.container,
+                 {}, {}, nullptr, {}, policy),
+          store2(archive, fighter_runtime_test::mario(), fixture.container,
+                 {}, {}, nullptr, {}, policy)
     {
         store1.bind(p1);
         store2.bind(p2);
@@ -98,6 +105,15 @@ struct Harness {
         check(store1.selected_motion(0) == 14 && store2.selected_motion(1) == 14,
               "Fixture did not establish the original active motion rows");
     }
+    void prepare_wait_only()
+    {
+        check(14 < fighter_runtime_test::mario().motion_count,
+              "Wait14 exceeds the canonical Mario action-row bound");
+        load(p1, 14, 0);
+        load(p2, 14, 1);
+        check(store1.selected_motion(0) == 14 && store2.selected_motion(1) == 14,
+              "Fixture did not establish the Wait14-only prestate");
+    }
 };
 
 struct State {
@@ -121,9 +137,343 @@ bool same(const State& a, const State& b)
         a.p1_identity == b.p1_identity && a.p2_identity == b.p2_identity;
 }
 
-void verify_round_trip()
+/* This is an actual-source ownership probe over the same synthetic DAT corpus
+ * as the controls below. Fixed witnesses avoid allocating while the branch
+ * under test is constructing or retaining source-borrowed clips. */
+constexpr std::size_t gate_max_nodes = 8;
+constexpr std::size_t gate_max_tracks = 16;
+constexpr std::size_t gate_max_stream_bytes = 64;
+constexpr std::size_t gate_fighter_bytes = 0x23ec;
+struct GateTrackWitness {
+    std::uintptr_t stream = 0;
+    std::uint16_t length = 0, start = 0;
+    std::uint8_t object_type = 0, frac_value = 0, frac_slope = 0;
+    std::array<std::uint8_t, gate_max_stream_bytes> bytes{};
+};
+struct GateTreeWitness {
+    std::uint32_t motion = 0;
+    std::uintptr_t tree = 0, row_identity = 0, nodes = 0, tracks = 0;
+    std::uint32_t type = 0, flags = 0, frames_bits = 0;
+    std::size_t node_count = 0, track_count = 0;
+    std::array<std::int8_t, gate_max_nodes> node_values{};
+    std::array<GateTrackWitness, gate_max_tracks> track_values{};
+};
+struct GateLayoutWitness {
+    std::uintptr_t harness = 0, p1 = 0, p2 = 0, p1_storage = 0, p2_storage = 0;
+    std::uintptr_t store1 = 0, store2 = 0, archive = 0;
+    std::uintptr_t fixture_data = 0, fixture_container = 0;
+    std::uintptr_t p1_runtime = 0, p2_runtime = 0, p1_rows = 0, p2_rows = 0;
+};
+struct GateResult {
+    bool corrected = false;
+    GateLayoutWitness layout{};
+    GateTreeWitness pre_p1{}, pre_p2{}, branch_a{}, branch_a_after_restore{};
+    GateTreeWitness branch_a_after_owner_retirement{}, branch_a_after_store_destruction{}, endpoint_p2{};
+    std::array<std::uint8_t, gate_fighter_bytes> pre_p1_payload{}, pre_p2_payload{};
+    std::uint64_t creates_before_branch = 0, destroys_before_branch = 0;
+    std::uint64_t creates_after_a = 0, creates_after_endpoint = 0, destroys_after_a = 0;
+    std::uint64_t destroys_after_restore = 0, destroys_after_disarm = 0, destroys_after_endpoint = 0;
+    std::uint64_t destroys_after_owner_retirement = 0, destroys_after_store_destruction = 0;
+    std::uint64_t destroys_after_capsule_destruction = 0;
+    bool a_lease_unchanged_after_restore = false, a_lease_unchanged_after_disarm = false;
+    bool a_lease_unchanged_after_owner_retirement = false, a_lease_unchanged_after_store_destruction = false;
+};
+GateResult gate_result;
+
+GateTreeWitness gate_tree(FigaTree* tree, void* row_identity, std::uint32_t motion)
 {
-    Harness h;
+    check(tree && tree->nodes && tree->tracks && row_identity,
+          "Source clip witness is missing its tree, node, track, or row identity");
+    GateTreeWitness witness{};
+    witness.motion = motion;
+    witness.tree = reinterpret_cast<std::uintptr_t>(tree);
+    witness.row_identity = reinterpret_cast<std::uintptr_t>(row_identity);
+    witness.nodes = reinterpret_cast<std::uintptr_t>(tree->nodes);
+    witness.tracks = reinterpret_cast<std::uintptr_t>(tree->tracks);
+    witness.type = std::uint32_t(tree->type);
+    witness.flags = tree->flags;
+    witness.frames_bits = std::bit_cast<std::uint32_t>(tree->frames);
+    std::size_t total_tracks = 0;
+    bool found_sentinel = false;
+    for (std::size_t i = 0; i <= gate_max_nodes; ++i) {
+        const std::int8_t value = tree->nodes[i];
+        if (value == -1) { found_sentinel = true; break; }
+        check(i < gate_max_nodes && value >= 0 && value <= 9,
+              "Synthetic source tree exceeded the bounded node witness");
+        witness.node_values[i] = value;
+        ++witness.node_count;
+        total_tracks += std::size_t(value);
+    }
+    check(found_sentinel && total_tracks > 0 && total_tracks <= gate_max_tracks,
+          "Synthetic source tree exceeded the bounded track witness");
+    witness.track_count = total_tracks;
+    for (std::size_t i = 0; i < total_tracks; ++i) {
+        const FigaTrack& track = tree->tracks[i];
+        check(track.ad_head && track.length > 0 && track.length <= gate_max_stream_bytes,
+              "Synthetic source stream exceeded the bounded byte witness");
+        GateTrackWitness& output = witness.track_values[i];
+        output.stream = reinterpret_cast<std::uintptr_t>(track.ad_head);
+        output.length = track.length;
+        output.start = track.startframe;
+        output.object_type = track.obj_type;
+        output.frac_value = track.frac_value;
+        output.frac_slope = track.frac_slope;
+        std::memcpy(output.bytes.data(), track.ad_head, track.length);
+    }
+    return witness;
+}
+GateTreeWitness gate_slot(Fighter* fighter, unsigned slot, std::uint32_t motion)
+{
+    MeleeWebActionFighterClipState clip{};
+    check(melee_web_action_fighter_clip_state(fighter, &clip),
+          "Could not read source Fighter clip fields for the retention gate");
+    return gate_tree(clip.trees[slot], clip.identities[slot], motion);
+}
+bool same_gate_tree(const GateTreeWitness& a, const GateTreeWitness& b)
+{
+    if (a.motion != b.motion || a.tree != b.tree || a.row_identity != b.row_identity ||
+        a.nodes != b.nodes || a.tracks != b.tracks || a.type != b.type ||
+        a.flags != b.flags || a.frames_bits != b.frames_bits ||
+        a.node_count != b.node_count || a.track_count != b.track_count) return false;
+    for (std::size_t i = 0; i < a.node_count; ++i)
+        if (a.node_values[i] != b.node_values[i]) return false;
+    for (std::size_t i = 0; i < a.track_count; ++i) {
+        const GateTrackWitness& x = a.track_values[i];
+        const GateTrackWitness& y = b.track_values[i];
+        if (x.stream != y.stream || x.length != y.length || x.start != y.start ||
+            x.object_type != y.object_type || x.frac_value != y.frac_value ||
+            x.frac_slope != y.frac_slope) return false;
+        for (std::size_t j = 0; j < x.length; ++j)
+            if (x.bytes[j] != y.bytes[j]) return false;
+    }
+    return true;
+}
+void gate_ptr(std::uintptr_t pointer)
+{
+    std::cout << "\"0x" << std::hex << pointer << std::dec << "\"";
+}
+void gate_bytes(const std::uint8_t* bytes, std::size_t count)
+{
+    static constexpr char digits[] = "0123456789abcdef";
+    std::cout << '"';
+    for (std::size_t i = 0; i < count; ++i) {
+        std::cout << digits[bytes[i] >> 4] << digits[bytes[i] & 0xf];
+    }
+    std::cout << '"';
+}
+void print_gate_tree(const char* name, const GateTreeWitness& w)
+{
+    std::cout << '"' << name << "\":{";
+    std::cout << "\"motion\":" << w.motion << ",\"tree\":"; gate_ptr(w.tree);
+    std::cout << ",\"row_identity\":"; gate_ptr(w.row_identity);
+    std::cout << ",\"nodes_ptr\":"; gate_ptr(w.nodes);
+    std::cout << ",\"tracks_ptr\":"; gate_ptr(w.tracks);
+    std::cout << ",\"type\":" << w.type << ",\"flags\":" << w.flags
+              << ",\"frames_bits\":" << w.frames_bits << ",\"node_values\":[";
+    for (std::size_t i = 0; i < w.node_count; ++i) {
+        if (i) std::cout << ',';
+        std::cout << int(w.node_values[i]);
+    }
+    std::cout << "],\"tracks\":[";
+    for (std::size_t i = 0; i < w.track_count; ++i) {
+        if (i) std::cout << ',';
+        const GateTrackWitness& track = w.track_values[i];
+        std::cout << "{\"stream\":"; gate_ptr(track.stream);
+        std::cout << ",\"length\":" << track.length << ",\"start\":" << track.start
+                  << ",\"object_type\":" << unsigned(track.object_type)
+                  << ",\"frac_value\":" << unsigned(track.frac_value)
+                  << ",\"frac_slope\":" << unsigned(track.frac_slope)
+                  << ",\"bytes\":";
+        gate_bytes(track.bytes.data(), track.length);
+        std::cout << '}';
+    }
+    std::cout << "]}";
+}
+void run_retention_gate(bool corrected)
+{
+    gate_result = GateResult{};
+    gate_result.corrected = corrected;
+    constexpr auto action_a = std::uint32_t(ftMr_SM_SpecialN);
+    constexpr auto action_b = std::uint32_t(ftCo_SM_AttackS4);
+    static_assert(action_a < 303 && action_b < 303 && action_a != action_b);
+    MeleeWebActionInterval* interval = nullptr;
+    {
+        Harness h(melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not capture and begin the common pre-branch ActionStore interval");
+
+        /* This prestate is collected identically in both fresh Wasm instances,
+         * after the same capsule/journal setup and before either lane branches. */
+        GateLayoutWitness& layout = gate_result.layout;
+        layout.harness = reinterpret_cast<std::uintptr_t>(&h);
+        layout.p1 = reinterpret_cast<std::uintptr_t>(h.p1);
+        layout.p2 = reinterpret_cast<std::uintptr_t>(h.p2);
+        layout.p1_storage = reinterpret_cast<std::uintptr_t>(h.p1_storage.bytes.data());
+        layout.p2_storage = reinterpret_cast<std::uintptr_t>(h.p2_storage.bytes.data());
+        layout.store1 = reinterpret_cast<std::uintptr_t>(&h.store1);
+        layout.store2 = reinterpret_cast<std::uintptr_t>(&h.store2);
+        layout.archive = reinterpret_cast<std::uintptr_t>(h.archive.get());
+        layout.fixture_data = reinterpret_cast<std::uintptr_t>(h.fixture.data.data());
+        layout.fixture_container = reinterpret_cast<std::uintptr_t>(h.fixture.container.data());
+        layout.p1_runtime = reinterpret_cast<std::uintptr_t>(&h.store1.runtime());
+        layout.p2_runtime = reinterpret_cast<std::uintptr_t>(&h.store2.runtime());
+        layout.p1_rows = reinterpret_cast<std::uintptr_t>(h.store1.action_rows());
+        layout.p2_rows = reinterpret_cast<std::uintptr_t>(h.store2.action_rows());
+        gate_result.pre_p1 = gate_slot(h.p1, 0, 14);
+        gate_result.pre_p2 = gate_slot(h.p2, 1, 14);
+        std::memcpy(gate_result.pre_p1_payload.data(), h.p1_storage.bytes.data(), gate_fighter_bytes);
+        std::memcpy(gate_result.pre_p2_payload.data(), h.p2_storage.bytes.data(), gate_fighter_bytes);
+        MeleeWebActionFighterClipState baseline_p2{};
+        check(melee_web_action_fighter_clip_state(h.p2, &baseline_p2),
+              "Could not save the modeled prestate Fighter payload");
+        gate_result.creates_before_branch = melee_web_action_interval_test_clip_create_count();
+        gate_result.destroys_before_branch = melee_web_action_interval_test_clip_destroy_count();
+
+        if (corrected) {
+            h.load(h.p2, int(action_a), 1);
+            check(h.store2.selected_motion(1) == action_a,
+                  "Predicted branch did not select authored action A");
+            gate_result.branch_a = gate_slot(h.p2, 1, action_a);
+            gate_result.creates_after_a = melee_web_action_interval_test_clip_create_count();
+            gate_result.destroys_after_a = melee_web_action_interval_test_clip_destroy_count();
+            check(gate_result.creates_after_a == gate_result.creates_before_branch,
+                  "Resident action selection allocated a native Clip after preparation");
+            check(melee_web_action_interval_seal_record(interval) == 1 &&
+                  melee_web_action_interval_admit(interval) == 1 &&
+                  melee_web_action_interval_restore(interval) == 1,
+                  "Existing ActionStore capsule could not restore the A branch prestate");
+            gate_result.destroys_after_restore = melee_web_action_interval_test_clip_destroy_count();
+            melee_web_action_interval_test_set_fighter_clip_state(h.p2, &baseline_p2);
+            check(h.store2.selected_motion(1) == 14 &&
+                  gate_slot(h.p2, 1, 14).tree == gate_result.pre_p2.tree &&
+                  gate_slot(h.p2, 1, 14).row_identity == gate_result.pre_p2.row_identity,
+                  "Modeled later Fighter-payload owner did not restore Wait14 pointer fields");
+            melee_web_action_interval_disarm(interval);
+            check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_DISARMED,
+                  "Corrected-branch journal did not explicitly disarm after restore");
+            gate_result.destroys_after_disarm = melee_web_action_interval_test_clip_destroy_count();
+            gate_result.branch_a_after_restore = gate_tree(
+                reinterpret_cast<FigaTree*>(gate_result.branch_a.tree),
+                reinterpret_cast<void*>(gate_result.branch_a.row_identity), action_a);
+            gate_result.a_lease_unchanged_after_restore =
+                same_gate_tree(gate_result.branch_a, gate_result.branch_a_after_restore);
+            gate_result.a_lease_unchanged_after_disarm =
+                gate_result.destroys_after_a == gate_result.destroys_after_restore &&
+                gate_result.destroys_after_restore == gate_result.destroys_after_disarm &&
+                gate_result.a_lease_unchanged_after_restore;
+            check(gate_result.a_lease_unchanged_after_disarm,
+                  "Restore or disarm released/changed the speculative A source lease");
+        } else {
+            /* The clean lane goes through the same capture/begin setup, then
+             * retires an empty journal before its first post-boundary load. */
+            melee_web_action_interval_disarm(interval);
+            check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_DISARMED,
+                  "Clean lane could not disarm its empty pre-branch journal");
+            gate_result.destroys_after_disarm = melee_web_action_interval_test_clip_destroy_count();
+        }
+
+        h.load(h.p2, int(action_b), 1);
+        check(h.store2.selected_motion(1) == action_b,
+              "Authoritative branch did not select authored action B");
+        gate_result.endpoint_p2 = gate_slot(h.p2, 1, action_b);
+        gate_result.creates_after_endpoint = melee_web_action_interval_test_clip_create_count();
+        gate_result.destroys_after_endpoint = melee_web_action_interval_test_clip_destroy_count();
+        check(gate_result.creates_after_endpoint == gate_result.creates_before_branch,
+              "Resident action selection allocated a native Clip after preparation");
+
+        /* Disarm first, retire the real source stores, then destroy the
+         * capsule. The A tree is still readable only while the capsule leases
+         * its displaced post-A slot/cache. */
+        h.store1.unbind();
+        h.store2.unbind();
+        gate_result.destroys_after_owner_retirement = melee_web_action_interval_test_clip_destroy_count();
+        if (corrected) {
+            gate_result.branch_a_after_owner_retirement = gate_tree(
+                reinterpret_cast<FigaTree*>(gate_result.branch_a.tree),
+                reinterpret_cast<void*>(gate_result.branch_a.row_identity), action_a);
+            gate_result.a_lease_unchanged_after_owner_retirement =
+                same_gate_tree(gate_result.branch_a, gate_result.branch_a_after_owner_retirement);
+            check(gate_result.a_lease_unchanged_after_owner_retirement,
+                  "Source-store retirement invalidated the capsule-retained A stream");
+        }
+    }
+    gate_result.destroys_after_store_destruction = melee_web_action_interval_test_clip_destroy_count();
+    if (corrected) {
+        gate_result.branch_a_after_store_destruction = gate_tree(
+            reinterpret_cast<FigaTree*>(gate_result.branch_a.tree),
+            reinterpret_cast<void*>(gate_result.branch_a.row_identity), action_a);
+        gate_result.a_lease_unchanged_after_store_destruction =
+            same_gate_tree(gate_result.branch_a, gate_result.branch_a_after_store_destruction);
+        check(gate_result.a_lease_unchanged_after_store_destruction,
+              "Store destruction invalidated the capsule-retained A stream");
+    }
+    melee_web_action_interval_destroy(interval);
+    gate_result.destroys_after_capsule_destruction = melee_web_action_interval_test_clip_destroy_count();
+    if (corrected) {
+        check(gate_result.destroys_after_capsule_destruction > gate_result.destroys_after_store_destruction,
+              "Destroying the capsule did not release its retained A Clip lease");
+    }
+}
+void print_retention_gate()
+{
+    const GateResult& r = gate_result;
+    const GateLayoutWitness& l = r.layout;
+    std::cout << "{\"scenario\":\"synthetic DAT corpus through production ActionStore/decoder/Clip path\",\"lane\":\""
+              << (r.corrected ? "gate-b" : "gate-a") << "\",\"layout\":{";
+    std::cout << "\"harness\":"; gate_ptr(l.harness);
+    std::cout << ",\"p1\":"; gate_ptr(l.p1); std::cout << ",\"p2\":"; gate_ptr(l.p2);
+    std::cout << ",\"p1_storage\":"; gate_ptr(l.p1_storage);
+    std::cout << ",\"p2_storage\":"; gate_ptr(l.p2_storage);
+    std::cout << ",\"store1\":"; gate_ptr(l.store1); std::cout << ",\"store2\":"; gate_ptr(l.store2);
+    std::cout << ",\"archive\":"; gate_ptr(l.archive);
+    std::cout << ",\"fixture_data\":"; gate_ptr(l.fixture_data);
+    std::cout << ",\"fixture_container\":"; gate_ptr(l.fixture_container);
+    std::cout << ",\"p1_runtime\":"; gate_ptr(l.p1_runtime); std::cout << ",\"p2_runtime\":"; gate_ptr(l.p2_runtime);
+    std::cout << ",\"p1_rows\":"; gate_ptr(l.p1_rows); std::cout << ",\"p2_rows\":"; gate_ptr(l.p2_rows);
+    std::cout << "},\"actions\":{\"A\":{\"motion\":" << ftMr_SM_SpecialN
+              << ",\"container_offset\":128},\"B\":{\"motion\":" << ftCo_SM_AttackS4
+              << ",\"container_offset\":256}},\"prestate\":{";
+    print_gate_tree("p1", r.pre_p1); std::cout << ','; print_gate_tree("p2", r.pre_p2);
+    std::cout << ",\"p1_payload_hex\":"; gate_bytes(r.pre_p1_payload.data(), r.pre_p1_payload.size());
+    std::cout << ",\"p2_payload_hex\":"; gate_bytes(r.pre_p2_payload.data(), r.pre_p2_payload.size());
+    std::cout << "},\"branch_a\":";
+    if (r.corrected) { std::cout << '{'; print_gate_tree("witness", r.branch_a); std::cout << '}'; }
+    else std::cout << "null";
+    std::cout << ",\"branch_a_after_restore\":";
+    if (r.corrected) { std::cout << '{'; print_gate_tree("witness", r.branch_a_after_restore); std::cout << '}'; }
+    else std::cout << "null";
+    std::cout << ",\"branch_a_after_owner_retirement\":";
+    if (r.corrected) { std::cout << '{'; print_gate_tree("witness", r.branch_a_after_owner_retirement); std::cout << '}'; }
+    else std::cout << "null";
+    std::cout << ",\"branch_a_after_store_destruction\":";
+    if (r.corrected) { std::cout << '{'; print_gate_tree("witness", r.branch_a_after_store_destruction); std::cout << '}'; }
+    else std::cout << "null";
+    std::cout << ",\"endpoint_p2\":{";
+    print_gate_tree("witness", r.endpoint_p2);
+    std::cout << "},\"lifecycle\":{\"creates_before_branch\":" << r.creates_before_branch
+              << ",\"destroys_before_branch\":" << r.destroys_before_branch
+              << ",\"creates_after_a\":" << r.creates_after_a
+              << ",\"creates_after_endpoint\":" << r.creates_after_endpoint
+              << ",\"destroys_after_a\":" << r.destroys_after_a
+              << ",\"destroys_after_restore\":" << r.destroys_after_restore
+              << ",\"destroys_after_disarm\":" << r.destroys_after_disarm
+              << ",\"destroys_after_endpoint\":" << r.destroys_after_endpoint
+              << ",\"destroys_after_owner_retirement\":" << r.destroys_after_owner_retirement
+              << ",\"destroys_after_store_destruction\":" << r.destroys_after_store_destruction
+              << ",\"destroys_after_capsule_destruction\":" << r.destroys_after_capsule_destruction
+              << ",\"a_lease_unchanged_after_restore\":" << (r.a_lease_unchanged_after_restore ? "true" : "false")
+              << ",\"a_lease_unchanged_after_disarm\":" << (r.a_lease_unchanged_after_disarm ? "true" : "false")
+              << ",\"a_lease_unchanged_after_owner_retirement\":"
+              << (r.a_lease_unchanged_after_owner_retirement ? "true" : "false")
+              << ",\"a_lease_unchanged_after_store_destruction\":"
+              << (r.a_lease_unchanged_after_store_destruction ? "true" : "false") << "}}\n";
+}
+
+void verify_round_trip(melee_web::GameplayActionStorePolicy policy)
+{
+    Harness h(policy);
     h.prepare();
     const State before = state(h);
     auto* interval = melee_web_action_interval_capture();
@@ -224,8 +574,94 @@ void verify_round_trip()
           melee_web_action_interval_failure_code(interval)==MELEE_WEB_ACTION_INTERVAL_OK,
           "Recreated Finished binding admitted or legacy status changed");
     melee_web_action_interval_destroy(interval);
-    check(melee_web_action_interval_test_clip_destroy_count() > before_replay_destroy,
-          "The pre-interval native Clip lease did not release during capsule cleanup");
+    if (policy == melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions) {
+        check(melee_web_action_interval_test_clip_destroy_count() == before_replay_destroy,
+              "Resident catalog ownership released a Clip during capsule cleanup");
+    } else {
+        check(melee_web_action_interval_test_clip_destroy_count() > before_replay_destroy,
+              "The pre-interval native Clip lease did not release during capsule cleanup");
+    }
+}
+
+void verify_resident_action_catalog()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    auto fixture = make_fixture();
+    auto archive = std::make_shared<const melee_web::DatArchive>(fixture.file());
+    auto runtime = std::make_shared<const melee_web::DatFighterRuntime>(
+        archive, fighter_runtime_test::mario());
+    melee_web::DatFighterAnimationStore decoded(runtime, fixture.container);
+    decoded.prepare_resident_native_actions();
+    const auto wait = decoded.select_native_action(14);
+    const auto special = decoded.select_native_action(ftMr_SM_SpecialN);
+    const auto decoded_attack = decoded.select_native_action(ftCo_SM_AttackS4);
+    const auto decoded_alias = decoded.select_native_action(8);
+    check(wait.animation && special.animation && decoded_attack.animation &&
+              decoded_attack.animation == decoded_alias.animation && wait.action.motion_id == 14 &&
+              special.action.motion_id == ftMr_SM_SpecialN &&
+              decoded_attack.action.motion_id == ftCo_SM_AttackS4 &&
+              decoded_alias.action.motion_id == 8,
+          "Resident decoder changed exact row identity or failed to retain the full animation key");
+    bool repeated_prepare_refused = false;
+    try { decoded.prepare_resident_native_actions(); }
+    catch (const melee_web::DatError&) { repeated_prepare_refused = true; }
+    check(repeated_prepare_refused,
+          "Resident decoder accepted repeated catalog preparation");
+
+    Harness h(Policy::ResidentOrdinaryActions);
+    constexpr auto alias_motion = std::uint32_t(ftCo_SM_AttackS4);
+    check(h.store1.interval_test_resident_catalog_ready() &&
+              h.store2.interval_test_resident_catalog_ready(),
+          "Explicit resident policy did not finish both catalogs before binding");
+    check(h.store1.runtime().actions().size() == fighter_runtime_test::mario().motion_count,
+          "Resident catalog omitted authored ordinary rows");
+
+    melee_web::GameplayActionStore::ResidentCatalogTestRow resident_attack{}, resident_alias{};
+    check(h.store1.interval_test_resident_catalog_row(alias_motion, &resident_attack) &&
+              h.store1.interval_test_resident_catalog_row(8, &resident_alias),
+          "Resident catalog did not expose the authored alias entries");
+    check(resident_attack.clip == resident_alias.clip &&
+              resident_attack.tree == resident_alias.tree &&
+              resident_attack.animation == resident_alias.animation &&
+              resident_attack.representative_motion == 8,
+          "Resident animation alias did not choose its first authored Clip representative");
+    melee_web::GameplayActionStore::ResidentCatalogTestRow empty{};
+    check(h.store1.interval_test_resident_catalog_row(0, &empty) && empty.clip &&
+              !empty.animation && !empty.tree,
+          "Resident empty action did not preserve its null-tree source semantics");
+
+    const auto creates_before_selection = melee_web_action_interval_test_clip_create_count();
+    h.prepare_wait_only();
+    h.load(h.p1, ftMr_SM_SpecialN, 0);
+    h.load(h.p1, int(alias_motion), 0);
+    h.load(h.p1, 14, 0);
+    h.load(h.p1, 8, 0);
+    h.load(h.p1, 0, 0);
+    check(melee_web_action_interval_test_clip_create_count() == creates_before_selection &&
+              h.store1.selected_motion(0) == 0,
+          "Resident selection allocated a native Clip after the prebind preparation");
+
+    bool results_refused = false;
+    try {
+        melee_web::GameplayActionStore unsupported(
+            h.archive, fighter_runtime_test::mario(), h.fixture.container,
+            h.archive, {}, nullptr, {}, Policy::ResidentOrdinaryActions);
+    } catch (const melee_web::DatError& error) {
+        results_refused = std::string(error.what()).find("Results motion domain") != std::string::npos;
+    }
+    check(results_refused,
+          "Resident private policy did not refuse a Results domain before binding");
+    bool fallback_refused = false;
+    try {
+        melee_web::GameplayActionStore unsupported(
+            h.archive, fighter_runtime_test::mario(), h.fixture.container,
+            {}, h.archive, &fighter_runtime_test::mario(), h.fixture.container,
+            Policy::ResidentOrdinaryActions);
+    } catch (const melee_web::DatError& error) {
+        fallback_refused = std::string(error.what()).find("fallback ownership") != std::string::npos;
+    }
+    check(fallback_refused,
+          "Resident private policy admitted Nana/Popo fallback ownership");
 }
 
 void verify_active_binding_guard()
@@ -421,9 +857,10 @@ void verify_disarm_keeps_leases_until_source_owner_retirement()
           "Final capsule destruction did not release its retained Clip leases");
 }
 
-void verify_unexpected_replay_selection_fails_the_experiment()
+void verify_unexpected_replay_selection_fails_the_experiment(
+    melee_web::GameplayActionStorePolicy policy)
 {
-    Harness h;
+    Harness h(policy);
     h.prepare();
     auto* interval = melee_web_action_interval_capture();
     check(interval && melee_web_action_interval_begin_record(interval) == 1,
@@ -473,11 +910,26 @@ void operator delete[](void* pointer, std::size_t) noexcept { ::operator delete(
 void operator delete(void* pointer, const std::nothrow_t&) noexcept { ::operator delete(pointer); }
 void operator delete[](void* pointer, const std::nothrow_t&) noexcept { ::operator delete(pointer); }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 2 && (std::strcmp(argv[1], "gate-a") == 0 ||
+                      std::strcmp(argv[1], "gate-b") == 0)) {
+        try {
+            /* Both lane names have equal length. No lane-specific output or
+             * formatting allocation occurs until after endpoint capture. */
+            run_retention_gate(std::strcmp(argv[1], "gate-b") == 0);
+            print_retention_gate();
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "ActionStore retention gate failed: " << error.what() << '\n';
+            return 1;
+        }
+    }
     try {
         static_assert(ftMr_SM_SpecialN < 303 && ftCo_SM_AttackS4 < 303);
-        verify_round_trip();
+        verify_round_trip(melee_web::GameplayActionStorePolicy::Legacy);
+        verify_round_trip(melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
+        verify_resident_action_catalog();
         verify_active_binding_guard();
         verify_capture_failure_is_read_only();
         verify_event_allocation_failure_refuses_admission();
@@ -485,7 +937,10 @@ int main()
         verify_changed_binding_refuses_without_restore_writes();
         verify_cache_hook_configuration_is_part_of_admission_identity();
         verify_disarm_keeps_leases_until_source_owner_retirement();
-        verify_unexpected_replay_selection_fails_the_experiment();
+        verify_unexpected_replay_selection_fails_the_experiment(
+            melee_web::GameplayActionStorePolicy::Legacy);
+        verify_unexpected_replay_selection_fails_the_experiment(
+            melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
         std::cout << "ActionStore interval actual-source controls passed; Mario action rows "
                   << ftMr_SM_SpecialN << " and " << ftCo_SM_AttackS4
                   << " are distinct from Fighter motion-state IDs.\n";

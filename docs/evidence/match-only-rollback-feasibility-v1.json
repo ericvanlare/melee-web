@@ -9638,7 +9638,7 @@
       }
     },
     "fixed_seven_tick_v17_component": {
-      "status": "FIRST_BROWSER_ATTEMPT_FAILS_REPLAY_PRESTEP_CACHED_OBSERVATION_FRAME",
+      "status": "PASS_FIXED_SEVEN_AUTHORITATIVE_REPLAY_AND_ACTUAL_PRESENT",
       "plan": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-browser-next-step-plan-v1.json",
         "sha256": "2774a689cf620df79180582aaacd53c229514163540fd7c47eb6fd9af07b2273"
@@ -9651,12 +9651,12 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-control-luna-v1/native-control-attempts-receipt.json",
         "sha256": "8a4ceb3bec3bbef437a400b9efadce5ece37618d368c50a75c86306e9ad9a4b2"
       },
-      "scope": "Fixed private V17 diagnostic. Separate prediction instance demonstrates a different remote action; authoritative instance records seven drawn ticks, restores, replays the same authoritative inputs without draw, then presents. This does not restore from the wrong-predicted branch. Actual adapter control uses modeled source/session/provider leaves; Actual first browser attempt is retained separately below and fails before replay.",
+      "scope": "Fixed private V17 diagnostic. Separate prediction instance demonstrates a different remote action; authoritative instance records seven drawn ticks, restores, replays the same authoritative inputs without draw, then presents. This does not restore from the wrong-predicted branch. Actual adapter focused controls use modeled source/session/provider leaves; both actual browser attempts are retained below, including the first failure and repaired success.",
       "next_true_correction_contract": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-corrected-branch-contract-sol-v2.json",
         "sha256": "0428e9df33c58c167ae21832755940419cab1b045cc081da16e87312ca00ec27"
       },
-      "next_true_correction_gate": "Held until this seven-tick step is accepted or checkpointed. Before new corrected-tape APIs, reduce actual action allocation/retention identity under identical-layout Wasm state; no arbitrary native-pointer comparison, pointer mask, allocator rewind or warming exemption.",
+      "next_true_correction_gate": "Independent review accepts the seven-tick component. One reduced actual ActionStore allocation/retention identity gate is released in two fresh identical-layout Wasm instances before new corrected-tape APIs. Equal-length lane arguments, shared Wait14-only initialization and identical checkpoint capture/begin lifecycle precede the compared prestate. No pointer normalization, allocator rewind or warming exemption.",
       "native_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-sol-review-v1.json",
         "sha256": "dad8891daa45d06e7360b2eaf3e9a126811ab658691f8dec8c8c252879b65771"
@@ -9698,20 +9698,96 @@
             "sha256": "b976043a8b294cadfb75cc4d03dab23cb469cf38f82f48485de81022cb187c0e"
           },
           "result": "All300 prefix samples agree between instances. Separate predicted7 and authoritative drawn7 execute; typed restore succeeds at command22. Command23 refuses1047 before first replay tick: real shared boundary compares restored source frame176 with stale observer frame183. Zero replay/raw equality or present claimed. CPU close retains1047; source/renderer close succeed; all9 producers and all owned PID absence verified."
+        },
+        {
+          "source_producer": "ac54e1831801002206a04b2ab129f1be758e2113",
+          "receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-seven-tick-v17-v2/result-receipt.json",
+            "sha256": "79e03bf00a592192580ce2c6b20537c60354199e4e26bd870c2d1d8ad2df4135"
+          },
+          "producer_archive": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-v17-browser-v2-archive/archive.json",
+            "sha256": "6b747cb1929f13fe6add5a225d7b99a85897b5d5d9de380d27ee0b9fd0c7ef5d"
+          },
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-seven-tick-v17-v2/result.json",
+            "sha256": "859c74a99673db0e738eb343055a28170e312eb3641b1d4b545c3422ac43a186"
+          },
+          "configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-seven-tick-v17-v2/final-linked-configuration-v1.json",
+            "sha256": "f8695d99cbb7aec85a80403bfb71d81050479804f9ed51b4d91c830e30f3faf8"
+          },
+          "linked_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-seven-tick-v17-v2/row-review.json",
+            "sha256": "7b0640c2593b7f3f72ce40fea87a1a6db89cab6bef47f6b557daf1ecb813c718"
+          },
+          "result": "Commands14\u201331 all0; seven baseline raw steps/draws, typed restore, seven no-draw same-authoritative replay ticks and actual final present. Strict CPU/drawn endpoint masks1022 match, all8raw5 pairs match; diagnostics slots7\u201314 unchanged and15 finaldraw. Both300prefixes agree; separate predicted remote fighter motion14 versus authoritative60 across all7; attempted prediction307 blocked without source tick. CPUclose0/source1/renderer1, bothpagesclosed, allownedPIDsabsent, all9producersarchived.",
+          "limitations": "Not wrong-predicted-branch restoration. No live/network/repeated rollback, full-match, seven-tick frame budget or profile acceptance.",
+          "independent_result_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-v17-browser-v2-independent-result-review.json",
+            "sha256": "1dbffd317a592bbf242addc0970806747cbe01498d337c7c21e51c97d9bca544",
+            "decision": "GO_SCOPED_COMPONENT_RESULT"
+          }
         }
       ],
-      "next": "Capture/restore exact diagnostic Observation metadata around successful typed restore, preserving original shared boundary checks; remove relaxed cursor helper. Actual shared source-boundary body in focused control must reproduce stale-frame refusal. No game/input/PCM/RNG/draw behavior change.",
+      "next": "Reduced actual-source action allocation/retention identity gate in two fresh identical-layout Wasm instances before new corrected-tape API implementation; conditional contract held to that gate. No live rollback claim.",
       "observer_metadata_repair": {
         "freeze": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-observer-metadata-repair-sol-v1/freeze.json",
           "sha256": "a978fabd07522f00850343a6122a4f7fdc926d78bb7a199d49dc37400078a494"
         },
-        "state": "FOCUSED_AND_INDEPENDENT_REVIEW_PASS_BUILD_BROWSER_UNRUN",
-        "scope": "Exact captured diagnostic Observation restored only after successful typed source restore; unchanged actual shared frame boundary required immediately afterward and before every replay tick. Real shared source-boundary function included in focused control. No source/input/PCM/RNG/draw writes added; no seven-tick browser success yet.",
+        "state": "FOCUSED_INDEPENDENT_REVIEW_AND_BROWSER_V2_PASS",
+        "scope": "Exact captured diagnostic Observation restored only after successful typed source restore; unchanged actual shared frame boundary required immediately afterward and before every replay tick. Real shared source-boundary function included in focused control. No source/input/PCM/RNG/draw writes added. The subsequent seven-tick browser result passes with this repair.",
         "review": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-observer-metadata-independent-review-v1.json",
           "sha256": "4e19346d5e054afaa51518bd8fbca7b59377c318232f16f583783aea70e92c7e"
         }
+      }
+    },
+    "action_retention_identity_gate": {
+      "status": "OBSERVED_NATIVE_CLIP_IDENTITY_DIVERGENCE",
+      "freeze": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-retention-gate-v1/freeze.json",
+        "sha256": "04f34d5e883699ffb2359c085450bd9a2ce15d50ab903b611c54a8e8634b6e8f"
+      },
+      "observation": "Two fresh identical-layout Wasm instances have identical prestate. Clean B versus A -> existing ActionStore restore -> modeled Fighter fields -> disarm retaining capsule -> B differs in native tree/node/track addresses. Row identity, stream pointer and bytes match for this fixture. A stays alive through restore, disarm, source unbind and store destruction; capsule teardown releases retained leases.",
+      "scope": "Synthetic DAT corpus through production selection, decoding and native Clip creation. This demonstrates source-visible native pointer drift, not full gameplay divergence. Both A and recorded journal/state allocations differ; no sole-allocation causal attribution.",
+      "validation": "Existing ActionStore interval controls and generic DAT controls pass. Repaired gate intentionally fails on strict endpoint identity. Initial JSON formatter failure retained. No third experiment or browser repetition.",
+      "repair_contract": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-stable-authored-catalog-contract-sol-v1.json",
+        "sha256": "490345d938b0e609c1c09dd9972196820c276e94cdcb5c402d5ae2dc04e9a17e"
+      },
+      "next": "One-shot explicit corrected action recording, preserving exact replay and retained leases, followed by typed coordinator/runtime composition. No browser activation before component review.",
+      "independent_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-retention-gate-independent-review-v1.json",
+        "sha256": "d1f92620bdbe2920c0df426ceae61f7a55a0c946fb4fb6cf00c9eca3704c8c7d",
+        "decision": "GO_NARROW_NEGATIVE_DIAGNOSTIC"
+      },
+      "repair_component": {
+        "status": "PASS_FOCUSED_CATALOG_IDENTITY_AND_ORIGINAL_DOMAIN_PREPARATION",
+        "source_archive": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/stable-catalog-component-archive-v1/archive.json",
+          "sha256": "0129ec250a178e110bafa3c842ec9a66c01d186523c088753e1e300c44225174"
+        },
+        "freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-stable-catalog-focused-v2/freeze.json",
+          "sha256": "95e2d1024ec6025c21384acd0aaf4634684ba20e74a40a6399d51137eccb1700"
+        },
+        "source_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-stable-catalog-independent-review-v1.json",
+          "sha256": "49e70a307ca777053c0a3bf4fe543068aeb8102ab9a2e4ec70fc26bde59fd9e4"
+        },
+        "resident_replay_control": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-stable-catalog-replay-focused-v1/replay-control-freeze.json",
+          "sha256": "59d81ba2050b232cc844e086668f3f483b5b5143e37a6328aec0484b965a04ce"
+        },
+        "original_domain": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-store-catalog-probe-offline-repair-sol-v1/evidence-offline.json",
+          "sha256": "40dbe19f5a4be46a04393618fe40dd4d679b1355195ce8c15f9ba423448c7544"
+        },
+        "observations": "Private prebind complete ordinary-domain decoded-animation/native-Clip catalog fixes strict clean-B versus A/restore/B pointer and byte identity in the reduced fixture. Existing exact replay and wrong-selection refusal run in both Legacy and Resident policies. Actual original Mario constructor covers303rows,252nonempty,194unique native keys;32.225459ms and3752672liveallocator bytes delta,0Wasm heap growth,323804nativeowned bytes plus762301stream bytes.",
+        "limits": "Single Wasm/Node whole-constructor readiness/cost observation, not catalog-only cost, browser frame budget, source animation execution, public profile admission or wrong-branch browser rollback. Default Legacy unchanged; no browser activation.",
+        "retained_failures": "Initial fixture variable-name collision; original-domain probe compatibility-header compile failure; final report KeyError after successful runtime. Report repaired/validated offline without rerun; original unittest error remains exit1."
       }
     }
   }

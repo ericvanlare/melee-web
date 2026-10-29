@@ -1425,19 +1425,52 @@ affected build at `13f2c5ab` pass. The first browser attempt agrees across both
 300-sample prefixes, completes seven authoritative drawn ticks and restores,
 then refuses command 23 before replay: the actual shared boundary detects a
 restored source frame of 176 against the cached observation at 183. This
-metadata dependency was missing from the modeled boundary control. The reduced repair now restores the exact captured observation only after
+metadata dependency was missing from the modeled boundary control. The reduced
+repair now restores the exact captured observation only after
 a successful typed commit and immediately checks the unchanged shared boundary.
 Its control executes the actual source-boundary helper, rejects stale metadata
-before any replay step, and passes independent review; a new browser attempt
-remains pending. No seven-tick replay equality or final present is claimed.
+before any replay step, and passes independent review; the subsequent browser
+result is recorded below. That first attempt establishes no replay equality or
+final present.
 Failed fixture/capture evidence and all nine producer files are retained;
 source/renderer shutdown completes and every owned PID is absent. CPU CLOSE
-preserves failure 1047. The proposed two-instance witness separates prediction nonvacuity from
+preserves failure 1047. The two-instance witness separates prediction nonvacuity
+from
 authoritative-to-same-input replay; it cannot establish correction from a wrong
-predicted branch. That next milestone first checks actual action allocation and
-retained borrowed identities, because exact action-tape replay currently refuses
-a changed action sequence. Full regression, publication-head CI, profile
-admission, full-match and working online browser rollback remain open.
+predicted branch. The repaired producer `ac54e183` now passes the actual
+seven-tick browser component: commands 14–31 succeed; all seven raw per-tick
+pairs plus the final drawn pair agree; strict CPU and drawn endpoint masks
+`0x3fe` match. No-draw diagnostics remain unchanged during replay, and the
+actual final present completes. The separate predicted instance has remote
+fighter motion 14 versus authoritative 60 through all seven samples; prediction
+307 is blocked without executing another source tick. Both instances close,
+CPU/source/renderer teardown passes, all recorded PIDs are absent and all nine
+producer artifacts are archived unchanged. Independent review reruns the shipped
+decoder on the retained payload and checks all eight raw pairs, actual input,
+prediction nonvacuity, diagnostics, final present and cleanup. This still replays
+the same authoritative branch; it does not restore the incorrectly predicted
+instance.
+The reduced wrong-branch action test now starts two identical-layout Wasm
+instances from matching state. Clean B versus A → restore → B differs in native
+FigaTree, node and track addresses; the authored row, animation stream pointer
+and bytes match in this synthetic fixture. Actual production allocation and
+selection run, while the later Fighter payload owner is modeled. A remains
+alive through source-owner and store retirement until capsule teardown. This
+exposes native identity drift without isolating a single allocator cause or
+claiming gameplay divergence. The first formatter failure and the strict
+identity failure are retained. The private, complete authored animation/clip
+catalog now passes that strict identity comparison. Legacy remains the default,
+and exact replay plus wrong-selection refusal pass under both policies.
+Independent review accepts the core source. The actual original Mario probe
+prepares all 303 rows (252 nonempty, 194 distinct animations): the complete
+constructor takes 32.225 ms with a 3,752,672-byte live allocator increase in this
+single Wasm/Node observation. These are whole-constructor costs, not browser
+timing or an isolated catalog measurement. The probe runtime succeeds; its
+reporting KeyError is repaired and checked offline, retaining the original
+unittest error and both preceding fixture failures. No runtime activation is
+implied. The next bounded change adds explicit corrected action recording while
+retaining exact replay and all borrowed leases. Full regression, publication-head
+CI, profile admission, full-match and working online browser rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

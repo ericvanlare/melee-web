@@ -466,8 +466,64 @@ DatSelectedAction DatFighterAnimationStore::select_native_action(std::uint32_t i
 {
     return select_impl(id, DatAnimationPolicy::NativeFighterAction);
 }
+void DatFighterAnimationStore::prepare_resident_native_actions()
+{
+    require(!resident_native_actions_ready_,
+            "Resident native action catalog was already prepared");
+    require(!interval_owner_,
+            "Resident native action catalog cannot be prepared after owner admission");
+    require(!selection_started_ && next_ == 0 &&
+                std::all_of(cache_.begin(), cache_.end(),
+                    [](const auto& entry) { return !entry.animation; }) &&
+                !cache_hooks_.hit && !cache_hooks_.miss_replay &&
+                !cache_hooks_.miss_record,
+            "Resident native action catalog must be prepared before selection or cache hooks");
+
+    std::map<ResidentKey, std::shared_ptr<const DatAnimation>> prepared;
+    const auto& rows = fighter_->actions();
+    for (std::size_t index = 0; index < rows.size(); ++index) {
+        const auto& action = rows[index];
+        require(action.motion_id == index,
+                "Resident native action catalog rows are not in authored motion order");
+        if (!action.archive_bytes) continue;
+        require(!action.symbol.empty(),
+                "Nonempty resident native action has no authored symbol");
+
+        const ResidentKey key{action.container_offset, action.archive_bytes,
+                              action.symbol, true};
+        if (prepared.contains(key)) continue;
+
+        const DatArchive archive(fighter_->archive_actions().slice(container_, action.motion_id));
+        const auto offset = root(archive, action.symbol);
+        try {
+            prepared.emplace(key, std::make_shared<const DatAnimation>(
+                archive, offset, DatAnimationPolicy::NativeFighterAction));
+        } catch (const DatError& error) {
+            throw DatError("Resident fighter action " + std::to_string(action.motion_id) +
+                           " (" + action.symbol + "): " + error.what());
+        }
+    }
+    resident_native_actions_.swap(prepared);
+    resident_native_actions_ready_ = true;
+}
+DatSelectedAction DatFighterAnimationStore::resident_native_action(std::uint32_t id) const
+{
+    require(resident_native_actions_ready_,
+            "Resident native action catalog is not prepared");
+    const auto& action = fighter_->action(id);
+    DatSelectedAction result{action, {}, fighter_->commands(id)};
+    if (!action.archive_bytes) return result;
+    const ResidentKey key{action.container_offset, action.archive_bytes,
+                          action.symbol, true};
+    const auto found = resident_native_actions_.find(key);
+    require(found != resident_native_actions_.end(),
+            "Authored action is missing from the resident native catalog");
+    result.animation = found->second;
+    return result;
+}
 DatSelectedAction DatFighterAnimationStore::select_impl(std::uint32_t id, DatAnimationPolicy policy)
 {
+    selection_started_ = true;
     const auto& source_action = fighter_->action(id);
     DatSelectedAction result{source_action, {}, fighter_->commands(id)};
     if (!result.action.archive_bytes) return result;
@@ -483,7 +539,22 @@ DatSelectedAction DatFighterAnimationStore::select_impl(std::uint32_t id, DatAni
     }
     if (cache_hooks_.miss_replay)
         result.animation = cache_hooks_.miss_replay(this, fighter_, &source_action, policy);
-    if (!result.animation) {
+    if (native_action && resident_native_actions_ready_) {
+        const bool replay_supplied_animation = bool(result.animation);
+        const ResidentKey key{result.action.container_offset, result.action.archive_bytes,
+                              result.action.symbol, true};
+        const auto found = resident_native_actions_.find(key);
+        require(found != resident_native_actions_.end(),
+                "Authored action is missing from the resident native catalog");
+        if (result.animation) {
+            require(result.animation.get() == found->second.get(),
+                    "Action replay supplied a different resident animation identity");
+        } else {
+            result.animation = found->second;
+        }
+        if (!replay_supplied_animation && cache_hooks_.miss_record)
+            cache_hooks_.miss_record(this, fighter_, &source_action, policy, result.animation);
+    } else if (!result.animation) {
         const DatArchive archive(fighter_->archive_actions().slice(container_, id));
         const auto offset = root(archive, result.action.symbol);
         try {

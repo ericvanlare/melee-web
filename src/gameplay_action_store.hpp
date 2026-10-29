@@ -2,9 +2,17 @@
 #include "gameplay_action_store.h"
 #include "dat_commands.hpp"
 #include <array>
+#include <cstdint>
 #include <map>
 #include <set>
+#include <tuple>
+#include <vector>
 namespace melee_web {
+enum class GameplayActionStorePolicy : std::uint8_t {
+    Legacy,
+    ResidentOrdinaryActions,
+};
+
 class GameplayActionStore {
 public:
     GameplayActionStore(std::shared_ptr<const DatArchive>, const FighterCostume&,
@@ -12,7 +20,8 @@ public:
                         std::shared_ptr<const DatArchive> result_motion = {},
                         std::shared_ptr<const DatArchive> nana_popo_archive = {},
                         const FighterCostume* nana_popo_identity = nullptr,
-                        std::span<const uint8_t> nana_popo_container = {});
+                        std::span<const uint8_t> nana_popo_container = {},
+                        GameplayActionStorePolicy policy = GameplayActionStorePolicy::Legacy);
     ~GameplayActionStore();
     GameplayActionStore(const GameplayActionStore&) = delete;
     GameplayActionStore& operator=(const GameplayActionStore&) = delete;
@@ -27,6 +36,15 @@ public:
     const DatFighterRuntime& runtime() const noexcept { return *runtime_; }
     uint32_t selected_motion(unsigned slot) const;
 #if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    struct ResidentCatalogTestRow {
+        std::uint32_t representative_motion = UINT32_MAX;
+        const void* clip = nullptr;
+        const DatAnimation* animation = nullptr;
+        const FigaTree* tree = nullptr;
+    };
+    [[nodiscard]] bool interval_test_resident_catalog_ready() const noexcept;
+    [[nodiscard]] bool interval_test_resident_catalog_row(
+        std::uint32_t motion, ResidentCatalogTestRow* out) const noexcept;
     void interval_test_disable_cache_hooks();
     void interval_test_change_cache_hooks();
     void interval_test_restore_cache_hooks();
@@ -47,6 +65,9 @@ private:
                     FigaTree**, void**, char*, size_t);
     std::shared_ptr<const DatFighterRuntime> runtime_;
     DatFighterAnimationStore store_;
+    GameplayActionStorePolicy policy_ = GameplayActionStorePolicy::Legacy;
+    bool resident_catalog_ready_ = false;
+    std::vector<std::shared_ptr<Clip>> resident_clips_;
     std::shared_ptr<DatCommands> commands_;
     std::set<uint32_t> command_motions_;
     std::shared_ptr<MeleeWebNativeActionRows> rows_;
