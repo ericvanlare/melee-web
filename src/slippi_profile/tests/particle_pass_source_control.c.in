@@ -60,6 +60,8 @@ static unsigned draw_order[32];
 static size_t draw_order_count;
 static int cobj_available = 1;
 static HSD_CObj* current_cobj;
+static HSD_JObj* counted_effect_root;
+static unsigned effect_display_calls;
 
 enum { PTCL_RENDER_LINKNO_0 = 1, PTCL_RENDER_LINKNO_1 = 2,
        PTCL_RENDER_LINKNO_2 = 4 };
@@ -183,7 +185,10 @@ void HSD_LObj_803668EC(HSD_LObj* lobj)
 void HSD_LObjSetupInit(HSD_CObj* cobj)
 { (void) cobj; draw_order[draw_order_count++] = 111; }
 void HSD_JObjDispAll(HSD_JObj* jobj, void* mtx, uint32_t mask, uint32_t flags)
-{ (void) jobj; (void) mtx; (void) mask; (void) flags; draw_order[draw_order_count++] = 112; }
+{
+    if (jobj == counted_effect_root) ++effect_display_calls;
+    (void) mtx; (void) mask; (void) flags; draw_order[draw_order_count++] = 112;
+}
 uint32_t HSD_GObj_80390EB8(int pass) { return (uint32_t) pass; }
 static void HSD_SetEraseColor(int r, int g, int b, int a)
 { (void) r; (void) g; (void) b; (void) a; }
@@ -484,6 +489,8 @@ static void reset_fixture(void)
     current_cobj = NULL;
     memset(draw_order, 0, sizeof(draw_order));
     draw_order_count = 0;
+    counted_effect_root = NULL;
+    effect_display_calls = 0;
     cobj_init(&cobj_main); cobj_init(&cobj_flash);
     cobj_init(&cobj_ground); cobj_init(&cobj_magnify);
     cobj_init(&cobj_ifcoget);
@@ -995,6 +1002,122 @@ static void test_main_hud_and_zero_camera_actual_dispatch(void)
     assert(actual_count == 0);
 }
 
+static void setup_safe_effect_owner(HSD_GObj* owner, HSD_JObj* root,
+                                    EF_Effect* effect,
+                                    HSD_GObjProc* proc, int after_manager)
+{
+    memset(owner, 0, sizeof(*owner));
+    memset(root, 0, sizeof(*root));
+    memset(effect, 0, sizeof(*effect));
+    root->object.parent.class_info = HSD_CLASS_INFO(&hsdJObj);
+    owner->classifier = HSD_GOBJ_CLASS_EFFECT;
+    owner->p_link = 11;
+    owner->p_priority = 0;
+    owner->gx_link = SLIPPI_PARTICLE_GX_MODEL;
+    owner->render_priority = 1;
+    owner->obj_kind = HSD_GObj_JObjKind;
+    owner->user_data_kind = 8;
+    owner->render_cb = HSD_GObj_JObjCallback;
+    owner->hsd_obj = root;
+    owner->user_data = effect;
+    owner->user_data_remove_func = efLib_remove_user_data;
+    effect->gobj = owner;
+    proc_init(proc, owner, 15, efLib_Update);
+    if (after_manager) {
+        /* Alternate valid bounded GX-chain order for the dispatch comparison. */
+        append_link(SLIPPI_PARTICLE_GX_MODEL, owner);
+    } else {
+        /* Retail effect setup registers this callback on GX7 at priority 1. */
+        GObj_SetupGXLink(owner, HSD_GObj_JObjCallback,
+                         SLIPPI_PARTICLE_GX_MODEL, 1);
+    }
+    gobj_alloc_data.used = 15;
+    source.live_gobj_bound = gobj_alloc_data.used;
+}
+
+static void compare_effect_owner_order(int after_manager)
+{
+    HSD_GObj owner;
+    HSD_GObjProc owner_proc;
+    HSD_JObj root;
+    EF_Effect effect;
+    SlippiParticlePassVisit storage[6];
+    SlippiParticlePassVisit canary[3];
+    HSD_GObj* saved_camera;
+    size_t count = 77;
+    unsigned canary_changed, index;
+    memset(storage, 0xA5, sizeof(storage));
+    memset(canary, 0xA5, sizeof(canary));
+    reset_fixture();
+    setup_safe_effect_owner(&owner, &root, &effect, &owner_proc,
+                            after_manager);
+    counted_effect_root = &root;
+    if (after_manager) {
+        assert(heads[SLIPPI_PARTICLE_GX_MODEL] == &objects[0]);
+        assert(objects[0].next_gx == &owner && owner.prev_gx == &objects[0]);
+    } else {
+        assert(heads[SLIPPI_PARTICLE_GX_MODEL] == &owner);
+        assert(owner.next_gx == &objects[0] && objects[0].prev_gx == &owner);
+    }
+
+    assert(slippi_profile_particle_pass_plan(
+        &main_camera, &source, storage, 3, &count, error, sizeof(error)));
+    canary_changed = memcmp(storage + 3, canary,
+                            sizeof(canary)) != 0;
+    actual_count = 0;
+    draw_order_count = 0;
+    effect_display_calls = 0;
+    saved_camera = HSD_GObj_804D7818;
+    HSD_GObj_804D7818 = &main_camera;
+    fn_800301D0(&main_camera, 0);
+    HSD_GObj_804D7818 = saved_camera;
+
+    fprintf(stderr,
+            "PARTICLE_JOIN_CAUSE order=%s planned=%zu actual_dispatches=%zu "
+            "first_planned_manager=%p first_actual_manager=%p "
+            "effect_displays=%u writes_past_capacity=%u\n",
+            after_manager ? "after" : "before", count, actual_count,
+            count ? (const void*) storage[0].manager : NULL,
+            actual_count ? (const void*) actual[0].manager : NULL,
+            effect_display_calls, canary_changed);
+    assert(count == 3);
+    assert(actual_count == 3 && effect_display_calls == 3);
+    assert(!canary_changed);
+    for (index = 0; index < 3; ++index) {
+        assert(storage[index].manager == &objects[0]);
+        assert(storage[index].camera == &main_camera);
+        assert(storage[index].code == actual[index].code);
+        assert(actual[index].camera == &main_camera);
+        assert(actual[index].manager == &objects[0]);
+        assert(actual[index].target == SLIPPI_PARTICLE_TARGET_MODEL_MASK);
+        assert(storage[index].target_mask == actual[index].target);
+    }
+}
+
+static void test_effect_display_is_not_a_particle_visit(void)
+{
+    HSD_GObj unknown;
+    SlippiParticlePassVisit output[6], before[6];
+    size_t count;
+
+    compare_effect_owner_order(0);
+    compare_effect_owner_order(1);
+
+    reset_fixture();
+    memset(&unknown, 0, sizeof(unknown));
+    unknown.render_cb = unsupported_render_callback;
+    append_link(SLIPPI_PARTICLE_GX_MODEL, &unknown);
+    gobj_alloc_data.used = 15;
+    source.live_gobj_bound = gobj_alloc_data.used;
+    memset(output, 0xA5, sizeof(output));
+    memcpy(before, output, sizeof(output));
+    count = 77;
+    assert(!slippi_profile_particle_pass_plan(
+        &main_camera, &source, output, 3, &count, error, sizeof(error)));
+    assert(strstr(error, "unsupported render callback") && count == 77);
+    assert(memcmp(output, before, sizeof(output)) == 0);
+}
+
 static void test_refusals_and_zero_camera_identities(void)
 {
     size_t count;
@@ -1250,6 +1373,7 @@ int main(int argc, char** argv)
     test_devtext_receipt_and_exact_dispatch();
     test_ifcoget_constructor_receipt_and_retirement();
     test_main_hud_and_zero_camera_actual_dispatch();
+    test_effect_display_is_not_a_particle_visit();
     test_refusals_and_zero_camera_identities();
     test_source_registration_order_control();
     test_source_schedule_and_ordinary_wrappers();

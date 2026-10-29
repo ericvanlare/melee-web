@@ -1354,10 +1354,21 @@ the debug-menu alternative. This closes the current camera inventory; original
 special-camera dispatch is still covered separately. The reviewed DevText repair
 at `edf003b5` passes camera/source preparation in the actual browser and reaches
 baseline draw 300, which refuses with code 1205 before any sealed comparison.
-The adapter overwrites the checked draw error, while source camera/dispatcher
-wrappers can lose leaf errors through null diagnostic buffers. The next bounded
-step preserves those first causes before another unchanged strict attempt. No
-specific draw behavior fix is justified yet. DevText constructor and render-owner
+Diagnostic-only repair `d9f5bbff` preserves adapter errors and the first particle
+leaf error, including null-buffer callers. Focused controls, independent review
+and the affected build pass. The unchanged strict browser run identifies the
+first cause: `Particle callback differs from prepared source visit`, followed by
+camera-consumption errors. No comparison or final present occurs. After these
+two draw-boundary attempts, the next step is a smaller composition of actual
+camera/GObj/efLib dispatch with the real presentation helper; the prior controls
+modeled those boundaries separately. The reduced source-dispatch case now
+reproduces six planned visits versus three actual particle callbacks: validated
+ordinary effect JObj displays were incorrectly emitted despite being excluded
+from the manager count. Emission now uses that same manager predicate. The
+focused control passes with exact declared capacity, original effect display
+calls retained, and unknown callbacks still refused. Independent review passes;
+the fixed browser attempt remains pending. Initial fixture failures are retained;
+the final capacity canary uses one backing array to avoid C subarray overrun UB. DevText constructor and render-owner
 controls, configured source-unit syntax and independent fixed-interval review
 pass; Results/reinitialization without actual retirement remains unsupported.
 Generic callback admission remains refused. No successful browser comparison is implied.

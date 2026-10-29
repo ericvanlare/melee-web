@@ -454,7 +454,10 @@ int slippi_profile_particle_pass_plan_with_mask(
             if (!(selection.gx_mask & (1u << link))) continue;
             for (object = source->gx_heads[link]; object;
                  object = object->next_gx) {
-                if (!object->render_cb) continue;
+                /* Safe effect JObj nodes are preflighted for source safety,
+                 * but the original HSD dispatcher must run them outside the
+                 * particle-manager visit plan. Keep emission/count identical. */
+                if (!manager_is(object, source, link)) continue;
                 visits[next].camera_kind = selection.kind;
                 visits[next].camera = camera;
                 visits[next].code = code;

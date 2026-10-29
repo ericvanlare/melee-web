@@ -334,6 +334,7 @@ def source_fixture() -> str:
             extract_function(gxlink, marker)
             for marker in (
                 "void GObj_GXReorder(HSD_GObj* gobj, HSD_GObj* hiprio_gobj)",
+                "void GObj_SetupGXLink(HSD_GObj* gobj, GObj_RenderFunc render_cb,",
                 "void GObj_SetupGXLinkMax(HSD_GObj* gobj, GObj_RenderFunc render_cb,",
             )
         ),

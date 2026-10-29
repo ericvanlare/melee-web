@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "CAMERA_SOURCE_PREFLIGHT_PASSES; first baseline draw refuses 1205 before comparisons; first-cause reporting repair in progress",
+      "status": "CAMERA_PREFLIGHT_PASSES; baseline draw1205 first cause is particle dispatch visit mismatch; smaller composed reproducer required",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9247,7 +9247,7 @@
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Preserve checked source/draw errors and NULL-buffer particle leaf first failures; review and run one strict two-tick attempt with unchanged policy.",
+      "next": "Compose actual camera/GObj/efLib dispatch with presentation helper, identify first tuple/order mismatch and review causal repair before next browser.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9528,6 +9528,42 @@
         "review": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/adapter-and-particle-first-cause-luna-review-v1.json",
           "sha256": "31cab6fb33b94b0be7d5b59a0e6a04365ec0858541943a20a4352baea5fe35a7"
+        },
+        "actual_browser": {
+          "runtime_head": "d9f5bbff0c79f616787415e8c821f993f62aa5a1",
+          "receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v8/result-receipt.json",
+            "sha256": "127c3cc0c6a7fa9bf27219bd91cd285391b5008103132af207f750f2b770db09"
+          },
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v12/result.json",
+            "sha256": "e3be1619e1ae2875fdfe55c15dc375a44a66cbcb0c6adc4bfbe53f04f2b0b511"
+          },
+          "configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v8/final-linked-configuration-v1.json",
+            "sha256": "da2676967a4eff8d9adeeb0ec368ed34d503b6a87e8c00e88774bac9f6e658cd"
+          },
+          "archive": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-first-cause-browser-archive/archive.json",
+            "sha256": "b3f539324a30cb0a12f0f2bb234c574327d1e3d26048879e56a28096eb4e4cbb"
+          }
+        }
+      },
+      "dispatch_reduction": {
+        "causal_source_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-dispatch-planner-causal-sol-review-v1.json",
+          "sha256": "e895f5c11d17043aef5a6086a74ffecd5b7e7b64f26d8c1e138ceea47cf5c52a"
+        },
+        "finding": "Focused original camera/efLib dispatch reproduces planned6 versus actual3 and wrong first visit owner. Emission now uses manager_is like preflight counting. Final defined single-array capacity control passes; original effect display called3times and unknown callback still refused. Independent review GO.",
+        "scope": "No observed browser tuple field yet; current first-error alone does not prove this is its only cause. Original effect display traversal must remain unchanged.",
+        "freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v8-safe-effect-fix-v4/freeze.json",
+          "sha256": "44d529db0235f31c7b4943ebc1ea52d4ee9faf614d57a08dae1b904474962961"
+        },
+        "limits": "Initial red canary used adjacent C subarrays; retain its observed write but do not treat it as a defined-C memory proof. Final single-array test verifies declared capacity without this UB. Fixture setup/compile failures retained. No fixed browser result yet.",
+        "review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-manager-emission-fix-sol-review-v1.json",
+          "sha256": "529e76249bd13f91499b32d9fcc18e1d73697db72450bb4bdb79e44455530919"
         }
       }
     }
