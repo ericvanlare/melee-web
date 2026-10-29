@@ -1321,11 +1321,24 @@ to strict comparison and restore coverage. No source bytes are masked or exempte
 
 The first V16 browser attempt captures successfully in command 8, then refuses the
 first baseline source tick in command 9 with code 1204. It checks zero comparison
-domains; unwritten raw pair data is not equality evidence. The generic adapter
-message loses the underlying refusal, so the next bounded repair preserves the
-first source/helper error before another attempt. The sticky owner failure remains
-visible during source and renderer close. All launched process IDs are independently
-absent and all nine runtime producer artifacts are retained unchanged. Unknown
+domains; unwritten raw pair data is not equality evidence. The initial generic
+adapter message loses the underlying refusal. The reviewed reporting repair at
+`5f0f5589` passes focused controls and the affected build; its same-input diagnostic
+attempt preserves the cause: "Source camera callback has no verified particle
+schedule." Both attempts and their distinct producers are retained. The next step
+is a reduced actual match-camera registration/dispatch control. Source inspection
+finds a typed magnify callback wrapper and the HUD's auxiliary-particle GX8 dispatch
+missing from the planner; which callback caused the captured first refusal remains
+unobserved. The subsequent reduced control passes with actual source registration
+and dispatch snippets, typed magnify identity, visible/hidden HUD checks and
+refusal-before-preparation negatives. Its constructor invocation order and graphics
+leaves are explicitly modeled. Independent source review and the composed control
+review pass; the affected browser build and linked policy review are next. Four
+failed control attempts remain retained, including the const-pointer compilation
+repair. No successful browser comparison is implied.
+The sticky owner failure remains visible during source and renderer close. All
+launched process IDs are independently absent and all nine runtime producer
+artifacts for each attempt are retained unchanged. Unknown
 particle writers, active pool reset, unproved historical projection-cache hits and
 repeated presents still refuse.
 

@@ -2780,3 +2780,58 @@ diff --git a/src/sysdolphin/baselib/psdisptev.c b/src/sysdolphin/baselib/psdispt
  
  void psSetupTevCommon(void)
  {
+diff --git a/src/melee/if/ifall.c b/src/melee/if/ifall.c
+--- a/src/melee/if/ifall.c
++++ b/src/melee/if/ifall.c
+@@ -155,6 +155,15 @@ static void fn_802F36B8(HSD_GObj* gobj, int unused)
+         }
+     }
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_hud_identity(HSD_GObj** camera,
++                                        GObj_RenderFunc* callback,
++                                        unsigned* hidden_state)
++{
++    *camera = ifAll_804A0FD8.gobj;
++    *callback = fn_802F36B8;
++    *hidden_state = ifAll_IsHUDHidden() ? 1u : 0u;
++}
++#endif
+ 
+ static void ifAll_802F370C(SceneDesc* arg0)
+ {
+diff --git a/src/melee/if/ifnametag.c b/src/melee/if/ifnametag.c
+--- a/src/melee/if/ifnametag.c
++++ b/src/melee/if/ifnametag.c
+@@ -181,5 +181,13 @@ void fn_802FCAC4(HSD_GObj* gobj, int pass)
+     }
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_nametag_identity(HSD_GObj** camera,
++                                            GObj_RenderFunc* callback)
++{
++    *camera = un_804D6D68;
++    *callback = fn_802FCAC4;
++}
++#endif
+ 
+ /// un_802FD4C8 will try to inline this otherwise
+ #ifdef MUST_MATCH
+diff --git a/src/melee/if/ifmagnify.c b/src/melee/if/ifmagnify.c
+--- a/src/melee/if/ifmagnify.c
++++ b/src/melee/if/ifmagnify.c
+@@ -463,5 +463,12 @@ static void melee_web_magnify_camera(HSD_GObj* gobj, int pass)
+     ifMagnify_802FBBDC(gobj);
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++GObj_RenderFunc slippi_particle_source_magnify_callback(void)
++{
++    return melee_web_magnify_camera;
++}
++#endif
+ #endif
+ 
+ void ifMagnify_802FC3C0(s32 slot)

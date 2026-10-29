@@ -20,6 +20,13 @@ SOURCE_PINS = {
     MELEE / "ef/eflib.c": "5450ecd99821f09ea4b9706d400d84b9a42d9d55d2864f530b2a98ce7481dbd4",
     MELEE / "gr/grdisplay.c": "6b1058e4cb5b979dbb8e38a238148d58ce20b47facc39ea241a6b567267cdb37",
     MELEE / "if/ifmagnify.c": "42c8a7477d15836e4771c4b77944b3e2b136b5203e01ecfa91dc314415d38a2b",
+    MELEE / "if/ifall.c": "545d32d9a4ca3f88bd7ab8d73a5c3c68e404f60f188a5935590f9c043fd7f879",
+    MELEE / "if/ifnametag.c": "5b1975b769609ed6bf43cd324056faaf84cd25a0bd7c41d8936974e6e383a225",
+    MELEE / "lb/lbbgflash.c": "9739385802bd101f778e8bbead41cf211d1362271b238674d7f33568b9778848",
+    MELEE / "gr/ground.c": "302f2542da48d7aef4d4ee637b2f375e834feb82a36e2f08caae4e810ec4bdc2",
+    BASELIB / "gobjgxlink.c": "b6c199614c8e5bca821a0e448a28b541947d77ea2dcfc9a517a5810e20b55bfb",
+    BASELIB / "lobj.c": "500352c3a6bf1ff1ddfc4ce79a51775fdd999b5a44bd5cc2aa3c3d29c8e024ca",
+    ROOT / "patches/melee-gameplay.patch": "7fe949fc22b5496267b27079663469dea554922abf5304e78a56adb769ad4bbc",
     PROFILE / "effect_matrix.c": "928edfb6524bc45fbfba2393bda1c765069352d2ea53587112f97a08749ba570",
 }
 
@@ -27,6 +34,8 @@ STUBS = {
     "Runtime/platform.h": r'''#ifndef FIXTURE_PLATFORM_H
 #define FIXTURE_PLATFORM_H
 typedef void (*Event)(void);
+typedef unsigned char u8;
+typedef unsigned int u32;
 #endif
 ''',
     "sysdolphin/baselib/class.h": r'''#ifndef FIXTURE_CLASS_H
@@ -42,6 +51,17 @@ typedef struct HSD_Class { HSD_ClassInfo *class_info; } HSD_Class;
 #include "class.h"
 typedef struct HSD_Obj { HSD_Class parent; } HSD_Obj;
 #define HSD_OBJECT_METHOD(o) (((HSD_Obj *)(o))->parent.class_info)
+#endif
+''',
+    "sysdolphin/baselib/lobj.h": r'''#ifndef FIXTURE_LOBJ_H
+#define FIXTURE_LOBJ_H
+#include "object.h"
+struct HSD_CObj;
+typedef struct HSD_LObj { HSD_Obj parent; } HSD_LObj;
+typedef struct HSD_LObjInfo { HSD_ClassInfo parent; } HSD_LObjInfo;
+extern HSD_LObjInfo hsdLobj;
+void HSD_LObj_803668EC(HSD_LObj*);
+void HSD_LObjSetupInit(struct HSD_CObj*);
 #endif
 ''',
     "sysdolphin/baselib/gobj.h": r'''#ifndef FIXTURE_GOBJ_H
@@ -68,12 +88,16 @@ extern HSD_GObj** HSD_GObjGXLinkHead;
 extern HSD_GObj** HSD_GObj_804D7820;
 extern uint8_t HSD_GObj_CameraKind;
 extern uint8_t HSD_GObj_JObjKind;
+extern uint8_t HSD_GObj_LightKind;
 typedef struct { uint8_t gx_link_max; } HSD_GObjLibInitDataType;
 extern HSD_GObjLibInitDataType HSD_GObjLibInitData;
 void HSD_GObj_80390ED0(HSD_GObj*, uint32_t);
 void HSD_GObj_803910D8(HSD_GObj*, int);
 void HSD_GObj_80390FC0(void);
 void HSD_GObj_JObjCallback(HSD_GObj*, int);
+void HSD_GObj_LObjCallback(HSD_GObj*, int);
+void GObj_SetupGXLinkMax(HSD_GObj*, GObj_RenderFunc, uint32_t);
+uint32_t HSD_GObj_80390EB8(int);
 #endif
 ''',
     "sysdolphin/baselib/gobjproc.h": r'''#ifndef FIXTURE_GOBJPROC_H
@@ -95,6 +119,7 @@ typedef struct HSD_ObjAllocData { uint32_t used; } HSD_ObjAllocData;
 typedef struct HSD_CObj { HSD_Obj parent; int token; } HSD_CObj;
 typedef struct HSD_CObjInfo { HSD_ClassInfo parent; } HSD_CObjInfo;
 extern HSD_CObjInfo hsdCObj;
+HSD_CObj* HSD_CObjGetCurrent(void);
 #endif
 ''',
     "sysdolphin/baselib/jobj.h": r'''#ifndef FIXTURE_JOBJ_H
@@ -110,6 +135,7 @@ typedef struct HSD_JObj {
 } HSD_JObj;
 typedef struct HSD_JObjInfo { HSD_ClassInfo parent; } HSD_JObjInfo;
 extern HSD_JObjInfo hsdJObj;
+void HSD_JObjDispAll(HSD_JObj*, void*, uint32_t, uint32_t);
 #endif
 ''',
     "sysdolphin/baselib/dobj.h": r'''#ifndef FIXTURE_DOBJ_H
@@ -170,8 +196,21 @@ void grDisplay_801C5F60(HSD_GObj*, int);
 #define FIXTURE_IFMAGNIFY_H
 #include <sysdolphin/baselib/gobj.h>
 void ifMagnify_802FBBDC(HSD_GObj*);
+void ifMagnify_802FB8C0(HSD_GObj*, int);
 #endif
 ''',
+    "melee/if/ifall.h": r'''#ifndef FIXTURE_IFALL_H
+#define FIXTURE_IFALL_H
+#include <stdbool.h>
+#include <sysdolphin/baselib/gobj.h>
+bool ifAll_IsHUDHidden(void);
+#endif
+''',
+    "melee/if/ifstatus.h": "#include <sysdolphin/baselib/gobj.h>\nvoid ifStatus_802F5DE0(HSD_GObj*, int);\nvoid ifStatus_802F5E50(HSD_GObj*, int);\n",
+    "melee/if/if_2F72.h": "#include <sysdolphin/baselib/gobj.h>\nvoid fn_802F770C(HSD_GObj*, int);\n",
+    "melee/if/if_2FD9.h": "#include <sysdolphin/baselib/gobj.h>\nvoid fn_802FDA4C(HSD_GObj*, int);\n",
+    "melee/if/ifstock.h": "#include <sysdolphin/baselib/gobj.h>\n",
+    "melee/if/iftime.h": "#include <sysdolphin/baselib/gobj.h>\n",
 }
 
 
@@ -193,6 +232,34 @@ def source_fixture() -> str:
     camera = (MELEE / "cm/camera.c").read_text(encoding="utf-8")
     gobj = (BASELIB / "gobj.c").read_text(encoding="utf-8")
     eflib = (MELEE / "ef/eflib.c").read_text(encoding="utf-8")
+    ifall = (MELEE / "if/ifall.c").read_text(encoding="utf-8")
+    nametag = (MELEE / "if/ifnametag.c").read_text(encoding="utf-8")
+    gxlink = (BASELIB / "gobjgxlink.c").read_text(encoding="utf-8")
+    gameplay_patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
+    profile_patch = (PROFILE / "patches/melee-profile-hooks.patch").read_text(encoding="utf-8")
+    ground_source = (MELEE / "gr/ground.c").read_text(encoding="utf-8")
+    flash_source = (MELEE / "lb/lbbgflash.c").read_text(encoding="utf-8")
+
+    def added_patch_function(source: str, marker: str) -> str:
+        body = extract_function(source, marker)
+        return "\n".join(line[1:] if line.startswith("+") else line
+                          for line in body.splitlines())
+
+    def source_registration(source: str, marker: str, old_owner: str,
+                            new_owner: str) -> str:
+        line = next(line.strip() for line in source.splitlines() if marker in line)
+        return line.replace(old_owner, new_owner)
+
+    def added_patch_registration(source: str, marker: str, old_owner: str,
+                                 new_owner: str) -> str:
+        line = next(line[1:].strip() for line in source.splitlines()
+                    if line.startswith("+") and marker in line)
+        return line.replace(old_owner, new_owner)
+
+    hud_storage_start = ifall.index("static struct ifAll_804A0FD8_t {")
+    hud_storage_end = ifall.index("\n\n", ifall.index("static u8 hidden;", hud_storage_start))
+    nametag_owner = next(line for line in nametag.splitlines()
+                         if "static HSD_GObj* un_804D6D68;" in line)
     snippets = {
         "ACTUAL_CAMERA_SOURCE": "\n\n".join(
             extract_function(camera, marker)
@@ -211,10 +278,79 @@ def source_fixture() -> str:
                 "void HSD_GObj_80390ED0(HSD_GObj* gobj, u32 mask)",
                 "void HSD_GObj_80390FC0(void)",
                 "void HSD_GObj_803910D8(HSD_GObj* gobj, int renderpass)",
+                "void HSD_GObj_LObjCallback(HSD_GObj* gobj, int unused)",
+                "void HSD_GObj_JObjCallback(HSD_GObj* gobj, int arg1)",
+            )
+        ),
+        "ACTUAL_GXLINK_SOURCE": "\n\n".join(
+            extract_function(gxlink, marker)
+            for marker in (
+                "void GObj_GXReorder(HSD_GObj* gobj, HSD_GObj* hiprio_gobj)",
+                "void GObj_SetupGXLinkMax(HSD_GObj* gobj, GObj_RenderFunc render_cb,",
             )
         ),
         "ACTUAL_EFLIB_SOURCE": extract_function(
             eflib, "void efLib_render_callback(HSD_GObj* gobj, int code)"
+        ),
+        "ACTUAL_HUD_STORAGE": ifall[hud_storage_start:hud_storage_end],
+        "ACTUAL_HUD_HIDDEN": extract_function(ifall, "bool ifAll_IsHUDHidden(void)"),
+        "ACTUAL_HUD_CALLBACK": extract_function(
+            ifall, "static void fn_802F36B8(HSD_GObj* gobj, int unused)"
+        ),
+        "ACTUAL_NAMETAG_OWNER": nametag_owner,
+        "ACTUAL_NAMETAG_CALLBACK": extract_function(
+            nametag, "void fn_802FCAC4(HSD_GObj* gobj, int pass)"
+        ),
+        "ACTUAL_MAGNIFY_WRAPPER": added_patch_function(
+            gameplay_patch,
+            "static void melee_web_magnify_camera(HSD_GObj* gobj, int pass)",
+        ),
+        "ACTUAL_HUD_BRIDGE": added_patch_function(
+            profile_patch,
+            "void slippi_particle_source_hud_identity(HSD_GObj** camera,",
+        ),
+        "ACTUAL_NAMETAG_BRIDGE": added_patch_function(
+            profile_patch,
+            "void slippi_particle_source_nametag_identity(HSD_GObj** camera,",
+        ),
+        "ACTUAL_MAGNIFY_BRIDGE": added_patch_function(
+            profile_patch,
+            "GObj_RenderFunc slippi_particle_source_magnify_callback(void)",
+        ),
+        "ACTUAL_MAIN_BRIDGE": added_patch_function(
+            profile_patch,
+            "+void slippi_particle_source_main_camera_identity(",
+        ),
+        "ACTUAL_FLASH_OWNER": added_patch_function(
+            gameplay_patch,
+            "+HSD_GObj* melee_web_bg_flash_camera_owner(void)",
+        ),
+        "SOURCE_REGISTER_MAIN": source_registration(
+            camera, "GObj_SetupGXLinkMax(gobj, fn_800301D0, 2);",
+            "gobj", "&main_camera",
+        ),
+        "SOURCE_REGISTER_GROUND": source_registration(
+            ground_source,
+            "GObj_SetupGXLinkMax(new_var2, &grDisplay_801C5F60, 5);",
+            "new_var2", "&ground_camera",
+        ),
+        "SOURCE_REGISTER_MAGNIFY": added_patch_registration(
+            gameplay_patch,
+            "GObj_SetupGXLinkMax(gobj, melee_web_magnify_camera, 0);",
+            "gobj", "&magnify_camera",
+        ),
+        "SOURCE_REGISTER_FLASH": source_registration(
+            flash_source,
+            "GObj_SetupGXLinkMax(*gobj1_slot, HSD_GObj_803910D8, 0xa);",
+            "*gobj1_slot", "&flash_camera",
+        ),
+        "SOURCE_REGISTER_NAMETAG": source_registration(
+            nametag, "GObj_SetupGXLinkMax(gobj, fn_802FCAC4, 6);",
+            "gobj", "&nametag_camera",
+        ),
+        "SOURCE_REGISTER_HUD": source_registration(
+            ifall, "GObj_SetupGXLinkMax(gobj, fn_802F36B8, 8);",
+            "gobj", "&hud_camera",
         ),
     }
     fixture = (PROFILE / "tests/particle_pass_source_control.c.in").read_text(
@@ -222,7 +358,7 @@ def source_fixture() -> str:
     )
     for name, body in snippets.items():
         fixture = fixture.replace(name, body)
-    if "ACTUAL_" in fixture:
+    if "ACTUAL_" in fixture or "SOURCE_REGISTER_" in fixture:
         raise AssertionError("unexpanded actual-source fixture placeholder")
     return fixture
 
@@ -254,6 +390,31 @@ class ParticlePassPlanTests(unittest.TestCase):
         )
         self.assertIn("(Event) ifMagnify_802FBBDC", magnify)
         self.assertIn("gobj->gxlink_prios = 0x10;", magnify)
+        ifall = (MELEE / "if/ifall.c").read_text(encoding="utf-8")
+        hud_setup = extract_function(ifall, "void ifAll_802F390C(void)")
+        self.assertIn("GObj_SetupGXLinkMax(gobj, fn_802F36B8, 8);", hud_setup)
+        self.assertIn("gobj->gxlink_prios = 0xD00;", hud_setup)
+        nametag_source = (MELEE / "if/ifnametag.c").read_text(encoding="utf-8")
+        nametag_setup = extract_function(nametag_source, "void un_802FD4C8(void)")
+        self.assertIn("GObj_SetupGXLinkMax(gobj, fn_802FCAC4, 6);", nametag_setup)
+        self.assertIn("gobj->gxlink_prios = 0x200;", nametag_setup)
+        gameplay_patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
+        self.assertIn("GObj_SetupGXLinkMax(gobj, melee_web_magnify_camera, 0);",
+                      gameplay_patch)
+        flash_source = (MELEE / "lb/lbbgflash.c").read_text(encoding="utf-8")
+        flash_setup = extract_function(flash_source, "void lbBgFlash_800209F4(void)")
+        self.assertIn("GObj_SetupGXLinkMax(*gobj1_slot, HSD_GObj_803910D8, 0xa);",
+                      flash_setup)
+        self.assertIn("(*gobj1_slot)->gxlink_prios = 0x10000;", flash_setup)
+        ground_setup = extract_function(
+            (MELEE / "gr/ground.c").read_text(encoding="utf-8"),
+            "Ground_GObj* Ground_GetStageGObj(int map_id)",
+        )
+        self.assertIn("GObj_SetupGXLinkMax(new_var2, &grDisplay_801C5F60, 5);",
+                      ground_setup)
+        self.assertIn("temp_r23_2->gxlink_prios = 8;", ground_setup)
+        profile_patch = (PROFILE / "patches/melee-profile-hooks.patch").read_text(encoding="utf-8")
+        self.assertIn("*camera = ifAll_804A0FD8.gobj;", profile_patch)
         cobj = (BASELIB / "cobj.c").read_text(encoding="utf-8")
         screen_setup = extract_function(cobj, "static bool setupNormalCamera(HSD_CObj* cobj)")
         set_current = extract_function(cobj, "bool HSD_CObjSetCurrent(HSD_CObj* cobj)")
@@ -295,8 +456,10 @@ class ParticlePassPlanTests(unittest.TestCase):
                 BASELIB / "gobjinit.c",
                 PROFILE / "particle_pass_plan.c",
                 PROFILE / "particle_pass_plan.h",
+                PROFILE / "particle_presentation.h",
                 PROFILE / "particle_source_schedule.c",
                 PROFILE / "particle_source_schedule.h",
+                ROOT / "src/gameplay_cpu_interval.h",
                 PROFILE / "tests/particle_pass_source_control.c.in",
                 PROFILE / "tests/test_particle_pass_plan.py",
                 ROOT / "tests/test_slippi_particle_pass_plan.py",

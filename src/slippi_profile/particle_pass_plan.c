@@ -211,6 +211,15 @@ static int effect_display_objects_safe(const HSD_GObj* owner,
     return 1;
 }
 
+int slippi_profile_particle_pass_jobj_display_safe(
+    const HSD_GObj* owner, char* error, size_t error_size)
+{
+    if (!owner || owner->obj_kind != HSD_GObj_JObjKind || !owner->hsd_obj)
+        return refuse(error, error_size,
+                      "Registered GX11 display owner is not a JObj GObj");
+    return effect_display_objects_safe(owner, error, error_size);
+}
+
 static int effect_owner_is(const HSD_GObj* object, unsigned gx_link)
 {
     const EF_Effect* effect;
@@ -253,26 +262,55 @@ static int select_camera(const HSD_GObj* camera,
         selection->known_zero = 0;
         return 1;
     }
-    if (camera == source->generic_camera && source->generic_camera &&
-        camera->render_cb == source->generic_callback &&
-        source->generic_callback && camera->hsd_obj == source->generic_cobj &&
-        source->generic_cobj) {
+    if (camera == source->hud_camera && source->hud_camera &&
+        camera->render_cb == source->hud_callback && source->hud_callback &&
+        camera->hsd_obj == source->hud_cobj && source->hud_cobj) {
         if (!source->screen_render_pass)
             return refuse(error, error_size,
-                          "Generic camera is not on the owned SCREEN render pass");
-        if (camera->gxlink_prios &
-            ~(SLIPPI_PARTICLE_GX_MODEL_MASK | SLIPPI_PARTICLE_GX_AUX_MASK))
+                          "HUD camera is not on the owned SCREEN render pass");
+        if (camera->gxlink_prios != 0xD00)
             return refuse(error, error_size,
-                          "Generic camera selects an unsupported GX schedule");
-        selection->kind = SLIPPI_PARTICLE_CAMERA_GENERIC;
-        selection->gx_mask = (unsigned) camera->gxlink_prios;
-        selection->known_zero = 0;
+                          "HUD camera mask differs from source GX8/10/11 schedule");
+        selection->kind = SLIPPI_PARTICLE_CAMERA_HUD;
+        selection->gx_mask = source->hud_hidden
+                                 ? 0
+                                 : SLIPPI_PARTICLE_GX_AUX_MASK;
+        selection->known_zero = source->hud_hidden != 0;
+        return 1;
+    }
+    if (camera == source->nametag_camera && source->nametag_camera &&
+        camera->render_cb == source->nametag_callback &&
+        source->nametag_callback && camera->hsd_obj == source->nametag_cobj &&
+        source->nametag_cobj) {
+        if (camera->gxlink_prios != 0x200)
+            return refuse(error, error_size,
+                          "Nametag camera mask differs from source GX9 schedule");
+        selection->kind = SLIPPI_PARTICLE_CAMERA_NAMETAG_ZERO;
+        selection->gx_mask = 0;
+        selection->known_zero = 1;
+        return 1;
+    }
+    if (camera == source->background_flash_camera &&
+        source->background_flash_camera &&
+        camera->render_cb == source->background_flash_callback &&
+        source->background_flash_callback &&
+        camera->hsd_obj == source->background_flash_cobj &&
+        source->background_flash_cobj) {
+        if (camera->gxlink_prios != 0x10000)
+            return refuse(error, error_size,
+                          "Background flash camera mask differs from source GX16 schedule");
+        selection->kind = SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH;
+        selection->gx_mask = 0;
+        selection->known_zero = 1;
         return 1;
     }
     if (camera == source->ground_camera && source->ground_camera &&
         camera->render_cb == source->ground_callback &&
         source->ground_callback && camera->hsd_obj == source->ground_cobj &&
         source->ground_cobj) {
+        if (camera->gxlink_prios != 0x8)
+            return refuse(error, error_size,
+                          "Ground camera mask differs from source GX3 schedule");
         selection->kind = SLIPPI_PARTICLE_CAMERA_GROUND_ZERO;
         selection->gx_mask = 0;
         selection->known_zero = 1;

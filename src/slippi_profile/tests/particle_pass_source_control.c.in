@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Actual camera/GObj/eflib source with render and GX leaves modeled. */
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,6 +9,7 @@
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
 #include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/lobj.h>
 #include <sysdolphin/baselib/dobj.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/mobj.h>
@@ -18,41 +20,56 @@
 #include "slippi_profile/particle_pass_plan.h"
 #include "slippi_profile/particle_source_schedule.h"
 
+#define HSD_ASSERT(line, condition) assert(condition)
+#define GET_COBJ(gobj) ((HSD_CObj*) (gobj)->hsd_obj)
+
 typedef int64_t s64;
 typedef uint64_t u64;
 typedef int32_t s32;
 typedef uint32_t u32;
+typedef struct Vec3 { float x, y, z; } Vec3;
 typedef struct {
+    HSD_GObj* gobj;
     int x398_b2, x398_b3, x398_b4, x398_b5, x399_b4, x399_b7;
     int background_r, background_g, background_b;
 } CameraState;
+static struct { HSD_GObj* x40; HSD_GObj* x44; } lbl_80433658;
 static CameraState cm_80452C68;
+ACTUAL_HUD_STORAGE
+ACTUAL_NAMETAG_OWNER
+static u8 un_804D6D6C;
+static void* un_804D6D78;
+static int un_804A1EF8[6];
 HSD_GObj* HSD_GObj_804D7814;
 HSD_GObj* HSD_GObj_804D7818;
 uint8_t HSD_GObj_CameraKind = 0x13;
 uint8_t HSD_GObj_JObjKind = 3;
+uint8_t HSD_GObj_LightKind = 4;
 HSD_CObjInfo hsdCObj;
+HSD_LObjInfo hsdLobj;
 HSD_JObjInfo hsdJObj;
 HSD_DObjInfo hsdDObj;
 HSD_MObjInfo hsdMObj;
 HSD_PObjInfo hsdPObj;
 HSD_TObjInfo hsdTObj;
 HSD_ObjAllocData gobj_alloc_data;
-static struct { const HSD_GObj* camera; const HSD_GObj* manager; unsigned code, target; } actual[32];
+static struct { const HSD_GObj* camera; const HSD_GObj* manager; unsigned code, target; } actual[64];
 static size_t actual_count;
+static unsigned draw_order[32];
+static size_t draw_order_count;
 static int cobj_available = 1;
+static HSD_CObj* current_cobj;
 
 enum { PTCL_RENDER_LINKNO_0 = 1, PTCL_RENDER_LINKNO_1 = 2,
        PTCL_RENDER_LINKNO_2 = 4 };
 
-static void source_main_process(HSD_GObj*);
+static void fn_8002F360(HSD_GObj*);
 /* Identity-only link leaves: this control does not exercise process behavior. */
 void efLib_particles_proc_main(HSD_GObj* gobj) { (void) gobj; }
 void efLib_particles_proc_aux(HSD_GObj* gobj) { (void) gobj; }
 static void fn_800301D0(HSD_GObj*, int);
 void HSD_GObj_803910D8(HSD_GObj*, int);
-static void camera_ground_callback(HSD_GObj*, int);
-static void camera_magnify_callback(HSD_GObj*, int);
+void HSD_GObj_LObjCallback(HSD_GObj*, int);
 static void unsupported_render_callback(HSD_GObj*, int);
 void grDisplay_801C5F60(HSD_GObj*, int);
 void ifMagnify_802FBBDC(HSD_GObj*);
@@ -83,16 +100,54 @@ static void mpLib_DrawZones(void);
 static int Camera_80030BA8(void);
 static void mpLib_DrawSpecialPoints(void);
 static void HSD_StateSetColorUpdate(int);
+enum { Gm_Player_NumMax = 6, Gm_PKind_Human = 1 };
+int Player_GetPlayerSlotType(int);
+int Player_GetNametagSlotID(int);
+void HSD_SisLib_803A746C(void*, int, float, float);
+void ifMagnify_802FB8C0(HSD_GObj*, int);
+void fn_802F9680(HSD_GObj*, int);
+void fn_802F94E0(HSD_GObj*, int);
+void fn_802F95E8(HSD_GObj*, int);
+void fn_802F9548(HSD_GObj*, int);
+void fn_802F9598(HSD_GObj*, int);
+void ifStatus_802F5DE0(HSD_GObj*, int);
+void ifStatus_802F5E50(HSD_GObj*, int);
+void fn_802FDA4C(HSD_GObj*, int);
+void fn_802F770C(HSD_GObj*, int);
+
+#define HUD_CALLBACK_STUB(name) \
+    void name(HSD_GObj* gobj, int pass) { (void) gobj; (void) pass; }
+HUD_CALLBACK_STUB(ifMagnify_802FB8C0)
+HUD_CALLBACK_STUB(fn_802F9680)
+HUD_CALLBACK_STUB(fn_802F94E0)
+HUD_CALLBACK_STUB(fn_802F95E8)
+HUD_CALLBACK_STUB(fn_802F9548)
+HUD_CALLBACK_STUB(fn_802F9598)
+HUD_CALLBACK_STUB(ifStatus_802F5DE0)
+HUD_CALLBACK_STUB(ifStatus_802F5E50)
+HUD_CALLBACK_STUB(fn_802FDA4C)
+HUD_CALLBACK_STUB(fn_802F770C)
+#undef HUD_CALLBACK_STUB
+int Player_GetPlayerSlotType(int slot) { (void) slot; return 0; }
+int Player_GetNametagSlotID(int slot) { (void) slot; return 0x78; }
+void HSD_SisLib_803A746C(void* text, int entry, float x, float y)
+{ (void) text; (void) entry; (void) x; (void) y; }
 
 ACTUAL_CAMERA_SOURCE
 ACTUAL_GOBJ_SOURCE
+ACTUAL_GXLINK_SOURCE
 ACTUAL_EFLIB_SOURCE
+ACTUAL_HUD_HIDDEN
+ACTUAL_HUD_CALLBACK
+ACTUAL_NAMETAG_CALLBACK
+ACTUAL_MAGNIFY_WRAPPER
+ACTUAL_HUD_BRIDGE
+ACTUAL_NAMETAG_BRIDGE
+ACTUAL_MAGNIFY_BRIDGE
+ACTUAL_FLASH_OWNER
+ACTUAL_MAIN_BRIDGE
 
-static void source_main_process(HSD_GObj* gobj) { (void) gobj; }
-static void camera_ground_callback(HSD_GObj* gobj, int code)
-{ (void) gobj; (void) code; }
-static void camera_magnify_callback(HSD_GObj* gobj, int code)
-{ (void) gobj; (void) code; }
+static void fn_8002F360(HSD_GObj* gobj) { (void) gobj; }
 static void unsupported_render_callback(HSD_GObj* gobj, int code)
 { (void) gobj; (void) code; }
 
@@ -100,7 +155,19 @@ static void lbRefract_8002247C(HSD_CObj* cobj) { (void) cobj; }
 static void Camera_8002A4AC(HSD_GObj* gobj) { (void) gobj; }
 static void lbShadow_8000F38C(int value) { (void) value; }
 static int HSD_CObjSetCurrent(HSD_CObj* cobj)
-{ return cobj != NULL && cobj_available; }
+{
+    if (!cobj || !cobj_available) return 0;
+    current_cobj = cobj;
+    return 1;
+}
+HSD_CObj* HSD_CObjGetCurrent(void) { return current_cobj; }
+void HSD_LObj_803668EC(HSD_LObj* lobj)
+{ (void) lobj; draw_order[draw_order_count++] = 110; }
+void HSD_LObjSetupInit(HSD_CObj* cobj)
+{ (void) cobj; draw_order[draw_order_count++] = 111; }
+void HSD_JObjDispAll(HSD_JObj* jobj, void* mtx, uint32_t mask, uint32_t flags)
+{ (void) jobj; (void) mtx; (void) mask; (void) flags; draw_order[draw_order_count++] = 112; }
+uint32_t HSD_GObj_80390EB8(int pass) { return (uint32_t) pass; }
 static void HSD_SetEraseColor(int r, int g, int b, int a)
 { (void) r; (void) g; (void) b; (void) a; }
 static void HSD_CObjEraseScreen(HSD_CObj* cobj, int a, int b, int c)
@@ -121,7 +188,7 @@ static void mpLib_8005A2DC(void) {}
 static void mpLib_DrawZones(void) {}
 static int Camera_80030BA8(void) { return 0; }
 static void mpLib_DrawSpecialPoints(void) {}
-static void HSD_CObjEndCurrent(void) {}
+static void HSD_CObjEndCurrent(void) { current_cobj = NULL; }
 static void HSD_StateSetColorUpdate(int value) { (void) value; }
 static void psDispParticles(u32 target, u32 code)
 {
@@ -131,6 +198,8 @@ static void psDispParticles(u32 target, u32 code)
     actual[actual_count].code = code;
     actual[actual_count].target = target;
     ++actual_count;
+    assert(draw_order_count < sizeof(draw_order) / sizeof(draw_order[0]));
+    draw_order[draw_order_count++] = 100u + code;
 }
 
 static HSD_GObj objects[2];
@@ -140,8 +209,12 @@ static HSD_GObj* tails[SLIPPI_PARTICLE_GX_LINK_SLOTS];
 HSD_GObj** HSD_GObjGXLinkHead = heads;
 HSD_GObj** HSD_GObj_804D7820 = tails;
 HSD_GObjLibInitDataType HSD_GObjLibInitData;
-static HSD_CObj cobj_main, cobj_generic, cobj_ground, cobj_magnify;
-static HSD_GObj main_camera, generic_camera, ground_camera, magnify_camera;
+static HSD_CObj cobj_main, cobj_flash, cobj_ground, cobj_magnify;
+static HSD_CObj cobj_hud, cobj_nametag;
+static HSD_LObj hud_light;
+static HSD_JObj hud_jobj;
+static HSD_GObj main_camera, flash_camera, ground_camera, magnify_camera;
+static HSD_GObj hud_camera, nametag_camera, hud_light_gobj, hud_jobj_gobj;
 static SlippiParticlePassSource source;
 static SlippiParticlePassVisit plan[32];
 static char error[160];
@@ -198,28 +271,27 @@ int slippi_particle_presentation_reset_after_restore(
 int slippi_particle_presentation_interval_end(uint64_t world, uint64_t interval)
 { (void) interval; ++helper_interval_end_calls; return world != 0; }
 
-void slippi_particle_source_main_camera_identity(
-    HSD_GObj** camera, GObj_RenderFunc* render_callback,
-    HSD_GObjEvent* process_callback, unsigned* x398_b3)
-{
-    *camera = &main_camera;
-    *render_callback = fn_800301D0;
-    *process_callback = source_main_process;
-    *x398_b3 = (unsigned) cm_80452C68.x398_b3;
-}
-
 void grDisplay_801C5F60(HSD_GObj* gobj, int code)
 { (void) gobj; (void) code; }
 void ifMagnify_802FBBDC(HSD_GObj* gobj) { (void) gobj; }
 void efLib_Update(HSD_GObj* gobj) { (void) gobj; }
 void efLib_remove_user_data(void* data) { (void) data; }
-void HSD_GObj_JObjCallback(HSD_GObj* gobj, int code)
-{ (void) gobj; (void) code; }
 
 static void cobj_init(HSD_CObj* cobj)
 {
     memset(cobj, 0, sizeof(*cobj));
     cobj->parent.parent.class_info = HSD_CLASS_INFO(&hsdCObj);
+}
+
+static void append_link(unsigned link, HSD_GObj* object)
+{
+    HSD_GObj* tail = tails[link];
+    object->gx_link = (uint8_t) link;
+    object->prev_gx = tail;
+    object->next_gx = NULL;
+    if (tail) tail->next_gx = object;
+    else heads[link] = object;
+    tails[link] = object;
 }
 
 static void proc_init(HSD_GObjProc* proc, HSD_GObj* gobj, unsigned link,
@@ -272,14 +344,29 @@ static void reset_fixture(void)
     memset(&source, 0, sizeof(source));
     memset(&cm_80452C68, 0, sizeof(cm_80452C68));
     memset(&gobj_alloc_data, 0, sizeof(gobj_alloc_data));
-    gobj_alloc_data.used = 6;
+    lbl_80433658.x44 = &flash_camera;
+    gobj_alloc_data.used = 10;
     hsdJObj.parent.head.nb_exist = 8;
     hsdDObj.parent.head.nb_exist = 8;
     hsdMObj.parent.head.nb_exist = 8;
     hsdPObj.parent.head.nb_exist = 8;
     hsdTObj.parent.head.nb_exist = 8;
-    cobj_init(&cobj_main); cobj_init(&cobj_generic);
+    memset(&ifAll_804A0FD8, 0, sizeof(ifAll_804A0FD8));
+    memset(&hidden, 0, sizeof(hidden));
+    memset(&un_804D6D68, 0, sizeof(un_804D6D68));
+    un_804D6D6C = 0;
+    memset(&un_804D6D78, 0, sizeof(un_804D6D78));
+    memset(un_804A1EF8, 0, sizeof(un_804A1EF8));
+    current_cobj = NULL;
+    memset(draw_order, 0, sizeof(draw_order));
+    draw_order_count = 0;
+    cobj_init(&cobj_main); cobj_init(&cobj_flash);
     cobj_init(&cobj_ground); cobj_init(&cobj_magnify);
+    cobj_init(&cobj_hud); cobj_init(&cobj_nametag);
+    memset(&hud_light, 0, sizeof(hud_light));
+    hud_light.parent.parent.class_info = HSD_CLASS_INFO(&hsdLobj);
+    memset(&hud_jobj, 0, sizeof(hud_jobj));
+    hud_jobj.object.parent.class_info = HSD_CLASS_INFO(&hsdJObj);
     actual_count = 0;
     cobj_available = 1;
     cpu_active = 0; cpu_token = 0;
@@ -292,26 +379,63 @@ static void reset_fixture(void)
     link_one(7, &objects[0]);
     link_one(8, &objects[1]);
     camera_init(&main_camera, &cobj_main, fn_800301D0, &procs[2],
-                source_main_process, 0x12);
-    camera_init(&generic_camera, &cobj_generic, HSD_GObj_803910D8,
+                fn_8002F360, 0x12);
+    cm_80452C68.gobj = &main_camera;
+    camera_init(&flash_camera, &cobj_flash, HSD_GObj_803910D8,
                 NULL, NULL, 0);
-    camera_init(&ground_camera, &cobj_ground, camera_ground_callback,
+    camera_init(&ground_camera, &cobj_ground, grDisplay_801C5F60,
                 NULL, NULL, 0);
-    camera_init(&magnify_camera, &cobj_magnify, camera_magnify_callback,
+    camera_init(&magnify_camera, &cobj_magnify,
+                slippi_particle_source_magnify_callback(),
                 NULL, NULL, 0);
+    camera_init(&hud_camera, &cobj_hud, fn_802F36B8, NULL, NULL, 0);
+    camera_init(&nametag_camera, &cobj_nametag, fn_802FCAC4, NULL, NULL, 0);
+    ifAll_804A0FD8.gobj = &hud_camera;
+    un_804D6D68 = &nametag_camera;
+    hud_camera.gxlink_prios = 0xD00;
+    nametag_camera.gxlink_prios = 0x200;
+    flash_camera.gxlink_prios = 0x10000;
+    magnify_camera.render_cb = slippi_particle_source_magnify_callback();
+    magnify_camera.gxlink_prios = 0x10;
+    main_camera.gxlink_prios = 1u << 7;
+    ground_camera.gxlink_prios = 1u << 3;
+    hud_light_gobj.obj_kind = HSD_GObj_LightKind;
+    hud_light_gobj.hsd_obj = &hud_light;
+    hud_light_gobj.render_cb = HSD_GObj_LObjCallback;
+    append_link(10, &hud_light_gobj);
+    hud_jobj_gobj.obj_kind = HSD_GObj_JObjKind;
+    hud_jobj_gobj.hsd_obj = &hud_jobj;
+    hud_jobj_gobj.render_cb = HSD_GObj_JObjCallback;
+    append_link(11, &hud_jobj_gobj);
+    HSD_GObjLibInitData.gx_link_max = SLIPPI_PARTICLE_GX_LINK_MAX;
+    /* These call statements are extracted from the source registrations;
+     * the owner expressions are replaced with this fixture's camera nodes. */
+SOURCE_REGISTER_MAIN
+SOURCE_REGISTER_GROUND
+SOURCE_REGISTER_MAGNIFY
+SOURCE_REGISTER_FLASH
+SOURCE_REGISTER_NAMETAG
+SOURCE_REGISTER_HUD
     source.main_camera = &main_camera;
-    source.generic_camera = &generic_camera;
+    source.background_flash_camera = &flash_camera;
+    source.hud_camera = &hud_camera;
+    source.nametag_camera = &nametag_camera;
     source.ground_camera = &ground_camera;
     source.magnify_camera = &magnify_camera;
     source.main_cobj = &cobj_main;
-    source.generic_cobj = &cobj_generic;
+    source.background_flash_cobj = &cobj_flash;
+    source.hud_cobj = &cobj_hud;
+    source.nametag_cobj = &cobj_nametag;
     source.ground_cobj = &cobj_ground;
     source.magnify_cobj = &cobj_magnify;
     source.main_callback = fn_800301D0;
-    source.generic_callback = HSD_GObj_803910D8;
-    source.ground_callback = camera_ground_callback;
-    source.magnify_callback = camera_magnify_callback;
-    source.main_process_callback = source_main_process;
+    source.background_flash_callback = HSD_GObj_803910D8;
+    source.hud_callback = fn_802F36B8;
+    source.nametag_callback = fn_802FCAC4;
+    source.ground_callback = grDisplay_801C5F60;
+    source.magnify_callback = slippi_particle_source_magnify_callback();
+    source.main_process_callback = fn_8002F360;
+    source.hud_hidden = hidden;
     source.particle_callback = efLib_render_callback;
     source.model_manager_process = efLib_particles_proc_main;
     source.aux_manager_process = efLib_particles_proc_aux;
@@ -319,22 +443,13 @@ static void reset_fixture(void)
     source.gx_tails = tails;
     source.gx_slot_count = SLIPPI_PARTICLE_GX_LINK_SLOTS;
     source.gx_link_max = SLIPPI_PARTICLE_GX_LINK_MAX;
-    source.live_gobj_bound = 2;
+    source.live_gobj_bound = gobj_alloc_data.used;
     source.screen_render_pass = 1;
-    HSD_GObjLibInitData.gx_link_max = SLIPPI_PARTICLE_GX_LINK_MAX;
 }
-
-static void link_camera_chain(int reverse);
 
 static void prepare_schedule_cameras(void)
 {
-    link_camera_chain(0);
-    main_camera.render_cb = fn_800301D0;
-    generic_camera.render_cb = HSD_GObj_803910D8;
-    generic_camera.gxlink_prios = (1u << 7) | (1u << 8);
-    ground_camera.render_cb = grDisplay_801C5F60;
-    magnify_camera.render_cb = (GObj_RenderFunc) (Event) ifMagnify_802FBBDC;
-    magnify_camera.gxlink_prios = 0x10;
+    /* reset_fixture uses actual GObj_SetupGXLinkMax and typed source callbacks. */
 }
 
 static void test_source_schedule_and_ordinary_wrappers(void)
@@ -345,13 +460,31 @@ static void test_source_schedule_and_ordinary_wrappers(void)
     assert(slippi_particle_source_world_begin(100));
     cpu_active = 1; cpu_token = 1001;
     assert(slippi_particle_source_prepare(100, cpu_token, error, sizeof(error)));
-    assert(helper_prepare_calls == 1 && helper_visit_count == 9);
+    assert(helper_prepare_calls == 1 && helper_visit_count == 6);
     assert(slippi_particle_source_draw_begin(100, cpu_token, error, sizeof(error)));
     for (camera = heads[SLIPPI_PARTICLE_GX_LINK_MAX + 1]; camera;
          camera = camera->next_gx) {
         if (!camera->render_cb) continue;
         assert(slippi_particle_source_camera_begin(camera, error, sizeof(error)));
+        {
+            HSD_GObj* saved_camera = HSD_GObj_804D7818;
+            HSD_GObj_804D7818 = camera;
+            camera->render_cb(camera, 0);
+            HSD_GObj_804D7818 = saved_camera;
+        }
         assert(slippi_particle_source_camera_end(camera, error, sizeof(error)));
+    }
+    assert(actual_count == 6);
+    assert(draw_order_count >= 15);
+    {
+        static const unsigned expected_hud_order[] = {
+            100, 110, 111, 112, 101, 110, 111, 112,
+            102, 110, 111, 112,
+        };
+        assert(draw_order_count >= sizeof(expected_hud_order) / sizeof(expected_hud_order[0]));
+        assert(memcmp(draw_order + draw_order_count -
+                          sizeof(expected_hud_order) / sizeof(expected_hud_order[0]),
+                      expected_hud_order, sizeof(expected_hud_order)) == 0);
     }
     assert(helper_camera_begin_calls == 2 && helper_camera_end_calls == 2);
     assert(slippi_particle_source_draw_end(error, sizeof(error)));
@@ -388,7 +521,7 @@ static void test_source_schedule_and_ordinary_wrappers(void)
 static void test_source_schedule_revalidation_and_ptcl_refusal(void)
 {
     unsigned prepared;
-    HSD_GObj owner;
+    HSD_GObj owner, unsupported;
     HSD_GObjProc owner_proc;
     HSD_JObj root;
     EF_Effect effect;
@@ -399,13 +532,68 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
     cpu_active = 1; cpu_token = 1002;
     assert(slippi_particle_source_prepare(102, cpu_token, error, sizeof(error)));
     prepared = helper_prepare_calls;
-    generic_camera.gxlink_prios = 1u << 7;
+    hud_camera.gxlink_prios = 0xC00;
     assert(!slippi_particle_source_draw_begin(102, cpu_token, error,
                                               sizeof(error)));
-    assert(strstr(error, "schedule changed"));
+    assert(strstr(error, "HUD camera identity"));
     assert(helper_prepare_calls == prepared && helper_draw_begin_calls == 0);
     cpu_active = 0;
     assert(!slippi_particle_source_world_end(102));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    assert(slippi_particle_source_world_begin(106));
+    cpu_active = 1; cpu_token = 1006;
+    assert(slippi_particle_source_prepare(106, cpu_token, error, sizeof(error)));
+    hidden = 1;
+    assert(!slippi_particle_source_draw_begin(106, cpu_token, error,
+                                              sizeof(error)));
+    assert(strcmp(error, "Source callback or particle schedule changed before draw") == 0);
+    assert(helper_draw_begin_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(106));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    assert(slippi_particle_source_world_begin(105));
+    cpu_active = 1; cpu_token = 1005;
+    assert(slippi_particle_source_prepare(105, cpu_token, error, sizeof(error)));
+    lbl_80433658.x44 = &nametag_camera;
+    assert(!slippi_particle_source_draw_begin(105, cpu_token, error,
+                                              sizeof(error)));
+    assert(strstr(error, "no verified particle schedule"));
+    assert(helper_draw_begin_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(105));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    memset(&unsupported, 0, sizeof(unsupported));
+    unsupported.render_cb = unsupported_render_callback;
+    unsupported.hsd_obj = &hud_jobj;
+    unsupported.obj_kind = HSD_GObj_JObjKind;
+    append_link(11, &unsupported);
+    gobj_alloc_data.used = 11;
+    assert(slippi_particle_source_world_begin(107));
+    cpu_active = 1; cpu_token = 1007;
+    prepared = helper_prepare_calls;
+    assert(!slippi_particle_source_prepare(107, cpu_token, error, sizeof(error)));
+    assert(strstr(error, "unverified callback"));
+    assert(helper_prepare_calls == prepared);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(107));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    hud_jobj.flags = JOBJ_PTCL;
+    assert(slippi_particle_source_world_begin(108));
+    cpu_active = 1; cpu_token = 1008;
+    prepared = helper_prepare_calls;
+    assert(!slippi_particle_source_prepare(108, cpu_token, error, sizeof(error)));
+    assert(strstr(error, "S/D particle callback node"));
+    assert(helper_prepare_calls == prepared);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(108));
 
     reset_fixture();
     prepare_schedule_cameras();
@@ -431,7 +619,7 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
     objects[0].next_gx = &owner;
     heads[SLIPPI_PARTICLE_GX_MODEL] = &objects[0];
     tails[SLIPPI_PARTICLE_GX_MODEL] = &owner;
-    gobj_alloc_data.used = 7;
+    gobj_alloc_data.used = 11;
     assert(slippi_particle_source_world_begin(103));
     cpu_active = 1; cpu_token = 1003;
     prepared = helper_prepare_calls;
@@ -479,7 +667,7 @@ static size_t gather_camera_chain(SlippiParticlePassVisit* all, size_t capacity)
     for (camera = heads[SLIPPI_PARTICLE_GX_LINK_MAX + 1]; camera;
          camera = camera->next_gx) {
         size_t one_count = 0;
-        assert(camera_count++ < 4);
+        assert(camera_count++ < 8);
         assert(camera->gx_link == SLIPPI_PARTICLE_GX_LINK_MAX + 1);
         assert(camera->prev_gx == previous);
         if (count > capacity) return (size_t) -1;
@@ -494,60 +682,33 @@ static size_t gather_camera_chain(SlippiParticlePassVisit* all, size_t capacity)
     return count;
 }
 
-static void link_camera_chain(int reverse)
-{
-    HSD_GObj* order[4] = { &main_camera, &ground_camera,
-                           &magnify_camera, &generic_camera };
-    unsigned i;
-    if (reverse) {
-        for (i = 0; i < 2; ++i) {
-            HSD_GObj* swap = order[i];
-            order[i] = order[3 - i];
-            order[3 - i] = swap;
-        }
-    }
-    for (i = 0; i < 4; ++i) {
-        order[i]->gx_link = SLIPPI_PARTICLE_GX_LINK_MAX + 1;
-        order[i]->prev_gx = i ? order[i - 1] : NULL;
-        order[i]->next_gx = i < 3 ? order[i + 1] : NULL;
-    }
-    heads[SLIPPI_PARTICLE_GX_LINK_MAX + 1] = order[0];
-    tails[SLIPPI_PARTICLE_GX_LINK_MAX + 1] = order[3];
-}
-
-static void test_complete_camera_chain_order(void)
+/* Synthetic complete-route order control using source-extracted direct
+ * registration statements and the original SetupGXLinkMax implementation.
+ * It validates ordering mechanics, not the runtime match initialization call
+ * graph or camera creation/teardown behavior. */
+static void test_source_registration_order_control(void)
 {
     SlippiParticlePassVisit gathered[32];
     size_t expected, index;
-    int reverse;
     reset_fixture();
-    source.main_callback = fn_800301D0;
-    source.generic_callback = HSD_GObj_803910D8;
-    source.ground_callback = camera_ground_callback;
-    source.magnify_callback = camera_magnify_callback;
-    magnify_camera.gxlink_prios = 0x10;
-    generic_camera.gxlink_prios = (1u << 7) | (1u << 8);
-    for (reverse = 0; reverse < 2; ++reverse) {
-        link_camera_chain(reverse);
-        expected = gather_camera_chain(gathered, 32);
-        assert(expected != (size_t) -1);
-        actual_count = 0;
-        HSD_GObj_80390FC0();
-        assert(actual_count == expected);
-        for (index = 0; index < expected; ++index) {
-            assert(actual[index].camera == gathered[index].camera);
-            assert(actual[index].manager == gathered[index].manager);
-            assert(actual[index].code == gathered[index].code);
-            assert(actual[index].target == gathered[index].target_mask);
-        }
+    expected = gather_camera_chain(gathered, 32);
+    assert(expected == 6);
+    actual_count = 0;
+    HSD_GObj_80390FC0();
+    assert(actual_count == expected);
+    for (index = 0; index < expected; ++index) {
+        assert(actual[index].camera == gathered[index].camera);
+        assert(actual[index].manager == gathered[index].manager);
+        assert(actual[index].code == gathered[index].code);
+        assert(actual[index].target == gathered[index].target_mask);
     }
 }
 
-static void test_main_and_generic_actual_dispatch(void)
+static void test_main_hud_and_zero_camera_actual_dispatch(void)
 {
     reset_fixture();
     source.main_callback = fn_800301D0;
-    source.generic_callback = HSD_GObj_803910D8;
+    source.background_flash_callback = HSD_GObj_803910D8;
     compare_plan_and_actual(&main_camera, fn_800301D0,
                             SLIPPI_PARTICLE_CAMERA_MAIN_TAIL);
     assert(actual_count == 3);
@@ -565,23 +726,42 @@ static void test_main_and_generic_actual_dispatch(void)
     fn_800301D0(&main_camera, 0);
     assert(actual_count == 0);
 
-    generic_camera.gxlink_prios = (1u << 7) | (1u << 8);
-    compare_plan_and_actual(&generic_camera, HSD_GObj_803910D8,
-                            SLIPPI_PARTICLE_CAMERA_GENERIC);
-    assert(actual_count == 6);
-    for (size_t i = 0; i < actual_count; i += 2) {
-        assert(actual[i].manager->gx_link == 7 && actual[i].code == i / 2);
-        assert(actual[i + 1].manager->gx_link == 8 && actual[i + 1].code == i / 2);
-        assert(actual[i].target == 5 && actual[i + 1].target == 2);
+    draw_order_count = 0;
+    actual_count = 0;
+    compare_plan_and_actual(&hud_camera, fn_802F36B8,
+                            SLIPPI_PARTICLE_CAMERA_HUD);
+    assert(actual_count == 3 && draw_order_count == 12);
+    for (size_t code = 0; code < 3; ++code) {
+        assert(actual[code].manager->gx_link == 8);
+        assert(actual[code].code == code && actual[code].target == 2);
+        assert(draw_order[code * 4] == 100 + code);
+        assert(draw_order[code * 4 + 1] == 110);
+        assert(draw_order[code * 4 + 2] == 111);
+        assert(draw_order[code * 4 + 3] == 112);
     }
 
-    generic_camera.gxlink_prios = 0;
+    hidden = 1;
+    source.hud_hidden = 1;
     actual_count = 0;
-    count = 6;
-    assert(slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 32,
+    draw_order_count = 0;
+    count = 77;
+    assert(slippi_profile_particle_pass_plan(&hud_camera, &source, plan, 32,
                                              &count, error, sizeof(error)));
     assert(count == 0);
-    HSD_GObj_803910D8(&generic_camera, 0);
+    fn_802F36B8(&hud_camera, 0);
+    assert(actual_count == 0 && draw_order_count == 0);
+
+    hidden = 0;
+    source.hud_hidden = 0;
+    compare_plan_and_actual(&nametag_camera, fn_802FCAC4,
+                            SLIPPI_PARTICLE_CAMERA_NAMETAG_ZERO);
+    assert(actual_count == 0);
+    compare_plan_and_actual(&flash_camera, HSD_GObj_803910D8,
+                            SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH);
+    assert(actual_count == 0);
+    compare_plan_and_actual(&magnify_camera,
+                            slippi_particle_source_magnify_callback(),
+                            SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO);
     assert(actual_count == 0);
 }
 
@@ -589,11 +769,8 @@ static void test_refusals_and_zero_camera_identities(void)
 {
     size_t count;
     SlippiParticlePassVisit saved;
+    HSD_GObj spoof;
     reset_fixture();
-    source.main_callback = fn_800301D0;
-    source.generic_callback = HSD_GObj_803910D8;
-    source.ground_callback = camera_ground_callback;
-    source.magnify_callback = camera_magnify_callback;
     memset(plan, 0xA5, sizeof(plan));
     saved = plan[0];
     procs[2].on_invoke = NULL;
@@ -603,6 +780,8 @@ static void test_refusals_and_zero_camera_identities(void)
                                               &count, error, sizeof(error)));
     assert(strstr(error, "Main camera process identity") && count == 77);
     assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
+    procs[2].on_invoke = fn_8002F360;
+    source.main_process_callback = fn_8002F360;
 
     count = 77;
     assert(slippi_profile_particle_pass_plan(&ground_camera, &source, plan, 32,
@@ -615,54 +794,53 @@ static void test_refusals_and_zero_camera_identities(void)
     assert(strstr(error, "GX4 schedule") && count == 77);
     assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
     magnify_camera.gxlink_prios = 0x10;
+
+    hud_camera.gxlink_prios = 0xC00;
     count = 77;
-    assert(slippi_profile_particle_pass_plan(&magnify_camera, &source, plan, 32,
-                                             &count, error, sizeof(error)));
-    assert(count == 0 && memcmp(&plan[0], &saved, sizeof(saved)) == 0);
-
-    generic_camera.gxlink_prios = (1u << 4) | (1u << 7);
-    saved = plan[0]; count = 77;
-    assert(!slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 32,
+    assert(!slippi_profile_particle_pass_plan(&hud_camera, &source, plan, 32,
                                               &count, error, sizeof(error)));
-    assert(strstr(error, "unsupported GX schedule") && count == 77);
+    assert(strstr(error, "GX8/10/11 schedule") && count == 77);
     assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
+    hud_camera.gxlink_prios = 0xD00;
 
-    HSD_GObj unsupported;
-    memset(&unsupported, 0, sizeof(unsupported));
-    unsupported.gx_link = 7;
-    unsupported.prev_gx = &objects[0];
-    unsupported.render_cb = unsupported_render_callback;
-    objects[0].next_gx = &unsupported;
-    tails[7] = &unsupported;
-    source.live_gobj_bound = 3;
-    generic_camera.gxlink_prios = 1u << 7;
-    saved = plan[0]; count = 77;
-    assert(!slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 32,
+    nametag_camera.gxlink_prios = 0x100;
+    count = 77;
+    assert(!slippi_profile_particle_pass_plan(&nametag_camera, &source, plan, 32,
                                               &count, error, sizeof(error)));
-    assert(strstr(error, "unsupported render callback") && count == 77);
-    assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
-    objects[0].next_gx = NULL;
-    tails[7] = &objects[0];
-    source.live_gobj_bound = 2;
+    assert(strstr(error, "GX9 schedule") && count == 77);
+    nametag_camera.gxlink_prios = 0x200;
 
-    generic_camera.gxlink_prios = 1u << 7;
-    objects[0].prev_gx = &objects[1];
-    saved = plan[0]; count = 77;
-    assert(!slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 32,
+    flash_camera.gxlink_prios = 0x8000;
+    count = 77;
+    assert(!slippi_profile_particle_pass_plan(&flash_camera, &source, plan, 32,
+                                              &count, error, sizeof(error)));
+    assert(strstr(error, "GX16 schedule") && count == 77);
+    flash_camera.gxlink_prios = 0x10000;
+
+    memset(&spoof, 0, sizeof(spoof));
+    spoof = nametag_camera;
+    spoof.next_gx = spoof.prev_gx = NULL;
+    count = 77;
+    assert(!slippi_profile_particle_pass_plan(&spoof, &source, plan, 32,
+                                              &count, error, sizeof(error)));
+    assert(strstr(error, "unsupported") && count == 77);
+
+    objects[1].prev_gx = &objects[0];
+    count = 77;
+    assert(!slippi_profile_particle_pass_plan(&hud_camera, &source, plan, 32,
                                               &count, error, sizeof(error)));
     assert(strstr(error, "topology") && count == 77);
-    assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
-    objects[0].prev_gx = NULL;
+    objects[1].prev_gx = NULL;
 
     count = 77;
-    assert(!slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 2,
+    assert(!slippi_profile_particle_pass_plan(&hud_camera, &source, plan, 2,
                                               &count, error, sizeof(error)));
     assert(strstr(error, "capacity") && count == 77);
     assert(memcmp(&plan[0], &saved, sizeof(saved)) == 0);
 
     source.screen_render_pass = 0;
     count = 77;
-    assert(!slippi_profile_particle_pass_plan(&generic_camera, &source, plan, 32,
+    assert(!slippi_profile_particle_pass_plan(&hud_camera, &source, plan, 32,
                                               &count, error, sizeof(error)));
     assert(strstr(error, "SCREEN") && count == 77);
     puts("actual-source particle camera dispatch and planner controls passed");
@@ -670,9 +848,9 @@ static void test_refusals_and_zero_camera_identities(void)
 
 int main(void)
 {
-    test_main_and_generic_actual_dispatch();
+    test_main_hud_and_zero_camera_actual_dispatch();
     test_refusals_and_zero_camera_identities();
-    test_complete_camera_chain_order();
+    test_source_registration_order_control();
     test_source_schedule_and_ordinary_wrappers();
     test_source_schedule_revalidation_and_ptcl_refusal();
     return 0;

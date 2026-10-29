@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "AFFECTED_BUILD_PASS; first V16 baseline source step refused before any CPU comparison",
+      "status": "AFFECTED_BUILD_PASS; baseline step refuses an unrecognized source camera callback, before all comparisons",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9241,13 +9241,13 @@
         "Actual source allocator backing-cell query and actual restore coordinator; explicit modeled OS/owner leaves"
       ],
       "limitations": [
-        "Baseline sample300 refused1204 in command9 after command8 capture; actual source/helper cause lost by generic adapter message",
+        "Both fixed V16 attempts capture in command8 and refuse1204 in baseline command9; diagnostic5f0f5589 preserves exact cause: Source camera callback has no verified particle schedule",
         "Zero CPU/drawn comparison domains checked; no raw pair equality claim from unwritten evidence",
         "Sticky owner failure preserved at source/renderer close; all recorded owned PIDs independently absent and all9producer pins unchanged",
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Preserve first source/helper failure through adapter, run focused reporting control, then one fixed diagnostic attempt; reduce revealed first refusal before further long runs",
+      "next": "Affected build of reviewed direct-route camera repair, exact linked policy review, then one fixed two-tick browser test; no input or comparison changes.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9295,6 +9295,52 @@
       "first_error_reporting_controls": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-first-error-focused-v1/result.json",
         "sha256": "56d97f5bbba7a1a24b43f90b9820645678f5c021b4303e4ca5029814d81addd4"
+      },
+      "first_error_reporting_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-first-error-review-v1.json",
+        "sha256": "e890c9a3b840e326d4a2de2cf6623636a6c21ce40697cd95071d3534c2d59856"
+      },
+      "diagnostic_producer_head": "5f0f5589351b8ff569105856af49de37efd85928",
+      "diagnostic_build": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v3/result.json",
+        "sha256": "f21576cec6cb469aff97f38d73dd25b27322f9d6579d1812112b944b9c0c94be"
+      },
+      "diagnostic_linked_configuration": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v2/final-linked-configuration-v1.json",
+        "sha256": "3a7f33aeb8b3946b76338f1c7f4ecb876588a5894939793f9f505d4e241fc188"
+      },
+      "diagnostic_browser_attempt": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v2/result-receipt.json",
+        "sha256": "601247d57cfc6814b6da9534027092f6cef58a21499196eab12409c383ded3f7"
+      },
+      "diagnostic_producer_archive": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-first-error-browser-archive/archive.json",
+        "sha256": "a2ded7fe8acacacb58d96998a2b3a6bb815545f8b785eedb114b86ee1e8bbd5d"
+      },
+      "camera_completion": {
+        "source_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-direct-route-camera-source-sol-review-v1.json",
+          "sha256": "ffc344ee4844056a3dd061dc6f5d2ea70b868b92bd69b4437d07b67fff328e67"
+        },
+        "const_bridge_delta_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-const-bridge-root-delta-luna-review-v1.json",
+          "sha256": "e2ca9e9625451c12f3b66caff35448fc025a5b4d981dfa90e8ea10ce9a6b6932"
+        },
+        "focused_control": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-fixture-sol-v3/result.json",
+          "sha256": "fa6c41f232f43f69e13a83fe8d44b0fd38c82421a77d8005d8c3f5795e888704"
+        },
+        "composed_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-direct-route-camera-composed-root-review-v1.json",
+          "sha256": "1351bf74226f7b935f85514a7f8122fac46a8f916b8a0127a12aa2a7d1acd4c2"
+        },
+        "scope": "Reduced actual source registration/dispatch and complete schedule control; original runtime initialization order and graphics leaves are not exercised. Production candidate not yet browser-built.",
+        "retained_failures": [
+          "particle-camera-completion-control-20261029-084534-c912fe33",
+          "particle-camera-completion-control-rerun-20261029-084729-30ce7e21",
+          "particle-camera-fixture-sol-v1",
+          "particle-camera-fixture-sol-v2"
+        ]
       }
     }
   }

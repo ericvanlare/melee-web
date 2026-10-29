@@ -20,9 +20,11 @@ enum {
 
 typedef enum {
     SLIPPI_PARTICLE_CAMERA_MAIN_TAIL,
-    SLIPPI_PARTICLE_CAMERA_GENERIC,
+    SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH,
     SLIPPI_PARTICLE_CAMERA_GROUND_ZERO,
     SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO,
+    SLIPPI_PARTICLE_CAMERA_HUD,
+    SLIPPI_PARTICLE_CAMERA_NAMETAG_ZERO,
 } SlippiParticleCameraKind;
 
 typedef struct SlippiParticlePassVisit {
@@ -39,15 +41,21 @@ typedef struct SlippiParticlePassVisit {
  * calls no render callback, CObj setup, GX operation, or source draw routine. */
 typedef struct {
     const HSD_GObj* main_camera;
-    const HSD_GObj* generic_camera;
+    const HSD_GObj* background_flash_camera;
+    const HSD_GObj* hud_camera;
+    const HSD_GObj* nametag_camera;
     const HSD_GObj* ground_camera;
     const HSD_GObj* magnify_camera;
     const void* main_cobj;
-    const void* generic_cobj;
+    const void* background_flash_cobj;
+    const void* hud_cobj;
+    const void* nametag_cobj;
     const void* ground_cobj;
     const void* magnify_cobj;
     GObj_RenderFunc main_callback;
-    GObj_RenderFunc generic_callback;
+    GObj_RenderFunc background_flash_callback;
+    GObj_RenderFunc hud_callback;
+    GObj_RenderFunc nametag_callback;
     GObj_RenderFunc ground_callback;
     GObj_RenderFunc magnify_callback;
     HSD_GObjEvent main_process_callback;
@@ -60,6 +68,7 @@ typedef struct {
     unsigned gx_link_max;
     unsigned live_gobj_bound;
     unsigned main_x398_b3;
+    unsigned hud_hidden;
     /* Adapter proves the owned CObj is on the original SCREEN render pass.
      * A null CObj or a different pass is outside this first capability. */
     int screen_render_pass;
@@ -82,5 +91,9 @@ int slippi_profile_particle_pass_plan_with_mask(
     SlippiParticlePassVisit* visits, size_t visit_capacity,
     size_t* visit_count, unsigned* selected_link_mask, char* error,
     size_t error_size);
+
+/* Shared source proof for registered GX11 JObj display callbacks. */
+int slippi_profile_particle_pass_jobj_display_safe(
+    const HSD_GObj* owner, char* error, size_t error_size);
 
 #endif

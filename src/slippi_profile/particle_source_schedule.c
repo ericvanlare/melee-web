@@ -9,10 +9,17 @@
 
 #include <melee/ef/eflib.h>
 #include <melee/gr/grdisplay.h>
+#include <melee/if/ifstatus.h>
+#include <melee/if/ifstock.h>
+#include <melee/if/iftime.h>
 #include <melee/if/ifmagnify.h>
+#include <melee/if/if_2F72.h>
+#include <melee/if/if_2FD9.h>
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <sysdolphin/baselib/object.h>
 #include <sysdolphin/baselib/objalloc.h>
 
 #include <stdio.h>
@@ -29,6 +36,38 @@ extern void efLib_render_callback(HSD_GObj*, int);
 extern void slippi_particle_source_main_camera_identity(
     HSD_GObj** camera, GObj_RenderFunc* render_callback,
     HSD_GObjEvent* process_callback, unsigned* x398_b3);
+extern void slippi_particle_source_hud_identity(
+    HSD_GObj** camera, GObj_RenderFunc* render_callback,
+    unsigned* hidden);
+extern void slippi_particle_source_nametag_identity(
+    HSD_GObj** camera, GObj_RenderFunc* render_callback);
+extern GObj_RenderFunc slippi_particle_source_magnify_callback(void);
+extern HSD_GObj* melee_web_bg_flash_camera_owner(void);
+extern void fn_802F9680(HSD_GObj*, int);
+extern void fn_802F94E0(HSD_GObj*, int);
+extern void fn_802F95E8(HSD_GObj*, int);
+extern void fn_802F9548(HSD_GObj*, int);
+extern void fn_802F9598(HSD_GObj*, int);
+extern void ifStatus_802F5DE0(HSD_GObj*, int);
+extern void ifStatus_802F5E50(HSD_GObj*, int);
+extern void fn_802FDA4C(HSD_GObj*, int);
+extern void fn_802F770C(HSD_GObj*, int);
+
+/* Only the callback identities registered by the direct match HUD setup are
+ * admitted on GX10/11. Every JObj callback is also checked against the base
+ * display classes and bounded topology by the planner's shared source proof. */
+static int hud_display_callback_is_known(unsigned link, GObj_RenderFunc callback)
+{
+    if (link == 10) return callback == HSD_GObj_LObjCallback;
+    if (link != 11) return 0;
+    return callback == HSD_GObj_JObjCallback ||
+           callback == ifMagnify_802FB8C0 ||
+           callback == fn_802F9680 || callback == fn_802F94E0 ||
+           callback == fn_802F95E8 || callback == fn_802F9548 ||
+           callback == fn_802F9598 || callback == ifStatus_802F5DE0 ||
+           callback == ifStatus_802F5E50 || callback == fn_802FDA4C ||
+           callback == fn_802F770C;
+}
 
 typedef struct NodeProof {
     const HSD_GObj* object;
@@ -52,11 +91,12 @@ typedef struct CameraEvent {
     NodeProof proof;
     size_t visit_first;
     size_t visit_count;
+    SlippiParticleCameraKind kind;
 } CameraEvent;
 
 typedef struct Schedule {
     uint64_t world, interval;
-    unsigned main_x398_b3, selected_links;
+    unsigned main_x398_b3, hud_hidden, selected_links;
     NodeProof* camera_nodes;
     size_t camera_node_count;
     CameraEvent* events;
@@ -65,7 +105,7 @@ typedef struct Schedule {
     size_t visit_count;
     NodeProof* selected_nodes;
     size_t selected_node_count;
-    size_t link_first[2], link_count[2];
+    size_t link_first[4], link_count[4];
 } Schedule;
 
 static struct {
@@ -176,12 +216,24 @@ static void source_base(SlippiParticlePassSource* source,
                         HSD_GObjEvent main_process_callback,
                         unsigned x398_b3, unsigned live_bound)
 {
+    HSD_GObj* hud_camera;
+    HSD_GObj* nametag_camera;
     memset(source, 0, sizeof(*source));
     source->main_camera = main_camera;
     source->main_cobj = main_camera->hsd_obj;
     source->main_callback = main_callback;
     source->main_process_callback = main_process_callback;
     source->main_x398_b3 = x398_b3;
+    slippi_particle_source_hud_identity(&hud_camera,
+                                        &source->hud_callback,
+                                        &source->hud_hidden);
+    slippi_particle_source_nametag_identity(&nametag_camera,
+                                            &source->nametag_callback);
+    source->hud_camera = hud_camera;
+    source->nametag_camera = nametag_camera;
+    source->background_flash_camera = melee_web_bg_flash_camera_owner();
+    source->background_flash_callback = HSD_GObj_803910D8;
+    source->magnify_callback = slippi_particle_source_magnify_callback();
     source->particle_callback = efLib_render_callback;
     source->model_manager_process = efLib_particles_proc_main;
     source->aux_manager_process = efLib_particles_proc_aux;
@@ -197,7 +249,8 @@ static void source_base(SlippiParticlePassSource* source,
 
 static int bind_camera_role(HSD_GObj* camera,
                             SlippiParticlePassSource* source,
-                            unsigned* main_seen, char* error,
+                            unsigned* main_seen,
+                            SlippiParticleCameraKind* kind, char* error,
                             size_t error_size)
 {
     if (!camera->render_cb) return 1;
@@ -209,28 +262,86 @@ static int bind_camera_role(HSD_GObj* camera,
             return refuse(error, error_size,
                           "Main camera callback differs from private source identity");
         ++*main_seen;
+        *kind = SLIPPI_PARTICLE_CAMERA_MAIN_TAIL;
         return 1;
     }
-    if (camera->render_cb == HSD_GObj_803910D8) {
-        source->generic_camera = camera;
-        source->generic_cobj = camera->hsd_obj;
-        source->generic_callback = HSD_GObj_803910D8;
+    if (camera == source->hud_camera) {
+        if (camera->render_cb != source->hud_callback ||
+            camera->gxlink_prios != 0xD00)
+            return refuse(error, error_size,
+                          "HUD camera identity, callback or exact GX schedule changed");
+        source->hud_cobj = camera->hsd_obj;
+        *kind = SLIPPI_PARTICLE_CAMERA_HUD;
+        return 1;
+    }
+    if (camera == source->nametag_camera) {
+        if (camera->render_cb != source->nametag_callback ||
+            camera->gxlink_prios != 0x200)
+            return refuse(error, error_size,
+                          "Nametag camera identity, callback or exact GX9 schedule changed");
+        source->nametag_cobj = camera->hsd_obj;
+        *kind = SLIPPI_PARTICLE_CAMERA_NAMETAG_ZERO;
+        return 1;
+    }
+    if (camera == source->background_flash_camera) {
+        if (camera->render_cb != source->background_flash_callback ||
+            camera->gxlink_prios != 0x10000)
+            return refuse(error, error_size,
+                          "Background flash owner, callback or exact GX16 schedule changed");
+        source->background_flash_cobj = camera->hsd_obj;
+        *kind = SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH;
         return 1;
     }
     if (camera->render_cb == grDisplay_801C5F60) {
+        if (source->ground_camera && source->ground_camera != camera)
+            return refuse(error, error_size,
+                          "Multiple ground camera callbacks exceed the admitted route");
         source->ground_camera = camera;
         source->ground_cobj = camera->hsd_obj;
         source->ground_callback = grDisplay_801C5F60;
+        if (camera->gxlink_prios != 0x8)
+            return refuse(error, error_size,
+                          "Ground camera mask differs from source GX3 schedule");
+        *kind = SLIPPI_PARTICLE_CAMERA_GROUND_ZERO;
         return 1;
     }
-    if (camera->render_cb == (GObj_RenderFunc) (Event) ifMagnify_802FBBDC) {
+    if (source->magnify_callback &&
+        camera->render_cb == source->magnify_callback) {
+        if (source->magnify_camera && source->magnify_camera != camera)
+            return refuse(error, error_size,
+                          "Multiple magnify camera callbacks exceed the admitted route");
         source->magnify_camera = camera;
         source->magnify_cobj = camera->hsd_obj;
-        source->magnify_callback = (GObj_RenderFunc) (Event) ifMagnify_802FBBDC;
+        if (camera->gxlink_prios != 0x10)
+            return refuse(error, error_size,
+                          "Magnify camera mask differs from source GX4 schedule");
+        *kind = SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO;
         return 1;
     }
     return refuse(error, error_size,
                   "Source camera callback has no verified particle schedule");
+}
+
+static int source_roles_unchanged(const SlippiParticlePassSource* source)
+{
+    HSD_GObj* hud_camera = NULL;
+    HSD_GObj* nametag_camera = NULL;
+    GObj_RenderFunc hud_callback = NULL;
+    GObj_RenderFunc nametag_callback = NULL;
+    unsigned hud_hidden = 0;
+    slippi_particle_source_hud_identity(&hud_camera, &hud_callback,
+                                       &hud_hidden);
+    slippi_particle_source_nametag_identity(&nametag_camera,
+                                           &nametag_callback);
+    return hud_camera == source->hud_camera &&
+           hud_callback == source->hud_callback &&
+           hud_hidden == source->hud_hidden &&
+           nametag_camera == source->nametag_camera &&
+           nametag_callback == source->nametag_callback &&
+           melee_web_bg_flash_camera_owner() ==
+               source->background_flash_camera &&
+           slippi_particle_source_magnify_callback() ==
+               source->magnify_callback;
 }
 
 static int append_visits(Schedule* schedule, size_t* capacity,
@@ -267,10 +378,11 @@ static int snapshot_selected_links(Schedule* schedule,
                                    const SlippiParticlePassSource* source,
                                    char* error, size_t error_size)
 {
-    unsigned links[] = { SLIPPI_PARTICLE_GX_MODEL, SLIPPI_PARTICLE_GX_AUX };
+    unsigned links[] = { SLIPPI_PARTICLE_GX_MODEL, SLIPPI_PARTICLE_GX_AUX,
+                         10, 11 };
     unsigned index;
     size_t total = 0;
-    for (index = 0; index < 2; ++index) {
+    for (index = 0; index < 4; ++index) {
         unsigned link = links[index];
         const HSD_GObj* object;
         const HSD_GObj* previous = NULL;
@@ -282,6 +394,22 @@ static int snapshot_selected_links(Schedule* schedule,
                 object->prev_gx != previous)
                 return refuse(error, error_size,
                               "Selected GX link changed during schedule preflight");
+            if (object->render_cb && (link == 10 || link == 11)) {
+                if (!hud_display_callback_is_known(link, object->render_cb))
+                    return refuse(error, error_size,
+                                  "HUD GX10/GX11 link contains an unverified callback");
+                if (link == 10) {
+                    if (object->obj_kind != HSD_GObj_LightKind ||
+                        !object->hsd_obj ||
+                        HSD_OBJECT_METHOD(object->hsd_obj) !=
+                            HSD_CLASS_INFO(&hsdLobj))
+                        return refuse(error, error_size,
+                                      "HUD GX10 callback does not own a base LObj");
+                } else if (!slippi_profile_particle_pass_jobj_display_safe(
+                               object, error, error_size)) {
+                    return 0;
+                }
+            }
             ++total;
             previous = object;
         }
@@ -299,7 +427,7 @@ static int snapshot_selected_links(Schedule* schedule,
         return refuse(error, error_size,
                       "Selected GX link snapshot allocation failed");
     schedule->selected_node_count = total;
-    for (index = 0; index < 2; ++index) {
+    for (index = 0; index < 4; ++index) {
         unsigned link = links[index];
         const HSD_GObj* object;
         size_t offset = schedule->link_first[index];
@@ -373,6 +501,7 @@ static int build_schedule(Schedule* output, uint64_t world,
     output->world = world;
     output->interval = interval;
     output->main_x398_b3 = main_x398_b3;
+    output->hud_hidden = base.hud_hidden;
 
     for (node = base.gx_heads[SLIPPI_PARTICLE_GX_LINK_MAX + 1]; node;
          node = node->next_gx) {
@@ -380,6 +509,7 @@ static int build_schedule(Schedule* output, uint64_t world,
         CameraEvent event;
         size_t count = 0;
         unsigned mask = 0;
+        SlippiParticleCameraKind kind = SLIPPI_PARTICLE_CAMERA_MAIN_TAIL;
         if (camera_count >= live_bound ||
             node->gx_link != SLIPPI_PARTICLE_GX_LINK_MAX + 1 ||
             node->prev_gx != previous) {
@@ -392,7 +522,7 @@ static int build_schedule(Schedule* output, uint64_t world,
         if (!node->render_cb) continue;
         memset(&event, 0, sizeof(event));
         event.proof = node_proof(node);
-        if (!bind_camera_role(node, &camera_source, &main_seen,
+        if (!bind_camera_role(node, &camera_source, &main_seen, &kind,
                               error, error_size)) {
             free(one_visits);
             return 0;
@@ -412,8 +542,11 @@ static int build_schedule(Schedule* output, uint64_t world,
         }
         event.visit_first = output->visit_count - count;
         event.visit_count = count;
+        event.kind = kind;
         output->events[output->event_count++] = event;
         output->selected_links |= mask;
+        if (kind == SLIPPI_PARTICLE_CAMERA_HUD)
+            output->selected_links |= (1u << 10) | (1u << 11);
     }
     free(one_visits);
     output->camera_node_count = camera_count;
@@ -423,6 +556,9 @@ static int build_schedule(Schedule* output, uint64_t world,
     if (main_seen != 1)
         return refuse(error, error_size,
                       "Private main camera is not unique in the source callback chain");
+    if (!source_roles_unchanged(&base))
+        return refuse(error, error_size,
+                      "Source camera role identity or HUD hidden state changed during preflight");
     if (!snapshot_selected_links(output, &base, error, error_size)) return 0;
     if (error && error_size) error[0] = '\0';
     return 1;
@@ -432,6 +568,7 @@ static int schedule_equal(const Schedule* left, const Schedule* right)
 {
     return left->world == right->world && left->interval == right->interval &&
         left->main_x398_b3 == right->main_x398_b3 &&
+        left->hud_hidden == right->hud_hidden &&
         left->selected_links == right->selected_links &&
         left->camera_node_count == right->camera_node_count &&
         left->event_count == right->event_count &&
@@ -583,6 +720,18 @@ int slippi_particle_source_camera_begin(const HSD_GObj* camera,
         node_proof(camera).render_callback != event->proof.render_callback)
         return source_failure("Source camera order differs from preflight",
                               error, error_size);
+    if (event->kind == SLIPPI_PARTICLE_CAMERA_HUD) {
+        HSD_GObj* hud_camera = NULL;
+        GObj_RenderFunc hud_callback = NULL;
+        unsigned hud_hidden = 0;
+        slippi_particle_source_hud_identity(&hud_camera, &hud_callback,
+                                            &hud_hidden);
+        if (hud_camera != camera ||
+            hud_callback != event->proof.render_callback ||
+            hud_hidden != state.schedule.hud_hidden)
+            return source_failure("HUD camera owner or hidden state changed before its source callback",
+                                  error, error_size);
+    }
     state.open_camera = camera;
     state.camera_open = 1;
     if (event->visit_count) {
