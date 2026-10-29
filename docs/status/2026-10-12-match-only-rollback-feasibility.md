@@ -1420,9 +1420,19 @@ the successful two-tick route stays intact. The actual adapter control passes
 with modeled source/session/provider leaves after correcting its Sealed-phase
 admission and restored-cursor check; two fixture link failures are retained.
 The repaired JavaScript runner passes 55 focused controls with no skips, and
-the isolated-source mirror regression passes. Independent native and JavaScript
-reviews pass; affected build and browser execution remain unrun. Failed
-JavaScript fixture attempts are retained. The proposed two-instance witness separates prediction nonvacuity from
+the isolated-source mirror regression passes. Independent reviews and the
+affected build at `13f2c5ab` pass. The first browser attempt agrees across both
+300-sample prefixes, completes seven authoritative drawn ticks and restores,
+then refuses command 23 before replay: the actual shared boundary detects a
+restored source frame of 176 against the cached observation at 183. This
+metadata dependency was missing from the modeled boundary control. The reduced repair now restores the exact captured observation only after
+a successful typed commit and immediately checks the unchanged shared boundary.
+Its control executes the actual source-boundary helper, rejects stale metadata
+before any replay step, and passes independent review; a new browser attempt
+remains pending. No seven-tick replay equality or final present is claimed.
+Failed fixture/capture evidence and all nine producer files are retained;
+source/renderer shutdown completes and every owned PID is absent. CPU CLOSE
+preserves failure 1047. The proposed two-instance witness separates prediction nonvacuity from
 authoritative-to-same-input replay; it cannot establish correction from a wrong
 predicted branch. That next milestone first checks actual action allocation and
 retained borrowed identities, because exact action-tape replay currently refuses

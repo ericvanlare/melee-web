@@ -211,6 +211,14 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         if not fixture_probe.is_file(): fixture_probe = REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
         actual_fixture = extract_fixture_observations(fixture_probe)
         generated = template.replace("@ACTUAL_FIXTURE_OBSERVATIONS@", actual_fixture)
+        # Extract the real shared source/frame admission predicate: modeled
+        # owner/runtime/transfer leaves remain explicit in the control.
+        browser_source = (CANDIDATE_ROOT / "src/slippi_profile/tests/synctest_browser.cpp").read_text()
+        start = browser_source.index("uint32_t payload_admission_source_boundary()")
+        end = browser_source.index("uint32_t payload_admission_boundary(", start)
+        actual_source_boundary = browser_source[start:end].rstrip()
+        generated = generated.replace("@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@", actual_source_boundary)
+        self.assertNotIn("@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@", generated)
         self.assertNotIn("@ACTUAL_FIXTURE_OBSERVATIONS@", generated)
         control_source = output_dir / "cpu_restore_adapter_control.cpp"
         control_source.write_text(generated)

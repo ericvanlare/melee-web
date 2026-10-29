@@ -71,6 +71,7 @@ struct CpuRestoreControl {
     CpuDrawnEvidence drawn{};
     CpuTwoTickEvidence two{};
     CpuSevenTickEvidence seven{};
+    Observation seven_pre_observation{};
     MeleeWebSourcePayloadFailureWitness failure_witness{1,sizeof(MeleeWebSourcePayloadFailureWitness)};
     MeleeWebClassPieceWitness class_piece_witness{1,sizeof(MeleeWebClassPieceWitness)};
     MeleeWebClassPieceCaptureWitness class_piece_capture_witness{1,sizeof(MeleeWebClassPieceCaptureWitness),0,0,1};
@@ -389,23 +390,6 @@ bool cpu_seven_safe(uint32_t expected){
            !melee_web_synctest_is_mario_kind(observation.players[i].fighter_kind))return false;
     return true;
 }
-/* A checked restore rewinds the authoritative session cursor immediately;
- * the cached observer still describes the sealed endpoint until the next raw
- * source step refreshes it. Admit that one pre-step boundary from the live
- * session cursor and retained interactive/owner predicates, then require the
- * ordinary full observation/frame check after the step. */
-bool cpu_seven_replay_cursor_safe(uint32_t expected){
-#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
-    if(!melee_web_snapshot_actual_stage_is_final_destination())return false;
-#endif
-    if(!cpu_tuple_unchanged()||!match||match->source_frames()!=expected||
-       !observation.ready||observation.ending||observation.complete||observation.paused||
-       observation.stocks[0]!=4||observation.stocks[1]!=4)return false;
-    for(unsigned i=0;i<2;++i)
-        if(melee_web_synctest_motion_boundary(observation.motion[i])!=0||
-           !melee_web_synctest_is_mario_kind(observation.players[i].fighter_kind))return false;
-    return true;
-}
 void cpu_seven_raw(CpuRestoreEvidence& e,bool replay){
     if(replay){e.replay=observation;e.replay_pcm=pcm;e.replay_pad=input_bytes;
         e.replay_profile=rng_profile_observation;e.replay_transfer=transfer_diagnostic;}
@@ -439,6 +423,7 @@ uint32_t cpu_execute_seven(uint32_t command){
         cpu_restore.profile_owner=rng_profile_gobj;cpu_restore.profile=rng_profile_enabled;
         cpu_restore.configured_seed=configured_source_seed;cpu_restore.initializer=native_initializer_enabled;
         e.pre_frame=observation.frame;
+        std::memcpy(&cpu_restore.seven_pre_observation,&observation,sizeof(observation));
         if(e.pre_frame>UINT32_MAX-7u||!cpu_seven_safe(e.pre_frame))
             return cpu_fail(0x4d2u,"seven-tick source frame/interactive owner refused");
         cpu_restore.pre_phase=audio_phase;cpu_restore.pre_profile=rng_profile_observation;
@@ -517,12 +502,18 @@ uint32_t cpu_execute_seven(uint32_t command){
             return cpu_fail(0x450u+e.commit_result,"seven-tick aggregate admission/commit refused");
         audio_phase=cpu_restore.pre_phase;rng_profile_observation=cpu_restore.pre_profile;
         rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
+        // The typed commit restores source state, not this fixture's cached
+        // observer. Restore the exact captured bytes only after commit succeeds,
+        // then require the unchanged shared source/frame boundary before replay.
+        std::memcpy(&observation,&cpu_restore.seven_pre_observation,sizeof(observation));
+        if(cpu_boundary()||!cpu_seven_safe(e.pre_frame))
+            return cpu_fail(0x4fau,"seven-tick restored observer/source boundary refused");
         cpu_restore.state=C::ReplayingSeven;return 0;
     }
     if(command>=23&&command<=29){
         const unsigned index=command-23u;
         if(cpu_restore.state!=C::ReplayingSeven||!cpu_seven_interval()||
-           cpu_boundary()||!cpu_seven_replay_cursor_safe(e.pre_frame+index))
+           cpu_boundary()||!cpu_seven_safe(e.pre_frame+index))
             return cpu_fail(0x4fau,"seven-tick replay interval refused before source step");
         int result=0;error[0]='\0';{
             CpuClassPieceTraceScope trace(command,MELEE_WEB_CLASS_PIECE_TRACE_STEP,

@@ -54,6 +54,9 @@ public:
     std::uint32_t source_frames() const noexcept { return frame_; }
     void set_source_frames(std::uint32_t value) noexcept { frame_=value; }
     void increment_source_frames() noexcept { ++frame_; }
+    bool ready() const noexcept { return true; } // modeled interactive session leaf
+    bool complete() const noexcept { return false; }
+    bool paused() const noexcept { return false; }
     struct CpuOwners {MeleeWebAudio* audio;};
     CpuOwners diagnostic_cpu_owners() const noexcept {return {reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102))};}
 private:
@@ -353,7 +356,15 @@ MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void) {
 MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void) {
     return {storage_boot_ticks.data(),sizeof(storage_boot_ticks),storage_disabled_links.data(),sizeof(storage_disabled_links)};
 }
+// Real source-boundary body; only external runtime/owner/transfer providers are
+// modeled here. The exact live cursor versus cached observation check executes.
+enum : uint32_t { PayloadUnsafeCallBoundary=2,PayloadOwnerUnavailable=3,
+                  PayloadTransferBusy=4,PayloadFrameMismatch=7 };
+extern "C" int melee_web_source_memory_healthy(void) { return world_exists ? 1 : 0; }
+extern "C" int melee_web_snapshot_quiescent(void) { return 1; } // modeled no pending source transfers
+@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@
 std::uint32_t payload_admission_boundary(bool require_idle) {
+    if(const uint32_t failure=payload_admission_source_boundary())return failure;
     if(require_idle) { ++idle_boundary_calls; if(pending_submission) return 1; }
     return 0;
 }
@@ -430,6 +441,7 @@ std::uint32_t ptr32(const void* p) {
 }
 void reset_fixture() {
     fail_capture=false;
+    renderer_ready=true;renderer_error_count=0;
     fixture_draw_diagnostics={};
     fail_static_replay=false;fail_baseline_sample300=false;journal_failure_tick=unexpected_draw_tick=0;
     step_attempts=fail_step_attempt=draw_attempts=fail_draw_attempt=0;
@@ -625,6 +637,7 @@ void verify_seven_tick_phase_boundary() {
     check(melee_web_synctest_cpu_seven_tick_evidence_bytes()==93512,"Seven ABI size drift");
     check(melee_web_synctest_cpu_restore_command(14)==0&&
           cpu_restore.state==CpuRestoreControl::CapturedSeven,"Seven capture refused");
+    const Observation captured_observation=observation;
     for(unsigned index=0;index<7;++index) {
         check(melee_web_synctest_cpu_restore_command(15u+index)==0&&
               tick_calls==index+1u&&draw_calls==index+1u&&pending_submission,
@@ -636,8 +649,9 @@ void verify_seven_tick_phase_boundary() {
     check(melee_web_synctest_cpu_restore_command(22)==0&&
           cpu_restore.state==CpuRestoreControl::ReplayingSeven&&
           cpu_restore.seven.commit_result==0&&match->source_frames()==176&&
-          observation.frame==183,
-          "Seven sealed command22 or checked restore cursor refused");
+          observation.frame==176&&
+          std::memcmp(&observation,&captured_observation,sizeof(observation))==0,
+          "Seven sealed command22, exact captured observer or checked restore cursor refused");
     for(unsigned index=0;index<7;++index) {
         check(melee_web_synctest_cpu_restore_command(23u+index)==0&&
               tick_calls==8u+index&&match->source_frames()==177u+index&&
@@ -659,6 +673,17 @@ void verify_seven_tick_phase_boundary() {
     check(tick_sample_count==14,"Seven raw source sample count drift");
     for(unsigned index=0;index<14;++index)
         check(tick_samples[index]==300u+(index%7u),"Seven raw source sample order drift");
+    close_and_retire();
+}
+void verify_seven_stale_observer_refusal() {
+    reset_fixture();check(configure_valid(),"Seven stale configure");
+    check(melee_web_synctest_cpu_restore_command(14)==0,"Seven stale capture");
+    for(unsigned i=0;i<7;++i){check(melee_web_synctest_cpu_restore_command(15+i)==0,"Seven stale baseline");pending_submission=false;}
+    check(melee_web_synctest_cpu_restore_command(22)==0,"Seven stale restore");
+    observation.frame=183; // reproduce the real failed command23 dependency
+    check(payload_admission_source_boundary()==PayloadFrameMismatch,"Actual source boundary accepted stale observer");
+    check(melee_web_synctest_cpu_restore_command(23)==0x417u&&tick_calls==7&&draw_calls==7,
+          "Stale observer reached a replay source step or lost exact frame refusal");
     close_and_retire();
 }
 void verify_payload_failure_retention() {
@@ -1085,6 +1110,7 @@ int main() {
         verify_two_tick_refusals();
         verify_payload_failure_retention();
         verify_seven_tick_phase_boundary();
+        verify_seven_stale_observer_refusal();
 #else
         reset_fixture();check(configure_valid(),"V5 configure");
         check(melee_web_synctest_cpu_restore_command(8)==0x4b0u&&tick_calls==0&&draw_calls==0,

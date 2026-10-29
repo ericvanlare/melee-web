@@ -9638,7 +9638,7 @@
       }
     },
     "fixed_seven_tick_v17_component": {
-      "status": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_BUILD_AND_BROWSER_UNRUN",
+      "status": "FIRST_BROWSER_ATTEMPT_FAILS_REPLAY_PRESTEP_CACHED_OBSERVATION_FRAME",
       "plan": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-browser-next-step-plan-v1.json",
         "sha256": "2774a689cf620df79180582aaacd53c229514163540fd7c47eb6fd9af07b2273"
@@ -9651,7 +9651,7 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-control-luna-v1/native-control-attempts-receipt.json",
         "sha256": "8a4ceb3bec3bbef437a400b9efadce5ece37618d368c50a75c86306e9ad9a4b2"
       },
-      "scope": "Fixed private V17 diagnostic. Separate prediction instance demonstrates a different remote action; authoritative instance records seven drawn ticks, restores, replays the same authoritative inputs without draw, then presents. This does not restore from the wrong-predicted branch. Actual adapter control uses modeled source/session/provider leaves; actual seven-tick source-world browser result remains unrun.",
+      "scope": "Fixed private V17 diagnostic. Separate prediction instance demonstrates a different remote action; authoritative instance records seven drawn ticks, restores, replays the same authoritative inputs without draw, then presents. This does not restore from the wrong-predicted branch. Actual adapter control uses modeled source/session/provider leaves; Actual first browser attempt is retained separately below and fails before replay.",
       "next_true_correction_contract": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-corrected-branch-contract-sol-v2.json",
         "sha256": "0428e9df33c58c167ae21832755940419cab1b045cc081da16e87312ca00ec27"
@@ -9673,7 +9673,46 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-final-js-independent-review-v1.json",
         "sha256": "5602a5287f83879016e6f65fc2a7971ad99dad7dc71c0c3d2d6acb6c483d3744"
       },
-      "focused_summary": "Native actual-adapter modeled-provider control passes; 55/55 Node controls pass with zero skips; actual isolated-mirror unittest method passes once. All failed fixture attempts retained. No actual seven-tick source-world/browser result yet."
+      "focused_summary": "Native actual-adapter modeled-provider control passes; 55/55 Node controls pass with zero skips; actual isolated-mirror unittest method passes once. All failed fixture attempts retained. These focused controls preceded the separately retained first browser failure.",
+      "source_producer": "13f2c5ab6dc3655859db75561acbd783deeb526f",
+      "actual_browser_attempts": [
+        {
+          "receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-seven-tick-v17-v1/result-receipt.json",
+            "sha256": "db64382a198b9f581f99662987e52fc14e3b7945d6f13882de0ff33ea9e49488"
+          },
+          "producer_archive": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-v17-browser-v1-archive/archive.json",
+            "sha256": "04b1c4a12393fe76a78f8db88d7ebec6e75a7e032f7a3ccd54ee24ad00910bac"
+          },
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-seven-tick-v17-v1/result.json",
+            "sha256": "adf7a3d57f5f1df3667f92d1acaecbe269bd4d2a231932131db1fde0d8f4d3be"
+          },
+          "configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-seven-tick-v17-v1/final-linked-configuration-v1.json",
+            "sha256": "51987ae34c64f47307a3e8d2acbc7e6977ea2b0535347ceca885b9b1df7b3f19"
+          },
+          "linked_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-seven-tick-v17-v1/row-review.json",
+            "sha256": "b976043a8b294cadfb75cc4d03dab23cb469cf38f82f48485de81022cb187c0e"
+          },
+          "result": "All300 prefix samples agree between instances. Separate predicted7 and authoritative drawn7 execute; typed restore succeeds at command22. Command23 refuses1047 before first replay tick: real shared boundary compares restored source frame176 with stale observer frame183. Zero replay/raw equality or present claimed. CPU close retains1047; source/renderer close succeed; all9 producers and all owned PID absence verified."
+        }
+      ],
+      "next": "Capture/restore exact diagnostic Observation metadata around successful typed restore, preserving original shared boundary checks; remove relaxed cursor helper. Actual shared source-boundary body in focused control must reproduce stale-frame refusal. No game/input/PCM/RNG/draw behavior change.",
+      "observer_metadata_repair": {
+        "freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-observer-metadata-repair-sol-v1/freeze.json",
+          "sha256": "a978fabd07522f00850343a6122a4f7fdc926d78bb7a199d49dc37400078a494"
+        },
+        "state": "FOCUSED_AND_INDEPENDENT_REVIEW_PASS_BUILD_BROWSER_UNRUN",
+        "scope": "Exact captured diagnostic Observation restored only after successful typed source restore; unchanged actual shared frame boundary required immediately afterward and before every replay tick. Real shared source-boundary function included in focused control. No source/input/PCM/RNG/draw writes added; no seven-tick browser success yet.",
+        "review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-observer-metadata-independent-review-v1.json",
+          "sha256": "4e19346d5e054afaa51518bd8fbca7b59377c318232f16f583783aea70e92c7e"
+        }
+      }
     }
   }
 }
