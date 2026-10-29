@@ -1332,10 +1332,13 @@ missing from the planner; which callback caused the captured first refusal remai
 unobserved. The subsequent reduced control passes with actual source registration
 and dispatch snippets, typed magnify identity, visible/hidden HUD checks and
 refusal-before-preparation negatives. Its constructor invocation order and graphics
-leaves are explicitly modeled. Independent source review and the composed control
-review pass; the affected browser build and linked policy review are next. Four
-failed control attempts remain retained, including the const-pointer compilation
-repair. No successful browser comparison is implied.
+leaves are explicitly modeled. Independent source/control review and the affected
+browser build pass at `5c4c78f0`; all 2,169 declared source policy entries retain
+their modes and sizes. The fixed browser attempt still refuses an unobserved camera
+callback in the first baseline sample, before any comparison. Failed controls and
+patch/type/link build repairs are retained. The next diagnostic appends the actual
+failed callback identity to this existing refusal; another inferred camera list is
+not evidence for expanding admission. No successful browser comparison is implied.
 The sticky owner failure remains visible during source and renderer close. All
 launched process IDs are independently absent and all nine runtime producer
 artifacts for each attempt are retained unchanged. Unknown

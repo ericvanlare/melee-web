@@ -217,7 +217,7 @@ static HSD_GObj main_camera, flash_camera, ground_camera, magnify_camera;
 static HSD_GObj hud_camera, nametag_camera, hud_light_gobj, hud_jobj_gobj;
 static SlippiParticlePassSource source;
 static SlippiParticlePassVisit plan[32];
-static char error[160];
+static char error[256];
 static int cpu_active;
 static uint64_t cpu_token;
 static unsigned helper_prepare_calls, helper_draw_begin_calls;
@@ -558,11 +558,22 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
     assert(slippi_particle_source_world_begin(105));
     cpu_active = 1; cpu_token = 1005;
     assert(slippi_particle_source_prepare(105, cpu_token, error, sizeof(error)));
+    prepared = helper_prepare_calls;
     lbl_80433658.x44 = &nametag_camera;
     assert(!slippi_particle_source_draw_begin(105, cpu_token, error,
                                               sizeof(error)));
-    assert(strstr(error, "no verified particle schedule"));
-    assert(helper_draw_begin_calls == 0);
+    {
+        static const char prefix[] =
+            "Source camera callback has no verified particle schedule";
+        assert(strncmp(error, prefix, sizeof(prefix) - 1) == 0);
+    }
+    assert(strstr(error, "(owner="));
+    assert(strstr(error, "callback=0x"));
+    assert(strstr(error, "gx_link=64"));
+    assert(strstr(error, "render_priority=10"));
+    assert(strstr(error, "obj_kind=19"));
+    assert(strstr(error, "gxlink_prios=0x10000"));
+    assert(helper_prepare_calls == prepared && helper_draw_begin_calls == 0);
     cpu_active = 0;
     assert(!slippi_particle_source_world_end(105));
 

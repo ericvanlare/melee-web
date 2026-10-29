@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "AFFECTED_BUILD_PASS; baseline step refuses an unrecognized source camera callback, before all comparisons",
+      "status": "KNOWN_CAMERA_CONTROLS_AND_BUILD_PASS; actual baseline still refuses unobserved camera callback, before all comparisons",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9241,13 +9241,13 @@
         "Actual source allocator backing-cell query and actual restore coordinator; explicit modeled OS/owner leaves"
       ],
       "limitations": [
-        "Both fixed V16 attempts capture in command8 and refuse1204 in baseline command9; diagnostic5f0f5589 preserves exact cause: Source camera callback has no verified particle schedule",
+        "Initial reporting attempts and known-camera completion attempt capture in command8 and refuse1204 in baseline command9; actual failed callback identity remains unobserved until bounded diagnostic run.",
         "Zero CPU/drawn comparison domains checked; no raw pair equality claim from unwritten evidence",
         "Sticky owner failure preserved at source/renderer close; all recorded owned PIDs independently absent and all9producer pins unchanged",
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Affected build of reviewed direct-route camera repair, exact linked policy review, then one fixed two-tick browser test; no input or comparison changes.",
+      "next": "Append bounded owner/callback/mask/kind/priority identity to existing refusal and resolve exact linked WASM table entry; no admission widening from another inferred role list.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9334,13 +9334,66 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-direct-route-camera-composed-root-review-v1.json",
           "sha256": "1351bf74226f7b935f85514a7f8122fac46a8f916b8a0127a12aa2a7d1acd4c2"
         },
-        "scope": "Reduced actual source registration/dispatch and complete schedule control; original runtime initialization order and graphics leaves are not exercised. Production candidate not yet browser-built.",
+        "scope": "Reduced source registration/dispatch controls and affected build pass. Fixed browser attempt still refuses unknown camera identity in first baseline sample300, zero comparisons; original runtime initialization graph remains unproven.",
         "retained_failures": [
           "particle-camera-completion-control-20261029-084534-c912fe33",
           "particle-camera-completion-control-rerun-20261029-084729-30ce7e21",
           "particle-camera-fixture-sol-v1",
           "particle-camera-fixture-sol-v2"
-        ]
+        ],
+        "runtime_head": "5c4c78f08014b2fcc32ade081a4e60a381df2c84",
+        "build": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v7/result.json",
+          "sha256": "2d0d301555b099e20e8ece8f781ae086ae0f7a6c45af894d97bc5f799584514b"
+        },
+        "linked_configuration": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v3/final-linked-configuration-v1.json",
+          "sha256": "bf4f6fd34985d2b7121fd8923015a9fb2318fd0ffebab61d4f972e645f6f721c"
+        },
+        "browser_attempt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v3/result-receipt.json",
+          "sha256": "afc1e962d25e6b5883b8ae06280dcf5eb14a9d949dcc9202f44d453169fda5fe"
+        },
+        "producer_archive": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-camera-browser-archive/archive.json",
+          "sha256": "a7b3f4ad616e61aaabf6fcdbd99233b981e9e6ed4f6efeded921b4970490a40f"
+        },
+        "repairs": [
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-patch-count-sol-review-v1.json",
+            "sha256": "bcae57d7ba6ca04b8e5dcf46d6c29f4d283f2e1917cb5b5c8fd0a8918863b318"
+          },
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-typed-object-sol-review-v1.json",
+            "sha256": "021b96ae3c4f532472de0f8ac5103af0a9e757801685b94e69f629065676bc27"
+          },
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-lobj-symbol-sol-review-v1.json",
+            "sha256": "200c8f24c5e20085339933c537c2707b526a37e319ed2ee21fbb9d3dd0e4f840"
+          }
+        ],
+        "final_focused_control": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-lobj-symbol-v1/result.json",
+          "sha256": "9a4368d6839d2797f9e4e04acc644dddbae3ec3a58fb04e04027a6c51edc7260"
+        },
+        "retained_build_failures": [
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v4/result.json",
+            "sha256": "da059bb7c9efa13957d50a99d63d9feddb0ce1716d078e089e7ecbcb87a8f8ba"
+          },
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v5/result.json",
+            "sha256": "2a26369cebaae00989b586e7ab7a316a300420124d7a55e54dbef4ce6cd60e33"
+          },
+          {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v6/result.json",
+            "sha256": "28eae2dffa9810d99551a4d007b48c2a090f9a1a7c415eea239bb1f8ed2df962"
+          }
+        ],
+        "unknown_identity_diagnostic_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-bind-diagnostic-sol-review-v1.json",
+          "sha256": "a33ebca875cca617c2d73efda6d244bf8c31b6d4e5cc16aa89c17c56708410a0"
+        }
       }
     }
   }

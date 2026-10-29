@@ -23,6 +23,7 @@
 #include <sysdolphin/baselib/objalloc.h>
 
 #include <stdio.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -320,8 +321,19 @@ static int bind_camera_role(HSD_GObj* camera,
         *kind = SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO;
         return 1;
     }
-    return refuse(error, error_size,
-                  "Source camera callback has no verified particle schedule");
+    {
+        char diagnostic[192];
+        (void) snprintf(
+            diagnostic, sizeof(diagnostic),
+            "Source camera callback has no verified particle schedule "
+            "(owner=%p callback=0x%" PRIxPTR " gx_link=%u "
+            "render_priority=%u obj_kind=%u gxlink_prios=0x%" PRIx64 ")",
+            (void*) camera, (uintptr_t) camera->render_cb,
+            (unsigned) camera->gx_link, (unsigned) camera->render_priority,
+            (unsigned) camera->obj_kind, camera->gxlink_prios);
+        diagnostic[sizeof(diagnostic) - 1] = '\0';
+        return refuse(error, error_size, diagnostic);
+    }
 }
 
 static int source_roles_unchanged(const SlippiParticlePassSource* source)
