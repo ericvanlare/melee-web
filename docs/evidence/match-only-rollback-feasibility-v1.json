@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "Current-main private browser initializes and completes 300 warm samples; baseline source step300 constructs a TObj during the fixed-owner cache interval and aborts. Reduce the lifecycle dependency without weakening equality before another capture. Full browser rollback remains open.",
+    "current_next_boundary": "V9 performs actual restore and both no-draw corrections, then strict owned-payload equality refuses row128 offset900. Map the captured136-byte class object/field and reduce its actual writer before another browser experiment. Final present, seven browser ticks and network rollback remain open.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8562,7 +8562,7 @@
       }
     },
     "tobj_stateless_v9_candidate_20261028": {
-      "status": "FOCUSED_ACTUAL_SOURCE_CONTROLS_PASS_BROWSER_NOT_YET_RUN",
+      "status": "ACTUAL_RESTORE_AND_TWO_NO_DRAW_TICKS_COMPLETE_STRICT_OWNED_PAYLOAD_MISMATCH",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9",
       "design": "Canonical UV/Reflection matrix Setup uses a full stack-local TObj copy with the original dirty condition and original Make/Setup arithmetic. Toon keeps its original early return after admission; Shadow keeps its original path. No per-object presentation allocation survives source allocation/reuse.",
       "admission": "World, exact canonical class/method/extent attestation, one-use token and sticky unsupported/custom/rebind/active-amnesia failures remain. Anchor no longer claims per-object inventory or completed Load provenance. Existing source allocator/payload/static/PCM/input comparisons are unchanged.",
@@ -8595,9 +8595,89 @@
         "tobj-v9-source-review-v2.json": {
           "sha256": "274bdb207ede8245eb63a726f121b0512b18a30e6717b701d664dc359c57e20f",
           "bytes": 3838
+        },
+        "browser-build-v9-v1/result.json": {
+          "sha256": "9144052f0c0bf107193c30a314e1d2e7a65212369b6e4f7c00def5dfed3f808f",
+          "bytes": 1870
+        },
+        "browser-build-v9-v1/artifact-inventory.json": {
+          "sha256": "6e68f13d390a5b8ed5a4c3b46300108986124e8c1f50b3fc42699fb410d94461",
+          "bytes": 1609
+        },
+        "linked-config-v9-v1/generation-result.json": {
+          "sha256": "278b07c96a55316bc431c84430cd64c085b8f3404055a6048320673ac1838963",
+          "bytes": 1011
+        },
+        "linked-config-v9-v1/validation-result.json": {
+          "sha256": "409c7841cdf98a9e1f8fb46fb8fd8f5b4c028be3dd1b0ce3b82dca5f2bad24e9",
+          "bytes": 682
+        },
+        "linked-config-v9-v1/row-review.json": {
+          "sha256": "f343cc8f2a7160ca541d5ac9ed2965e1155adbeef1c20b3e51e69f6363a289dc",
+          "bytes": 2120
+        },
+        "linked-config-v9-v1/final-linked-configuration-v1.json": {
+          "sha256": "73288d361330f1d1ada9c76c60c5dc72e09e7dcb14e148cd0f507d70a7eafc07",
+          "bytes": 989506
+        },
+        "browser-two-tick-v9-v1/runner/evidence.json": {
+          "sha256": "c3edac57a8dcc80363ba6c1251f5324e7cc1059373854afcdf11399e56d55b82",
+          "bytes": 1209088
+        },
+        "browser-two-tick-v9-v1/owner.json": {
+          "sha256": "48d2e542d13fbbb38138359c1928651a224312f58a63a5adc0c16b0a80611160",
+          "bytes": 80526
+        },
+        "browser-two-tick-v9-v1/first-failure-receipt.json": {
+          "sha256": "9a62b3e20aa0ce2035118a8b43e9b96193c6e5d7356d558d992b2de003474144",
+          "bytes": 55545
+        },
+        "browser-two-tick-v9-v1/independent-postflight.json": {
+          "sha256": "17a303b7ca1006a9a508697e74a807dbc473713d0262c747199a53ef2fd3f5c7",
+          "bytes": 2566
+        },
+        "tobj-v9-browser-outcome-review-v1.json": {
+          "sha256": "3cdb4bcd304bf2527d12b73d4e8b8046300b6268be2241e06750ea8ca870f4b9",
+          "bytes": 3108
         }
       },
-      "review": "INDEPENDENT_SOURCE_AND_FOCUSED_CONTROLS_GO"
+      "review": "INDEPENDENT_SOURCE_AND_FOCUSED_CONTROLS_GO",
+      "source_head": "1ecaa2b828eab1c4fb65b9d2975cffa3f332bdcc",
+      "browser_result": {
+        "command_results": {
+          "8": 0,
+          "9": 0,
+          "10": 0,
+          "11": 1216
+        },
+        "source_frames": [
+          176,
+          178
+        ],
+        "commit_result": 0,
+        "diagnostic_mask": 127,
+        "both_raw_five_pairs_equal": true,
+        "strict_cpu_checked_domains": 30,
+        "strict_cpu_matched_domains": 14,
+        "first_difference": {
+          "domain": 4,
+          "row": 128,
+          "offset": 900,
+          "extent": 1024,
+          "expected_byte": 11,
+          "actual_byte": 248
+        },
+        "capture_time_class_piece": {
+          "class_info": 895452,
+          "requested": 136,
+          "piece_offset": 68,
+          "scope": "CAPTURE_TIME_ONLY; live lifetime coverage unavailable reason7"
+        },
+        "final_present": "UNRUN",
+        "cleanup": "Snapshot close and renderer shutdown return1; CPU CLOSE preserves1216 comparison refusal. Independently observed all recorded PIDs absent and producer pins unchanged.",
+        "scope": "Fixed two-tick same-instance browser interval. Does not establish accepted typed equality, seven-tick browser correction, online rollback or whole-profile correctness."
+      },
+      "browser_outcome_review": "GO_SCOPED_RESULT_AND_DOCS; strict owned payload remains unequal, final present unrun"
     }
   }
 }

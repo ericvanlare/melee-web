@@ -1105,8 +1105,22 @@ amnesia remains sticky. Earlier fixture setup, double-destruction and result-lab
 failures are retained. These controls use declared memory/audio/camera/GX providers
 and do not prove browser rollback. The old V8 browser and linked metadata were
 archived and verified before any rebuild. The driver requires the new identity;
-its observed failure fields now match the stateless implementation. A fresh V9
-browser build, linked configuration and unchanged two-tick run are next.
+its observed failure fields now match the stateless implementation.
+
+The fresh V9 browser at `1ecaa2b8` passes the affected build and exact linked
+configuration checks. The unchanged two-tick experiment now completes the warm
+prefix, both drawn reference ticks, actual restore, and both no-draw corrections.
+Both per-tick raw-five comparisons agree. The strict owned-payload comparison
+still refuses: row 128, byte 900, in a captured 136-byte class object at piece
+offset 68. Capture-time class attribution is available; continuous live-piece
+coverage is not. No comparison was relaxed. The next experiment is a source
+reduction of that field and its writer, rather than another identical replay.
+Final presentation was not reached. Snapshot close and renderer shutdown both
+succeed; CPU CLOSE preserves the comparison refusal. All recorded processes are
+independently absent and producer hashes remain unchanged. The structured
+`tobj_stateless_v9_candidate_20261028` receipt binds the build, configuration,
+review, raw report and first-failure receipt. Browser rollback remains incomplete;
+full regression and publication-head CI remain pending.
 
 
 ## Stage decision dependencies, issue #333
