@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Actual camera/GObj/eflib source with render and GX leaves modeled. */
 #include <assert.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -219,6 +220,7 @@ static void psDispParticles(u32 target, u32 code)
 }
 
 static HSD_GObj objects[2];
+static HSD_GObj diagnostic_link_nodes[128];
 static HSD_GObjProc procs[3];
 static HSD_GObj* heads[SLIPPI_PARTICLE_GX_LINK_SLOTS];
 static HSD_GObj* tails[SLIPPI_PARTICLE_GX_LINK_SLOTS];
@@ -233,6 +235,15 @@ static HSD_GObj main_camera, flash_camera, ground_camera, magnify_camera;
 static HSD_GObj hud_camera, nametag_camera, hud_light_gobj, hud_jobj_gobj;
 static HSD_GObj ifcoget_camera, ifcoget_jobj_gobj;
 static HSD_CObj cobj_ifcoget;
+#define SOURCE_GRAPH_NODE_CAPACITY 160
+typedef struct SourceGraphSnapshot {
+    HSD_GObj* nodes[SOURCE_GRAPH_NODE_CAPACITY];
+    HSD_GObj copies[SOURCE_GRAPH_NODE_CAPACITY];
+    size_t count;
+    HSD_GObj* heads[SLIPPI_PARTICLE_GX_LINK_SLOTS];
+    HSD_GObj* tails[SLIPPI_PARTICLE_GX_LINK_SLOTS];
+    unsigned allocator_used;
+} SourceGraphSnapshot;
 static SlippiParticlePassSource source;
 static SlippiParticlePassVisit plan[32];
 static char error[256];
@@ -355,6 +366,65 @@ static void camera_init(HSD_GObj* camera, HSD_CObj* cobj,
     if (proc) proc_init(proc, camera, process_link, process_callback);
 }
 
+static void assert_unknown_camera_refusal(const HSD_GObj* camera)
+{
+    char expected[sizeof(error)];
+    assert(snprintf(expected, sizeof(expected),
+                    "Source camera callback has no verified particle schedule "
+                    "(owner=%p callback=0x%" PRIxPTR " gx_link=%u "
+                    "render_priority=%u obj_kind=%u gxlink_prios=0x%" PRIx64 ")",
+                    (const void*) camera, (uintptr_t) camera->render_cb,
+                    (unsigned) camera->gx_link,
+                    (unsigned) camera->render_priority,
+                    (unsigned) camera->obj_kind, camera->gxlink_prios) > 0);
+    assert(strcmp(error, expected) == 0);
+}
+
+static void source_graph_add(SourceGraphSnapshot* snapshot, HSD_GObj* node)
+{
+    assert(snapshot->count < SOURCE_GRAPH_NODE_CAPACITY);
+    snapshot->nodes[snapshot->count] = node;
+    memcpy(&snapshot->copies[snapshot->count], node, sizeof(*node));
+    ++snapshot->count;
+}
+
+static void source_graph_snapshot(SourceGraphSnapshot* snapshot,
+                                  HSD_GObj* extra)
+{
+    size_t index;
+    memset(snapshot, 0, sizeof(*snapshot));
+    memcpy(snapshot->heads, heads, sizeof(heads));
+    memcpy(snapshot->tails, tails, sizeof(tails));
+    snapshot->allocator_used = gobj_alloc_data.used;
+    source_graph_add(snapshot, &objects[0]);
+    source_graph_add(snapshot, &objects[1]);
+    source_graph_add(snapshot, &main_camera);
+    source_graph_add(snapshot, &flash_camera);
+    source_graph_add(snapshot, &ground_camera);
+    source_graph_add(snapshot, &magnify_camera);
+    source_graph_add(snapshot, &hud_camera);
+    source_graph_add(snapshot, &nametag_camera);
+    source_graph_add(snapshot, &ifcoget_camera);
+    source_graph_add(snapshot, &hud_light_gobj);
+    source_graph_add(snapshot, &hud_jobj_gobj);
+    source_graph_add(snapshot, &ifcoget_jobj_gobj);
+    for (index = 0; index < sizeof(diagnostic_link_nodes) /
+                           sizeof(diagnostic_link_nodes[0]); ++index)
+        source_graph_add(snapshot, &diagnostic_link_nodes[index]);
+    if (extra) source_graph_add(snapshot, extra);
+}
+
+static void source_graph_assert_unchanged(const SourceGraphSnapshot* snapshot)
+{
+    size_t index;
+    assert(gobj_alloc_data.used == snapshot->allocator_used);
+    assert(memcmp(heads, snapshot->heads, sizeof(heads)) == 0);
+    assert(memcmp(tails, snapshot->tails, sizeof(tails)) == 0);
+    for (index = 0; index < snapshot->count; ++index)
+        assert(memcmp(snapshot->nodes[index], &snapshot->copies[index],
+                      sizeof(snapshot->copies[index])) == 0);
+}
+
 static void reset_fixture(void)
 {
     memset(heads, 0, sizeof(heads));
@@ -362,6 +432,7 @@ static void reset_fixture(void)
     cpu_active = 0;
     assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
     memset(&source, 0, sizeof(source));
+    memset(diagnostic_link_nodes, 0, sizeof(diagnostic_link_nodes));
     memset(&cm_80452C68, 0, sizeof(cm_80452C68));
     memset(&gobj_alloc_data, 0, sizeof(gobj_alloc_data));
     lbl_80433658.x44 = &flash_camera;
@@ -558,6 +629,7 @@ static void test_source_schedule_and_ordinary_wrappers(void)
 static void test_source_schedule_revalidation_and_ptcl_refusal(void)
 {
     unsigned prepared;
+    SourceGraphSnapshot graph;
     HSD_GObj owner, unsupported;
     HSD_GObjProc owner_proc;
     HSD_JObj root;
@@ -596,23 +668,79 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
     cpu_active = 1; cpu_token = 1005;
     assert(slippi_particle_source_prepare(105, cpu_token, error, sizeof(error)));
     prepared = helper_prepare_calls;
-    lbl_80433658.x44 = &nametag_camera;
+    ground_camera.render_cb = HSD_GObj_803910D8;
+    ground_camera.gxlink_prios = 0x20000;
+    source_graph_snapshot(&graph, NULL);
     assert(!slippi_particle_source_draw_begin(105, cpu_token, error,
                                               sizeof(error)));
-    {
-        static const char prefix[] =
-            "Source camera callback has no verified particle schedule";
-        assert(strncmp(error, prefix, sizeof(prefix) - 1) == 0);
-    }
-    assert(strstr(error, "(owner="));
-    assert(strstr(error, "callback=0x"));
-    assert(strstr(error, "gx_link=64"));
-    assert(strstr(error, "render_priority=10"));
-    assert(strstr(error, "obj_kind=19"));
-    assert(strstr(error, "gxlink_prios=0x10000"));
+    assert_unknown_camera_refusal(&ground_camera);
     assert(helper_prepare_calls == prepared && helper_draw_begin_calls == 0);
+    assert(actual_count == 0 && draw_order_count == 0);
+    source_graph_assert_unchanged(&graph);
     cpu_active = 0;
     assert(!slippi_particle_source_world_end(105));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    assert(slippi_particle_source_world_begin(109));
+    cpu_active = 1; cpu_token = 1009;
+    assert(slippi_particle_source_prepare(109, cpu_token, error, sizeof(error)));
+    prepared = helper_prepare_calls;
+    {
+        HSD_GObj invalid_link;
+        HSD_GObj* unvisited_link = &diagnostic_link_nodes[0];
+        memset(&invalid_link, 0, sizeof(invalid_link));
+        invalid_link.render_cb = HSD_GObj_JObjCallback;
+        invalid_link.obj_kind = HSD_GObj_JObjKind;
+        invalid_link.hsd_obj = &hud_jobj;
+        unvisited_link->render_cb = HSD_GObj_JObjCallback;
+        unvisited_link->obj_kind = HSD_GObj_JObjKind;
+        unvisited_link->hsd_obj = &hud_jobj;
+        append_link(17, &invalid_link);
+        append_link(17, unvisited_link);
+        invalid_link.prev_gx = &objects[0];
+        gobj_alloc_data.used = 14;
+        ground_camera.render_cb = HSD_GObj_803910D8;
+        ground_camera.gxlink_prios = 0x20000;
+        source_graph_snapshot(&graph, &invalid_link);
+        assert(!slippi_particle_source_draw_begin(109, cpu_token, error,
+                                                  sizeof(error)));
+        assert_unknown_camera_refusal(&ground_camera);
+        source_graph_assert_unchanged(&graph);
+    }
+    assert(helper_prepare_calls == prepared && helper_draw_begin_calls == 0);
+    assert(actual_count == 0 && draw_order_count == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(109));
+
+    reset_fixture();
+    prepare_schedule_cameras();
+    assert(slippi_particle_source_world_begin(110));
+    cpu_active = 1; cpu_token = 1010;
+    assert(slippi_particle_source_prepare(110, cpu_token, error, sizeof(error)));
+    prepared = helper_prepare_calls;
+    for (unsigned index = 0; index < sizeof(diagnostic_link_nodes) /
+                                      sizeof(diagnostic_link_nodes[0]); ++index) {
+        HSD_GObj* link_node = &diagnostic_link_nodes[index];
+        link_node->classifier = HSD_GOBJ_CLASS_EFFECT;
+        link_node->obj_kind = HSD_GObj_JObjKind;
+        link_node->hsd_obj = &hud_jobj;
+        link_node->render_cb = HSD_GObj_JObjCallback;
+        append_link(17, link_node);
+    }
+    gobj_alloc_data.used = 12 + (unsigned) (sizeof(diagnostic_link_nodes) /
+                                             sizeof(diagnostic_link_nodes[0]));
+    ground_camera.render_cb = HSD_GObj_803910D8;
+    ground_camera.gxlink_prios = 0x20000;
+    source_graph_snapshot(&graph, NULL);
+    assert(!slippi_particle_source_draw_begin(110, cpu_token, error,
+                                              sizeof(error)));
+    assert_unknown_camera_refusal(&ground_camera);
+    assert(helper_prepare_calls == prepared && helper_draw_begin_calls == 0);
+    assert(actual_count == 0 && draw_order_count == 0);
+    source_graph_assert_unchanged(&graph);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(110));
 
     reset_fixture();
     prepare_schedule_cameras();

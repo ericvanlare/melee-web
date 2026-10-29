@@ -32,6 +32,31 @@ SOURCE_PINS = {
     PROFILE / "effect_matrix.c": "928edfb6524bc45fbfba2393bda1c765069352d2ea53587112f97a08749ba570",
 }
 
+PARTICLE_SOURCE_DIAG_PREFIX = "MELEE_PARTICLE_SOURCE_DIAG_V1"
+
+
+def particle_source_diagnostics(output):
+    groups = {}
+    current = None
+    for line in output.splitlines():
+        if not line.startswith(PARTICLE_SOURCE_DIAG_PREFIX + " "):
+            continue
+        fields = {}
+        for item in line.split()[1:]:
+            if "=" in item:
+                key, value = item.split("=", 1)
+                fields[key] = value
+        if fields.get("event") == "begin":
+            current = int(fields["world"])
+            if current in groups:
+                raise AssertionError(f"duplicate particle diagnostic for world {current}")
+            groups[current] = [fields]
+        elif current is not None:
+            groups[current].append(fields)
+            if fields.get("event") == "end":
+                current = None
+    return groups
+
 STUBS = {
     "Runtime/platform.h": r'''#ifndef FIXTURE_PLATFORM_H
 #define FIXTURE_PLATFORM_H
@@ -474,7 +499,9 @@ class ParticlePassPlanTests(unittest.TestCase):
             command = [
                 compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
                 "-Wno-unused-parameter", "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1",
-                "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-I" + str(include),
+                "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1",
+                "-DMELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET=12288",
+                "-I" + str(include),
                 "-I" + str(ROOT / "src"),
                 str(PROFILE / "particle_pass_plan.c"),
                 str(PROFILE / "particle_source_schedule.c"), str(fixture),
@@ -527,6 +554,69 @@ class ParticlePassPlanTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("actual-source particle camera dispatch", result.stdout)
+            diagnostics = particle_source_diagnostics(result.stdout)
+            self.assertEqual({102, 105, 109, 110, 200, 202}, set(diagnostics))
+            for world, rows in diagnostics.items():
+                block_bytes = sum(len(PARTICLE_SOURCE_DIAG_PREFIX + " " +
+                                      " ".join(f"{key}={value}" for key, value in row.items())) + 1
+                                  for row in rows)
+                self.assertLessEqual(block_bytes, 12288, f"world {world} exceeded output cap")
+                end = next(row for row in rows if row.get("event") == "end")
+                if world not in (109, 110):
+                    self.assertEqual("1", end["complete"])
+
+            complete = diagnostics[105]
+            begin = complete[0]
+            self.assertEqual("bind-camera-refusal", begin["boundary"])
+            self.assertEqual("105", begin["world"])
+            camera_rows = [row for row in complete if row.get("event") == "camera"]
+            self.assertEqual(7, len(camera_rows))
+            self.assertEqual("6", camera_rows[-1]["idx"])
+            self.assertTrue({"owner", "cobj", "classifier", "p_link", "p_priority",
+                             "gx_link", "render_priority", "obj_kind", "mask",
+                             "render_entry", "process_gobj", "process_entry"}
+                            .issubset(camera_rows[-1]))
+            complete_end = next(row for row in complete if row.get("event") == "end")
+            self.assertEqual("1", complete_end["complete"])
+            self.assertEqual("0", complete_end["overflow"])
+            self.assertEqual("0", complete_end["invalid_chain"])
+            self.assertEqual("0x0000000000038f90", complete_end["gx_union"])
+            gx_rows = [row for row in complete if row.get("event") == "gx-link"]
+            self.assertEqual(9, len(gx_rows))
+            self.assertEqual({4, 7, 8, 9, 10, 11, 15, 16, 17},
+                             {int(row["link"]) for row in gx_rows})
+            self.assertTrue(all({"owner", "classifier", "obj_kind", "p_link",
+                                 "p_priority", "render_priority", "attached",
+                                 "render_entry", "process_gobj", "process_child",
+                                 "process_link", "process_entry"}.issubset(row)
+                                for row in complete if row.get("event") == "gx-node"))
+            self.assertTrue(all(row["topology_complete"] == "1" and
+                                row["records_complete"] == "1"
+                                for row in gx_rows))
+
+            invalid = diagnostics[109]
+            self.assertEqual("109", invalid[0]["world"])
+            invalid_end = next(row for row in invalid if row.get("event") == "end")
+            self.assertEqual("0", invalid_end["complete"])
+            self.assertEqual("1", invalid_end["invalid_chain"])
+            invalid_gx17 = next(row for row in invalid
+                                if row.get("event") == "gx-link" and row.get("link") == "17")
+            self.assertEqual("1", invalid_gx17["visited"])
+            self.assertEqual("0", invalid_gx17["tail_reached"])
+            self.assertEqual("0", invalid_gx17["topology_complete"])
+
+            truncated = diagnostics[110]
+            self.assertEqual("110", truncated[0]["world"])
+            truncated_end = next(row for row in truncated if row.get("event") == "end")
+            self.assertEqual("0", truncated_end["complete"])
+            self.assertEqual("1", truncated_end["overflow"])
+            self.assertEqual("0", truncated_end["invalid_chain"])
+            truncated_gx17 = next(row for row in truncated
+                                  if row.get("event") == "gx-link" and row.get("link") == "17")
+            self.assertEqual("128", truncated_gx17["visited"])
+            self.assertEqual("1", truncated_gx17["tail_reached"])
+            self.assertEqual("1", truncated_gx17["topology_complete"])
+            self.assertEqual("0", truncated_gx17["records_complete"])
         except BaseException:
             print("Retained particle pass planner fixture:", scratch, flush=True)
             raise

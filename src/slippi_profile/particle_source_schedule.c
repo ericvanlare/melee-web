@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -296,6 +297,249 @@ static void source_base(SlippiParticlePassSource* source,
     /* This value records the verified source caller's SCREEN intent. The
      * planner does not observe or claim a current GPU render pass. */
     source->screen_render_pass = 1;
+}
+
+#ifndef MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET
+#define MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET (64u * 1024u)
+#endif
+#if MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET < 2048u
+#error "Particle source diagnostic budget must reserve detail and final records"
+#endif
+#define SOURCE_DIAG_FINAL_BUDGET 1024u
+#define SOURCE_DIAG_STATUS_BUDGET \
+    (MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET > 4096u \
+         ? MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET / 4u - 1024u \
+         : MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET / 4u)
+#define SOURCE_DIAG_DETAIL_BUDGET \
+    (MELEE_WEB_PARTICLE_SOURCE_DIAG_BUDGET - SOURCE_DIAG_STATUS_BUDGET - \
+     SOURCE_DIAG_FINAL_BUDGET)
+#define SOURCE_DIAG_LINE_CAP 512u
+
+typedef struct SourceDiagnostic {
+    size_t detail_bytes, status_bytes, final_bytes;
+    size_t camera_rows, gx_rows;
+    size_t camera_visited, gx_visited, gx_lists, gx_lists_walked;
+    uint64_t union_mask;
+    unsigned overflow, invalid_chain, unavailable, invalid_mask, output_error;
+} SourceDiagnostic;
+
+static int source_diag_line(SourceDiagnostic* diagnostic, unsigned bucket,
+                            const char* format, ...)
+{
+    char line[SOURCE_DIAG_LINE_CAP];
+    size_t* used;
+    size_t limit;
+    va_list args;
+    int length;
+    va_start(args, format);
+    length = vsnprintf(line, sizeof(line), format, args);
+    va_end(args);
+    if (length < 0 || (size_t) length >= sizeof(line)) {
+        diagnostic->overflow = 1;
+        return 0;
+    }
+    if (bucket == 0) {
+        used = &diagnostic->detail_bytes;
+        limit = SOURCE_DIAG_DETAIL_BUDGET;
+    } else if (bucket == 1) {
+        used = &diagnostic->status_bytes;
+        limit = SOURCE_DIAG_STATUS_BUDGET;
+    } else {
+        used = &diagnostic->final_bytes;
+        limit = SOURCE_DIAG_FINAL_BUDGET;
+    }
+    if (*used > limit || (size_t) length + 1 > limit - *used) {
+        diagnostic->overflow = 1;
+        return 0;
+    }
+    if (fwrite(line, 1, (size_t) length, stdout) != (size_t) length ||
+        fputc('\n', stdout) == EOF) {
+        diagnostic->output_error = 1;
+        return 0;
+    }
+    *used += (size_t) length + 1;
+    return 1;
+}
+
+/* Read-only first-refusal evidence. Topology walks remain bounded by the
+ * live allocator count; output has its own fixed cap and cannot claim complete
+ * when rows are omitted. GX rows describe authored-mask topology, not draws. */
+static void source_camera_diagnostic(uint64_t world, uint64_t interval,
+                                     const SlippiParticlePassSource* source,
+                                     const HSD_GObj* failed_camera)
+{
+    SourceDiagnostic diagnostic = { 0 };
+    const size_t live_bound = gobj_alloc_data.used;
+    const unsigned gx_max = HSD_GObjLibInitData.gx_link_max;
+    const unsigned camera_link = gx_max + 1;
+    const HSD_GObj* camera_head;
+    const HSD_GObj* camera_tail;
+    const HSD_GObj* object;
+    const HSD_GObj* previous = NULL;
+    size_t camera_rows = 0, camera_visited = 0;
+    unsigned camera_invalid = 0, camera_tail_reached = 0;
+    unsigned link;
+
+    (void) source_diag_line(
+        &diagnostic, 0,
+        "MELEE_PARTICLE_SOURCE_DIAG_V1 event=begin boundary=bind-camera-refusal "
+        "world=%" PRIu64 " interval=%" PRIu64 " bound=%zu gxmax=%u "
+        "failed_owner=%p failed_entry=0x%" PRIxPTR " failed_link=%u "
+        "failed_priority=%u failed_kind=%u failed_mask=0x%016" PRIx64,
+        world, interval, live_bound, gx_max, (const void*) failed_camera,
+        (uintptr_t) failed_camera->render_cb, (unsigned) failed_camera->gx_link,
+        (unsigned) failed_camera->render_priority,
+        (unsigned) failed_camera->obj_kind, failed_camera->gxlink_prios);
+    if (!live_bound || !source->gx_heads || !source->gx_tails || gx_max > 63 ||
+        source->gx_link_max != gx_max ||
+        (size_t) gx_max + 2 > source->gx_slot_count ||
+        (size_t) gx_max + 2 > SLIPPI_PARTICLE_GX_LINK_SLOTS) {
+        diagnostic.unavailable = 1;
+        goto finish;
+    }
+
+    camera_head = source->gx_heads[camera_link];
+    camera_tail = source->gx_tails[camera_link];
+    if ((camera_head == NULL) != (camera_tail == NULL)) camera_invalid = 1;
+    object = camera_head;
+    while (object) {
+        NodeProof proof;
+        unsigned canonical;
+        if (camera_visited >= live_bound) {
+            camera_invalid = 1;
+            break;
+        }
+        proof = node_proof(object);
+        if (proof.gx_link != camera_link || proof.previous != previous)
+            camera_invalid = 1;
+        diagnostic.union_mask |= proof.gxlink_priorities;
+        canonical = cobj_is_canonical(object) != 0;
+        if (source_diag_line(
+                &diagnostic, 0,
+                "MELEE_PARTICLE_SOURCE_DIAG_V1 event=camera idx=%zu owner=%p "
+                "next=%p prev=%p cobj=%p camera_kind=%u canonical_cobj=%u "
+                "classifier=0x%04x p_link=%u p_priority=%u gx_link=%u "
+                "render_priority=%u obj_kind=%u mask=0x%016" PRIx64 " "
+                "render_entry=0x%" PRIxPTR " process_gobj=%p "
+                "process_entry=0x%" PRIxPTR,
+                camera_visited, (const void*) proof.object,
+                (const void*) proof.next, (const void*) proof.previous,
+                proof.hsd_object, (unsigned) (object->obj_kind == HSD_GObj_CameraKind),
+                canonical, (unsigned) proof.classifier, (unsigned) proof.p_link,
+                (unsigned) proof.p_priority, (unsigned) proof.gx_link,
+                (unsigned) proof.render_priority, (unsigned) proof.object_kind,
+                proof.gxlink_priorities, (uintptr_t) proof.render_callback,
+                (const void*) proof.process_gobj,
+                (uintptr_t) proof.process_callback))
+            ++camera_rows;
+        ++camera_visited;
+        previous = object;
+        if (camera_invalid) break;
+        object = (const HSD_GObj*) proof.next;
+    }
+    camera_tail_reached = previous == camera_tail;
+    if (!camera_tail_reached || source->gx_heads[camera_link] != camera_head ||
+        source->gx_tails[camera_link] != camera_tail)
+        camera_invalid = 1;
+    if (camera_invalid) diagnostic.invalid_chain = 1;
+    diagnostic.camera_visited = camera_visited;
+    diagnostic.camera_rows = camera_rows;
+    (void) source_diag_line(
+        &diagnostic, 1,
+        "MELEE_PARTICLE_SOURCE_DIAG_V1 event=camera-end visited=%zu rows=%zu "
+        "bound=%zu tail_reached=%u topology_complete=%u records_complete=%u",
+        camera_visited, camera_rows, live_bound, camera_tail_reached,
+        !camera_invalid, camera_rows == camera_visited && !diagnostic.overflow);
+
+    {
+        uint64_t allowed_mask = gx_max == 63
+            ? UINT64_MAX : ((UINT64_C(1) << (gx_max + 1)) - 1);
+        if (diagnostic.union_mask & ~allowed_mask)
+            diagnostic.invalid_mask = 1;
+    }
+    for (link = 0; link <= gx_max; ++link) {
+        const HSD_GObj* head;
+        const HSD_GObj* tail;
+        const HSD_GObj* current;
+        const HSD_GObj* link_previous = NULL;
+        size_t visited = 0, rows = 0;
+        unsigned invalid = 0, tail_reached;
+        if (!(diagnostic.union_mask & (UINT64_C(1) << link))) continue;
+        ++diagnostic.gx_lists;
+        head = source->gx_heads[link];
+        tail = source->gx_tails[link];
+        if ((head == NULL) != (tail == NULL)) invalid = 1;
+        current = head;
+        while (current) {
+            NodeProof proof;
+            if (visited >= live_bound) {
+                invalid = 1;
+                break;
+            }
+            proof = node_proof(current);
+            if (proof.gx_link != link || proof.previous != link_previous)
+                invalid = 1;
+            if (source_diag_line(
+                    &diagnostic, 0,
+                    "MELEE_PARTICLE_SOURCE_DIAG_V1 event=gx-node link=%u idx=%zu "
+                    "owner=%p next=%p prev=%p classifier=0x%04x obj_kind=%u "
+                    "p_link=%u p_priority=%u render_priority=%u attached=%p "
+                    "render_entry=0x%" PRIxPTR " process_gobj=%p "
+                    "process_child=%p process_link=%u process_entry=0x%" PRIxPTR,
+                    link, visited, (const void*) proof.object,
+                    (const void*) proof.next, (const void*) proof.previous,
+                    (unsigned) proof.classifier, (unsigned) proof.object_kind,
+                    (unsigned) proof.p_link, (unsigned) proof.p_priority,
+                    (unsigned) proof.render_priority, proof.hsd_object,
+                    (uintptr_t) proof.render_callback,
+                    (const void*) proof.process_gobj,
+                    (const void*) proof.process_child, (unsigned) proof.process_link,
+                    (uintptr_t) proof.process_callback))
+                ++rows;
+            ++visited;
+            link_previous = current;
+            if (invalid) break;
+            current = (const HSD_GObj*) proof.next;
+        }
+        tail_reached = link_previous == tail;
+        if (!tail_reached || source->gx_heads[link] != head ||
+            source->gx_tails[link] != tail)
+            invalid = 1;
+        if (invalid) diagnostic.invalid_chain = 1;
+        ++diagnostic.gx_lists_walked;
+        diagnostic.gx_visited += visited;
+        diagnostic.gx_rows += rows;
+        (void) source_diag_line(
+            &diagnostic, 1,
+            "MELEE_PARTICLE_SOURCE_DIAG_V1 event=gx-link link=%u head=%p tail=%p "
+            "visited=%zu rows=%zu bound=%zu tail_reached=%u topology_complete=%u "
+            "records_complete=%u invalid_chain=%u",
+            link, (const void*) head, (const void*) tail, visited, rows,
+            live_bound, tail_reached, !invalid,
+            rows == visited && !diagnostic.overflow, invalid);
+    }
+
+finish:
+    {
+        unsigned complete = !diagnostic.overflow && !diagnostic.invalid_chain &&
+            !diagnostic.unavailable && !diagnostic.invalid_mask &&
+            !diagnostic.output_error &&
+            diagnostic.camera_rows == diagnostic.camera_visited &&
+            diagnostic.gx_rows == diagnostic.gx_visited &&
+            diagnostic.gx_lists == diagnostic.gx_lists_walked;
+        (void) source_diag_line(
+            &diagnostic, 2,
+            "MELEE_PARTICLE_SOURCE_DIAG_V1 event=end complete=%u overflow=%u "
+            "invalid_chain=%u unavailable=%u invalid_mask=%u output_error=%u "
+            "bound=%zu camera_visited=%zu camera_rows=%zu gx_union=0x%016" PRIx64 " "
+            "gx_lists=%zu gx_lists_walked=%zu gx_visited=%zu gx_rows=%zu",
+            complete, diagnostic.overflow, diagnostic.invalid_chain,
+            diagnostic.unavailable, diagnostic.invalid_mask,
+            diagnostic.output_error, live_bound, diagnostic.camera_visited,
+            diagnostic.camera_rows, diagnostic.union_mask, diagnostic.gx_lists,
+            diagnostic.gx_lists_walked, diagnostic.gx_visited, diagnostic.gx_rows);
+        (void) fflush(stdout);
+    }
 }
 
 static int bind_camera_role(HSD_GObj* camera,
@@ -602,6 +846,7 @@ static int build_schedule(Schedule* output, uint64_t world,
         event.proof = node_proof(node);
         if (!bind_camera_role(node, &camera_source, &main_seen, &kind,
                               error, error_size)) {
+            source_camera_diagnostic(world, interval, &base, node);
             free(one_visits);
             return 0;
         }

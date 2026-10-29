@@ -1343,8 +1343,12 @@ The constructor's camera pointer is local; its published pointer belongs to the
 separate UI object. The bounded repair adds an exact constructor/retirement receipt
 and checks of the selected GX10/GX15 callbacks. Its focused dispatch/lifetime
 control and three configured translation-unit syntax checks pass. Independent
-review permits one fixed-lifetime two-tick experiment; browser validation is
-pending. Results/reinitialization without actual retirement is still unsupported.
+review permits one fixed-lifetime two-tick experiment. The affected build passes
+at `7a1827e3`; the actual baseline then moves past IfCoGet and refuses the next
+camera (priority 11, mask `0x20000`), still before any comparison. The next reduced
+diagnostic will identify the complete remaining camera chain to avoid another
+one-camera-at-a-time capture loop. Results/reinitialization without actual
+retirement is still unsupported.
 Generic callback admission remains refused. No successful browser comparison is implied.
 The sticky owner failure remains visible during source and renderer close. All
 launched process IDs are independently absent and all nine runtime producer

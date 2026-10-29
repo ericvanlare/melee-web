@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "ACTUAL_IFCOGET_CAMERA_IDENTIFIED; strict baseline still refuses before all comparisons; bounded constructor-owner repair in progress",
+      "status": "IFCOGET_FIXED_INTERVAL_BUILD_PASS; actual baseline now refuses next camera before comparison",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9247,7 +9247,7 @@
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Review the exact IfCoGet constructor/lifetime receipt and selected GX10/GX15 callback guards; after focused and actual-TU checks, one unchanged strict two-tick browser attempt. No generic callback widening.",
+      "next": "Reduce complete actual match camera chain and finite source roles once, preserve first refusal; avoid per-camera capture loop.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9422,11 +9422,40 @@
         "ifcoget_candidate": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/ifcoget-camera-candidate-v1/freeze.json",
           "sha256": "4b0a0ef0f1ff36769e807bad6a0a3bf38f99055cce5828430b1a5fe606c29319",
-          "scope": "Exact constructor and actual GObj destruction observations; active-interval lifetime changes refuse before source mutation. GX10/GX15 retain bounded callback/tree checks. Focused actual-dispatch control and three configured TU syntax checks pass. Independent review permits only the strict fixed-lifetime experiment; Results/reinitialization without actual retirement remains unsupported.",
+          "scope": "Focused/syntax/build and independent fixed-interval review pass. Actual baseline moves past IfCoGet but refuses the next camera: priority11 mask0x20000. Zero compared domains; no final present. Source policy remains unchanged; new host receipt and expanded schedule storage are separately reviewed. Results/reinitialization without actual retirement remains unsupported.",
           "review": {
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/ifcoget-camera-luna-review-v1.json",
             "sha256": "7e45eb0174388904287f2bedfbbd8658aae85c4f46f828523d0b934cac21933a"
+          },
+          "runtime_head": "7a1827e33d0f5d5ca79386677fb3d02b68982b56",
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v9/result.json",
+            "sha256": "ecb9d1dc5204c9b0858f3ffc9b5bf8932eb68a02c2e9749c6b92b428a0ff91b9"
+          },
+          "browser_receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v5/result-receipt.json",
+            "sha256": "edd14d81182fd1e20e2862dfef82a9213171de965829d1444a652e9d71714bee"
+          },
+          "linked_configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v5/final-linked-configuration-v1.json",
+            "sha256": "157e907b76b17130af4adb1e2de617b7b941b4eb938e10491087462628dd2971"
+          },
+          "next_camera_source_join": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-v5-camera-source-join-luna-review-v1.json",
+            "sha256": "bc84c02b2a012a55a53c44d8c3adda2779b65f0b3e269a1a86ccc16867e3281a",
+            "limit": "Actual callback resolved; likely DevText constructor classifier21/p_link24, but source scene context alone does not prove runtime owner. Full chain diagnostic will distinguish DebugMenu alternative p_link20."
           }
+        },
+        "complete_boundary_diagnostic": {
+          "freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-complete-camera-chain-diag-luna-v1-20261029-rerun1/freeze.json",
+            "sha256": "15e7de6be39e22c9650ac8d50d3dbb82e4924549c900300c1158d5acbe89082c"
+          },
+          "review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/complete-camera-chain-diagnostic-sol-review-v1.json",
+            "sha256": "e4cb023b9ba6a8a09a6aa83cf9d332f37166ac914679274f0f98c29d5443b53d"
+          },
+          "scope": "Failure-only complete camera and authored-mask callback topology observer. Focused control passes complete/invalid/truncated semantics and unchanged refusal/source graph/helper/draw counts. Initial harness expected-world failure retained. No callback or preparation invocation; no admission or comparison changes. One diagnostic browser observation pending."
         }
       }
     }
