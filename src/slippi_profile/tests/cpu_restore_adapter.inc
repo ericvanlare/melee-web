@@ -89,6 +89,13 @@ uint32_t cpu_boundary(){
     return 0;
 }
 bool cpu_native_active(){return cpu_restore.state!=CpuRestoreControl::Idle;}
+struct CpuClassPieceTraceScope {
+    uint32_t command;
+    CpuClassPieceTraceScope(uint32_t command_,uint32_t scope,uint32_t frame,uint32_t sample)
+      :command(command_){melee_web_source_memory_class_piece_slab_trace_context(command,scope,frame,sample);}
+    ~CpuClassPieceTraceScope(){melee_web_source_memory_class_piece_slab_trace_context(
+        command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);}
+};
 uint32_t cpu_close(){
     if(cpu_restore.capsule)cpu_restore.capsule->disarm();
     cpu_restore.configured_statics.reset();
@@ -180,12 +187,19 @@ uint32_t cpu_execute_two(uint32_t command){
             return cpu_fail(0x4b3u,"first baseline boundary refused");
         if(!cpu_restore.capsule->begin_record(*match)||!cpu_two_interval())
             return cpu_fail(0x4b3u,"two-tick record interval refused");
-        const int result=melee_web_snapshot_step(300);cpu_two_raw(e.tick_pairs[0],false);
+        int result=0;{
+            CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame,300);
+            result=melee_web_snapshot_step(300);
+        }cpu_two_raw(e.tick_pairs[0],false);
         if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
             return cpu_fail(0x4b4u,"baseline sample300 refused");
         if(!cpu_two_diag(1)||e.diagnostics[0]!=e.diagnostics[1])return cpu_fail(0x4c4u,"baseline CPU300 drew");
         melee_web_tobj_writer_boundary(1,observation.frame);
-        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
+        int draw_result=0;{
+            CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.pre_frame+1u,300);
+            draw_result=melee_web_synctest_draw_present();
+        }
+        if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b5u,"baseline draw300 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
@@ -195,13 +209,20 @@ uint32_t cpu_execute_two(uint32_t command){
         if(cpu_restore.state!=C::Baseline0SubmittedTwo||payload_admission_boundary(true)!=0||
            !cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())return cpu_fail(0x4b6u,"baseline300 native idle refused");
         if(!cpu_two_diag(2))return cpu_fail(0x4c4u,"baseline300 idle diagnostics unavailable");
-        const int result=melee_web_snapshot_step(301);cpu_two_raw(e.tick_pairs[1],false);
+        int result=0;{
+            CpuClassPieceTraceScope trace(10,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame+1u,301);
+            result=melee_web_snapshot_step(301);
+        }cpu_two_raw(e.tick_pairs[1],false);
         if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.post_frame)||!cpu_two_interval())
             return cpu_fail(0x4b7u,"baseline sample301 refused");
         if(!cpu_two_diag(3)||e.diagnostics[2]!=e.diagnostics[3])return cpu_fail(0x4c4u,"baseline CPU301 drew");
         if(!cpu_restore.capsule->seal_post(*match))return cpu_fail(0x4b8u,"two-tick final CPU endpoint seal refused");
         melee_web_tobj_writer_boundary(2,observation.frame);
-        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
+        int draw_result=0;{
+            CpuClassPieceTraceScope trace(10,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.post_frame,301);
+            draw_result=melee_web_synctest_draw_present();
+        }
+        if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b9u,"baseline draw301 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
@@ -224,7 +245,11 @@ uint32_t cpu_execute_two(uint32_t command){
         rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
         for(unsigned i=0;i<2;++i){
             if(!cpu_two_interval())return cpu_fail(0x4bdu,"two-tick replay interval refused before step");
-            const int result=melee_web_snapshot_step(300u+i);auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
+            int result=0;{
+                CpuClassPieceTraceScope trace(11,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame+i,300u+i);
+                result=melee_web_snapshot_step(300u+i);
+            }
+            auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
             if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+i+1u)||!cpu_two_interval())
                 return cpu_fail(0x4bdu+i,"two-tick replay source boundary refused");
             if(!cpu_two_diag(5u+i)||e.diagnostics[4]!=e.diagnostics[5u+i])return cpu_fail(0x4c4u,"corrective CPU tick drew");
@@ -457,6 +482,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(command==5){if(cpu_restore.two_active)cpu_restore.two.last_command=5;return cpu_close();}
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
+    melee_web_source_memory_class_piece_slab_trace_context(
+        command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
     melee_web_lobj_writer_phase(command);
     melee_web_tobj_writer_phase(command);
     cpu_restore.inflight=true;uint32_t result=0;

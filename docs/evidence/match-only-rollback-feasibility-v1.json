@@ -8944,7 +8944,7 @@
           "sha256": "2fe8dd65ad9d5d92d81771ab0d1c18b2139301d113644df86c9882ea8ea0e29d"
         }
       },
-      "current_next_boundary": "V13 candidate keeps original-selected GPU palette names local to TObj setup. Focused ordered GX comparison and unchanged strict two-tick browser comparison required; no restoration policy change.",
+      "current_next_boundary": "Superseded by local_tlut_v13_result_20261029; historicalV12 receipts remain unchanged.",
       "raw_piece_caller_diagnostic_review": {
         "path": "rollback-renderer-resume-20261028-155740-eef0524c/raw-piece-callsite-source-sol-review-v1.json",
         "sha256": "b93bef10f6d4ea82446abf187207450ef8217a546f2f1aa3ca48daffbad0ab43",
@@ -8959,6 +8959,18 @@
         "archive": "rollback-renderer-resume-20261028-155740-eef0524c/raw-piece-caller-browser-archive/archive.json",
         "scope": "Strict1216 persists; capture-only original TLUT allocation caller4 confirmed; ten raw vectors match, finalpresent unrun. No live lifetime/writer authority."
       }
+    },
+    "local_tlut_v13_result_20261029": {
+      "source_commit": "eaeb99c985f64e78e01fc052bf8c7ee84c682bb8",
+      "receipt": "rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-local-tlut-v13-v1/result-receipt.json",
+      "receipt_sha256": "5293fb7b15fad3f64f86280f5b62fd45f3592dbb22105b30f87953c408ec1a8f",
+      "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-production-source-sol-review-v1.json",
+      "fixture_review": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-v13-root-fixture-review-v1.json",
+      "next_boundary_review": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-v13-next-boundary-sol-review-v1.json",
+      "next_boundary_review_sha256": "12859f799f3668ae8d2792df11d29fe935cbcce285c60bd190307077acb798b8",
+      "archive": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-v13-browser-archive/archive.json",
+      "scope": "Previous palette mismatch passed; strict1216 moves to row3015 offset836 with no live piece captured. Ten raw vectors match; finalpresent unrun. No complete browser rollback.",
+      "next": "Bounded target-slab metadata trace using existing allocator hooks; preserve frozen capture ledger and strict comparisons."
     }
   }
 }

@@ -11,6 +11,22 @@ static_assert(sizeof(PieceCell)==16);
 #if UINTPTR_MAX==UINT32_MAX
 static_assert(sizeof(PieceOwner)==120);
 #endif
+struct PieceSlabTraceEvent {
+ uint32_t kind,command,scope,frame,sample;
+ uint32_t row,row_source,row_requested,event_source,requested,physical,target_in_event,target_part;
+ uint32_t origin_site,stage,class_info,previous,inside_row;
+ uint64_t row_host,event_host,generation,epoch,world;
+};
+struct PieceSlabTrace {
+ uint32_t state=0,arm_status=0,closed=0,count=0,overflow=0;
+ uint32_t command=0,scope=MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,frame=0,sample=0;
+ uint32_t row=0,source=0,requested=0,target_offset=0,target_source=0;
+ uint64_t host=0,generation=0,epoch=0,world=0;
+ uint32_t compare_status=UINT32_MAX,joined=0,join_reason=0;
+ uint32_t difference_valid=0,difference_row=0,difference_offset=0,expected_byte=0,actual_byte=0;
+ PieceSlabTraceEvent events[32]{};
+} piece_slab_trace;
+static_assert(sizeof(PieceSlabTraceEvent)==112);
 constexpr uint32_t piece_live=0x80000000u,piece_units=0x03ffffffu;
 // states:0 unavailable,1 AwaitCold,2 Tracking,3 Armed,4 Refused.
 // reasons:1 unavailable,2 not-cold,3 bounds,4 missing,5 conflict,
@@ -102,6 +118,36 @@ void piece_origin(void* pointer,int32_t requested,uint32_t site) {
  }
  if(piece_event(12,row,p,uint32_t(requested),physical,c.origin_site,site))c.origin_site=site;
 }
+uint32_t piece_trace_rounded_extent(int32_t requested) {
+ if(requested<=0||static_cast<uint32_t>(requested)>UINT32_MAX-31u)return 0;
+ return (static_cast<uint32_t>(requested)+31u)&~31u;
+}
+void piece_slab_trace_event(uint32_t kind,void* pointer,int32_t requested,
+ uint32_t physical,uint32_t origin_site,uint32_t stage,
+ const void* info,const void* previous) {
+ auto& trace=piece_slab_trace;
+ if(trace.state!=2||trace.closed||!pointer||!physical)return;
+ const uintptr_t host=reinterpret_cast<uintptr_t>(pointer);
+ HostAllocation* row=find_host_allocation(host);
+ if(!row)return;
+ const uintptr_t displacement=host-row->host;
+ if(displacement>row->requested)return;
+ const uint64_t event_source64=uint64_t(row->source.value())+displacement;
+ const uint64_t event_end64=event_source64+physical;
+ const uint64_t target=trace.target_source;
+ if(event_source64>target||target>=event_end64||row->source.value()!=trace.source)return;
+ if(trace.count>=32){trace.overflow=1;return;}
+ const uint32_t req=requested>0?static_cast<uint32_t>(requested):0;
+ const bool inside=physical<=row->requested-displacement;
+ const uint32_t target_in_event=static_cast<uint32_t>(target-event_source64);
+ const uint32_t target_part=target_in_event<req?0u:(target_in_event<physical?1u:2u);
+ trace.events[trace.count++]={kind,trace.command,trace.scope,trace.frame,trace.sample,
+  static_cast<uint32_t>(row-allocations.data()),row->source.value(),row->requested,
+  static_cast<uint32_t>(event_source64),req,physical,target_in_event,target_part,origin_site,stage,
+  static_cast<uint32_t>(reinterpret_cast<uintptr_t>(info)),
+  static_cast<uint32_t>(reinterpret_cast<uintptr_t>(previous)),inside?1u:0u,
+  static_cast<uint64_t>(row->host),static_cast<uint64_t>(host),row->generation,owner_epoch,world_generation};
+}
 #endif
 }
 static_assert(sizeof(MeleeWebClassPieceAnchor)==40);
@@ -120,6 +166,7 @@ extern "C" void melee_web_class_piece_cold(const void* list,int32_t count) {
 }
 extern "C" void melee_web_class_piece_alloc(void* p,int32_t req,uint32_t extent) {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace_event(1,p,req,extent,0,0,nullptr,nullptr);
  piece_allocate(p,req,extent,1);
 #else
  (void)p;(void)req;(void)extent;
@@ -127,6 +174,7 @@ extern "C" void melee_web_class_piece_alloc(void* p,int32_t req,uint32_t extent)
 }
 extern "C" void melee_web_class_piece_origin(void* p,int32_t req,uint32_t site) {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace_event(4,p,req,piece_trace_rounded_extent(req),site,0,nullptr,nullptr);
  piece_origin(p,req,site);
 #else
  (void)p;(void)req;(void)site;
@@ -134,6 +182,7 @@ extern "C" void melee_web_class_piece_origin(void* p,int32_t req,uint32_t site) 
 }
 extern "C" void melee_web_class_piece_promote(void* p,int32_t req) {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace_event(2,p,req,piece_trace_rounded_extent(req),0,0,nullptr,nullptr);
  if(!active||piece_owner.reason)return;
  auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));
  if(!row||row->host!=reinterpret_cast<uintptr_t>(p)||req<=0||row->requested!=uint32_t(req)||(req&31)){
@@ -145,6 +194,7 @@ extern "C" void melee_web_class_piece_promote(void* p,int32_t req) {
 }
 extern "C" void melee_web_class_piece_free(void* p,int32_t req) {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace_event(3,p,req,piece_trace_rounded_extent(req),0,0,nullptr,nullptr);
  if(!active||!piece_owner.cells||piece_owner.reason||!p)return;
  HostAllocation* row=nullptr;uint32_t source=0,index=0;
  if(req<=0||uint32_t(req)>0x7fffffc0u||!piece_span(reinterpret_cast<uintptr_t>(p),(uint32_t(req)+31)&~31u,row,source,index)){
@@ -158,6 +208,7 @@ extern "C" void melee_web_class_piece_free(void* p,int32_t req) {
 }
 extern "C" void melee_web_class_piece_label(void* p,const void* info,int32_t size,uint32_t stage,const void* previous) {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace_event(5,p,size,piece_trace_rounded_extent(size),0,stage,info,previous);
  if(!active||!piece_owner.cells||piece_owner.reason)return;
  const uintptr_t tag=reinterpret_cast<uintptr_t>(info),host=reinterpret_cast<uintptr_t>(p);
  HostAllocation* row=nullptr;uint32_t source=0,index=0;

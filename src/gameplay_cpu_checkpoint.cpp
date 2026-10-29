@@ -81,6 +81,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         // Diagnostic arm is not a CPU-admission condition. It owns no source
         // memory, and its serial/table are never captured or restored.
         c->class_piece_anchor_=melee_web_class_piece_arm();
+        if(span==CpuCheckpointSpan::TwoTicks)
+            (void)melee_web_source_memory_class_piece_slab_trace_arm(
+                c->commit_.payload,c->class_piece_anchor_,0x80d2fd20u,1024u,836u);
 #if !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
         c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==CpuCheckpointSpan::TwoTicks?8u:1u);
 #endif
@@ -252,11 +255,13 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
             class_piece_witness_=melee_web_source_memory_class_piece_witness(post_payload_,payload,class_piece_anchor_);
             class_piece_capture_witness_=melee_web_source_memory_class_piece_capture_witness(commit_.payload,post_payload_,payload,class_piece_anchor_);
         }
+        melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
         comparison_={static_cast<std::uint32_t>(CpuComparisonDomain::Payload),payload.status,
             static_cast<std::uint32_t>(payload.allocation_index),static_cast<std::uint32_t>(payload.byte_offset),
             payload.expected_byte,payload.actual_byte,static_cast<std::uint32_t>(payload.host_address),
             payload.requested_bytes,payload.status==1?payload.admission_status:payload.source_address};phase_=Phase::Failed;return false;
     }
+    melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Payload);
     if(!check(CpuComparisonDomain::Flow,melee_web_match_flow_cpu_snapshot_matches(owner_.flow,post_flow_,nullptr,0)==1))return false;
     if(!matches_post_bytes(session,post_bytes_,audio_ranges_,audio_range_count_)){phase_=Phase::Failed;return false;}
@@ -327,6 +332,7 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Statics);return true;
 }
 void GameplayCpuCheckpoint::disarm() noexcept {
+    melee_web_source_memory_class_piece_slab_trace_early_close();
     slippi_tobj_anchor_disarm(commit_.tobj_anchor);
     slippi_lobj_anchor_disarm(commit_.lobj_anchor);
     melee_web_lobj_writer_disarm(lobj_writer_session_);

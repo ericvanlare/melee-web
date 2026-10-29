@@ -85,6 +85,35 @@ export async function recordCensusFailurePageState(report, page) {
   }
 }
 
+export async function recordClassPieceSlabTrace(report, page) {
+  let trace = {status: 'unavailable', reason: 'page unavailable'};
+  if (page) {
+    try {
+      // Native close may emit EARLY_CLOSE. Read its existing stdout buffer after
+      // close, without calling Wasm or turning diagnostics into browser errors.
+      trace = await page.evaluate(() => {
+        const logs = window.__slippiSynctest?.logs;
+        if (!Array.isArray(logs)) return {status: 'unavailable', reason: 'native log buffer unavailable'};
+        const prefix = 'MELEE_CLASS_PIECE_SLAB_TRACE ';
+        const lineLimit = 64, perLineLimit = 4096;
+        const lines = [];
+        let matchedLineCount = 0, truncated = false;
+        for (const row of logs) {
+          if (row?.stream !== 'stdout' || typeof row.line !== 'string' || !row.line.startsWith(prefix)) continue;
+          matchedLineCount++;
+          if (lines.length === lineLimit) { truncated = true; continue; }
+          if (row.line.length > perLineLimit) truncated = true;
+          lines.push(row.line.slice(0, perLineLimit));
+        }
+        return {status: truncated ? 'truncated' : lines.length ? 'retained' : 'no-output',
+          matchedLineCount, lineLimit, perLineLimit, lines};
+      });
+    } catch (error) { trace = {status: 'unavailable', reason: String(error)}; }
+  }
+  // Retention alone does not establish a complete or joined native trace.
+  report.nativeDiagnostics = {...report.nativeDiagnostics, classPieceSlabTrace: trace};
+}
+
 export function selectTobjFailureStatics(manifest) {
   // V9 keeps only bounded diagnostic scalars; never follow former owner arrays.
   return [['first_failure', 4], ['first_failure_line', 4],
@@ -889,6 +918,7 @@ async function main() {
         report.cleanup = {...(report.cleanup || {}), renderer: closed};
       } catch (error) { cleanupFailures.push({step: 'renderer-close', error: String(error)}); }
     }
+    await recordClassPieceSlabTrace(report, page);
     if (browserCdp) {
       try {
         const finalInventory = await browserCdp.send('SystemInfo.getProcessInfo');

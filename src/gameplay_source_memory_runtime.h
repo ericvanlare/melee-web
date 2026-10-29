@@ -220,6 +220,25 @@ MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_wit
 MeleeWebClassPieceWitness melee_web_source_memory_class_piece_witness(
  const MeleeWebSourceMemoryPayloadSnapshot*,MeleeWebSourcePayloadComparison,MeleeWebClassPieceAnchor);
 
+/* Bounded read-only trace of existing class-piece hooks around one exact
+ * payload-difference locator. This is diagnostic only: it never affects the
+ * allocator, PieceOwner ledger, source bytes, or CPU comparison. */
+enum MeleeWebClassPieceSlabTraceScope {
+    MELEE_WEB_CLASS_PIECE_TRACE_COMMAND = 0,
+    MELEE_WEB_CLASS_PIECE_TRACE_STEP = 1,
+    MELEE_WEB_CLASS_PIECE_TRACE_DRAW = 2
+};
+int melee_web_source_memory_class_piece_slab_trace_arm(
+    const MeleeWebSourceMemoryPayloadSnapshot*, MeleeWebClassPieceAnchor,
+    uint32_t locator_source, uint32_t locator_extent, uint32_t target_offset);
+void melee_web_source_memory_class_piece_slab_trace_context(
+    uint32_t command, uint32_t scope, uint32_t frame, uint32_t sample);
+void melee_web_source_memory_class_piece_slab_trace_finalize(
+    const MeleeWebSourceMemoryPayloadSnapshot* pre,
+    const MeleeWebSourceMemoryPayloadSnapshot* post,
+    MeleeWebSourcePayloadComparison original);
+void melee_web_source_memory_class_piece_slab_trace_early_close(void);
+
 #ifdef __cplusplus
 }
 #endif

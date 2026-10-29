@@ -110,8 +110,63 @@ class SourceClassPieceTests(OwnedWorkspaceTests):
             if active:inputs += [ROOT/"src/source_address_context.cpp",ROOT/"src/source_game_heap_context.cpp"]
             run(mode+"-link",[em/"em++","-std=c++17","-O1","-fexceptions",*common,*flags,*inputs,
                               "-Wl,--wrap=calloc","-sDISABLE_EXCEPTION_CATCHING=0","-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-o",js])
-            for case in (["origin","origin-duplicate","origin-unknown","raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm",*["capture-"+x for x in ["armed","frozen","reuse","disarm","duplicate","topology","descriptor","amnesia","serial","wrong-header","stale-row","extent","anchor","cold","driftserial","bounds","pending","null-class","raw","missing","mirror","retired","recreated"]]] if active else ["inactive"]):
+            for case in (["origin","origin-duplicate","origin-unknown","raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm",*["capture-"+x for x in ["armed","frozen","reuse","disarm","duplicate","topology","descriptor","amnesia","serial","wrong-header","stale-row","extent","anchor","cold","driftserial","bounds","pending","null-class","raw","missing","mirror","retired","recreated","trace-positive","trace-close","trace-overflow","trace-unavailable","trace-nojoin"]]] if active else ["inactive"]):
                 result=run(mode+"-"+case,[node_runtime(),js,case])
+                if active and case in ("capture-trace-positive","capture-trace-close","capture-trace-overflow","capture-trace-unavailable","capture-trace-nojoin"):
+                    prefix="MELEE_CLASS_PIECE_SLAB_TRACE "
+                    lines=[line[len(prefix):] for line in result.stdout.splitlines() if line.startswith(prefix)]
+                    self.assertTrue(lines,"trace output is present on the retained native stdout path")
+                    self.assertLessEqual(len(lines),33,"one summary plus the fixed 32-event cap")
+                    self.assertTrue(all(len(line)<=4096 for line in lines),"each record fits retained stdout bound")
+                    records=[json.loads(line) for line in lines]
+                    summaries=[record for record in records if record.get("type")=="summary"]
+                    events=[record for record in records if record.get("type")=="event"]
+                    self.assertEqual(len(summaries),1,"close/finalize emits one summary")
+                    summary=summaries[0]
+                    self.assertEqual(len(events),summary["event_count"])
+                    self.assertLessEqual(summary["event_count"],32)
+                    if case=="capture-trace-positive":
+                        self.assertTrue(summary["joined"])
+                        self.assertEqual(summary["join_reason"],"EXACT_FINAL_WITNESS_JOIN")
+                        self.assertTrue(summary["complete"])
+                        self.assertFalse(summary["overflow"])
+                        self.assertEqual(summary["comparison"],"MISMATCH")
+                        matching=[event for event in events if event["kind_name"]=="FREE"]
+                        self.assertTrue(matching,"actual class free is observed")
+                        event=matching[0]
+                        self.assertEqual((event["command"],event["scope"],event["frame"],event["sample"]),(9,"STEP",176,300))
+                        self.assertEqual((event["requested_extent"],event["physical_extent"],event["target_part"]),(48,64,"PHYSICAL_PADDING"))
+                        self.assertRegex(event["row_host"],r"^0x[0-9a-f]{16}$")
+                        self.assertRegex(event["generation"],r"^0x[0-9a-f]{16}$")
+                        self.assertEqual(event["row_host"],summary["row_host"])
+                    elif case=="capture-trace-close":
+                        self.assertEqual(summary["close_status"],0)
+                        self.assertIsNone(summary["comparison_status"])
+                        self.assertFalse(summary["joined"])
+                        self.assertEqual(summary["join_reason"],"EARLY_CLOSE")
+                        self.assertFalse(summary["complete"])
+                    elif case=="capture-trace-overflow":
+                        self.assertTrue(summary["joined"],"identity join may remain useful despite event overflow")
+                        self.assertEqual(summary["join_reason"],"OVERFLOW_INCONCLUSIVE")
+                        self.assertTrue(summary["overflow"])
+                        self.assertFalse(summary["complete"])
+                        self.assertEqual(summary["event_count"],32)
+                    elif case=="capture-trace-unavailable":
+                        self.assertEqual(summary["arm_status"],2)
+                        self.assertEqual(summary["arm"],"UNAVAILABLE")
+                        self.assertEqual(summary["join_reason"],"ARM_UNAVAILABLE")
+                        self.assertFalse(summary["joined"])
+                        self.assertEqual(summary["comparison"],"EQUAL")
+                        self.assertEqual(summary["event_count"],0)
+                        self.assertFalse(summary["complete"])
+                    else:
+                        self.assertEqual(summary["arm_status"],1)
+                        self.assertFalse(summary["joined"],"a different exact-diff offset cannot join the selected target")
+                        self.assertTrue(summary["difference_valid"])
+                        self.assertEqual(summary["difference_offset"],summary["target_offset"]+1)
+                        self.assertEqual(summary["comparison"],"MISMATCH")
+                        self.assertEqual(summary["join_reason"],"CANDIDATE_WITNESS_MISMATCH")
+                        self.assertEqual(summary["event_count"],1)
                 if active and case=="capture-frozen":
                     marker="ACTUAL_CLASS_CAPTURE_BASE64="
                     values=[line[len(marker):] for line in result.stdout.splitlines() if line.startswith(marker)]

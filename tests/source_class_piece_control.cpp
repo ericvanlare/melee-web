@@ -135,6 +135,72 @@ int main(int argc,char** argv){
   hsdFreeMemPiece(next,32);
   auto* pre=snapshot();auto* post=snapshot();auto anchor=melee_web_class_piece_arm();
   check(anchor.ready,"capture ready");const uint64_t frozen=cell_hash();
+  if(!std::strcmp(mode,"capture-trace-positive")||!std::strcmp(mode,"capture-trace-close")||
+     !std::strcmp(mode,"capture-trace-overflow")||!std::strcmp(mode,"capture-trace-unavailable")||
+     !std::strcmp(mode,"capture-trace-nojoin")){
+   auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(p));
+   check(row&&reinterpret_cast<uintptr_t>(p)>=row->host,"trace target row");
+   const uint32_t target_offset=static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)-row->host)+60u;
+   check(target_offset<row->requested,"trace target remains inside selected slab row");
+   if(!std::strcmp(mode,"capture-trace-unavailable")){
+    check(melee_web_source_memory_class_piece_slab_trace_arm(pre,anchor,row->source.value()+1u,row->requested,target_offset)==0,
+          "wrong locator is explicitly unavailable");
+    const auto comparison=melee_web_source_memory_payload_snapshot_compare_live(post);
+    check(comparison.status==0,"unavailable trace does not alter source payload");
+    melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+    melee_web_source_memory_class_piece_slab_trace_finalize(pre,post,comparison);
+    return 0;
+   }
+   check(melee_web_source_memory_class_piece_slab_trace_arm(pre,anchor,row->source.value(),row->requested,target_offset)==1,
+         "same-run trace arm selects exact captured row");
+   if(!std::strcmp(mode,"capture-trace-positive")){
+    melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+    hsdFreeMemPiece(p,48);auto* reused=static_cast<unsigned char*>(hsdNew(&a));
+    check(reused==p,"actual class free/reuse keeps source target");
+    melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+    check(cell_hash()==frozen,"trace observation leaves frozen PieceOwner cells unchanged");
+    melee_web_source_memory_payload_snapshot_destroy(post);post=snapshot();
+    p[60]^=1;const auto comparison=melee_web_source_memory_payload_snapshot_compare_live(post);
+    check(comparison.status==2&&comparison.byte_offset==target_offset&&comparison.expected_byte!=comparison.actual_byte,
+          "original strict comparator identifies target byte after actual class reuse");
+    melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+    melee_web_source_memory_class_piece_slab_trace_finalize(pre,post,comparison);
+    check(melee_web_source_memory_healthy(),"trace remains independent of source-memory health");
+    return 0;
+   }
+   if(!std::strcmp(mode,"capture-trace-close")){
+    melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+    melee_web_class_piece_free(p,48);
+    melee_web_source_memory_class_piece_slab_trace_early_close();
+    melee_web_source_memory_class_piece_slab_trace_early_close();
+    check(cell_hash()==frozen,"early trace close does not rewrite PieceOwner cells");
+    return 0;
+   }
+   if(!std::strcmp(mode,"capture-trace-nojoin")){
+    melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+    melee_web_class_piece_free(p,48);
+    check(cell_hash()==frozen,"nonmatching target event leaves PieceOwner cells unchanged");
+    melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+    p[61]^=1;
+    const auto comparison=melee_web_source_memory_payload_snapshot_compare_live(post);
+    check(comparison.status==2&&comparison.byte_offset==target_offset+1u,"strict comparator identifies a different offset");
+    melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+    melee_web_source_memory_class_piece_slab_trace_finalize(pre,post,comparison);
+    return 0;
+   }
+   melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+   for(unsigned i=0;i<33;++i)melee_web_class_piece_free(p,48);
+   check(cell_hash()==frozen,"overflow trace leaves PieceOwner cells unchanged");
+   check(melee_web_source_memory_payload_snapshot_compare_live(pre).status==0,
+         "diagnostic class callbacks leave source payload bytes unchanged");
+   melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+   melee_web_source_memory_payload_snapshot_destroy(post);post=snapshot();p[60]^=1;
+   const auto comparison=melee_web_source_memory_payload_snapshot_compare_live(post);
+   check(comparison.status==2&&comparison.byte_offset==target_offset,"overflow fixture retains strict mismatch");
+   melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+   melee_web_source_memory_class_piece_slab_trace_finalize(pre,post,comparison);
+   return 0;
+  }
   raw_target[target_offset]^=1;
   if(!std::strcmp(mode,"capture-armed")){
    auto w=capture_query(pre,post,anchor);check(w.status==1&&w.live_reason==0&&w.scope==1&&w.class_info==reinterpret_cast<uintptr_t>(&a),"armed capture-only");

@@ -1225,8 +1225,16 @@ vector comparisons still agree. This is allocation-caller evidence at capture,
 not a current lifetime or observed-writer claim. The next private V13 candidate
 keeps that slot name local to original TObj setup, with the same ordered GPU
 commands and eight-entry palette selection. Strict source comparison remains
-unchanged; V13 has not yet run in the browser. The exact V12 diagnostic producer,
-failed evidence and cleanup are retained.
+unchanged. At `eaeb99c9`, V13 passes the focused original/private ordered GX
+comparison and reaches command 11 in the browser. Strict payload comparison now
+stops at a different allocation: row 3015, offset 836. The frozen capture ledger
+has no live class-piece record covering that byte; this alone does not identify
+its writer or later lifetime. All ten final raw vector comparisons agree; final
+present remains unrun. Snapshot close and renderer shutdown succeed, CPU close
+retains 1216, and all recorded owned processes are absent. Both exact producers
+and failed runs are retained. Next is a bounded target-slab allocation trace to
+distinguish later draw-time allocation from a writer without a recorded allocation,
+without changing the frozen ledger or comparing away source bytes.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

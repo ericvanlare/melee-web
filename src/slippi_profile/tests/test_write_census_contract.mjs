@@ -6,7 +6,7 @@ import vm from 'node:vm';
 import {webcrypto} from 'node:crypto';
 import {decodeDrawDiagnostics} from './runner_contract.mjs';
 import {assembleCompletedCensusExecution, recordFailedCensusExecution,
-  recordCensusFailurePageState,
+  recordCensusFailurePageState, recordClassPieceSlabTrace,
   selectTobjFailureStatics, recordTobjFailureStatics,
   validateCensusDrawSample, validateCpuRestoreRouteSelection, validateBrowserProfileForRoute} from './run_write_census.mjs';
 import {
@@ -60,6 +60,59 @@ test('unavailable failure logs remain explicit and do not replace the original e
   });
   assert.equal(report.browserPageState.logs, null);
   assert.equal(report.failure, original);
+});
+
+test('class-piece trace retains only exact native stdout prefix without calling Wasm', async () => {
+  const prefix = 'MELEE_CLASS_PIECE_SLAB_TRACE ';
+  const expected = [prefix + '{"kind":"event"}', prefix + '{"status":"EARLY_CLOSE"}'];
+  const context = vm.createContext({window: {__slippiSynctest: {
+    logs: [
+      {stream: 'stdout', line: expected[0]},
+      {stream: 'stderr', line: prefix + '{"unexpected":true}'},
+      {stream: 'stdout', line: 'noise ' + prefix},
+      {stream: 'stdout', line: 'MELEE_CLASS_PIECE_SLAB_TRACE_OTHER {}'},
+      {stream: 'stdout', line: expected[1]},
+    ],
+    get module() { throw new Error('must not call closed Wasm'); },
+  }}});
+  const page = {evaluate: async callback => JSON.parse(JSON.stringify(
+    vm.runInContext(`(${callback.toString()})()`, context)))};
+  const report = {result: 'failed', failure: {message: 'original 1216'}, nativeDiagnostics: {other: 7}};
+  const failure = report.failure;
+  await recordClassPieceSlabTrace(report, page);
+  assert.equal(report.nativeDiagnostics.classPieceSlabTrace.status, 'retained');
+  assert.deepEqual(report.nativeDiagnostics.classPieceSlabTrace.lines, expected);
+  assert.equal(report.nativeDiagnostics.classPieceSlabTrace.matchedLineCount, 2);
+  assert.equal(report.nativeDiagnostics.other, 7);
+  assert.equal(report.failure, failure);
+  assert.equal(report.result, 'failed');
+  context.window.__slippiSynctest.logs = [];
+  await recordClassPieceSlabTrace(report, page);
+  assert.equal(report.nativeDiagnostics.classPieceSlabTrace.status, 'no-output');
+  delete context.window.__slippiSynctest.logs;
+  await recordClassPieceSlabTrace(report, page);
+  assert.equal(report.nativeDiagnostics.classPieceSlabTrace.status, 'unavailable');
+});
+
+test('class-piece trace reports unavailable or truncated retention without replacing failure', async () => {
+  const report = {failure: {message: 'original failure'}};
+  const failure = report.failure;
+  await recordClassPieceSlabTrace(report, null);
+  assert.equal(report.nativeDiagnostics.classPieceSlabTrace.status, 'unavailable');
+  await recordClassPieceSlabTrace(report, {evaluate: async () => { throw new Error('page closed'); }});
+  assert.match(report.nativeDiagnostics.classPieceSlabTrace.reason, /page closed/);
+  const context = vm.createContext({window: {__slippiSynctest: {
+    logs: Array.from({length: 65}, () => ({stream: 'stdout',
+      line: 'MELEE_CLASS_PIECE_SLAB_TRACE ' + 'x'.repeat(4096)})),
+  }}});
+  await recordClassPieceSlabTrace(report, {evaluate: async callback => JSON.parse(JSON.stringify(
+    vm.runInContext(`(${callback.toString()})()`, context)))});
+  const trace = report.nativeDiagnostics.classPieceSlabTrace;
+  assert.equal(trace.status, 'truncated');
+  assert.equal(trace.matchedLineCount, 65);
+  assert.equal(trace.lines.length, 64);
+  assert.ok(trace.lines.every(line => line.length === 4096));
+  assert.equal(report.failure, failure);
 });
 
 function tobjFailureManifest() {

@@ -8,6 +8,7 @@
 #include "source_game_heap_context.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
@@ -1230,6 +1231,164 @@ extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_
  (void)pre;(void)anchor;r.reason=1;
 #endif
  return r;
+}
+
+namespace {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+const char* piece_slab_trace_arm_name(uint32_t status) {
+ return status==1?"ARMED":(status==2?"UNAVAILABLE":"NOT_REQUESTED");
+}
+const char* piece_slab_trace_scope_name(uint32_t scope) {
+ return scope==MELEE_WEB_CLASS_PIECE_TRACE_STEP?"STEP":
+        (scope==MELEE_WEB_CLASS_PIECE_TRACE_DRAW?"DRAW":"COMMAND");
+}
+const char* piece_slab_trace_kind_name(uint32_t kind) {
+ switch(kind){case 1:return "ALLOC";case 2:return "PROMOTE";case 3:return "FREE";
+ case 4:return "ORIGIN";case 5:return "LABEL";default:return "UNKNOWN";}
+}
+const char* piece_slab_trace_target_part_name(uint32_t part) {
+ return part==0?"REQUESTED":(part==1?"PHYSICAL_PADDING":"UNKNOWN");
+}
+void piece_slab_trace_emit(uint32_t close_status) {
+ auto& t=piece_slab_trace;
+ const char* join_reason=t.overflow?"OVERFLOW_INCONCLUSIVE":
+  (t.joined?"EXACT_FINAL_WITNESS_JOIN":
+  (t.join_reason==1?"COMPARE_EQUAL":t.join_reason==2?"COMPARE_REFUSED":
+   t.join_reason==3?"ARM_UNAVAILABLE":t.join_reason==4?"CANDIDATE_IDENTITY_MISMATCH":
+   t.join_reason==5?"FINAL_WITNESS_MISMATCH":t.join_reason==6?"CANDIDATE_WITNESS_MISMATCH":
+   t.join_reason==7?"OVERFLOW_INCONCLUSIVE":t.join_reason==8?"EARLY_CLOSE":"UNJOINED"));
+ const char* compare_name=t.compare_status==0?"EQUAL":t.compare_status==1?"REFUSED":
+  t.compare_status==2?"MISMATCH":"NOT_RUN";
+ const char* compare_value=t.compare_status==UINT32_MAX?"null":
+  (t.compare_status==0?"0":t.compare_status==1?"1":t.compare_status==2?"2":"null");
+ std::printf("MELEE_CLASS_PIECE_SLAB_TRACE {\"type\":\"summary\",\"schema\":1,\"arm_status\":%u,\"arm\":\"%s\",\"close_status\":%u,\"comparison_status\":%s,\"comparison\":\"%s\",\"joined\":%s,\"join_reason\":\"%s\",\"event_count\":%u,\"event_limit\":32,\"overflow\":%s,\"complete\":%s,\"row\":%u,\"row_source\":\"0x%08x\",\"row_requested\":%u,\"target_offset\":%u,\"target_source\":\"0x%08x\",\"row_host\":\"0x%016llx\",\"row_generation\":\"0x%016llx\",\"owner_epoch\":\"0x%016llx\",\"world\":\"0x%016llx\",\"difference_valid\":%s,\"difference_row\":%u,\"difference_offset\":%u,\"expected_byte\":%u,\"actual_byte\":%u}\n",
+  t.arm_status,piece_slab_trace_arm_name(t.arm_status),close_status,
+  compare_value,compare_name,t.joined?"true":"false",join_reason,
+  t.count,t.overflow?"true":"false",(t.arm_status==1&&!t.overflow&&close_status==1)?"true":"false",
+  t.row,t.source,t.requested,t.target_offset,t.target_source,
+  static_cast<unsigned long long>(t.host),static_cast<unsigned long long>(t.generation),
+  static_cast<unsigned long long>(t.epoch),static_cast<unsigned long long>(t.world),
+  t.difference_valid?"true":"false",t.difference_valid?t.difference_row:0u,
+  t.difference_valid?t.difference_offset:0u,t.difference_valid?t.expected_byte:0u,
+  t.difference_valid?t.actual_byte:0u);
+ for(uint32_t i=0;i<t.count;++i){
+  const auto& e=t.events[i];
+  std::printf("MELEE_CLASS_PIECE_SLAB_TRACE {\"type\":\"event\",\"index\":%u,\"kind\":%u,\"kind_name\":\"%s\",\"command\":%u,\"scope\":\"%s\",\"frame\":%u,\"sample\":%u,\"row\":%u,\"row_source\":\"0x%08x\",\"row_requested\":%u,\"event_source\":\"0x%08x\",\"event_host\":\"0x%016llx\",\"row_host\":\"0x%016llx\",\"generation\":\"0x%016llx\",\"owner_epoch\":\"0x%016llx\",\"world\":\"0x%016llx\",\"requested_extent\":%u,\"physical_extent\":%u,\"target_in_event\":%u,\"target_part\":\"%s\",\"origin_site\":%u,\"stage\":%u,\"class_info\":\"0x%08x\",\"previous\":\"0x%08x\",\"inside_row\":%s}\n",
+   i,e.kind,piece_slab_trace_kind_name(e.kind),e.command,piece_slab_trace_scope_name(e.scope),e.frame,e.sample,
+   e.row,e.row_source,e.row_requested,e.event_source,
+   static_cast<unsigned long long>(e.event_host),static_cast<unsigned long long>(e.row_host),
+   static_cast<unsigned long long>(e.generation),static_cast<unsigned long long>(e.epoch),
+   static_cast<unsigned long long>(e.world),e.requested,e.physical,e.target_in_event,
+   piece_slab_trace_target_part_name(e.target_part),e.origin_site,e.stage,e.class_info,e.previous,
+   e.inside_row?"true":"false");
+ }
+ std::fflush(stdout);
+}
+#endif
+}
+
+extern "C" void melee_web_source_memory_class_piece_slab_trace_context(
+ uint32_t command,uint32_t scope,uint32_t frame,uint32_t sample) {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ piece_slab_trace.command=command;
+ piece_slab_trace.scope=scope<=MELEE_WEB_CLASS_PIECE_TRACE_DRAW?scope:MELEE_WEB_CLASS_PIECE_TRACE_COMMAND;
+ piece_slab_trace.frame=frame;piece_slab_trace.sample=sample;
+#else
+ (void)command;(void)scope;(void)frame;(void)sample;
+#endif
+}
+
+extern "C" int melee_web_source_memory_class_piece_slab_trace_arm(
+ const MeleeWebSourceMemoryPayloadSnapshot* snapshot,MeleeWebClassPieceAnchor anchor,
+ uint32_t locator_source,uint32_t locator_extent,uint32_t target_offset) {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ const uint32_t command=piece_slab_trace.command,scope=piece_slab_trace.scope;
+ const uint32_t frame=piece_slab_trace.frame,sample=piece_slab_trace.sample;
+ piece_slab_trace=PieceSlabTrace{};
+ auto& t=piece_slab_trace;t.command=command;t.scope=scope;t.frame=frame;t.sample=sample;
+ t.arm_status=2;t.state=1;t.join_reason=3;
+ if(!active||!healthy||payload_snapshot_check(snapshot)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+    !anchor.ready||anchor.epoch!=owner_epoch||anchor.world!=world_generation||
+    anchor.instance!=piece_owner.instance||anchor.serial!=piece_owner.capture||
+    piece_owner.state!=3||piece_owner.reason||piece_owner.serial!=anchor.serial||
+    !locator_extent||target_offset>=locator_extent)return 0;
+ const auto* rows=payload_rows(snapshot);size_t selected=SIZE_MAX;
+ for(size_t i=0;i<snapshot->row_count;++i){
+  if(rows[i].source.value()!=locator_source||rows[i].requested!=locator_extent)continue;
+  if(selected!=SIZE_MAX){t.join_reason=4;return 0;}selected=i;
+ }
+ if(selected==SIZE_MAX||selected>=allocations.size()){t.join_reason=4;return 0;}
+ const auto& saved=rows[selected];const auto& current=allocations[selected];
+ if(saved.source.value()!=current.source.value()||saved.requested!=current.requested||
+    saved.host!=current.host||saved.generation!=current.generation||
+    snapshot->epoch!=owner_epoch||snapshot->world!=world_generation){t.join_reason=4;return 0;}
+ const uint64_t target=uint64_t(saved.source.value())+target_offset;
+ if(target>UINT32_MAX){t.join_reason=4;return 0;}
+ t.row=static_cast<uint32_t>(selected);t.source=saved.source.value();t.requested=saved.requested;
+ t.target_offset=target_offset;t.target_source=static_cast<uint32_t>(target);
+ t.host=saved.host;t.generation=saved.generation;t.epoch=snapshot->epoch;t.world=snapshot->world;
+ t.state=2;t.arm_status=1;t.join_reason=0;return 1;
+#else
+ (void)snapshot;(void)anchor;(void)locator_source;(void)locator_extent;(void)target_offset;return 0;
+#endif
+}
+
+extern "C" void melee_web_source_memory_class_piece_slab_trace_finalize(
+ const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,
+ MeleeWebSourcePayloadComparison original) {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ auto& t=piece_slab_trace;if(!t.state||t.closed)return;
+ t.closed=1;t.compare_status=original.status;
+ t.joined=0;
+ if(t.arm_status!=1)t.join_reason=3;
+ else if(original.status==0)t.join_reason=1;
+ else if(original.status==1)t.join_reason=2;
+ else if(original.status!=2)t.join_reason=5;
+ else {
+  const auto w=melee_web_source_memory_payload_snapshot_witness(post);
+  const bool witness_matches=payload_snapshot_check(post)==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&w.status==2&&
+   original.allocation_index==w.row&&original.byte_offset==w.offset&&
+   original.host_address==w.host_address&&original.source_address==w.source_address&&
+   original.requested_bytes==w.requested_bytes&&w.offset>=w.window_offset&&
+   w.offset-w.window_offset<w.window_count&&
+   original.expected_byte==w.expected[w.offset-w.window_offset]&&
+   original.actual_byte==w.actual[w.offset-w.window_offset];
+  if(witness_matches){
+   t.difference_valid=1;t.difference_row=w.row;t.difference_offset=w.offset;
+   t.expected_byte=original.expected_byte;t.actual_byte=original.actual_byte;
+  }
+  bool candidate_matches=witness_matches&&
+   payload_snapshot_check(pre)==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+   t.row==w.row&&t.row<pre->row_count&&t.row<post->row_count&&t.row<allocations.size();
+  if(candidate_matches){
+   const auto& before=payload_rows(pre)[t.row];const auto& after=payload_rows(post)[t.row];
+   const auto& current=allocations[t.row];
+   candidate_matches=before.source.value()==t.source&&after.source.value()==t.source&&
+    before.requested==t.requested&&after.requested==t.requested&&
+    before.host==t.host&&after.host==t.host&&current.host==t.host&&
+    before.generation==t.generation&&after.generation==t.generation&&
+    current.generation==t.generation&&pre->epoch==t.epoch&&post->epoch==t.epoch&&
+    pre->world==t.world&&post->world==t.world&&w.owner_epoch==t.epoch&&
+    w.world_generation==t.world&&w.source_address==t.source&&
+    uint64_t(w.source_address)+w.offset==t.target_source&&
+    w.offset==t.target_offset&&w.requested_bytes==t.requested;
+  }
+  if(candidate_matches){t.joined=1;t.join_reason=0;}
+  else t.join_reason=witness_matches?6:5;
+ }
+ if(t.overflow&&t.joined)t.join_reason=7;
+ piece_slab_trace_emit(1);t.state=3;
+#else
+ (void)pre;(void)post;(void)original;
+#endif
+}
+
+extern "C" void melee_web_source_memory_class_piece_slab_trace_early_close(void) {
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ auto& t=piece_slab_trace;if(!t.state||t.closed)return;
+ t.closed=1;t.compare_status=UINT32_MAX;t.joined=0;t.join_reason=8;
+ piece_slab_trace_emit(0);t.state=3;
+#endif
 }
 
 #include "gameplay_lobj_writer_diagnostic.inc"
