@@ -78,6 +78,14 @@ uint32_t cpu_fail(uint32_t code,const char* message){
     if(cpu_restore.two_active){cpu_restore.two.first_failure=cpu_restore.first_failure;cpu_restore.two.state=cpu_restore.state;}
     return cpu_restore.first_failure;
 }
+uint32_t cpu_step_fail(uint32_t code,const char* boundary){
+    // The source step writes error directly. Preserve that cause before
+    // cpu_fail replaces it, without overlapping snprintf input/output.
+    char message[sizeof(error)]{};
+    std::snprintf(message,sizeof(message),"%s: %s",boundary,
+                  error[0]?error:"source step returned failure without a diagnostic");
+    return cpu_fail(code,message);
+}
 bool cpu_tuple_unchanged(){return match&&cpu_restore.profile_owner==rng_profile_gobj&&
     cpu_restore.configured_seed==configured_source_seed&&cpu_restore.initializer==native_initializer_enabled&&
     cpu_restore.profile==rng_profile_enabled;}
@@ -199,7 +207,8 @@ uint32_t cpu_execute_two(uint32_t command){
             CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame,300);
             result=melee_web_snapshot_step(300);
         }cpu_two_raw(e.tick_pairs[0],false);
-        if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
+        if(result!=1)return cpu_step_fail(0x4b4u,"baseline sample300 refused");
+        if(cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
             return cpu_fail(0x4b4u,"baseline sample300 refused");
         if(!cpu_two_diag(1)||e.diagnostics[0]!=e.diagnostics[1])return cpu_fail(0x4c4u,"baseline CPU300 drew");
         melee_web_tobj_writer_boundary(1,observation.frame);

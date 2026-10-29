@@ -101,6 +101,9 @@ static int source_failure(const char* message, char* error, size_t error_size)
 {
     uint64_t world = state.world;
     uint64_t interval = state.interval;
+    /* error belongs to the caller. Unwind only writes a separate ignored
+     * buffer, so a leaf message==error remains valid throughout cleanup. */
+    const int preserve_buffer = message == error;
     state.failed = 1;
     if (state.drawing || state.ordinary_drawing) {
         char ignored[1];
@@ -115,8 +118,17 @@ static int source_failure(const char* message, char* error, size_t error_size)
     state.drawing = state.camera_open = state.helper_camera_open = 0;
     state.open_camera = NULL;
     state.event_cursor = 0;
-    if (message == error) return 0;
+    if (preserve_buffer) return 0;
     return refuse(error, error_size, message);
+}
+
+/* Use only after a leaf has refused. Preserve its actual first diagnostic;
+ * the generic wrapper label is a fallback for leaves without a message. */
+static int source_leaf_failure(const char* fallback, char* error,
+                               size_t error_size)
+{
+    return source_failure(error && error_size && error[0] ? error : fallback,
+                          error, error_size);
 }
 
 static NodeProof node_proof(const HSD_GObj* object)
@@ -497,7 +509,7 @@ int slippi_particle_source_prepare(uint64_t world_generation,
             interval_token, error, error_size)) {
         schedule_clear(&candidate);
         state.interval = interval_token;
-        return source_failure("Particle presentation preparation refused",
+        return source_leaf_failure("Particle presentation preparation refused",
                               error, error_size);
     }
     state.schedule = candidate;
@@ -522,7 +534,7 @@ int slippi_particle_source_draw_begin(uint64_t world_generation,
         if (!state.active && !world_generation) return 1;
         if (!slippi_particle_presentation_draw_begin(
                 world_generation, 0, error, error_size))
-            return source_failure("Ordinary particle draw admission refused",
+            return source_leaf_failure("Ordinary particle draw admission refused",
                                   error, error_size);
         state.ordinary_drawing = 1;
         return 1;
@@ -536,7 +548,7 @@ int slippi_particle_source_draw_begin(uint64_t world_generation,
     if (!build_schedule(&current, world_generation, interval_token,
                         error, error_size)) {
         schedule_clear(&current);
-        return source_failure("Source topology changed before original draw",
+        return source_leaf_failure("Source topology changed before original draw",
                               error, error_size);
     }
     if (!schedule_equal(&state.schedule, &current)) {
@@ -547,7 +559,7 @@ int slippi_particle_source_draw_begin(uint64_t world_generation,
     schedule_clear(&current);
     if (!slippi_particle_presentation_draw_begin(
             world_generation, interval_token, error, error_size))
-        return source_failure("Particle presentation draw admission refused",
+        return source_leaf_failure("Particle presentation draw admission refused",
                               error, error_size);
     state.ordinary_drawing = 0;
     state.drawing = 1;
@@ -576,7 +588,7 @@ int slippi_particle_source_camera_begin(const HSD_GObj* camera,
     if (event->visit_count) {
         if (!slippi_particle_presentation_camera_begin(camera, error,
                                                        error_size))
-            return source_failure("Particle camera begin refused", error,
+            return source_leaf_failure("Particle camera begin refused", error,
                                   error_size);
         state.helper_camera_open = 1;
     }
@@ -596,7 +608,7 @@ int slippi_particle_source_camera_end(const HSD_GObj* camera,
                               error_size);
     if (state.helper_camera_open &&
         !slippi_particle_presentation_camera_end(camera, error, error_size))
-        return source_failure("Particle camera did not consume its visits",
+        return source_leaf_failure("Particle camera did not consume its visits",
                               error, error_size);
     state.helper_camera_open = 0;
     state.camera_open = 0;

@@ -1312,11 +1312,22 @@ restore-coordinator controls also pass, including particle-owner refusal before
 any restore writer. Their modeled providers and prior math-object identities
 remain explicit in the structured receipt. Failed fixtures are retained.
 
-The frozen candidate passed independent composed source review. Focused controls and
-source-unit syntax are not a runtime build or browser result. Unknown particle
-writers, active pool reset, unproved historical projection-cache hits and repeated
-presents explicitly refuse. No counter-only fix, source-policy exception or
-repeated browser capture has been used to bypass the mismatch.
+The frozen candidate passed independent composed source review. The first affected
+build exposed a missing original callback declaration; the exact declaration repair
+passed production-unit compilation and independent review. The browser build and
+manifest then passed at `97e178e8`. Linked review maps ten compiler-split rows to
+three full declared objects plus a newly emitted fog pointer slot, adding 31 bytes
+to strict comparison and restore coverage. No source bytes are masked or exempted.
+
+The first V16 browser attempt captures successfully in command 8, then refuses the
+first baseline source tick in command 9 with code 1204. It checks zero comparison
+domains; unwritten raw pair data is not equality evidence. The generic adapter
+message loses the underlying refusal, so the next bounded repair preserves the
+first source/helper error before another attempt. The sticky owner failure remains
+visible during source and renderer close. All launched process IDs are independently
+absent and all nine runtime producer artifacts are retained unchanged. Unknown
+particle writers, active pool reset, unproved historical projection-cache hits and
+repeated presents still refuse.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

@@ -161,6 +161,7 @@ std::size_t admission_trace_count=0;
 std::uint32_t fail_admission_leaf=0;
 bool fail_capture=false;
 bool fail_replay=false;
+bool fail_baseline_sample300=false;
 bool modeled_payload_byte_failure=false;
 bool fail_static_replay=false;
 unsigned journal_failure_tick=0,unexpected_draw_tick=0;
@@ -415,7 +416,7 @@ std::uint32_t ptr32(const void* p) {
 void reset_fixture() {
     fail_capture=false;
     fixture_draw_diagnostics={};
-    fail_static_replay=false;journal_failure_tick=unexpected_draw_tick=0;
+    fail_static_replay=false;fail_baseline_sample300=false;journal_failure_tick=unexpected_draw_tick=0;
     // Fixture-only in-place reset: avoid a >64KiB automatic aggregate.
     cpu_restore.~CpuRestoreControl();
     ::new (static_cast<void*>(&cpu_restore)) CpuRestoreControl{};
@@ -600,6 +601,29 @@ void verify_two_tick_refusals() {
     pending_submission=false;fail_replay=true;
     check(melee_web_synctest_cpu_restore_command(10)!=0&&tick_calls==1,"Latched interval failure stepped301");
     close_and_retire();
+    reset_fixture();check(configure_valid(),"Two step-failure configure");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two step-failure capture");
+    fail_baseline_sample300=true;
+    const auto step_failure=melee_web_synctest_cpu_restore_command(9);
+    const std::string step_message(error);
+    const auto* step_evidence=static_cast<const CpuRestoreEvidence*>(melee_web_synctest_cpu_restore_evidence());
+    check(step_failure==1204&&step_evidence->first_failure==1204&&
+          tick_calls==0&&tick_sample_count==0&&draw_calls==0,
+          "Baseline source-step refusal lost its specific code or reached draw");
+    check(error[sizeof(error)-1]=='\0'&&
+          step_message.find("baseline sample300 refused: fixture sample300 source sentinel")!=std::string::npos,
+          "Baseline source-step refusal lost its cause or failed to terminate the bounded message");
+    check(melee_web_synctest_cpu_restore_command(10)==step_failure&&
+          std::string(error)==step_message&&draw_calls==0,
+          "Next command overwrote the first baseline source-step refusal");
+    check(melee_web_synctest_cpu_restore_command(5)==step_failure&&
+          std::string(error)==step_message&&draw_calls==0,
+          "CLOSE overwrote the first baseline source-step refusal or drew");
+    check(melee_web_synctest_cpu_before_source_close()==1,
+          "Source close was not admitted after disarm");
+    match.reset();world_exists=false;
+    check(melee_web_synctest_cpu_after_source_close()==1,
+          "Source retirement refused the baseline source-step failure");
     for(bool unexpected_draw:{false,true}) {
         reset_fixture();check(configure_valid(),"Two replay interruption configure");
         check(melee_web_synctest_cpu_restore_command(8)==0&&melee_web_synctest_cpu_restore_command(9)==0,"Two replay interruption setup");
@@ -760,6 +784,13 @@ void verify_invalid_configuration_guards() {
 
 extern "C" int melee_web_snapshot_step(unsigned sample) {
     if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301))||tick_sample_count>=tick_samples.size()) return 0;
+    if(fail_baseline_sample300&&sample==300) {
+        const char sentinel[]="fixture sample300 source sentinel";
+        std::memset(error,'x',sizeof(error));
+        std::memcpy(error,sentinel,sizeof(sentinel)-1);
+        error[sizeof(error)-1]='\0';
+        return 0;
+    }
     tick_samples[tick_sample_count++]=sample;++tick_calls;
     if(!interruption_done&&interruption==StepInterruption::ReenterCommand) {
         interruption_done=true;(void)melee_web_synctest_cpu_restore_command(5);
