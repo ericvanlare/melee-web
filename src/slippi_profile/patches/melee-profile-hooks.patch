@@ -2783,7 +2783,7 @@ diff --git a/src/sysdolphin/baselib/psdisptev.c b/src/sysdolphin/baselib/psdispt
 diff --git a/src/melee/if/ifall.c b/src/melee/if/ifall.c
 --- a/src/melee/if/ifall.c
 +++ b/src/melee/if/ifall.c
-@@ -155,6 +155,15 @@ static void fn_802F36B8(HSD_GObj* gobj, int unused)
+@@ -155,6 +155,17 @@ static void fn_802F36B8(HSD_GObj* gobj, int unused)
          }
      }
  }
@@ -2804,7 +2804,7 @@ diff --git a/src/melee/if/ifall.c b/src/melee/if/ifall.c
 diff --git a/src/melee/if/ifnametag.c b/src/melee/if/ifnametag.c
 --- a/src/melee/if/ifnametag.c
 +++ b/src/melee/if/ifnametag.c
-@@ -181,5 +181,13 @@ void fn_802FCAC4(HSD_GObj* gobj, int pass)
+@@ -181,5 +181,14 @@ void fn_802FCAC4(HSD_GObj* gobj, int pass)
      }
  }
 +
