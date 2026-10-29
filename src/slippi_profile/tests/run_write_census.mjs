@@ -627,6 +627,16 @@ async function main() {
       if (message.type() === 'error') pageErrors.push(message.text());
     });
     await page.goto(serving.origin, {waitUntil: 'domcontentloaded'});
+    if (twoTickDrawnReference && tobjPresentationCache) {
+      // Temporary joint-writer attribution: retain outer source callers beyond
+      // V8's default ten frames. Native observation/output caps are unchanged.
+      report.jointWriterStackDiagnostic = await page.evaluate(() => {
+        const priorLimit = Error.stackTraceLimit;
+        Error.stackTraceLimit = 64;
+        return {priorLimit, limit: Error.stackTraceLimit,
+          scope: 'private two-tick diagnostic; no simulation or timing claim'};
+      });
+    }
     const init = await runBrowserInit(page, serving.origin, path.basename(runtime));
     report.browser = {
       name: 'headless installed Chrome through scripts/browser_tools.mjs',

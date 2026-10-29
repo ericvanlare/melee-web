@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216; V8 initialization repaired on current main; two-tick baseline source construction is refused; full browser rollback remains unproven**
+**Browser exercised / One-tick restore-replay-and-present passed; V9 restores and replays two ticks with raw sample agreement, but strict source-payload equality fails on a draw-updated joint matrix. Final present and full browser rollback remain unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
