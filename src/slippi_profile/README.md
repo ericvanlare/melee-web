@@ -232,3 +232,15 @@ The canonical original loader copies descriptors into distinct runtime palettes;
 this adaptation does not admit arbitrary external aliases between those palettes
 and SObj descriptors. The private V13 identity refuses V12 snapshots/manifests.
 It remains an incomplete diagnostic profile, not online-profile admission.
+
+
+V14 targets the observed effect-model matrix dependency. The private profile
+prepares dirty, non-user-defined matrices under the original effect GObj owners
+after match process callbacks, while the source callback context is still active.
+This includes effects spawned and attached during the current tick. It uses the
+original matrix routines; it adds no source draw or GPU submission to correction.
+The ordinary scheduler entry remains unchanged for menus and other scenes.
+Unexpected owner shapes fail explicitly before any effect matrix preparation.
+The full source payload comparison remains strict. V13 manifests and snapshots
+are refused by this candidate, which remains an incomplete diagnostic profile
+pending its browser result and later rollback gates.

@@ -6,6 +6,7 @@ from src.slippi_profile.tests import test_ci_discovery as _ci_discovery
 from src.slippi_profile.tests import test_deadupfall_reduction as _deadupfall_reduction
 from src.slippi_profile.tests import test_dbooc_binary32_oracle as _dbooc_oracle
 from src.slippi_profile.tests import test_dbooc_scalar_helper as _dbooc_scalar
+from src.slippi_profile.tests import test_effect_matrix as _effect_matrix
 from src.slippi_profile.tests import test_fighter_projection as _fighter_projection
 from src.slippi_profile.tests import test_offscreen_timer_block as _offscreen_timer
 from src.slippi_profile.tests import test_profile_controls as _profile_controls
@@ -60,4 +61,8 @@ class SlippiUcfShieldDropTests(_ucf_shield_drop.UcfShieldDropTests):
 
 
 class SlippiFighterProjectionTests(_fighter_projection.FighterProjectionTests):
+    pass
+
+
+class SlippiEffectMatrixTests(_effect_matrix.EffectMatrixTests):
     pass

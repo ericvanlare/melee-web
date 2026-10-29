@@ -2,6 +2,13 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+#include "slippi_profile/effect_matrix.h"
+#include "slippi_profile/profile.h"
+_Static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY ==
+                   SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14,
+               "Effect matrix post-step is restricted to private V14");
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_source_memory_runtime.h"
 #endif
@@ -40,6 +47,24 @@ extern u16 staleAttackInstance, unk_804D6480;
 extern PadLibData default_libinfo_data;
 extern HSD_PadStatus default_status_data;
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+static int post_effect_matrices(void* context, char* error, size_t error_size)
+{
+    (void) context;
+    return slippi_profile_effect_matrices_post_step(error, error_size);
+}
+
+static int match_gameplay_step(char* error, size_t error_size)
+{
+    return melee_web_gameplay_step_post_source(post_effect_matrices, NULL,
+                                                error, error_size);
+}
+#else
+static int match_gameplay_step(char* error, size_t error_size)
+{
+    return melee_web_gameplay_step(error, error_size);
+}
+#endif
 struct MeleeWebMatchContext {
     MeleeWebPlayerContext* players[MELEE_WEB_MATCH_MAX_PLAYERS];
     uint32_t player_count, slots[MELEE_WEB_MATCH_MAX_PLAYERS], controllers[MELEE_WEB_MATCH_MAX_PLAYERS];
@@ -465,7 +490,7 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     else{HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();}
     if(HSD_PadLibData.qcount)return fail(e,n,"Original controller processing did not consume raw sample");
     if(before&&!before(context,e,n))return 0;
-    if(!melee_web_gameplay_step(e,n))return 0;
+    if(!match_gameplay_step(e,n))return 0;
     h->ticks++;
     if(after&&!after(context,e,n))return 0;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -501,7 +526,7 @@ int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebController
         /* Source Fighter consumers use normalized values; raw fields remain
          * zero because this is an explicit post-normalization input boundary. */
     }
-    if(!melee_web_gameplay_step(e,n))return 0;
+    if(!match_gameplay_step(e,n))return 0;
     h->ticks++;return ok(e,n);
 }
 int melee_web_match_step(MeleeWebMatchContext* h,uint32_t ticks,char* e,size_t n)

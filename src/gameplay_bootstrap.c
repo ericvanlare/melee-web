@@ -489,7 +489,9 @@ int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
     return success(error, error_size);
 }
 
-int melee_web_gameplay_step(char* error, size_t error_size)
+static int gameplay_step(MeleeWebGameplayPostSourceCallback post_source,
+                         void* post_source_context,
+                         char* error, size_t error_size)
 {
     if (!tables_live) return fail(error, error_size, "Gameplay bootstrap is not initialized");
     if (!melee_web_gameplay_heap_owns(arena))
@@ -504,13 +506,38 @@ int melee_web_gameplay_step(char* error, size_t error_size)
         return fail(error, error_size, "Source PPC callback context is unavailable for this scheduler tick");
     stepping = 1;
     HSD_GObj_80390CFC();
+    int source_healthy = !post_source || melee_web_source_memory_healthy();
+    char post_source_error[192] = {0};
+    int post_source_ok = 1;
+    if (source_healthy && post_source)
+        post_source_ok = post_source(post_source_context, post_source_error,
+                                     sizeof(post_source_error));
     stepping = 0;
-    if (!melee_web_source_context_end_tick())
+    int context_balanced = melee_web_source_context_end_tick();
+    if (!post_source_ok)
+        return fail(error, error_size,
+                    post_source_error[0] ? post_source_error :
+                    "Private source post-step callback refused");
+    if (!context_balanced)
         return fail(error, error_size, "Source PPC callback frames did not balance at scheduler return");
-    if (!melee_web_source_memory_healthy())
+    if (!source_healthy || !melee_web_source_memory_healthy())
         return fail(error, error_size, "Source main-heap allocation mirror rejected a scheduler allocation");
     ++ticks;
     return success(error, error_size);
+}
+
+int melee_web_gameplay_step(char* error, size_t error_size)
+{
+    return gameplay_step(NULL, NULL, error, error_size);
+}
+
+int melee_web_gameplay_step_post_source(
+    MeleeWebGameplayPostSourceCallback callback, void* context,
+    char* error, size_t error_size)
+{
+    if (!callback)
+        return fail(error, error_size, "Private source post-step callback is required");
+    return gameplay_step(callback, context, error, error_size);
 }
 
 int melee_web_gameplay_world_exists(void) { return arena != NULL; }

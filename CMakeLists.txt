@@ -165,7 +165,9 @@ if(EMSCRIPTEN)
     target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_CPU_INTERVAL_ENABLED=1)
   endif()
   if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
-    target_sources(gameplay_runtime PRIVATE src/slippi_profile/fighter_projection.c)
+    target_sources(gameplay_runtime PRIVATE
+      src/slippi_profile/fighter_projection.c
+      src/slippi_profile/effect_matrix.c)
     target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1)
   endif()
   if(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)

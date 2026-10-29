@@ -30,9 +30,14 @@ void slippi_profile_refresh_fighter_matrices(HSD_JObj *root)
     refresh_subtree(root);
 }
 
+void slippi_profile_refresh_display_root_matrices(HSD_JObj *root)
+{
+    /* Refresh the root and child-descendant sibling chains. The root's next
+     * sibling belongs to another top-level owner and is deliberately excluded. */
+    refresh_one(root);
+}
+
 void slippi_profile_refresh_ground_matrices(HSD_JObj *root)
 {
-    /* HSD_JObjDispAll starts at the Ground GObj root and follows children;
-     * its top-level next sibling is outside this GObj's display traversal. */
-    refresh_one(root);
+    slippi_profile_refresh_display_root_matrices(root);
 }

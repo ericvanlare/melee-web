@@ -1235,9 +1235,17 @@ retains 1216, and all recorded owned processes are absent. Both exact producers
 and failed runs are retained. The bounded trace at `77828017` now identifies the same post-capture joint
 allocation during the source update in both paths, with its class pointer joined
 to this producer’s `hsdJObj` symbol. The difference falls in the joint matrix.
-The trace is complete and does not overflow; the specific writer and owner
-reachability still need source assessment. Strict comparison and the frozen
-ledger remain unchanged.
+The allocation trace is complete and does not overflow. At `063f443a`, the
+typed target probe identifies `efLib_Create` / `efLib_Create_Attach_Pos` through
+`efSync_Spawn` / `efAsync_QueueProcessDeferred` as the creator. Original
+`HSD_JObjMakeMatrix` inside `HSD_JObjSetupMatrixSub` writes the matrix during
+the baseline draws through the effect display callback. The strict CPU mismatch
+matches draw 300: the CPU snapshot is sealed before draw 301. Relevant original
+caller names precede the capped stack tails; those tails remain unknown. This
+supports an effect-owner preparation repair, not the earlier particle hypothesis
+or a global joint sweep. Strict 1216 remains, all ten raw pairs agree, and final
+present is unrun. The source, result, producer archive and independent timing
+review are pinned in the existing structured receipt.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

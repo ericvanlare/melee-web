@@ -1,0 +1,188 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Project helpers are actual; owner objects and SetupMatrixSub are modeled. */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <melee/ef/eflib.h>
+#include <melee/ef/types.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/gobjuserdata.h>
+#include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/objalloc.h>
+#include "slippi_profile/effect_matrix.h"
+
+HSD_GObjList* HSD_GObj_Entities;
+HSD_GObjLibInitDataType HSD_GObjLibInitData;
+HSD_GObj** plinklow_gobjs;
+HSD_ObjAllocData gobj_alloc_data;
+uint8_t HSD_GObj_JObjKind = 3;
+static unsigned matrix_calls, render_calls;
+static int world_live = 1;
+static uint64_t world_generation = 9;
+
+int melee_web_gameplay_world_exists(void) { return world_live; }
+uint64_t melee_web_gameplay_generation(void) { return world_generation; }
+void efLib_render_callback(HSD_GObj* gobj, int code)
+{ (void) gobj; (void) code; ++render_calls; }
+void efLib_particles_proc_main(HSD_GObj* gobj) { (void) gobj; }
+void efLib_particles_proc_aux(HSD_GObj* gobj) { (void) gobj; }
+void efLib_Update(HSD_GObj* gobj) { (void) gobj; }
+void efLib_remove_user_data(void* data) { (void) data; }
+void HSD_GObj_JObjCallback(HSD_GObj* gobj, int code)
+{ (void) gobj; (void) code; ++render_calls; }
+void HSD_JObjSetupMatrixSub(HSD_JObj* jobj)
+{
+    if (jobj->parent && (jobj->parent->flags & JOBJ_MTX_DIRTY))
+        assert(!"child evaluated before dirty parent");
+    jobj->flags &= ~JOBJ_MTX_DIRTY;
+    jobj->setup_order = ++matrix_calls;
+}
+
+static void process_init(HSD_GObjProc* proc, HSD_GObj* object,
+                         HSD_GObjEvent callback)
+{
+    memset(proc, 0, sizeof(*proc));
+    proc->gobj = object;
+    proc->s_link = 15;
+    proc->on_invoke = callback;
+    object->proc = proc;
+}
+
+static void manager_init(HSD_GObj* object, HSD_GObjProc* proc,
+                         unsigned link)
+{
+    memset(object, 0, sizeof(*object));
+    object->classifier = HSD_GOBJ_CLASS_EFFECT;
+    object->p_link = link;
+    object->p_priority = 1;
+    object->gx_link = link == 11 ? 7 : 8;
+    object->render_priority = 2;
+    object->obj_kind = HSD_GOBJ_OBJ_NONE;
+    object->user_data_kind = HSD_GOBJ_USER_DATA_NONE;
+    object->render_cb = efLib_render_callback;
+    process_init(proc, object, link == 11 ? efLib_particles_proc_main :
+                                             efLib_particles_proc_aux);
+}
+
+static void effect_init(HSD_GObj* object, HSD_GObjProc* proc,
+                        EF_Effect* effect, HSD_JObj* root, unsigned link)
+{
+    memset(object, 0, sizeof(*object));
+    memset(effect, 0, sizeof(*effect));
+    object->classifier = HSD_GOBJ_CLASS_EFFECT;
+    object->p_link = link;
+    object->p_priority = 0;
+    object->gx_link = 7;
+    object->render_priority = 1;
+    object->obj_kind = HSD_GObj_JObjKind;
+    object->user_data_kind = 8;
+    object->render_cb = HSD_GObj_JObjCallback;
+    object->hsd_obj = root;
+    object->user_data = effect;
+    object->user_data_remove_func = efLib_remove_user_data;
+    effect->gobj = object;
+    process_init(proc, object, efLib_Update);
+}
+
+static void owner_link(unsigned link, HSD_GObj* head, HSD_GObj* tail)
+{
+    ((HSD_GObj**) HSD_GObj_Entities)[link] = head;
+    plinklow_gobjs[link] = tail;
+}
+
+static int positive(void)
+{
+    HSD_GObj* heads[13] = {0};
+    HSD_GObj* tails[13] = {0};
+    HSD_GObjList* list = (HSD_GObjList*) heads;
+    HSD_GObj manager11, manager12, effect11, effect12;
+    HSD_GObjProc manager_proc11, manager_proc12, effect_proc11, effect_proc12;
+    EF_Effect owner11, owner12;
+    HSD_JObj root11, child11, grandchild11, root12, userdef, outside;
+    char error[160] = {0};
+
+    memset(&root11, 0, sizeof(root11)); memset(&child11, 0, sizeof(child11));
+    memset(&grandchild11, 0, sizeof(grandchild11));
+    memset(&root12, 0, sizeof(root12)); memset(&userdef, 0, sizeof(userdef));
+    memset(&outside, 0, sizeof(outside));
+    root11.flags = JOBJ_MTX_DIRTY; root11.child = &child11; root11.next = &outside;
+    child11.parent = &root11; child11.child = &grandchild11;
+    child11.next = &userdef; child11.flags = JOBJ_MTX_DIRTY;
+    grandchild11.parent = &child11; grandchild11.flags = JOBJ_MTX_DIRTY;
+    userdef.parent = &root11; userdef.flags = JOBJ_MTX_DIRTY | JOBJ_USER_DEF_MTX;
+    root12.flags = JOBJ_MTX_DIRTY | JOBJ_USER_DEF_MTX;
+    outside.flags = JOBJ_MTX_DIRTY;
+    HSD_GObj_Entities = list; plinklow_gobjs = tails;
+    HSD_GObjLibInitData.p_link_max = 12; gobj_alloc_data.used = 4;
+    manager_init(&manager11, &manager_proc11, 11);
+    manager_init(&manager12, &manager_proc12, 12);
+    effect_init(&effect11, &effect_proc11, &owner11, &root11, 11);
+    effect_init(&effect12, &effect_proc12, &owner12, &root12, 12);
+    effect11.next = &manager11; manager11.prev = &effect11;
+    effect12.next = &manager12; manager12.prev = &effect12;
+    owner_link(11, &effect11, &manager11); owner_link(12, &effect12, &manager12);
+
+    assert(slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(matrix_calls == 3);
+    assert(root11.setup_order == 1 && child11.setup_order == 2 &&
+           grandchild11.setup_order == 3);
+    assert((userdef.flags & JOBJ_MTX_DIRTY) && userdef.setup_order == 0);
+    assert((root12.flags & JOBJ_MTX_DIRTY) && root12.setup_order == 0);
+    assert((outside.flags & JOBJ_MTX_DIRTY) && outside.setup_order == 0);
+    assert(render_calls == 0 && error[0] == '\0');
+    return 0;
+}
+
+static int unknown_row_refuses_before_any_refresh(void)
+{
+    HSD_GObj* heads[13] = {0}; HSD_GObj* tails[13] = {0};
+    HSD_GObjList* list = (HSD_GObjList*) heads;
+    HSD_GObj manager, effect, unknown;
+    HSD_GObjProc manager_proc, effect_proc;
+    EF_Effect owner; HSD_JObj root = {0}; char error[160] = {0};
+    HSD_GObj_Entities = list; plinklow_gobjs = tails;
+    HSD_GObjLibInitData.p_link_max = 12; gobj_alloc_data.used = 3;
+    manager_init(&manager, &manager_proc, 11);
+    effect_init(&effect, &effect_proc, &owner, &root, 11);
+    memset(&unknown, 0, sizeof(unknown));
+    unknown.classifier = 6; unknown.p_link = 11;
+    effect.next = &unknown; unknown.prev = &effect;
+    unknown.next = &manager; manager.prev = &unknown;
+    owner_link(11, &effect, &manager); owner_link(12, NULL, NULL);
+    root.flags = JOBJ_MTX_DIRTY;
+    matrix_calls = 0;
+    assert(!slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(strstr(error, "Unsupported GObj") != NULL && matrix_calls == 0);
+    assert(root.flags & JOBJ_MTX_DIRTY);
+    return 0;
+}
+
+static int unavailable_table_refuses(void)
+{
+    HSD_GObj* heads[13] = {0}; HSD_GObj* tails[13] = {0};
+    HSD_GObj_Entities = (HSD_GObjList*) heads; plinklow_gobjs = tails;
+    HSD_GObjLibInitData.p_link_max = 11; gobj_alloc_data.used = 0;
+    matrix_calls = 0;
+    char error[160] = {0};
+    assert(!slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(strstr(error, "link capacity") != NULL && matrix_calls == 0);
+    HSD_GObjLibInitData.p_link_max = 12;
+    plinklow_gobjs = NULL;
+    assert(!slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(strstr(error, "owner table") != NULL && matrix_calls == 0);
+    return 0;
+}
+
+int main(void)
+{
+    assert(positive() == 0);
+    assert(unknown_row_refuses_before_any_refresh() == 0);
+    assert(unavailable_table_refuses() == 0);
+    world_live = 0;
+    char error[160] = {0};
+    assert(!slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(strstr(error, "live owned gameplay world") != NULL);
+    puts("effect matrix helper: exact owners, traversal, and fail-closed controls passed");
+    return 0;
+}

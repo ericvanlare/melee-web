@@ -169,6 +169,14 @@ int melee_web_gameplay_vs_startup_active(void);
 int melee_web_gameplay_vs_manager_preparing(void);
 int melee_web_gameplay_initialize_vs_dynamics(char* error, size_t error_size);
 int melee_web_gameplay_step(char* error, size_t error_size);
+/* Internal per-invocation hook for a private match source post-step. The
+ * callback is never retained and runs inside the source callback context. */
+typedef int (*MeleeWebGameplayPostSourceCallback)(void* context,
+                                                  char* error,
+                                                  size_t error_size);
+int melee_web_gameplay_step_post_source(
+    MeleeWebGameplayPostSourceCallback callback, void* context,
+    char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);
 /* Returns the live world's generation without walking SDK heap statistics.

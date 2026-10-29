@@ -8970,13 +8970,22 @@
       "next_boundary_review_sha256": "12859f799f3668ae8d2792df11d29fe935cbcce285c60bd190307077acb798b8",
       "archive": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-v13-browser-archive/archive.json",
       "scope": "Previous palette mismatch passed; strict1216 moves to row3015 offset836 with no live piece captured. Ten raw vectors match; finalpresent unrun. No complete browser rollback.",
-      "next": "Trace result at77828017 identifies a post-capture HSD_JObj allocation; inspect its matrix writer and existing source-update hooks before any repair.",
+      "next": "The063f443a typed target probe identifies the deferred effect creator and draw-only matrix writer; next is a reviewed owner-specific simulation preparation fix, not a particle/global sweep.",
       "target_slab_trace": {
         "source_commit": "77828017fe56cb79860f9c555a2f5a292b7d2481",
         "receipt": "rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-class-piece-slab-trace-v1/result-receipt.json",
         "receipt_sha256": "3c3cb80a0dd3c2638b93c1f6384a6e7cd797d1e41e9613a6d7e37f04d3272ca8",
         "archive": "rollback-renderer-resume-20261028-155740-eef0524c/class-piece-slab-trace-browser-archive/archive.json",
         "scope": "Complete exact allocation join identifies newly created HSD_JObj during source update on both paths; specific matrix writer/reachability still needs source assessment. Strict payload1216 persists; finalpresent unrun."
+      },
+      "target_jobj_creator_writer": {
+        "source_commit": "063f443a03cc5b36249161d798c1a51c7e7a2bf7",
+        "receipt": "rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-jobj-creator-writer-v1/result-receipt.json",
+        "receipt_sha256": "12955fa097ca15ee1b559fb15b7aaaeeec1c3868766beac66f11610085db3253",
+        "review": "rollback-renderer-resume-20261028-155740-eef0524c/effect-jobj-target-result-sol-review-v1.json",
+        "review_sha256": "2f0c650a65bf16db1aef753cc865258d47bad7e62c8278c021605dced6a29c09",
+        "archive": "rollback-renderer-resume-20261028-155740-eef0524c/jobj-creator-writer-browser-archive/archive.json",
+        "scope": "Exact joined new JObj creator prefix is efLib_Create/Attach_Pos via efSync_Spawn/QueueProcessDeferred. Original Make/Setup changes matrix only during baseline draws; CPU mismatch matches draw300 because seal_post precedes draw301. Relevant stack names observed before2048byte truncation; tail unknown. Strict1216 persists; ten raw pairs equal and finalpresent unrun."
       }
     }
   }
