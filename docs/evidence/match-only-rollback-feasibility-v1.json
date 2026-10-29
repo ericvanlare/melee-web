@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "CAMERA_PREFLIGHT_PASSES; baseline draw1205 first cause is particle dispatch visit mismatch; smaller composed reproducer required",
+      "status": "BASELINE_DRAWS_AND_TWO_CORRECTIVE_TICKS_EXECUTED; strict endpoint comparison refuses HSD_PerfCurrentStat.nb_mtx_load; final present unrun",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9247,7 +9247,7 @@
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Compose actual camera/GObj/efLib dispatch with presentation helper, identify first tuple/order mismatch and review causal repair before next browser.",
+      "next": "Review raw fixed-browser evidence and cohesive HSD performance counter ownership; no masks/exemptions or presentation rewind.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9560,11 +9560,53 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v8-safe-effect-fix-v4/freeze.json",
           "sha256": "44d529db0235f31c7b4943ebc1ea52d4ee9faf614d57a08dae1b904474962961"
         },
-        "limits": "Initial red canary used adjacent C subarrays; retain its observed write but do not treat it as a defined-C memory proof. Final single-array test verifies declared capacity without this UB. Fixture setup/compile failures retained. No fixed browser result yet.",
+        "limits": "Initial red canary used adjacent C subarrays; retain its observed write but do not treat it as a defined-C memory proof. Final single-array test verifies declared capacity without this UB. Fixture setup/compile failures retained. Actual browser result is separately pinned below.",
         "review": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-manager-emission-fix-sol-review-v1.json",
           "sha256": "529e76249bd13f91499b32d9fcc18e1d73697db72450bb4bdb79e44455530919"
+        },
+        "actual_browser": {
+          "runtime_head": "97d43fed306f346edbf9f29580312587a1285579",
+          "receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v9/result-receipt.json",
+            "sha256": "864487c273140e9635e11f60b5a5edf39f7b33c961c2b80197d210476955a7b5"
+          },
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v13/result.json",
+            "sha256": "6a15ee8708fc59ab31dc16ea1d084231fcb8c6ea8df99b618b267a6def55504b"
+          },
+          "configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v9/final-linked-configuration-v1.json",
+            "sha256": "3f1a3e2df7bcd5b2ef844101da6021c474fa925f824657986688fa194efa9140"
+          },
+          "archive": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-manager-emission-browser-archive/archive.json",
+            "sha256": "72b3f9b343ef2e679af35c451ea5614043393c3460317347f1ac9a1306fd6561"
+          },
+          "independent_result_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v9-independent-result-review.json",
+            "sha256": "f8807e0a40a844dd42743a0e56a4d09646e539d4a4076fe2e47a731e9abbeb72"
+          },
+          "reviewed_scope": "Both written raw tick pairs match all five exact categories; no-draw diagnostic records4/5/6 equal. Commit0,frames176\u2192178; strict endpoint domain9 still fails HSD_PerfCurrentStat.nb_mtx_load. Final present unrun. Snapshot/renderer shutdown1, sticky CPU CLOSE1216, all PIDs absent."
         }
+      }
+    },
+    "performance_measurement_v17_candidate": {
+      "status": "REVIEWED_FOCUSED_CONTROLS_PASS_AFFECTED_BUILD_PENDING",
+      "contract": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/hsd-performance-measurement-v17-contract-sol-v1.json",
+        "sha256": "f64d3c649e86844dd70d8cba990654a9d381646ae948c0f4dc2be0f300619413"
+      },
+      "scope": "Process-persistent typed performance observation group, exact original operations and read consumers; canonical symbols remain linked/full strict. Existing private particle prerequisite, new V17 identity, Vanilla unchanged. Overlay derived state remains unsupported.",
+      "producer_predecessor": "97d43fed306f346edbf9f29580312587a1285579",
+      "freeze": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-measurement-v17-focused/freeze-v17.json",
+        "sha256": "19ef4eb52a1a15b8e0c767f2913ed35acb32a4c09e3568bc4ad0e6979b455dd4"
+      },
+      "focused_controls": "Actual perf.c, perf.h inline, lbshadow counter branch and hsd_392A Last reader with deterministic clock leaves: ordinary/private metric bytes and clock calls exact; repeated/zero-delta Draw, unsigned counter wrap, negative elapsed time, Init, persistence, active-world refusal and sticky drift pass. One native test, one profile C identity test, two Node identity tests pass. Two mechanical fixture failures retained. No affected browser build or capture yet.",
+      "review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-measurement-v17-sol-review-v1.json",
+        "sha256": "129600330ac5904fcd0642f61c951c68757bfc4626c560cbbbb147f09444580b"
       }
     }
   }

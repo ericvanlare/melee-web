@@ -1940,16 +1940,18 @@ test('current light set v15 identity requires explicit light owner and two-tick 
 });
 
 
-test('particle preparation v16 is explicit atop the unchanged v15 route and refuses prior identities', () => {
+test('particle measurement v17 is explicit atop the unchanged v15 route and refuses prior identities', () => {
   const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};
   const v15={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15'};
   const v16={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'};
+  const v17={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17'};
   assert.equal(validateBrowserProfileForRoute(v15,true,exports,true,true),v15.profile);
-  assert.equal(validateBrowserProfileForRoute(v16,true,exports,true,true,true),v16.profile);
-  assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,true,true),/Unexpected profile identity/);
+  assert.equal(validateBrowserProfileForRoute(v17,true,exports,true,true,true),v17.profile);
+  assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,true,true,true),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v17,true,exports,true,true),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute(v15,true,exports,true,true,true),/Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,false,false,true),/requires v15 TObj/);
-  assert.throws(()=>validateBrowserProfileForRoute(v16,false,exports,true,true,true),/requires/);
+  assert.throws(()=>validateBrowserProfileForRoute(v17,true,exports,false,false,true),/requires v15 TObj/);
+  assert.throws(()=>validateBrowserProfileForRoute(v17,false,exports,true,true,true),/requires/);
   for (const profile of [
     'slippi-render-dependencies-logical-frame-lobj-tobj-v8',
     'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9',
@@ -1974,11 +1976,11 @@ test('actual initialized profile assignment retains writer scope, not zero-count
   const initial=source.match(/profile: (\{identity: null, sourceIdentity: null,[\s\S]*?\}),\n    input:/)?.[1];
   const initialized=source.match(/report\.profile = \{\.\.\.report\.profile, identity: init\.profile,[\s\S]*?\};/)?.[0];
   assert.ok(initial,'actual initial profile object is extracted');assert.ok(initialized,'actual post-initialization profile assignment is extracted');
-  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15','slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'];
+  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15','slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17'];
   for(let i=0;i<profiles.length;i++) {
     const context={init:{profile:profiles[i],source:'actual-source',rngHelper:'rng',stageBridge:'stage'},SOURCE_SEED:7,
       SYNCTEST_PROFILE:profiles[0],LOGICAL_FRAME_V6_PROFILE:profiles[1],LOBJ_PRESENTATION_V7_PROFILE:profiles[2],LOBJ_CURRENT_SET_V15_PROFILE:profiles[3],
-      PARTICLE_PRESENTATION_V16_PROFILE:profiles[4],
+      PARTICLE_MEASUREMENT_V17_PROFILE:profiles[4],
       twoTickDrawnReference:i>0,lobjPresentationCache:i>1,tobjPresentationCache:i>2,particlePresentationCache:i>3};
     context.report={profile:vm.runInNewContext('('+initial+')',context)};
     const prior=context.report.profile.sourceTextureMatrixWriterDiagnostic;

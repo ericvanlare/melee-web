@@ -1366,17 +1366,40 @@ reproduces six planned visits versus three actual particle callbacks: validated
 ordinary effect JObj displays were incorrectly emitted despite being excluded
 from the manager count. Emission now uses that same manager predicate. The
 focused control passes with exact declared capacity, original effect display
-calls retained, and unknown callbacks still refused. Independent review passes;
-the fixed browser attempt remains pending. Initial fixture failures are retained;
-the final capacity canary uses one backing array to avoid C subarray overrun UB. DevText constructor and render-owner
+calls retained, and unknown callbacks still refused. Independent review and the
+affected build pass. Producer `97d43fed` executes both baseline draws and two
+corrective source ticks, then refuses strict typed equality (1216): source-static
+row 2053, offset 12 joins `HSD_PerfCurrentStat.nb_mtx_load` in the exact linked
+manifest. Independent byte review confirms both written per-tick observations,
+PCM, PAD, RNG/profile and transfer records match exactly; no-draw diagnostic
+records 4–6 also match. This does not override the failed full-state comparison.
+Snapshot close and renderer shutdown return success; CPU CLOSE retains the first
+comparison failure. Final present remains unrun. The next bounded
+step inventories the cohesive HSD performance counters and their typed
+presentation ownership. Initial fixture failures remain retained; the final
+capacity canary uses one backing array to avoid C subarray overrun UB. DevText constructor and render-owner
 controls, configured source-unit syntax and independent fixed-interval review
 pass; Results/reinitialization without actual retirement remains unsupported.
 Generic callback admission remains refused. No successful browser comparison is implied.
-The sticky owner failure remains visible during source and renderer close. All
-launched process IDs are independently absent and all nine runtime producer
+The earlier sticky owner failures during source and renderer close remain
+retained separately from the successful source/renderer shutdown at `97d43fed`.
+All launched process IDs are independently absent and all nine runtime producer
 artifacts for each attempt are retained unchanged. Unknown
 particle writers, active pool reset, unproved historical projection-cache hits and
 repeated presents still refuse.
+
+The frozen private V17 candidate routes the cohesive HSD Current/Last/start-time
+measurement group into a typed persistent owner. Original operations and all
+known reads remain; the canonical globals stay referenced and must retain their
+full strict comparison policy in the linked build. The actual-source focused
+control matches ordinary metric bytes and clock calls, including repeated/zero
+draw elapsed time, unsigned wrap and negative elapsed time. World persistence
+and sticky refusal after canonical drift also pass. Profile identity controls
+pass; V16 remains historical and is refused by the V17 route. Two mechanical
+fixture failures are retained. Overlay runtime remains unsupported; these
+controls establish neither a browser result nor profile admission. Independent
+review passes the frozen candidate for its affected build; configured translation
+units and canonical symbol retention are still build gates.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

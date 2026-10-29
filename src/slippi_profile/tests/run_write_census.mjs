@@ -27,7 +27,7 @@ const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
 const LOBJ_CURRENT_SET_V15_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15';
-const PARTICLE_PRESENTATION_V16_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16';
+const PARTICLE_MEASUREMENT_V17_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -159,7 +159,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v16 particle preparation lane requires v15 TObj, v7 LObj, and the fixed two-tick route');
+    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and the fixed two-tick route');
   }
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
@@ -179,9 +179,9 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
   if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v15 current light set lane requires v7 and two ticks');
   if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !twoTickDrawnReference)) {
-    throw new Error('The v16 particle preparation lane requires v15 TObj, v7 LObj, and two ticks');
+    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and two ticks');
   }
-  const expectedProfile = particlePresentationCache ? PARTICLE_PRESENTATION_V16_PROFILE :
+  const expectedProfile = particlePresentationCache ? PARTICLE_MEASUREMENT_V17_PROFILE :
     tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
@@ -701,7 +701,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: particlePresentationCache ? PARTICLE_PRESENTATION_V16_PROFILE :
+      name: particlePresentationCache ? PARTICLE_MEASUREMENT_V17_PROFILE :
         tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache, particlePresentationCache};

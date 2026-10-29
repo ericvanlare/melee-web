@@ -1,0 +1,200 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Apple libc uses this name for an internal assert macro; HSD declares a
+ * source-compatible function with the same name. */
+#ifdef __assert
+#undef __assert
+#endif
+#include <sysdolphin/baselib/debug.h>
+#include <sysdolphin/baselib/perf.h>
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include <slippi_profile/perf_measurement.h>
+#endif
+extern s64 start_time;
+
+static const s64 clock_values[] = { 1000, 1200, 1500, 1000, 900 };
+static unsigned clock_index;
+static char clock_trace[16];
+static unsigned clock_trace_size;
+
+OSTime OSGetTime(void)
+{
+    clock_trace[clock_trace_size++] = 'T';
+    assert(clock_index < sizeof(clock_values) / sizeof(clock_values[0]));
+    return clock_values[clock_index++];
+}
+
+u64 OSSecondsToTicks(u32 seconds)
+{
+    clock_trace[clock_trace_size++] = 'S';
+    assert(seconds == 1);
+    return 6000;
+}
+
+void __assert(char* file, u32 line, char* condition)
+{
+    (void) file;
+    (void) line;
+    (void) condition;
+    abort();
+}
+
+static f32 hsd_804D7858, hsd_804D785C, hsd_804D7860;
+static f32 hsd_804D7864, hsd_804D7868, hsd_804D786C;
+static s32 hsd_804D7870, hsd_804D7874, hsd_804D7878;
+static f32 hsd_804D787C, hsd_804D7880, hsd_804D7884;
+
+@HSD_392A_SOURCE_FUNCTION@
+
+static void source_shadow_counter(void)
+{
+@LBSHADOW_COUNTER_SOURCE@
+}
+
+static HSD_PerfStat* current_stat(void)
+{
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    return slippi_hsd_perf_measurement_current();
+#else
+    return &HSD_PerfCurrentStat;
+#endif
+}
+
+static const HSD_PerfStat* last_stat(void)
+{
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    return slippi_hsd_perf_measurement_last();
+#else
+    return &HSD_PerfLastStat;
+#endif
+}
+
+int main(int argc, char** argv)
+{
+    (void) argv;
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    assert(slippi_hsd_perf_measurement_current() == 0);
+    if (argc > 1) {
+        HSD_PerfStat original_current = HSD_PerfCurrentStat;
+        assert(slippi_hsd_perf_measurement_world_begin(91));
+        HSD_PerfCurrentStat.nb_mtx_load = 1;
+        assert(slippi_hsd_perf_measurement_current() == 0);
+        HSD_PerfCurrentStat = original_current;
+        assert(!slippi_hsd_perf_measurement_world_end(91));
+        assert(slippi_hsd_perf_measurement_current() == 0);
+        assert(!slippi_hsd_perf_measurement_world_begin(92));
+        return 0;
+    }
+    assert(!slippi_hsd_perf_measurement_world_begin(0));
+    assert(slippi_hsd_perf_measurement_world_begin(90));
+    const HSD_PerfStat source_current = HSD_PerfCurrentStat;
+    const HSD_PerfStat source_last = HSD_PerfLastStat;
+    const s64 source_start = start_time;
+#define CHECK_CANONICAL() \
+    do { \
+        assert(!memcmp(&HSD_PerfCurrentStat, &source_current, sizeof(source_current))); \
+        assert(!memcmp(&HSD_PerfLastStat, &source_last, sizeof(source_last))); \
+        assert(!memcmp(&start_time, &source_start, sizeof(source_start))); \
+    } while (0)
+#else
+    (void) argc;
+    (void) argv;
+#define CHECK_CANONICAL() ((void) 0)
+#endif
+
+    HSD_PerfSetStartTime();
+    CHECK_CANONICAL();
+    HSD_PerfSetCPUTime();
+    CHECK_CANONICAL();
+    HSD_PerfSetDrawTime();
+    CHECK_CANONICAL();
+    HSD_PerfSetDrawTime();
+    CHECK_CANONICAL();
+    HSD_PerfSetTotalTime();
+    CHECK_CANONICAL();
+    HSD_PerfCountMtxLoad();
+    CHECK_CANONICAL();
+    source_shadow_counter();
+    CHECK_CANONICAL();
+
+    HSD_PerfStat* current = current_stat();
+    assert(current != 0);
+    assert(current->nb_mtx_load == 2);
+    current->nb_mtx_load = UINT32_MAX;
+    HSD_PerfCountMtxLoad();
+    CHECK_CANONICAL();
+    assert(current->nb_mtx_load == 0);
+    source_shadow_counter();
+    CHECK_CANONICAL();
+    assert(current->nb_mtx_load == 1);
+
+    HSD_PerfCountEnvelopeBlending(0);
+    CHECK_CANONICAL();
+    HSD_PerfCountEnvelopeBlending(31);
+    CHECK_CANONICAL();
+    current->env_blend[31] = UINT32_MAX;
+    HSD_PerfCountEnvelopeBlending(31);
+    CHECK_CANONICAL();
+    assert(current->env_blend[0] == 1 && current->env_blend[31] == 0);
+    assert(current->cpu_time == 2.0f && current->draw_time == 0.0f &&
+           current->total_time == -1.0f);
+
+    HSD_PerfInitStat();
+    CHECK_CANONICAL();
+    assert(current->nb_mtx_load == 0 && current->env_blend[0] == 0);
+    assert(last_stat()->nb_mtx_load == 1 && last_stat()->env_blend[0] == 1 &&
+           last_stat()->env_blend[31] == 0);
+    fn_80392934();
+    assert(hsd_804D7858 == last_stat()->cpu_time);
+    assert(hsd_804D785C == last_stat()->draw_time);
+    assert(hsd_804D7860 == last_stat()->total_time);
+    CHECK_CANONICAL();
+
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    HSD_PerfStat saved_current = *current;
+    HSD_PerfStat saved_last = *last_stat();
+    s64 saved_start = *slippi_hsd_perf_measurement_start_time();
+    assert(!slippi_hsd_perf_measurement_world_end(89));
+    assert(slippi_hsd_perf_measurement_current() != 0);
+    assert(slippi_hsd_perf_measurement_world_end(90));
+    assert(slippi_hsd_perf_measurement_current() == 0);
+    assert(slippi_hsd_perf_measurement_world_begin(93));
+    current = current_stat();
+    assert(!memcmp(current, &saved_current, sizeof(saved_current)));
+    assert(!memcmp(last_stat(), &saved_last, sizeof(saved_last)));
+    assert(*slippi_hsd_perf_measurement_start_time() == saved_start);
+    HSD_PerfCountMtxLoad();
+    CHECK_CANONICAL();
+    assert(current->nb_mtx_load == 1);
+#else
+    HSD_PerfCountMtxLoad();
+    assert(HSD_PerfCurrentStat.nb_mtx_load == 1);
+#endif
+
+    assert(clock_index == 5);
+    printf("TRACE:");
+    fwrite(clock_trace, 1, clock_trace_size, stdout);
+    assert(fwrite(current_stat(), 1, sizeof(HSD_PerfStat), stdout) ==
+           sizeof(HSD_PerfStat));
+    assert(fwrite(last_stat(), 1, sizeof(HSD_PerfStat), stdout) ==
+           sizeof(HSD_PerfStat));
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    assert(fwrite(slippi_hsd_perf_measurement_start_time(), 1, sizeof(s64), stdout) ==
+           sizeof(s64));
+    assert(slippi_hsd_perf_measurement_world_end(93));
+#else
+    assert(fwrite(&start_time, 1, sizeof(s64), stdout) == sizeof(s64));
+#endif
+    return 0;
+}

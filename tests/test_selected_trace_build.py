@@ -65,7 +65,7 @@ class SelectedTraceBuildTests(unittest.TestCase):
     def test_particle_presentation_configure_only_forwards_on_and_keeps_older_profiles_off(self):
         lock = {"repositories": {}, "emscripten": "6.0.9"}
         cases = (
-            ("v16", "gameplay_slippi_synctest", True,
+            ("v17", "gameplay_slippi_synctest", True,
              "slippi-synctest-logical-frame-lobj-presentation-tobj-presentation-particle-presentation-aurora-staging-release",
              dict(slippi_logical_frame_clock=True, slippi_lobj_presentation_cache=True,
                   slippi_tobj_presentation_cache=True,
@@ -113,13 +113,15 @@ class SelectedTraceBuildTests(unittest.TestCase):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertIn(
             'option(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE\n'
-            '  "Enable the private v16 particle-preparation presentation profile" OFF)', cmake)
+            '  "Enable the private v17 particle-preparation and measurement profile" OFF)', cmake)
         self.assertIn(
             "if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND\n"
             "   NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)", cmake)
         self.assertIn("src/slippi_profile/particle_presentation.c", cmake)
         self.assertIn("src/slippi_profile/particle_source_schedule.c", cmake)
         self.assertIn("src/slippi_profile/particle_pass_plan.c", cmake)
+        self.assertIn("target_sources(hsd_native_runtime PRIVATE src/slippi_profile/perf_measurement.c)", cmake)
+        self.assertNotIn("target_sources(gameplay_runtime PRIVATE src/slippi_profile/perf_measurement.c)", cmake)
         self.assertIn("target_compile_definitions(gameplay_runtime PUBLIC\n"
                       "      MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1)", cmake)
         self.assertIn("target_compile_definitions(hsd_native_runtime PRIVATE\n"

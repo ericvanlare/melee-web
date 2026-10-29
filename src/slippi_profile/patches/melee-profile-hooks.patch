@@ -2922,3 +2922,198 @@ diff --git a/src/melee/if/textdraw.c b/src/melee/if/textdraw.c
          } else {
              HSD_GObjPLink_80390228(gobj);
          }
+
+
+diff --git a/src/sysdolphin/baselib/perf.c b/src/sysdolphin/baselib/perf.c
+--- a/src/sysdolphin/baselib/perf.c
++++ b/src/sysdolphin/baselib/perf.c
+@@ -1,4 +1,8 @@
+ #include "perf.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/perf_measurement.h>
++#endif
+ 
+ #include <string.h>
+ 
+@@ -12,35 +16,85 @@
+ 
+ void HSD_PerfInitStat(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_PerfStat* last = slippi_hsd_perf_measurement_last_for_init();
++    HSD_ASSERT(0xA1, current != 0 && last != 0);
++    if (current == 0 || last == 0) __builtin_trap();
++    *last = *current;
++    memset(current, 0, sizeof(HSD_PerfStat));
++#else
+     HSD_PerfLastStat = HSD_PerfCurrentStat;
+     memset(&HSD_PerfCurrentStat, 0, sizeof(HSD_PerfStat));
++#endif
+ }
+ 
+ void HSD_PerfSetStartTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA2, start != 0);
++    if (start == 0) __builtin_trap();
++    *start = OSGetTime();
++#else
+     start_time = OSGetTime();
++#endif
+ }
+ 
+ void HSD_PerfSetCPUTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA3, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->cpu_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.cpu_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfSetDrawTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA4, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->draw_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.draw_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfSetTotalTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA5, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->total_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.total_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfCountEnvelopeBlending(s32 n)
+ {
+     HSD_ASSERT(0xA4, n < 32);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA6, current != 0);
++    if (current == 0) __builtin_trap();
++    current->env_blend[n]++;
++#else
+     HSD_PerfCurrentStat.env_blend[n]++;
++#endif
+ }
+
+diff --git a/src/sysdolphin/baselib/perf.h b/src/sysdolphin/baselib/perf.h
+--- a/src/sysdolphin/baselib/perf.h
++++ b/src/sysdolphin/baselib/perf.h
+@@ -14,6 +14,17 @@
+ extern HSD_PerfStat HSD_PerfCurrentStat;
+ extern HSD_PerfStat HSD_PerfLastStat;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "debug.h"
++#ifdef __cplusplus
++extern "C" {
++#endif
++HSD_PerfStat* slippi_hsd_perf_measurement_current(void);
++#ifdef __cplusplus
++}
++#endif
++#endif
++
+ void HSD_PerfInitStat(void);
+ void HSD_PerfSetStartTime(void);
+ void HSD_PerfSetCPUTime(void);
+@@ -23,7 +34,14 @@
+ 
+ static inline void HSD_PerfCountMtxLoad(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA7, current != 0);
++    if (current == 0) __builtin_trap();
++    current->nb_mtx_load += 1;
++#else
+     HSD_PerfCurrentStat.nb_mtx_load += 1;
++#endif
+ }
+ 
+ #endif
+
+diff --git a/src/sysdolphin/baselib/hsd_392A.c b/src/sysdolphin/baselib/hsd_392A.c
+--- a/src/sysdolphin/baselib/hsd_392A.c
++++ b/src/sysdolphin/baselib/hsd_392A.c
+@@ -3,6 +3,9 @@
+ #include <stdio.h>
+ 
+ #include "perf.h"
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/perf_measurement.h>
++#endif
+ #include "psstructs.h" // IWYU pragma: keep
+ 
+ // types
+@@ -48,12 +51,24 @@
+     f32 draw;
+     f32 total;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    const HSD_PerfStat* last = slippi_hsd_perf_measurement_last();
++    HSD_ASSERT(0xA8, last != 0);
++    if (last == 0) __builtin_trap();
++    cpu = last->cpu_time;
++    hsd_804D7858 = cpu;
++    draw = last->draw_time;
++    hsd_804D785C = draw;
++    total = last->total_time;
++    hsd_804D7860 = total;
++#else
+     cpu = HSD_PerfLastStat.cpu_time;
+     hsd_804D7858 = cpu;
+     draw = HSD_PerfLastStat.draw_time;
+     hsd_804D785C = draw;
+     total = HSD_PerfLastStat.total_time;
+     hsd_804D7860 = total;
++#endif
+ 
+     if (hsd_804D7864 < cpu || hsd_804D7870-- < 0) {
+         hsd_804D7864 = cpu;
+
+diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
+--- a/src/melee/lb/lbshadow.c
++++ b/src/melee/lb/lbshadow.c
+@@ -250,7 +250,14 @@
+     imagedesc = shadow->texture->imagedesc;
+     GXSetScissor(0, 0, imagedesc->width, imagedesc->height);
+     GXLoadPosMtxImm(HSD_identityMtx, GX_PNMTX0);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA9, current != 0);
++    if (current == 0) __builtin_trap();
++    current->nb_mtx_load++;
++#else
+     HSD_PerfCurrentStat.nb_mtx_load++;
++#endif
+     GXSetCurrentMtx(GX_PNMTX0);
+     HSD_ClearVtxDesc();
+     GXSetVtxDesc(GX_VA_POS, GX_DIRECT);

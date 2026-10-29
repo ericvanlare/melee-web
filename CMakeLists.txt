@@ -47,7 +47,7 @@ if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_AURORA_STAGING_SHA
   message(FATAL_ERROR "The private presentation profile requires the Aurora staging-shadow inventory and CPU owner provenance")
 endif()
 option(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-  "Enable the private v16 particle-preparation presentation profile" OFF)
+  "Enable the private v17 particle-preparation and measurement profile" OFF)
 if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND
    NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
   message(FATAL_ERROR "Particle presentation requires the private v15 TObj profile")
@@ -250,6 +250,7 @@ if(EMSCRIPTEN)
     target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1)
   endif()
   if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
+    target_sources(hsd_native_runtime PRIVATE src/slippi_profile/perf_measurement.c)
     target_compile_definitions(hsd_native_runtime PRIVATE
       MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1)
   endif()

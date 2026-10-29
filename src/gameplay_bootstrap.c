@@ -1,6 +1,9 @@
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
 #include "slippi_profile/particle_source_schedule.h"
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include "slippi_profile/perf_measurement.h"
+#endif
 #include "gameplay_bootstrap.h"
 #include "gameplay_source_context.h"
 #include "gameplay_source_memory_runtime.h"
@@ -265,7 +268,23 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     const int tobj_world_started = lobj_world_started && slippi_tobj_world_begin(next_world_generation);
     const int particle_world_started = tobj_world_started &&
         slippi_particle_source_world_begin(next_world_generation);
-    if (!particle_world_started || !melee_web_source_memory_begin(next_world_generation, heap)) {
+    const int source_memory_started = particle_world_started &&
+        melee_web_source_memory_begin(next_world_generation, heap);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    const int perf_measurement_world_started = source_memory_started &&
+        slippi_hsd_perf_measurement_world_begin(next_world_generation);
+#else
+    const int perf_measurement_world_started = 1;
+#endif
+    if (!source_memory_started || !perf_measurement_world_started) {
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+        if (perf_measurement_world_started &&
+            !slippi_hsd_perf_measurement_world_end(next_world_generation)) {
+            return fail(error, error_size, "HSD performance measurement owner failed before startup");
+        }
+#endif
+        if (source_memory_started)
+            (void) melee_web_source_memory_end(next_world_generation);
         if (particle_world_started) (void) slippi_particle_source_world_end(next_world_generation);
         if (tobj_world_started) slippi_tobj_world_end(next_world_generation);
         if (lobj_world_started) slippi_lobj_world_end(next_world_generation);
@@ -308,6 +327,12 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             startup_in_progress = 0;
             HSD_ObjSetHeap(0, NULL);
             HSD_SetHeap(-1);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+            const int perf_measurement_world_ok =
+                slippi_hsd_perf_measurement_world_end(generation);
+#else
+            const int perf_measurement_world_ok = 1;
+#endif
             (void) slippi_particle_source_world_end(generation);
             slippi_tobj_world_end(generation);
             slippi_lobj_world_end(generation);
@@ -328,6 +353,9 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             if (!source_memory_ok)
                 return fail(error, error_size,
                             "Source main-heap allocation mirror failed while rejecting VS startup");
+            if (!perf_measurement_world_ok)
+                return fail(error, error_size,
+                            "HSD performance measurement owner failed while rejecting VS startup");
             if (error && error_size && !error[0])
                 snprintf(error, error_size, "Original VS scene-manager preparation failed");
             return 0;
@@ -639,6 +667,12 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     _HSD_ObjAllocForgetMemory(NULL, NULL);
     HSD_ObjSetHeap(0, NULL);
     HSD_SetHeap(-1);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    const int perf_measurement_world_ok =
+        slippi_hsd_perf_measurement_world_end(generation);
+#else
+    const int perf_measurement_world_ok = 1;
+#endif
     const int particle_world_ok = slippi_particle_source_world_end(generation);
     slippi_tobj_world_end(generation);
     slippi_lobj_world_end(generation);
@@ -665,6 +699,8 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
         shutting_down = 0;
         if (!source_memory_ok)
             return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+        if (!perf_measurement_world_ok)
+            return fail(error, error_size, "HSD performance measurement owner failed before teardown");
         if (!particle_world_ok)
             return fail(error, error_size, "Particle presentation owner failed before teardown");
         return success(error, error_size);
@@ -681,6 +717,8 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     shutting_down = 0;
     if (!source_memory_ok)
         return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+    if (!perf_measurement_world_ok)
+        return fail(error, error_size, "HSD performance measurement owner failed before teardown");
     if (!particle_world_ok)
         return fail(error, error_size, "Particle presentation owner failed before teardown");
     return success(error, error_size);
