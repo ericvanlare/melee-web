@@ -424,9 +424,10 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
  }
  
  int melee_web_source_clock_snapshot_bootstrap_mask_admit(
-@@ -630,6 +672,9 @@
+@@ -630,7 +672,10 @@
      melee_source_clock_in_callback = 0;
      melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
+     melee_menu_clock_constructor_pending = 0;
      melee_source_clock_owner = owner;
 +#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
 +    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
@@ -489,10 +490,11 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
      melee_source_clock_prepared = 0;
      return 1;
  }
-@@ -715,6 +785,13 @@
+@@ -715,7 +785,14 @@
  int melee_web_source_clock_present(void)
  {
-     if (!melee_source_clock_owned()) return 0;
+     if (!melee_source_clock_owned() || melee_menu_clock_constructor_pending)
+         return 0;
 +#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
 +    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH){
 +        if(melee_source_clock_prepared || melee_source_clock_in_callback ||
@@ -503,9 +505,10 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
      if (gm_80479D58.unk_4 != (u32) -2) gm_80479D58.unk_4++;
      return 1;
  }
-@@ -767,6 +844,9 @@
+@@ -767,7 +844,10 @@
      melee_source_clock_prepared = 0;
      melee_source_clock_in_callback = 0;
+     melee_menu_clock_constructor_pending = 0;
      melee_source_clock_owner = 0;
 +#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
 +    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
