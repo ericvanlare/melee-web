@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "Implement reviewed typed shadow-camera/texture-matrix presentation view with constructor-bound child tuple and early retirement. Preserve original topology and full-draw consumers; refuse unsupported inverse/resize/membership transitions. Then repeat strict fixed2tick restore/present for this changed repair.",
+    "current_next_boundary": "Identify exact V12 first-draw tuple/topology refusal with first-failure reason and reduced sample0 driver, retaining guards and original operations. Then repair observed boundary before unchanged strict two-tick restore/present.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8885,6 +8885,33 @@
         },
         "scope": "Typed callback pointer/write occurrence only; not continuous child lifetime or restoration authority. All10 final raw pairs equal; process cleanup and nine artifact hashes independently verified."
       }
+    },
+    "shadow_camera_v12_result_20261029": {
+      "producer_commit": "db0774773290bdfda82c6377f6face8d2c3cb134",
+      "harness_commit": "db0774773290bdfda82c6377f6face8d2c3cb134",
+      "evidence_run": "rollback-renderer-resume-20261028-155740-eef0524c",
+      "result": "First source draw0 guard refusal; zero warm samples, no restore/comparison/final present. Snapshotclose trapped, renderer shutdown succeeds, all owned PIDs absent.",
+      "receipt": {
+        "path": "browser-two-tick-shadow-camera-v12-v1/result-receipt.json",
+        "sha256": "77e025c0b22caac619db3cc716934bf49545bee6c40e5ea7a08a86e12c180232"
+      },
+      "source_review": {
+        "path": "shadow-camera-v12-source-sol-review-v1.json",
+        "sha256": "1d740df89cc5f9c5ddf189bd88bdeb6a8ea6cd36f655109784d579c4f71fd028"
+      },
+      "build": {
+        "path": "browser-build-shadow-camera-v12-v1/artifact-inventory.json",
+        "sha256": "c115ae3f66a6b2cb8a9aee7ba20b840a2d73589d599cbdcddaa568f1bb24164d"
+      },
+      "configuration_review": {
+        "path": "linked-config-shadow-camera-v12-v1/row-review.json",
+        "sha256": "645706a2a578f3ed0c326259b5bf85676f382ae415e3332c5f7e215801857dad"
+      },
+      "preserved_producer": {
+        "path": "shadow-v12-failed-first-draw-browser-archive/archive.json",
+        "sha256": "37acbe0393277a5a3c2562929e55d3bce66e5575e5bd119f64bd9cb931407991"
+      },
+      "scope": "Failed candidate only. Historical V11 raw agreement remains separate; no browser rollback acceptance."
     }
   }
 }

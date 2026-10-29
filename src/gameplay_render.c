@@ -245,7 +245,11 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     *HSD_VIGetRenderMode()=old_mode;HSD_StartRender(pass);
     const int projection_restored=slippi_fighter_projection_draw_end();
     h->drawing=0;
-    if(!projection_restored)return fail(e,n,"Fighter presentation view restoration failed");
+    if(!projection_restored){
+        if(e&&n)snprintf(e,n,"Fighter presentation view restoration failed: %s",
+                         slippi_fighter_projection_failure_reason());
+        return 0;
+    }
     if(!accepted)return fail(e,n,"Original HSD camera rejected the render target");
     if(!restored)return fail(e,n,"Source callback changed the current camera without restoration");
     return ok(e,n);

@@ -9,6 +9,7 @@
 #include <sysdolphin/baselib/shadow.h>
 #include <sysdolphin/baselib/tobj.h>
 #include <sysdolphin/baselib/wobj.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -55,6 +56,27 @@ typedef struct ShadowMember {
     void* object;
 } ShadowMember;
 
+typedef enum ProjectionFailure {
+    PROJECTION_FAILURE_NONE,
+    PROJECTION_FAILURE_CONTRACT,
+    PROJECTION_FAILURE_DRAW_STATE,
+    PROJECTION_FAILURE_FIGHTER_IDENTITY,
+    PROJECTION_FAILURE_SHADOW_OWNER,
+    PROJECTION_FAILURE_SHADOW_OBJECT,
+    PROJECTION_FAILURE_SHADOW_CAMERA,
+    PROJECTION_FAILURE_SHADOW_CAMERA_CHILDREN,
+    PROJECTION_FAILURE_SHADOW_INVERSE,
+    PROJECTION_FAILURE_SHADOW_TEXTURE,
+    PROJECTION_FAILURE_SHADOW_IMAGE_DESC,
+    PROJECTION_FAILURE_SHADOW_COORD,
+    PROJECTION_FAILURE_SHADOW_IMAGE_PIXELS,
+    PROJECTION_FAILURE_SHADOW_IMAGE_LAYOUT,
+    PROJECTION_FAILURE_SHADOW_DESCRIPTOR,
+    PROJECTION_FAILURE_SHADOW_MEMBER_COUNT,
+    PROJECTION_FAILURE_SHADOW_MEMBER_ORDER,
+    PROJECTION_FAILURE_SHADOW_ACTIVE,
+} ProjectionFailure;
+
 /* These are presentation values only. The actual source constructor supplies
  * the owner and pool descriptor; no draw/capture-time adoption is allowed.
  * Retain creation receipts until world end: a checked source restore can make
@@ -79,8 +101,73 @@ typedef struct Projection {
 static Projection* owners;
 static uint64_t world;
 static int drawing, failed;
+static ProjectionFailure first_failure;
+static unsigned failure_members_before, failure_members_after;
+static unsigned char failure_active_before, failure_active_after;
+static int failure_has_shadow_counts;
+static char failure_text[160];
 
-static int refuse(void) { failed = 1; return 0; }
+static int refuse_with(ProjectionFailure reason)
+{
+    if (!failed) {
+        failed = 1;
+        first_failure = reason == PROJECTION_FAILURE_NONE
+            ? PROJECTION_FAILURE_CONTRACT : reason;
+    }
+    return 0;
+}
+static int refuse(void) { return refuse_with(PROJECTION_FAILURE_CONTRACT); }
+
+static const char* failure_name(ProjectionFailure reason)
+{
+    switch (reason) {
+    case PROJECTION_FAILURE_DRAW_STATE: return "draw interval state changed";
+    case PROJECTION_FAILURE_FIGHTER_IDENTITY: return "fighter lifetime identity changed";
+    case PROJECTION_FAILURE_SHADOW_OWNER: return "shadow owner tuple changed";
+    case PROJECTION_FAILURE_SHADOW_OBJECT: return "shadow object changed";
+    case PROJECTION_FAILURE_SHADOW_CAMERA: return "shadow camera changed";
+    case PROJECTION_FAILURE_SHADOW_CAMERA_CHILDREN: return "shadow camera WObj tuple changed";
+    case PROJECTION_FAILURE_SHADOW_INVERSE: return "shadow camera inverse appeared";
+    case PROJECTION_FAILURE_SHADOW_TEXTURE: return "shadow texture changed";
+    case PROJECTION_FAILURE_SHADOW_IMAGE_DESC: return "shadow image descriptor changed";
+    case PROJECTION_FAILURE_SHADOW_COORD: return "shadow texture coordinate mode changed";
+    case PROJECTION_FAILURE_SHADOW_IMAGE_PIXELS: return "shadow image pixels changed";
+    case PROJECTION_FAILURE_SHADOW_IMAGE_LAYOUT: return "shadow image layout changed";
+    case PROJECTION_FAILURE_SHADOW_DESCRIPTOR: return "shadow texture transform changed";
+    case PROJECTION_FAILURE_SHADOW_MEMBER_COUNT: return "shadow member count changed";
+    case PROJECTION_FAILURE_SHADOW_MEMBER_ORDER: return "shadow member order changed";
+    case PROJECTION_FAILURE_SHADOW_ACTIVE: return "shadow active state changed";
+    case PROJECTION_FAILURE_NONE: return "no projection failure";
+    case PROJECTION_FAILURE_CONTRACT:
+    default: return "projection contract refusal";
+    }
+}
+
+const char* slippi_fighter_projection_failure_reason(void)
+{
+    const char* name = failure_name(first_failure);
+    if (failure_has_shadow_counts) {
+        snprintf(failure_text, sizeof(failure_text),
+                 "%s (members %u->%u; active %u->%u)", name,
+                 failure_members_before, failure_members_after,
+                 (unsigned)failure_active_before, (unsigned)failure_active_after);
+        return failure_text;
+    }
+    return name;
+}
+
+static int refuse_shadow_topology(ProjectionFailure reason,
+                                  const Projection* p, unsigned final_count)
+{
+    if (!failed) {
+        failure_members_before = p->draw_member_count;
+        failure_members_after = final_count;
+        failure_active_before = p->draw_shadow_active;
+        failure_active_after = p->shadow.shadow->active;
+        failure_has_shadow_counts = 1;
+    }
+    return refuse_with(reason);
+}
 static int same(MeleeWebFighterProjectionIdentity a,
                 MeleeWebFighterProjectionIdentity b)
 {
@@ -146,27 +233,36 @@ static int bind_shadow(Projection* p)
 
 /* This follows only the exact tuple installed by the real Fighter constructor.
  * It never adopts child pointers discovered during drawing. */
-static int shadow_tuple_matches(const Projection* p)
+static ProjectionFailure shadow_tuple_failure(const Projection* p)
 {
     const ShadowTuple* t = &p->shadow;
-    if (!p->shadow_bound || p->shadow_retired ||
-        &p->fp->x20A4 != t->lb || p->fp->x20A4.shadow != t->shadow ||
-        t->shadow->camera != t->camera || t->shadow->texture != t->texture ||
-        t->camera->eyepos != t->eye || t->camera->interest != t->interest ||
-        t->camera->proj_mtx != NULL ||
-        t->texture->imagedesc != t->image ||
-        tobj_coord(t->texture) != TEX_COORD_SHADOW ||
-        t->image->image_ptr != t->image_pixels ||
-        t->image->width != t->image_width ||
-        t->image->height != t->image_height ||
-        t->image->format != t->image_format ||
-        t->image->mipmap != t->image_mipmap ||
-        memcmp(&t->shadow->scaleS, t->scale_s, sizeof(float)) != 0 ||
+    if (!p->shadow_bound || p->shadow_retired || &p->fp->x20A4 != t->lb)
+        return PROJECTION_FAILURE_SHADOW_OWNER;
+    if (p->fp->x20A4.shadow != t->shadow)
+        return PROJECTION_FAILURE_SHADOW_OBJECT;
+    if (t->shadow->camera != t->camera)
+        return PROJECTION_FAILURE_SHADOW_CAMERA;
+    if (t->shadow->texture != t->texture)
+        return PROJECTION_FAILURE_SHADOW_TEXTURE;
+    if (t->camera->eyepos != t->eye || t->camera->interest != t->interest)
+        return PROJECTION_FAILURE_SHADOW_CAMERA_CHILDREN;
+    if (t->camera->proj_mtx != NULL)
+        return PROJECTION_FAILURE_SHADOW_INVERSE;
+    if (t->texture->imagedesc != t->image)
+        return PROJECTION_FAILURE_SHADOW_IMAGE_DESC;
+    if (tobj_coord(t->texture) != TEX_COORD_SHADOW)
+        return PROJECTION_FAILURE_SHADOW_COORD;
+    if (t->image->image_ptr != t->image_pixels)
+        return PROJECTION_FAILURE_SHADOW_IMAGE_PIXELS;
+    if (t->image->width != t->image_width || t->image->height != t->image_height ||
+        t->image->format != t->image_format || t->image->mipmap != t->image_mipmap)
+        return PROJECTION_FAILURE_SHADOW_IMAGE_LAYOUT;
+    if (memcmp(&t->shadow->scaleS, t->scale_s, sizeof(float)) != 0 ||
         memcmp(&t->shadow->scaleT, t->scale_t, sizeof(float)) != 0 ||
         memcmp(&t->shadow->transS, t->translate_s, sizeof(float)) != 0 ||
         memcmp(&t->shadow->transT, t->translate_t, sizeof(float)) != 0)
-        return 0;
-    return 1;
+        return PROJECTION_FAILURE_SHADOW_DESCRIPTOR;
+    return PROJECTION_FAILURE_NONE;
 }
 
 static void read_shadow_values(const Projection* p, ShadowValues* v)
@@ -234,21 +330,36 @@ static int capture_shadow_members(Projection* p)
     return 1;
 }
 
-static int shadow_members_unchanged(const Projection* p)
+static ProjectionFailure shadow_members_failure(const Projection* p,
+                                                 unsigned* final_count)
 {
     HSD_SList* node = p->shadow.shadow->objects;
     unsigned i;
-    for (i = 0; i < p->draw_member_count; ++i) {
-        if (!node || node->data != p->draw_members[i].object)
-            return 0;
+    int order_matches = 1;
+    for (i = 0; node && i <= SHADOW_MEMBER_LIMIT; ++i) {
+        if (i < p->draw_member_count && node->data != p->draw_members[i].object)
+            order_matches = 0;
+        if (i == SHADOW_MEMBER_LIMIT) break;
         node = node->next;
     }
-    return node == NULL && p->shadow.shadow->active == p->draw_shadow_active;
+    if (node) {
+        i = SHADOW_MEMBER_LIMIT + 1;
+        order_matches = 0;
+    }
+    *final_count = i;
+    if (i != p->draw_member_count)
+        return PROJECTION_FAILURE_SHADOW_MEMBER_COUNT;
+    if (!order_matches)
+        return PROJECTION_FAILURE_SHADOW_MEMBER_ORDER;
+    if (p->shadow.shadow->active != p->draw_shadow_active)
+        return PROJECTION_FAILURE_SHADOW_ACTIVE;
+    return PROJECTION_FAILURE_NONE;
 }
 int slippi_fighter_projection_world_begin(uint64_t w)
 {
     if (!w || world || owners || drawing) return refuse();
-    world=w; failed=0; return 1;
+    world=w; failed=0; first_failure=PROJECTION_FAILURE_NONE;
+    failure_has_shadow_counts=0; return 1;
 }
 int slippi_fighter_projection_world_end(uint64_t w)
 {
@@ -267,8 +378,8 @@ int slippi_fighter_projection_created(void* object,const void* descriptor,size_t
     for(p=owners;p;p=p->next)
         if(p->fp==object && same(p->identity,identity)) break;
     if (p) {
-        if (!p->shadow_bound || p->shadow_retired || !shadow_tuple_matches(p))
-            return refuse();
+        ProjectionFailure reason = shadow_tuple_failure(p);
+        if (reason != PROJECTION_FAILURE_NONE) return refuse_with(reason);
         return 1;
     }
     p=calloc(1,sizeof(*p)); if(!p) return refuse();
@@ -287,9 +398,11 @@ int slippi_fighter_projection_shadow_retiring(void* lbshadow, void* shadow)
     if (failed || drawing) return refuse();
     for (p=owners;p;p=p->next) {
         if ((void*)p->shadow.lb != lbshadow) continue;
-        if (!p->shadow_bound || p->shadow_retired || p->shadow.shadow != shadow ||
-            !current(p) || !shadow_tuple_matches(p))
-            return refuse();
+        if (!p->shadow_bound || p->shadow_retired || p->shadow.shadow != shadow)
+            return refuse_with(PROJECTION_FAILURE_SHADOW_OBJECT);
+        if (!current(p)) return refuse_with(PROJECTION_FAILURE_FIGHTER_IDENTITY);
+        ProjectionFailure reason = shadow_tuple_failure(p);
+        if (reason != PROJECTION_FAILURE_NONE) return refuse_with(reason);
         p->shadow_retired = 1;
         return 1;
     }
@@ -323,7 +436,9 @@ int slippi_fighter_projection_draw_begin(void)
         Projection* p;
         for(p=owners;p;p=p->next)
             if(p->fp==g->user_data && p->selected) break;
-        if(!p || p->listed || !shadow_tuple_matches(p)) return refuse();
+        if (!p || p->listed) return refuse();
+        ProjectionFailure reason = shadow_tuple_failure(p);
+        if (reason != PROJECTION_FAILURE_NONE) return refuse_with(reason);
         p->listed=1;
     }
     for(Projection* p=owners;p;p=p->next)
@@ -343,23 +458,37 @@ int slippi_fighter_projection_draw_begin(void)
 }
 int slippi_fighter_projection_draw_end(void)
 {
-    if (!world || !drawing) return refuse();
+    if (!world || !drawing) return refuse_with(PROJECTION_FAILURE_DRAW_STATE);
     /* Lifecycle hooks refuse destruction/construction during the view. Check
      * every identity again before reading or restoring any source fields. */
-    for(Projection* p=owners;p;p=p->next)
-        if(p->selected && (!current(p) || !shadow_tuple_matches(p))) return refuse();
-    int topology_changed=0;
+    for(Projection* p=owners;p;p=p->next) if (p->selected) {
+        if (!current(p)) return refuse_with(PROJECTION_FAILURE_FIGHTER_IDENTITY);
+        ProjectionFailure reason = shadow_tuple_failure(p);
+        if (reason != PROJECTION_FAILURE_NONE) return refuse_with(reason);
+    }
+    ProjectionFailure topology_failure = PROJECTION_FAILURE_NONE;
+    Projection* topology_owner = NULL;
+    unsigned topology_final_count = 0;
     for(Projection* p=owners;p;p=p->next) if(p->selected) {
         memcpy(p->screen,&p->fp->x2188,sizeof(p->screen));
         p->flag=p->fp->x221F_b0;
         read_shadow_values(p, &p->shadow_values);
-        if (!shadow_members_unchanged(p)) topology_changed=1;
+        unsigned final_count = 0;
+        ProjectionFailure reason = shadow_members_failure(p, &final_count);
+        if (topology_failure == PROJECTION_FAILURE_NONE &&
+            reason != PROJECTION_FAILURE_NONE) {
+            topology_failure = reason;
+            topology_owner = p;
+            topology_final_count = final_count;
+        }
         memcpy(&p->fp->x2188,p->saved,sizeof(p->saved));
         /* Restore only this bit; other draw-authored flag bits stay visible. */
         p->fp->x221F_b0=p->saved_flag;p->selected=0;
         write_shadow_values(p, &p->saved_shadow_values);
     }
     drawing=0;
-    if (topology_changed) return refuse();
+    if (topology_failure != PROJECTION_FAILURE_NONE)
+        return refuse_shadow_topology(topology_failure, topology_owner,
+                                      topology_final_count);
     return !failed;
 }

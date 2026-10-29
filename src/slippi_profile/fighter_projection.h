@@ -15,6 +15,7 @@ int slippi_fighter_projection_retiring(void*);
 int slippi_fighter_projection_require(void*);
 int slippi_fighter_projection_draw_begin(void);
 int slippi_fighter_projection_draw_end(void);
+const char* slippi_fighter_projection_failure_reason(void);
 #ifdef __cplusplus
 }
 #endif
@@ -24,5 +25,6 @@ static inline int slippi_fighter_projection_world_end(uint64_t w){(void)w;return
 static inline int slippi_fighter_projection_shadow_retiring(void* lb,void* s){(void)lb;(void)s;return 1;}
 static inline int slippi_fighter_projection_draw_begin(void){return 1;}
 static inline int slippi_fighter_projection_draw_end(void){return 1;}
+static inline const char* slippi_fighter_projection_failure_reason(void){return "profile projection detail unavailable";}
 #endif
 #endif

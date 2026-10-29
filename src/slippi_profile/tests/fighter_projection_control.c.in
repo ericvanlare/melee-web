@@ -20,6 +20,7 @@ static HSD_Shadow shadow;
 static HSD_SList shadow_object;
 static HSD_WObj other_eye;
 static unsigned char fighter_model;
+static unsigned char other_model;
 static unsigned char shadow_pixels[256];
 static HSD_GObj camera_gobj={0,0,&camera};
 static HSD_GObj* current_camera=&camera_gobj;
@@ -127,7 +128,7 @@ static void init_fixture(Fighter* fp, HSD_GObj* fighter)
 int main(void)
 {
  Fighter fp={0}; CmSubject subject={0}; HSD_GObj fighter={0};
- HSD_SList rebuilt_shadow_node={0};
+ HSD_SList rebuilt_shadow_node={0}, extra_shadow_node={0};
  init_fixture(&fp,&fighter);fp.x890_cameraBox=&subject;
  fp.x2188=(S32Vec2){123,456};fp.neighbor=1;
  set_shadow_values(&fp,0);camera.flags&=~0xC0000000u;
@@ -208,16 +209,91 @@ int main(void)
  assert(fp.x2188.x==31&&fp.x2188.y==32);
  assert(slippi_fighter_projection_world_end(4));
 
- /* A lazy inverse allocation is never adopted or freed by this value view. */
- identity.world=5;identity.fighter=8;
+ /* Source-authored active changes are distinguished from member changes. */
+ identity.world=5;identity.fighter=9;
  assert(slippi_fighter_projection_world_begin(5));
  init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
  assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
  assert(slippi_fighter_projection_draw_begin());
+ shadow.active=0;
+ assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow active state changed (members 1->1; active 1->0)")==0);
+ assert(shadow.active==0&&shadow.objects==&shadow_object);
+ assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow active state changed (members 1->1; active 1->0)")==0);
+ assert(shadow.active==0&&shadow.objects==&shadow_object);
+ assert(slippi_fighter_projection_world_end(5));
+
+ /* The ordered JObj value list is checked without constraining node identity. */
+ identity.world=6;identity.fighter=10;
+ assert(slippi_fighter_projection_world_begin(6));
+ init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ assert(slippi_fighter_projection_draw_begin());
+ shadow_object.data=&other_model;
+ assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow member order changed (members 1->1; active 1->1)")==0);
+ assert(shadow.objects==&shadow_object&&shadow_object.data==&other_model);
+ assert(slippi_fighter_projection_world_end(6));
+
+ /* A source-valid second accessory member is reported with exact bounded count. */
+ identity.world=7;identity.fighter=11;
+ assert(slippi_fighter_projection_world_begin(7));
+ init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ assert(slippi_fighter_projection_draw_begin());
+ extra_shadow_node.data=&other_model;extra_shadow_node.next=&shadow_object;
+ shadow.objects=&extra_shadow_node;
+ assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow member count changed (members 1->2; active 1->1)")==0);
+ assert(shadow.objects==&extra_shadow_node&&extra_shadow_node.next==&shadow_object);
+ assert(slippi_fighter_projection_world_end(7));
+
+ /* Image layout mismatch is reported before draw admission mutates any values. */
+ identity.world=8;identity.fighter=12;
+ assert(slippi_fighter_projection_world_begin(8));
+ init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
+ fp.x2188=(S32Vec2){48,49};
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ shadow_image.width=128;
+ assert(!slippi_fighter_projection_draw_begin());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow image layout changed")==0);
+ assert(shadow_image.width==128&&fp.x2188.x==48&&fp.x2188.y==49);
+ assert(shadow_eye.pos.x==1&&shadow_eye.pos.y==2&&shadow_eye.pos.z==3);
+ assert(slippi_fighter_projection_world_end(8));
+
+ /* A lazy inverse allocation is never adopted or freed by this value view. */
+ identity.world=9;identity.fighter=13;
+ assert(slippi_fighter_projection_world_begin(9));
+ init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ assert(slippi_fighter_projection_draw_begin());
  Mtx late_inverse={{0}};
+ Vec3 eye_before=shadow_eye.pos;
+ Mtx texture_before;
+ memcpy(texture_before,shadow_texture.mtx,sizeof(texture_before));
+ uint32_t texture_flags_before=shadow_texture.flags;
+ S32Vec2 screen_before=fp.x2188;
  camera.proj_mtx=&late_inverse;
  assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow camera inverse appeared")==0);
  assert(camera.proj_mtx==&late_inverse);
+ assert(memcmp(&shadow_eye.pos,&eye_before,sizeof(eye_before))==0);
+ assert(memcmp(shadow_texture.mtx,texture_before,sizeof(texture_before))==0);
+ assert(shadow_texture.flags==texture_flags_before);
+ assert(memcmp(&fp.x2188,&screen_before,sizeof(screen_before))==0);
+ assert(!slippi_fighter_projection_draw_end());
+ assert(strcmp(slippi_fighter_projection_failure_reason(),
+               "shadow camera inverse appeared")==0);
+ assert(camera.proj_mtx==&late_inverse);
+ assert(memcmp(&shadow_eye.pos,&eye_before,sizeof(eye_before))==0);
+ assert(memcmp(shadow_texture.mtx,texture_before,sizeof(texture_before))==0);
  /* The failed interval is terminal, as in production's sticky refusal path. */
  return 0;
 }

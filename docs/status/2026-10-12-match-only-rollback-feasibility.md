@@ -1185,7 +1185,7 @@ final raw category pairs still match, and strict refusal and final-present
 exclusion remain unchanged. This proves the write occurrence and pointer
 membership for the observed interval, not continuous child lifetime.
 
-The reviewed next repair isolates the camera's typed values and the directly
+The reviewed V12 repair isolates the camera's typed values and the directly
 written shadow texture matrix through the full original draw. Late shadow-texture
 consumers must see that matrix before canonical values are restored. Source list,
 reference-count, image and active-texture membership operations retain their
@@ -1193,6 +1193,15 @@ ownership; they cannot be replaced by pointer copies. The existing Fighter
 completion hooks follow shadow construction, while child retirement must occur
 before the original shadow destruction. No generic world-object handling or
 main-camera ownership is inferred from this shadow proof.
+
+V12 at `db077477` passes focused controls and the affected browser build, but its
+first browser run stops at original draw 0: the new presentation restoration guard
+refuses before any warm sample or rollback command completes. The exact refused
+condition is not yet identified. Its snapshot close also traps on the terminal
+refusal; renderer shutdown succeeds and all owned browser processes are absent.
+The producer and failed run are retained. The next step is a precise first-failure
+reason and one reduced first-draw check, with every guard unchanged. V11's later
+two-tick results remain historical and cannot be attributed to this candidate.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The
