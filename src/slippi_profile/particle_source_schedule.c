@@ -21,6 +21,8 @@
 
 extern HSD_ObjAllocData gobj_alloc_data;
 extern HSD_CObjInfo hsdCObj;
+/* eflib.c exports this callback but does not declare it in eflib.h. */
+extern void efLib_render_callback(HSD_GObj*, int);
 
 /* Implemented beside the private camera callback and its process in camera.c.
  * These are source identities, not guessed code addresses. */
