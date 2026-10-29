@@ -1351,11 +1351,15 @@ nodes, nine authored-mask lists and 40 callback nodes without truncation. All 38
 distinct render/process table entries resolve against that exact producer. The
 last camera has classifier 21 and process link 24, matching DevText rather than
 the debug-menu alternative. This closes the current camera inventory; original
-special-camera dispatch is still covered separately. Baseline comparison remains
-unrun pending the bounded DevText browser test. Its exact constructor receipt and
-existing render-owner getter preserve original draw behavior; focused controls,
-configured source-unit syntax and independent fixed-interval review pass. Results/reinitialization without actual
-retirement is still unsupported.
+special-camera dispatch is still covered separately. The reviewed DevText repair
+at `edf003b5` passes camera/source preparation in the actual browser and reaches
+baseline draw 300, which refuses with code 1205 before any sealed comparison.
+The adapter overwrites the checked draw error, while source camera/dispatcher
+wrappers can lose leaf errors through null diagnostic buffers. The next bounded
+step preserves those first causes before another unchanged strict attempt. No
+specific draw behavior fix is justified yet. DevText constructor and render-owner
+controls, configured source-unit syntax and independent fixed-interval review
+pass; Results/reinitialization without actual retirement remains unsupported.
 Generic callback admission remains refused. No successful browser comparison is implied.
 The sticky owner failure remains visible during source and renderer close. All
 launched process IDs are independently absent and all nine runtime producer

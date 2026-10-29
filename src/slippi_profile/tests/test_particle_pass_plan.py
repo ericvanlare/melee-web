@@ -639,6 +639,14 @@ class ParticlePassPlanTests(unittest.TestCase):
             self.assertEqual("1", truncated_gx17["tail_reached"])
             self.assertEqual("1", truncated_gx17["topology_complete"])
             self.assertEqual("0", truncated_gx17["records_complete"])
+            first = subprocess.run([str(scratch / "control"), "first-error"],
+                                   cwd=scratch, capture_output=True, text=True, timeout=15)
+            (scratch / "first-error.log").write_text(first.stdout + first.stderr)
+            self.assertEqual(0, first.returncode, first.stdout + first.stderr)
+            records = [line for line in first.stderr.splitlines()
+                       if line.startswith("Particle schedule first failure:")]
+            self.assertEqual(["Particle schedule first failure: Unexpected source camera end"], records)
+            self.assertIn("source first-error preservation control passed", first.stdout)
         except BaseException:
             print("Retained particle pass planner fixture:", scratch, flush=True)
             raise

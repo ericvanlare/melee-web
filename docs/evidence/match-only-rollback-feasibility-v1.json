@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "COMPLETE_CURRENT_CAMERA_BOUNDARY_OBSERVED; strict baseline still refuses DevText before comparisons",
+      "status": "CAMERA_SOURCE_PREFLIGHT_PASSES; first baseline draw refuses 1205 before comparisons; first-cause reporting repair in progress",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9247,7 +9247,7 @@
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Finish bounded source closure of complete observed camera chain and implement exact DevText camera role, then one unchanged strict two-tick attempt.",
+      "next": "Preserve checked source/draw errors and NULL-buffer particle leaf first failures; review and run one strict two-tick attempt with unchanged policy.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9488,7 +9488,46 @@
           "review": {
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/devtext-camera-luna-review-v1.json",
             "sha256": "edfaebebcc93a39f3a224343569658d78ab52534f61527b833fe8bf8040e99c0"
+          },
+          "browser_result": {
+            "runtime_head": "edf003b561797e17caaa892f14f76d73d05cbae3",
+            "receipt": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v7/result-receipt.json",
+              "sha256": "eceb6806de86b46cb4fe9011e3d39d05d6f808868b1d8e61574ee2216c5f3ef0"
+            },
+            "build": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v11/result.json",
+              "sha256": "8b49b0027dd05602494cb61eb1a4b014664092042eb34155e6c57ac461b114de"
+            },
+            "configuration": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v7/final-linked-configuration-v1.json",
+              "sha256": "30276775664b99602139411bc7f30cfd1a4c3d6ba78b05213424256f1c4ab740"
+            },
+            "archive": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-devtext-browser-archive/archive.json",
+              "sha256": "248b7f9b04a763264626d712f1b81fcb9b2abeb4d0489750d65457b361774496"
+            },
+            "scope": "Camera/source preparation passed; baseline draw300 refused1205. No raw pairs sealed, comparisons or final present. Owned processes absent and all producer pins unchanged. Runtime cleanup retains original failed-owner errors."
           }
+        },
+        "draw_cause_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-preparation-draw-cause-sol-review-v1.json",
+          "sha256": "866c86cd9bed6920d8ef5fc458a4a2edb95c4027f0cf55f6c8a00e9c45ffd1f0"
+        }
+      },
+      "first_cause_diagnostics": {
+        "adapter_freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/adapter-error-cause-repair-v2/freeze.json",
+          "sha256": "2172178062e5351d23f0153a4d59878ad8360a810865e021be8aed1d7d56eefd"
+        },
+        "particle_freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-first-cause-candidate-v1/freeze.json",
+          "sha256": "a9d70cf0654ab5ec84a3060bfb773d57a89b44ac9b4b77e173430943a3c07368"
+        },
+        "scope": "Diagnostic-only current checked-call cause preservation and first existing-log particle failure through NULL callers; error codes, source guards, comparisons, cleanup and evidence ABI unchanged. Adapter focused1PASS and particle focused2PASS; independent review GO. No new browser result.",
+        "review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/adapter-and-particle-first-cause-luna-review-v1.json",
+          "sha256": "31cab6fb33b94b0be7d5b59a0e6a04365ec0858541943a20a4352baea5fe35a7"
         }
       }
     }

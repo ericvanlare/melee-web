@@ -143,6 +143,14 @@ static int bytes_equal(const void* left, const void* right, size_t size)
     return !size || memcmp(left, right, size) == 0;
 }
 
+static void source_mark_failed(const char* reason)
+{
+    const int first = !state.failed;
+    state.failed = 1;
+    if (first)
+        fprintf(stderr, "Particle schedule first failure: %.256s\n", reason);
+}
+
 static int source_failure(const char* message, char* error, size_t error_size)
 {
     uint64_t world = state.world;
@@ -150,7 +158,7 @@ static int source_failure(const char* message, char* error, size_t error_size)
     /* error belongs to the caller. Unwind only writes a separate ignored
      * buffer, so a leaf message==error remains valid throughout cleanup. */
     const int preserve_buffer = message == error;
-    state.failed = 1;
+    source_mark_failed(message);
     if (state.drawing || state.ordinary_drawing) {
         char ignored[1];
         (void) slippi_particle_presentation_draw_end(ignored, sizeof(ignored));
@@ -232,7 +240,7 @@ static int cobj_is_canonical(const HSD_GObj* camera)
 int slippi_particle_source_ifcoget_constructing(void)
 {
     if (melee_web_cpu_interval_active() || ifcoget_receipt.camera) {
-        state.failed = 1;
+        source_mark_failed("IfCoGet constructor admission refused");
         return 0;
     }
     return 1;
@@ -248,7 +256,7 @@ int slippi_particle_source_ifcoget_created(HSD_GObj* camera)
         camera->render_priority != 9 ||
         camera->render_cb != HSD_GObj_803910D8 ||
         camera->gxlink_prios != 0x8400) {
-        state.failed = 1;
+        source_mark_failed("IfCoGet constructor publication refused");
         return 0;
     }
     ifcoget_receipt.camera = camera;
@@ -262,7 +270,7 @@ int slippi_particle_source_devtext_constructing(
     if (melee_web_cpu_interval_active() || devtext_receipt.camera ||
         classifier != 0x15 || p_link != 24 || priority != 0 ||
         gx_link != 17 || camera_priority != 11) {
-        state.failed = 1;
+        source_mark_failed("DevText constructor admission refused");
         return 0;
     }
     return 1;
@@ -277,7 +285,7 @@ int slippi_particle_source_devtext_created(HSD_GObj* camera)
         camera->render_priority != 11 ||
         camera->render_cb != HSD_GObj_803910D8 ||
         camera->gxlink_prios != 0x20000) {
-        state.failed = 1;
+        source_mark_failed("DevText constructor publication refused");
         return 0;
     }
     devtext_receipt.camera = camera;
@@ -290,7 +298,7 @@ int slippi_particle_source_gobj_retiring(const HSD_GObj* object)
     if (object != ifcoget_receipt.camera && object != devtext_receipt.camera)
         return 1;
     if (melee_web_cpu_interval_active()) {
-        state.failed = 1;
+        source_mark_failed("Observed source camera retirement during CPU interval");
         return 0;
     }
     if (object == ifcoget_receipt.camera)
@@ -987,6 +995,42 @@ static int schedule_equal(const Schedule* left, const Schedule* right)
         bytes_equal(left->link_count, right->link_count, sizeof(left->link_count));
 }
 
+/* Called only after the unchanged equality verdict has failed. */
+static void describe_schedule_difference(const Schedule* left,
+                                          const Schedule* right,
+                                          char* message, size_t size)
+{
+    const char* field = "unknown";
+    size_t row = 0;
+#define DIFFERENT_SCALAR(name) \
+    if (left->name != right->name) { field = #name; goto found; }
+    DIFFERENT_SCALAR(world)
+    DIFFERENT_SCALAR(interval)
+    DIFFERENT_SCALAR(main_x398_b3)
+    DIFFERENT_SCALAR(hud_hidden)
+    DIFFERENT_SCALAR(selected_links)
+    DIFFERENT_SCALAR(camera_node_count)
+    DIFFERENT_SCALAR(event_count)
+    DIFFERENT_SCALAR(visit_count)
+    DIFFERENT_SCALAR(selected_node_count)
+#undef DIFFERENT_SCALAR
+#define DIFFERENT_ROWS(name, count) \
+    for (row = 0; row < (count); ++row) \
+        if (memcmp(&left->name[row], &right->name[row], \
+                   sizeof(left->name[row]))) { field = #name; goto found; }
+    DIFFERENT_ROWS(camera_nodes, left->camera_node_count)
+    DIFFERENT_ROWS(events, left->event_count)
+    DIFFERENT_ROWS(visits, left->visit_count)
+    DIFFERENT_ROWS(selected_nodes, left->selected_node_count)
+    DIFFERENT_ROWS(link_first, sizeof(left->link_first)/sizeof(left->link_first[0]))
+    DIFFERENT_ROWS(link_count, sizeof(left->link_count)/sizeof(left->link_count[0]))
+#undef DIFFERENT_ROWS
+found:
+    snprintf(message, size,
+             "Source callback or particle schedule changed before draw: field=%s row=%zu",
+             field, row);
+}
+
 int slippi_particle_source_world_begin(uint64_t world_generation)
 {
     if (!world_generation || state.world || state.drawing ||
@@ -1090,9 +1134,10 @@ int slippi_particle_source_draw_begin(uint64_t world_generation,
                               error, error_size);
     }
     if (!schedule_equal(&state.schedule, &current)) {
+        char message[192];
+        describe_schedule_difference(&state.schedule, &current, message, sizeof(message));
         schedule_clear(&current);
-        return source_failure("Source callback or particle schedule changed before draw",
-                              error, error_size);
+        return source_failure(message, error, error_size);
     }
     schedule_clear(&current);
     if (!slippi_particle_presentation_draw_begin(
@@ -1182,7 +1227,8 @@ int slippi_particle_source_draw_end(char* error, size_t error_size)
     state.event_cursor = 0;
     schedule_clear(&state.schedule);
     if (!complete || !result) {
-        state.failed = 1;
+        source_mark_failed(error && error_size && error[0] ? error :
+                           "Original source draw did not consume the complete camera chain");
         if (state.interval)
             (void) slippi_particle_presentation_interval_end(
                 state.world, state.interval);
@@ -1226,7 +1272,7 @@ int slippi_particle_source_interval_end(uint64_t world_generation,
     state.open_camera = NULL;
     state.ordinary_drawing = 0;
     state.drawing = state.camera_open = state.helper_camera_open = 0;
-    if (!result) state.failed = 1;
+    if (!result) source_mark_failed("Particle source interval end refused");
     return result;
 }
 

@@ -16,7 +16,11 @@
 // Phase is a diagnostic-only modeled unavailable leaf in this adapter control.
 extern "C" void melee_web_lobj_writer_phase(uint32_t){}
 extern "C" void melee_web_tobj_writer_phase(uint32_t){}
-extern "C" void melee_web_tobj_writer_boundary(uint32_t,uint32_t){}
+unsigned tobj_boundary_calls=0;
+uint32_t tobj_boundary_index=0,tobj_boundary_frame=0;
+extern "C" void melee_web_tobj_writer_boundary(uint32_t index,uint32_t frame){
+    ++tobj_boundary_calls;tobj_boundary_index=index;tobj_boundary_frame=frame;
+}
 
 #include <cstdio>
 #include <cstring>
@@ -162,6 +166,9 @@ std::uint32_t fail_admission_leaf=0;
 bool fail_capture=false;
 bool fail_replay=false;
 bool fail_baseline_sample300=false;
+unsigned step_attempts=0,fail_step_attempt=0;
+unsigned draw_attempts=0,fail_draw_attempt=0;
+bool fail_draw_without_diagnostic=false;
 bool modeled_payload_byte_failure=false;
 bool fail_static_replay=false;
 unsigned journal_failure_tick=0,unexpected_draw_tick=0;
@@ -417,6 +424,8 @@ void reset_fixture() {
     fail_capture=false;
     fixture_draw_diagnostics={};
     fail_static_replay=false;fail_baseline_sample300=false;journal_failure_tick=unexpected_draw_tick=0;
+    step_attempts=fail_step_attempt=draw_attempts=fail_draw_attempt=0;
+    fail_draw_without_diagnostic=false;
     // Fixture-only in-place reset: avoid a >64KiB automatic aggregate.
     cpu_restore.~CpuRestoreControl();
     ::new (static_cast<void*>(&cpu_restore)) CpuRestoreControl{};
@@ -427,6 +436,7 @@ void reset_fixture() {
     rng_profile_observation={1,0x1234u,0,UINT32_MAX,0,176,0,0};transfer_diagnostic={};
     pcm.fill(0);input_bytes.fill(0);audio_phase=7;
     draw_calls=0;pending_submission=false;world_exists=true;fail_admission_leaf=0;fail_replay=false;modeled_payload_byte_failure=false;
+    tobj_boundary_calls=0;tobj_boundary_index=tobj_boundary_frame=0;
     idle_boundary_calls=submission_boundary_calls=0;capsule_disarms=capsule_destroys=0;
     action_disarms=action_destroys=0;tick_calls=0;tick_samples={};tick_sample_count=0;
     interruption=StepInterruption::None;interruption_done=false;
@@ -452,6 +462,58 @@ void close_and_retire() {
     check(melee_web_synctest_cpu_before_source_close()==1,"Source close was not admitted after disarm");
     match.reset();world_exists=false;
     check(melee_web_synctest_cpu_after_source_close()==1,"Retired source owners did not release the capsule");
+}
+void assert_source_call_failure_latched(std::uint32_t code,const std::string& message,
+                                        std::uint32_t next_command,
+                                        unsigned expected_ticks,unsigned expected_draws) {
+    const auto* evidence=static_cast<const CpuRestoreEvidence*>(
+        melee_web_synctest_cpu_restore_evidence());
+    check(evidence&&evidence->first_failure==code&&cpu_restore.state==CpuRestoreControl::Failed,
+          "Checked source refusal did not preserve its code/state");
+    if(cpu_restore.two_active)
+        check(cpu_restore.two.first_failure==code&&cpu_restore.two.state==CpuRestoreControl::Failed,
+              "Two-tick checked source refusal did not preserve its code/state");
+    check(melee_web_synctest_cpu_restore_command(next_command)==code&&
+          std::string(error)==message&&tick_calls==expected_ticks&&draw_calls==expected_draws,
+          "Next command overwrote the checked source cause or advanced source/draw work");
+    check(melee_web_synctest_cpu_restore_command(5)==code&&std::string(error)==message&&
+          tick_calls==expected_ticks&&draw_calls==expected_draws,
+          "CLOSE overwrote the checked source cause or advanced source/draw work");
+    check(melee_web_synctest_cpu_before_source_close()==1,
+          "Source close was not admitted after checked source refusal");
+    match.reset();world_exists=false;
+    check(melee_web_synctest_cpu_after_source_close()==1,
+          "Source retirement refused checked source failure");
+}
+void setup_two_capture_for_failure() {
+    reset_fixture();check(configure_valid(),"Two source-failure configure refused");
+    check(melee_web_synctest_cpu_restore_command(8)==0,"Two source-failure capture refused");
+}
+void setup_two_baseline300_for_failure() {
+    setup_two_capture_for_failure();
+    check(melee_web_synctest_cpu_restore_command(9)==0,"Two source-failure baseline300 refused");
+    pending_submission=false;
+}
+void setup_two_baseline301_for_failure() {
+    setup_two_baseline300_for_failure();
+    check(melee_web_synctest_cpu_restore_command(10)==0,"Two source-failure baseline301 refused");
+    pending_submission=false;
+}
+void setup_two_equal_for_failure() {
+    setup_two_baseline301_for_failure();
+    check(melee_web_synctest_cpu_restore_command(11)==0,"Two source-failure replay refused");
+}
+void mark_stale_source_error() {
+    std::snprintf(error,sizeof(error),"stale error from an earlier boundary");
+}
+void assert_source_call_report(std::uint32_t code,const char* boundary,const char* cause,
+                               std::uint32_t next_command,unsigned expected_ticks,
+                               unsigned expected_draws) {
+    const std::string message(error);
+    check(message.find(boundary)!=std::string::npos&&message.find(cause)!=std::string::npos&&
+          message.find("stale error")==std::string::npos,
+          "Checked source refusal lost its current cause or used stale error text");
+    assert_source_call_failure_latched(code,message,next_command,expected_ticks,expected_draws);
 }
 void verify_successful_interval() {
     reset_fixture();
@@ -640,6 +702,110 @@ void verify_two_tick_refusals() {
     check(melee_web_synctest_cpu_restore_command(2)!=0&&tick_calls==0,"Legacy command entered two route");
     close_and_retire();
 }
+void verify_checked_source_call_failure_reporting() {
+#if MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
+    {
+        setup_two_capture_for_failure();
+        fail_draw_attempt=1;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(9);
+        check(code==0x4b5u&&tick_calls==1&&draw_calls==0&&draw_attempts==1,
+              "Two baseline300 draw refusal changed code or reached another draw");
+        check(tobj_boundary_calls==2&&tobj_boundary_index==0&&tobj_boundary_frame==0,
+              "Two baseline300 draw refusal did not close the writer boundary");
+        assert_source_call_report(code,"baseline draw300 refused",
+            "fixture draw_present attempt=1 sentinel",10,1,0);
+    }
+    {
+        setup_two_baseline300_for_failure();
+        fail_step_attempt=step_attempts+1;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(10);
+        check(code==0x4b7u&&tick_calls==1&&draw_calls==1,
+              "Two baseline301 step refusal changed code or reached its draw");
+        assert_source_call_report(code,"baseline sample301 refused",
+            "fixture snapshot_step sample=301 sentinel",11,1,1);
+    }
+    {
+        setup_two_baseline300_for_failure();
+        fail_draw_attempt=2;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(10);
+        check(code==0x4b9u&&tick_calls==2&&draw_calls==1&&draw_attempts==2,
+              "Two baseline301 draw refusal changed code or reached another draw");
+        check(tobj_boundary_calls==4&&tobj_boundary_index==0&&tobj_boundary_frame==0,
+              "Two baseline301 draw refusal did not close the writer boundary");
+        assert_source_call_report(code,"baseline draw301 refused",
+            "fixture draw_present attempt=2 sentinel",11,2,1);
+    }
+    {
+        setup_two_baseline301_for_failure();
+        fail_step_attempt=step_attempts+1;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(11);
+        check(code==0x4bdu&&tick_calls==2&&draw_calls==2,
+              "Two replay300 step refusal changed code or advanced source/draw");
+        assert_source_call_report(code,"replay sample300 refused",
+            "fixture snapshot_step sample=300 sentinel",12,2,2);
+    }
+    {
+        setup_two_baseline301_for_failure();
+        fail_step_attempt=step_attempts+2;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(11);
+        check(code==0x4beu&&tick_calls==3&&draw_calls==2,
+              "Two replay301 step refusal changed code or advanced source/draw");
+        assert_source_call_report(code,"replay sample301 refused",
+            "fixture snapshot_step sample=301 sentinel",12,3,2);
+    }
+    {
+        setup_two_equal_for_failure();
+        fail_draw_attempt=3;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(12);
+        check(code==0x4c1u&&tick_calls==4&&draw_calls==2&&draw_attempts==3,
+              "Two final draw refusal changed code or advanced another draw");
+        assert_source_call_report(code,"two-tick final draw refused",
+            "fixture draw_present attempt=3 sentinel",13,4,2);
+    }
+#endif
+    {
+        reset_fixture();check(configure_valid(),"Single baseline-step configure refused");
+        check(melee_web_synctest_cpu_restore_command(1)==0,"Single baseline-step capture refused");
+        fail_step_attempt=step_attempts+1;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(2);
+        check(code==0x437u&&tick_calls==0&&draw_calls==0,
+              "Single baseline-step refusal changed code or reached draw");
+        assert_source_call_report(code,"baseline sample300 refused",
+            "fixture snapshot_step sample=300 sentinel",3,0,0);
+    }
+    {
+        reset_fixture();check(configure_valid(),"Single replay-step configure refused");
+        check(melee_web_synctest_cpu_restore_command(1)==0,"Single replay-step capture refused");
+        fail_step_attempt=step_attempts+2;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(2);
+        check(code==0x470u&&tick_calls==1&&draw_calls==0,
+              "Single replay-step refusal changed code or reached draw");
+        assert_source_call_report(code,"replay sample300 refused",
+            "fixture snapshot_step sample=300 sentinel",3,1,0);
+    }
+    {
+        reset_fixture();check(configure_valid(),"Single baseline-draw configure refused");
+        check(melee_web_synctest_cpu_restore_command(1)==0,"Single baseline-draw capture refused");
+        fail_draw_attempt=1;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(6);
+        check(code==0x4a0u&&tick_calls==1&&draw_calls==0&&draw_attempts==1,
+              "Single baseline-draw refusal changed code or reached draw completion");
+        assert_source_call_report(code,"baseline source draw refused",
+            "fixture draw_present attempt=1 sentinel",7,1,0);
+    }
+    {
+        reset_fixture();check(configure_valid(),"Single final-draw configure refused");
+        check(melee_web_synctest_cpu_restore_command(1)==0&&
+              melee_web_synctest_cpu_restore_command(2)==0,
+              "Single final-draw setup refused");
+        fail_draw_attempt=1;fail_draw_without_diagnostic=true;mark_stale_source_error();
+        const auto code=melee_web_synctest_cpu_restore_command(3);
+        check(code==0x481u&&tick_calls==2&&draw_calls==0&&draw_attempts==1,
+              "Single final-draw refusal changed code or reached draw completion");
+        assert_source_call_report(code,"final source draw refused",
+            "source draw returned failure without a diagnostic",4,2,0);
+    }
+}
 void verify_drawn_refusal_and_postdraw_mismatch() {
     reset_fixture();check(configure_valid(),"Configure failed");
     check(!melee_web_synctest_cpu_restore_command(1)&&!melee_web_synctest_cpu_restore_command(6),"Baseline failed");
@@ -783,7 +949,12 @@ void verify_invalid_configuration_guards() {
 }
 
 extern "C" int melee_web_snapshot_step(unsigned sample) {
+    ++step_attempts;
     if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301))||tick_sample_count>=tick_samples.size()) return 0;
+    if(fail_step_attempt==step_attempts) {
+        std::snprintf(error,sizeof(error),"fixture snapshot_step sample=%u sentinel",sample);
+        return 0;
+    }
     if(fail_baseline_sample300&&sample==300) {
         const char sentinel[]="fixture sample300 source sentinel";
         std::memset(error,'x',sizeof(error));
@@ -840,6 +1011,12 @@ extern "C" int melee_web_snapshot_step(unsigned sample) {
     return 1;
 }
 extern "C" int melee_web_synctest_draw_present() {
+    ++draw_attempts;
+    if(fail_draw_attempt==draw_attempts) {
+        if(!fail_draw_without_diagnostic)
+            std::snprintf(error,sizeof(error),"fixture draw_present attempt=%u sentinel",draw_attempts);
+        return 0;
+    }
     if(!match||draw_calls>=(cpu_restore.two_active?3u:2u)) return 0;
     if(cpu_restore.drawn.mode||cpu_restore.two_active)++source_state.flow; // Explicit modeled presentation-clock leaf.
     ++fixture_draw_diagnostics[8];++fixture_draw_diagnostics[12];
@@ -858,6 +1035,7 @@ int main() {
               "Default V5 admitted two-tick route or executed source work");
         close_and_retire();
 #endif
+        verify_checked_source_call_failure_reporting();
         verify_successful_interval();
         verify_drawn_reference_interval();
         verify_drawn_refusal_and_postdraw_mismatch();

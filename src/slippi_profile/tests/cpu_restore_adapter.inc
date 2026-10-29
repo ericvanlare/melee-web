@@ -78,12 +78,13 @@ uint32_t cpu_fail(uint32_t code,const char* message){
     if(cpu_restore.two_active){cpu_restore.two.first_failure=cpu_restore.first_failure;cpu_restore.two.state=cpu_restore.state;}
     return cpu_restore.first_failure;
 }
-uint32_t cpu_step_fail(uint32_t code,const char* boundary){
-    // The source step writes error directly. Preserve that cause before
-    // cpu_fail replaces it, without overlapping snprintf input/output.
+uint32_t cpu_checked_source_fail(uint32_t code,const char* boundary,
+                                 const char* fallback){
+    // Checked source calls write error directly. Preserve only the current
+    // call's cause before cpu_fail replaces it, without overlapping buffers.
     char message[sizeof(error)]{};
     std::snprintf(message,sizeof(message),"%s: %s",boundary,
-                  error[0]?error:"source step returned failure without a diagnostic");
+                  error[0]?error:fallback);
     return cpu_fail(code,message);
 }
 bool cpu_tuple_unchanged(){return match&&cpu_restore.profile_owner==rng_profile_gobj&&
@@ -203,23 +204,29 @@ uint32_t cpu_execute_two(uint32_t command){
             return cpu_fail(0x4b3u,"first baseline boundary refused");
         if(!cpu_restore.capsule->begin_record(*match)||!cpu_two_interval())
             return cpu_fail(0x4b3u,"two-tick record interval refused");
-        int result=0;{
+        int result=0;error[0]='\0';{
             CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame,300);
             result=melee_web_snapshot_step(300);
         }cpu_two_raw(e.tick_pairs[0],false);
-        if(result!=1)return cpu_step_fail(0x4b4u,"baseline sample300 refused");
+        if(result!=1)return cpu_checked_source_fail(0x4b4u,"baseline sample300 refused",
+            "source step returned failure without a diagnostic");
         if(cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
             return cpu_fail(0x4b4u,"baseline sample300 refused");
         if(!cpu_two_diag(1)||e.diagnostics[0]!=e.diagnostics[1])return cpu_fail(0x4c4u,"baseline CPU300 drew");
         melee_web_tobj_writer_boundary(1,observation.frame);
-        int draw_result=0;{
+        int draw_result=0;error[0]='\0';{
             CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.pre_frame+1u,300);
             draw_result=melee_web_synctest_draw_present();
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
             melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_DRAW);
 #endif
         }
-        if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
+        if(draw_result!=1){
+            melee_web_tobj_writer_boundary(0,0);
+            return cpu_checked_source_fail(0x4b5u,"baseline draw300 refused",
+                "source draw returned failure without a diagnostic");
+        }
+        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b5u,"baseline draw300 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
@@ -229,23 +236,30 @@ uint32_t cpu_execute_two(uint32_t command){
         if(cpu_restore.state!=C::Baseline0SubmittedTwo||payload_admission_boundary(true)!=0||
            !cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())return cpu_fail(0x4b6u,"baseline300 native idle refused");
         if(!cpu_two_diag(2))return cpu_fail(0x4c4u,"baseline300 idle diagnostics unavailable");
-        int result=0;{
+        int result=0;error[0]='\0';{
             CpuClassPieceTraceScope trace(10,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame+1u,301);
             result=melee_web_snapshot_step(301);
         }cpu_two_raw(e.tick_pairs[1],false);
-        if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.post_frame)||!cpu_two_interval())
+        if(result!=1)return cpu_checked_source_fail(0x4b7u,"baseline sample301 refused",
+            "source step returned failure without a diagnostic");
+        if(cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.post_frame)||!cpu_two_interval())
             return cpu_fail(0x4b7u,"baseline sample301 refused");
         if(!cpu_two_diag(3)||e.diagnostics[2]!=e.diagnostics[3])return cpu_fail(0x4c4u,"baseline CPU301 drew");
         if(!cpu_restore.capsule->seal_post(*match))return cpu_fail(0x4b8u,"two-tick final CPU endpoint seal refused");
         melee_web_tobj_writer_boundary(2,observation.frame);
-        int draw_result=0;{
+        int draw_result=0;error[0]='\0';{
             CpuClassPieceTraceScope trace(10,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.post_frame,301);
             draw_result=melee_web_synctest_draw_present();
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
             melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_DRAW);
 #endif
         }
-        if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
+        if(draw_result!=1){
+            melee_web_tobj_writer_boundary(0,0);
+            return cpu_checked_source_fail(0x4b9u,"baseline draw301 refused",
+                "source draw returned failure without a diagnostic");
+        }
+        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b9u,"baseline draw301 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
@@ -268,7 +282,7 @@ uint32_t cpu_execute_two(uint32_t command){
         rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
         for(unsigned i=0;i<2;++i){
             if(!cpu_two_interval())return cpu_fail(0x4bdu,"two-tick replay interval refused before step");
-            int result=0;{
+            int result=0;error[0]='\0';{
                 CpuClassPieceTraceScope trace(11,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame+i,300u+i);
                 result=melee_web_snapshot_step(300u+i);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
@@ -276,7 +290,10 @@ uint32_t cpu_execute_two(uint32_t command){
 #endif
             }
             auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
-            if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+i+1u)||!cpu_two_interval())
+            if(result!=1)return cpu_checked_source_fail(0x4bdu+i,
+                i==0?"replay sample300 refused":"replay sample301 refused",
+                "source step returned failure without a diagnostic");
+            if(cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+i+1u)||!cpu_two_interval())
                 return cpu_fail(0x4bdu+i,"two-tick replay source boundary refused");
             if(!cpu_two_diag(5u+i)||e.diagnostics[4]!=e.diagnostics[5u+i])return cpu_fail(0x4c4u,"corrective CPU tick drew");
             if(!cpu_two_raw_equal(pair))return cpu_fail(0x4bfu,"two-tick per-sample raw evidence differs");
@@ -302,7 +319,11 @@ uint32_t cpu_execute_two(uint32_t command){
     if(command==12){
         if(cpu_restore.state!=C::TwoEqual||!e.cpu_equality||cpu_boundary()||!cpu_two_safe(e.post_frame))
             return cpu_fail(0x4c1u,"two-tick final present requires accepted CPU equality");
-        if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame))
+        error[0]='\0';
+        const int draw_result=melee_web_synctest_draw_present();
+        if(draw_result!=1)return cpu_checked_source_fail(0x4c1u,"two-tick final draw refused",
+            "source draw returned failure without a diagnostic");
+        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame))
             return cpu_fail(0x4c1u,"two-tick final draw submission refused");
         cpu_restore.state=C::TwoDrawSubmitted;return 0;
     }
@@ -356,7 +377,9 @@ uint32_t cpu_execute(uint32_t command){
         if(cpu_boundary())return cpu_restore.first_failure;
         if(match->source_frames()!=cpu_restore.evidence.pre_frame||
            !cpu_restore.capsule->begin_record(*match))return cpu_fail(0x436u,"record interval refused");
-        if(melee_web_snapshot_step(300)!=1)return cpu_fail(0x437u,"baseline sample300 failed");
+        error[0]='\0';
+        if(melee_web_snapshot_step(300)!=1)return cpu_checked_source_fail(0x437u,
+            "baseline sample300 refused","source step returned failure without a diagnostic");
         if(cpu_restore.first_failure||cpu_boundary()||!cpu_tuple_unchanged())return cpu_fail(0x438u,"baseline boundary failed");
         auto& e=cpu_restore.evidence;e.baseline=observation;e.baseline_pcm=pcm;e.baseline_pad=input_bytes;
         e.baseline_profile=rng_profile_observation;e.baseline_transfer=transfer_diagnostic;e.post_frame=observation.frame;
@@ -365,7 +388,9 @@ uint32_t cpu_execute(uint32_t command){
         if(command==6){
             cpu_restore.drawn.mode=1;
             if(!cpu_drawn_diagnostics(0))return cpu_fail(0x4a8u,"CPU reference diagnostics unavailable");
-            if(melee_web_synctest_draw_present()!=1)return cpu_fail(0x4a0u,"baseline source draw failed");
+            error[0]='\0';
+            if(melee_web_synctest_draw_present()!=1)return cpu_checked_source_fail(0x4a0u,
+                "baseline source draw refused","source draw returned failure without a diagnostic");
             if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0)
                 return cpu_fail(0x4a1u,"baseline source draw submission refused");
             cpu_restore.drawn.stage=1;cpu_restore.state=C::BaselineSubmitted;return 0;
@@ -396,7 +421,9 @@ uint32_t cpu_execute(uint32_t command){
          * allocation or fallible source operation occurs between writers. */
         audio_phase=cpu_restore.pre_phase;rng_profile_observation=cpu_restore.pre_profile;
         rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
-        if(melee_web_snapshot_step(300)!=1)return cpu_fail(0x470u,"replay sample300 failed");
+        error[0]='\0';
+        if(melee_web_snapshot_step(300)!=1)return cpu_checked_source_fail(0x470u,
+            "replay sample300 refused","source step returned failure without a diagnostic");
         e.replay=observation;e.replay_pcm=pcm;e.replay_pad=input_bytes;
         e.replay_profile=rng_profile_observation;e.replay_transfer=transfer_diagnostic;
         if(cpu_restore.first_failure||cpu_boundary()||!cpu_tuple_unchanged())
@@ -428,7 +455,9 @@ uint32_t cpu_execute(uint32_t command){
         if(cpu_restore.state!=C::Equal||!cpu_restore.evidence.equality)
             return cpu_fail(0x480u,"DRAW requires accepted CPU replay equality");
         if(cpu_boundary())return cpu_restore.first_failure;
-        if(melee_web_synctest_draw_present()!=1)return cpu_fail(0x481u,"final source draw failed");
+        error[0]='\0';
+        if(melee_web_synctest_draw_present()!=1)return cpu_checked_source_fail(0x481u,
+            "final source draw refused","source draw returned failure without a diagnostic");
         if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0)
             return cpu_fail(0x482u,"final draw submission boundary failed");
         cpu_restore.state=C::DrawSubmitted;return 0;

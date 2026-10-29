@@ -157,6 +157,31 @@ int main(int argc,char** argv)
     assert(slippi_particle_presentation_anchor_admit(anchor));
     assert(mint_calls==4); /* Capture/admit never adopt a new cell. */
     token=41;
+    if(!strcmp(mode,"first-error") || !strcmp(mode,"first-camera") ||
+       !strcmp(mode,"first-bare")) {
+        assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+        memcpy(before,particles,sizeof(before)); before_app=app;
+        assert(slippi_particle_presentation_draw_begin(1,token,NULL,0));
+        if(!strcmp(mode,"first-camera")) {
+            assert(!slippi_particle_presentation_camera_end(&camera,NULL,0));
+        } else {
+            assert(slippi_particle_presentation_camera_begin(&camera,NULL,0));
+            if(!strcmp(mode,"first-error")) {
+                assert(slippi_particle_presentation_dispatch_begin(
+                    &manager,1,7,5,NULL,0)==SLIPPI_PARTICLE_DISPATCH_REFUSED);
+            } else {
+                uint8_t key; HSD_Particle *sorted,*nonedge;
+                assert(slippi_particle_presentation_render_data(
+                    16,0,&key,&sorted,&nonedge)==SLIPPI_PARTICLE_DISPATCH_REFUSED);
+            }
+        }
+        assert(!slippi_particle_presentation_camera_end(&camera,NULL,0));
+        assert(!slippi_particle_presentation_draw_end(NULL,0));
+        assert(!slippi_particle_presentation_draw_end(NULL,0));
+        assert(!memcmp(before,particles,sizeof(before)));
+        assert(!memcmp(&before_app,&app,sizeof(app)));
+        goto failed_cleanup;
+    }
     if(!strcmp(mode,"lifetime")) {
         assert(slippi_particle_presentation_particle_retiring(&particles[0],&particle_pool));
         assert(slippi_particle_presentation_particle_created(&particles[0],&particle_pool));
@@ -220,6 +245,7 @@ int main(int argc,char** argv)
             }
         }
     }
+failed_cleanup:
     assert(mint_calls==(!strcmp(mode,"lifetime")?5u:4u));
     assert(slippi_particle_presentation_failure());
     assert(slippi_particle_presentation_interval_end(1,token));

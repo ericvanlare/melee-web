@@ -140,7 +140,7 @@ class ParticlePresentationTests(unittest.TestCase):
             else:
                 self.run_command('compile', argv, ROOT, scratch)
             node = node_runtime(ROOT)
-            modes = ('positive', 'wrap') if actual_math else ('positive', 'stale', 'kind', 'foreign', 'changed', 'wrong', 'repeat', 'lifetime', 'wrap', 'poolbusy')
+            modes = ('positive', 'wrap') if actual_math else ('positive', 'stale', 'kind', 'foreign', 'changed', 'wrong', 'repeat', 'lifetime', 'wrap', 'poolbusy', 'first-error', 'first-camera', 'first-bare')
             if os.environ.get('MELEE_PARTICLE_PRESENTATION_MODE'):
                 modes = (os.environ['MELEE_PARTICLE_PRESENTATION_MODE'],)
             for mode in modes:
@@ -148,6 +148,17 @@ class ParticlePresentationTests(unittest.TestCase):
                                           [str(node), str(scratch / 'control.js'), mode],
                                           ROOT, scratch)
                 self.assertIn('particle presentation control ' + mode + ' passed', result.stdout)
+                if mode.startswith('first-'):
+                    records = [line for line in result.stderr.splitlines()
+                               if line.startswith('Particle helper first failure:')]
+                    self.assertEqual(1, len(records), result.stderr)
+                    expected = {
+                        'first-error': 'Particle callback differs from prepared source visit',
+                        'first-camera': 'Particle camera omitted a prepared visit',
+                        'first-bare': 'slippi_particle_presentation_render_data:',
+                    }[mode]
+                    self.assertIn(expected, records[0])
+                    self.assertNotIn('Particle draw did not consume', records[0])
                 if actual_math:
                     self.assertIn('actual archived HSD_MtxSRT/PS math', result.stdout)
             inputs = [upstream, ROOT / 'patches/melee-gameplay.patch',

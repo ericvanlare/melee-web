@@ -64,10 +64,21 @@ static struct {
     const void *matrix_slots_source, *tev_source, *fog_source;
 } state;
 
-static int fail(void) { state.failed = 1; return 0; }
+/* Existing failure latch is also the one-record diagnostic latch. Logging
+ * does not replace error buffers or alter any guard/cleanup decision. */
+static int failure_at(const char* function, unsigned line, const char* reason)
+{
+    const int first = !state.failed;
+    state.failed = 1;
+    if (first)
+        fprintf(stderr, "Particle helper first failure: %s:%u: %.256s\n",
+                function, line, reason);
+    return 0;
+}
+#define fail() failure_at(__func__, __LINE__, "guard refused")
 static int report(char* out, size_t size, const char* what)
 {
-    fail();
+    failure_at(__func__, __LINE__, what);
     if (out && size) snprintf(out, size, "%s", what);
     return 0;
 }
