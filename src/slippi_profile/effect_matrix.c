@@ -18,6 +18,12 @@ extern HSD_GObj** plinklow_gobjs;
 extern void efLib_render_callback(HSD_GObj*, int);
 
 enum { EF_MODEL_LINK = 11, EF_AUX_LINK = 12, EF_OWNER_LINK_MAX = 12 };
+typedef enum {
+    OWNER_NODE_OTHER,
+    OWNER_NODE_MANAGER,
+    OWNER_NODE_EFFECT,
+    OWNER_NODE_UNSUPPORTED_EFFECT,
+} OwnerNodeKind;
 
 static int refuse(char* error, size_t error_size, const char* message)
 {
@@ -71,14 +77,45 @@ static int effect_owner(HSD_GObj* object, unsigned link)
     return effect->gobj == object;
 }
 
-static int classify(HSD_GObj* object, unsigned link, int* is_manager)
+static unsigned rejected_effect_process_signature(HSD_GObj* object)
 {
-    *is_manager = 0;
-    if (particle_manager(object, link)) {
-        *is_manager = 1;
-        return 1;
-    }
-    return effect_owner(object, link);
+    unsigned signature = 0;
+    HSD_GObjProc* process = object->proc;
+    if (!process) return signature;
+    signature |= 1u << 0;
+    if (process->gobj == object) signature |= 1u << 1;
+    if (process->s_link == 15) signature |= 1u << 2;
+    if (process->child == NULL) signature |= 1u << 3;
+    if (process->on_invoke == efLib_particles_proc_main) signature |= 1u << 4;
+    if (process->on_invoke == efLib_particles_proc_aux) signature |= 1u << 5;
+    if (process->on_invoke == efLib_Update) signature |= 1u << 6;
+    return signature;
+}
+
+static int refuse_unsupported_effect(HSD_GObj* object, unsigned link,
+                                     char* error, size_t error_size)
+{
+    if (error && error_size)
+        snprintf(error, error_size,
+                 "Unsupported class-8 GObj class=%u link=%u/%u obj=%u ud=%u proc=%02x",
+                 (unsigned) object->classifier, (unsigned) object->p_link,
+                 link, (unsigned) object->obj_kind,
+                 (unsigned) object->user_data_kind,
+                 rejected_effect_process_signature(object));
+    return 0;
+}
+
+static OwnerNodeKind classify(HSD_GObj* object, unsigned link)
+{
+    /* The authored scheduler links are shared by other original systems.
+     * Do not inspect kind-specific pointers unless this row is an effect. */
+    if (object->classifier != HSD_GOBJ_CLASS_EFFECT)
+        return OWNER_NODE_OTHER;
+    if (particle_manager(object, link))
+        return OWNER_NODE_MANAGER;
+    if (effect_owner(object, link))
+        return OWNER_NODE_EFFECT;
+    return OWNER_NODE_UNSUPPORTED_EFFECT;
 }
 
 static int inspect_list(unsigned link, char* error, size_t error_size)
@@ -87,16 +124,16 @@ static int inspect_list(unsigned link, char* error, size_t error_size)
     HSD_GObj* previous = NULL;
     unsigned count = 0;
     while (object) {
-        int is_manager;
+        OwnerNodeKind kind;
         if (count >= gobj_alloc_data.used)
             return refuse(error, error_size,
                           "Effect GObj list exceeded the live allocator bound");
         if (object->p_link != link || object->prev != previous)
             return refuse(error, error_size,
                           "Effect GObj list topology disagrees with its source link");
-        if (!classify(object, link, &is_manager))
-            return refuse(error, error_size,
-                          "Unsupported GObj in original effect-owner list");
+        kind = classify(object, link);
+        if (kind == OWNER_NODE_UNSUPPORTED_EFFECT)
+            return refuse_unsupported_effect(object, link, error, error_size);
         previous = object;
         object = object->next;
         ++count;
@@ -113,16 +150,18 @@ static int refresh_list(unsigned link, char* error, size_t error_size)
     HSD_GObj* previous = NULL;
     unsigned count = 0;
     while (object) {
-        int is_manager;
+        OwnerNodeKind kind;
         if (count >= gobj_alloc_data.used)
             return refuse(error, error_size,
                           "Effect GObj list changed beyond the live allocator bound");
-        if (object->p_link != link || object->prev != previous ||
-            !classify(object, link, &is_manager))
+        if (object->p_link != link || object->prev != previous)
             return refuse(error, error_size,
                           "Effect GObj owner changed after source preflight");
+        kind = classify(object, link);
+        if (kind == OWNER_NODE_UNSUPPORTED_EFFECT)
+            return refuse_unsupported_effect(object, link, error, error_size);
         HSD_GObj* next = object->next;
-        if (!is_manager)
+        if (kind == OWNER_NODE_EFFECT)
             slippi_profile_refresh_display_root_matrices(
                 (HSD_JObj*) object->hsd_obj);
         previous = object;

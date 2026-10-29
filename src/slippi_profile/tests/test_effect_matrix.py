@@ -32,10 +32,12 @@ struct HSD_GObj {
  void *hsd_obj, *user_data; void (*user_data_remove_func)(void*);
 };
 #define HSD_GOBJ_CLASS_EFFECT 8
+#define HSD_GOBJ_CLASS_FOG 10
 #define HSD_GOBJ_OBJ_NONE 255
 extern HSD_GObjList *HSD_GObj_Entities;
 extern HSD_GObjLibInitDataType HSD_GObjLibInitData;
 extern uint8_t HSD_GObj_JObjKind;
+extern int8_t HSD_GObj_FogKind;
 void HSD_GObj_JObjCallback(HSD_GObj*, int);
 #endif
 ''',
@@ -90,7 +92,7 @@ def _function(source: str, name: str) -> str:
 
 
 class EffectMatrixTests(unittest.TestCase):
-    def test_actual_owner_preflight_and_display_root_helper(self):
+    def test_project_helper_with_modeled_owner_and_setup_seams(self):
         scratch_parent = ROOT / "work"
         scratch_parent.mkdir(exist_ok=True)
         scratch = Path(tempfile.mkdtemp(prefix="effect-matrix-", dir=scratch_parent))

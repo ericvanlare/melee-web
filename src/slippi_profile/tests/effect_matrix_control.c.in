@@ -17,6 +17,7 @@ HSD_GObjLibInitDataType HSD_GObjLibInitData;
 HSD_GObj** plinklow_gobjs;
 HSD_ObjAllocData gobj_alloc_data;
 uint8_t HSD_GObj_JObjKind = 3;
+int8_t HSD_GObj_FogKind = 4;
 static unsigned matrix_calls, render_calls;
 static int world_live = 1;
 static uint64_t world_generation = 9;
@@ -30,6 +31,8 @@ void efLib_particles_proc_aux(HSD_GObj* gobj) { (void) gobj; }
 void efLib_Update(HSD_GObj* gobj) { (void) gobj; }
 void efLib_remove_user_data(void* data) { (void) data; }
 void HSD_GObj_JObjCallback(HSD_GObj* gobj, int code)
+{ (void) gobj; (void) code; ++render_calls; }
+static void ground_fog_callback(HSD_GObj* gobj, int code)
 { (void) gobj; (void) code; ++render_calls; }
 void HSD_JObjSetupMatrixSub(HSD_JObj* jobj)
 {
@@ -146,15 +149,65 @@ static int unknown_row_refuses_before_any_refresh(void)
     manager_init(&manager, &manager_proc, 11);
     effect_init(&effect, &effect_proc, &owner, &root, 11);
     memset(&unknown, 0, sizeof(unknown));
-    unknown.classifier = 6; unknown.p_link = 11;
+    unknown.classifier = HSD_GOBJ_CLASS_EFFECT; unknown.p_link = 11;
+    unknown.p_priority = 0; unknown.gx_link = 0;
+    unknown.obj_kind = HSD_GOBJ_OBJ_NONE;
+    unknown.user_data_kind = HSD_GOBJ_USER_DATA_NONE;
+    HSD_GObjProc unknown_proc;
+    process_init(&unknown_proc, &unknown, efLib_Update);
     effect.next = &unknown; unknown.prev = &effect;
     unknown.next = &manager; manager.prev = &unknown;
     owner_link(11, &effect, &manager); owner_link(12, NULL, NULL);
     root.flags = JOBJ_MTX_DIRTY;
     matrix_calls = 0;
     assert(!slippi_profile_effect_matrices_post_step(error, sizeof(error)));
-    assert(strstr(error, "Unsupported GObj") != NULL && matrix_calls == 0);
+    assert(strstr(error, "Unsupported class-8 GObj class=8 link=11/11 obj=255 ud=255 proc=4f") != NULL);
+    assert(matrix_calls == 0);
     assert(root.flags & JOBJ_MTX_DIRTY);
+    return 0;
+}
+
+static int ground_fog_mixed_list_is_skipped_and_effect_refreshed(void)
+{
+    HSD_GObj* heads[13] = {0}; HSD_GObj* tails[13] = {0};
+    HSD_GObjList* list = (HSD_GObjList*) heads;
+    HSD_GObj manager, effect, fog;
+    HSD_GObjProc manager_proc, effect_proc;
+    EF_Effect owner; HSD_JObj root = {0}; int fog_payload = 0;
+    char error[160] = {0};
+
+    HSD_GObj_Entities = list; plinklow_gobjs = tails;
+    HSD_GObjLibInitData.p_link_max = 12; gobj_alloc_data.used = 3;
+    manager_init(&manager, &manager_proc, 11);
+    effect_init(&effect, &effect_proc, &owner, &root, 11);
+
+    /* Reduced original Ground_801C1E94, melee b43912cc: ground.c:1120-1123.
+     * GObj_Create(0xA, 0xB, 0), FogKind assignment, then GX link (0, 0). */
+    memset(&fog, 0, sizeof(fog));
+    fog.classifier = HSD_GOBJ_CLASS_FOG;
+    fog.p_link = 0xB;
+    fog.p_priority = 0;
+    fog.gx_link = 0;
+    fog.render_priority = 0;
+    fog.obj_kind = (uint8_t) HSD_GObj_FogKind;
+    fog.user_data_kind = HSD_GOBJ_USER_DATA_NONE;
+    fog.hsd_obj = &fog_payload;
+    fog.render_cb = ground_fog_callback;
+
+    fog.next = &effect; effect.prev = &fog;
+    effect.next = &manager; manager.prev = &effect;
+    owner_link(11, &fog, &manager); owner_link(12, NULL, NULL);
+    root.flags = JOBJ_MTX_DIRTY; matrix_calls = 0; render_calls = 0;
+    assert(slippi_profile_effect_matrices_post_step(error, sizeof(error)));
+    assert(error[0] == '\0' && matrix_calls == 1);
+    assert(!(root.flags & JOBJ_MTX_DIRTY));
+    assert(fog.classifier == HSD_GOBJ_CLASS_FOG && fog.p_link == 0xB &&
+           fog.p_priority == 0 && fog.gx_link == 0 &&
+           fog.render_priority == 0 && fog.obj_kind == (uint8_t) HSD_GObj_FogKind &&
+           fog.hsd_obj == &fog_payload && fog.user_data == NULL &&
+           fog.user_data_kind == HSD_GOBJ_USER_DATA_NONE &&
+           fog.render_cb == ground_fog_callback);
+    assert(render_calls == 0);
     return 0;
 }
 
@@ -178,6 +231,7 @@ int main(void)
 {
     assert(positive() == 0);
     assert(unknown_row_refuses_before_any_refresh() == 0);
+    assert(ground_fog_mixed_list_is_skipped_and_effect_refreshed() == 0);
     assert(unavailable_table_refuses() == 0);
     world_live = 0;
     char error[160] = {0};
