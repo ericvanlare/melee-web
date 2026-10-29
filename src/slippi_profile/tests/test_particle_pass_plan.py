@@ -20,10 +20,12 @@ SOURCE_PINS = {
     MELEE / "ef/eflib.c": "5450ecd99821f09ea4b9706d400d84b9a42d9d55d2864f530b2a98ce7481dbd4",
     MELEE / "gr/grdisplay.c": "6b1058e4cb5b979dbb8e38a238148d58ce20b47facc39ea241a6b567267cdb37",
     MELEE / "if/ifmagnify.c": "42c8a7477d15836e4771c4b77944b3e2b136b5203e01ecfa91dc314415d38a2b",
+    MELEE / "if/ifcoget.c": "33c87ce9f2ab4068cca892c1e64bde31545f632138f44f618e833382dba99df0",
     MELEE / "if/ifall.c": "545d32d9a4ca3f88bd7ab8d73a5c3c68e404f60f188a5935590f9c043fd7f879",
     MELEE / "if/ifnametag.c": "5b1975b769609ed6bf43cd324056faaf84cd25a0bd7c41d8936974e6e383a225",
     MELEE / "lb/lbbgflash.c": "9739385802bd101f778e8bbead41cf211d1362271b238674d7f33568b9778848",
     MELEE / "gr/ground.c": "302f2542da48d7aef4d4ee637b2f375e834feb82a36e2f08caae4e810ec4bdc2",
+    BASELIB / "gobjplink.c": "0dd495c0dc5ea268e2f9b4a0932c6b2179e25526dc81593367831f4e3c52089e",
     BASELIB / "gobjgxlink.c": "b6c199614c8e5bca821a0e448a28b541947d77ea2dcfc9a517a5810e20b55bfb",
     BASELIB / "lobj.c": "500352c3a6bf1ff1ddfc4ce79a51775fdd999b5a44bd5cc2aa3c3d29c8e024ca",
     ROOT / "patches/melee-gameplay.patch": "7fe949fc22b5496267b27079663469dea554922abf5304e78a56adb769ad4bbc",
@@ -80,6 +82,7 @@ struct HSD_GObj {
  void *hsd_obj, *user_data; void (*user_data_remove_func)(void*);
 };
 #define HSD_GOBJ_CLASS_EFFECT 8
+#define HSD_GOBJ_CLASS_CAMERA 0x13
 #define HSD_GOBJ_OBJ_NONE 255
 #define HSD_GOBJ_USER_DATA_NONE 255
 extern HSD_GObj* HSD_GObj_804D7814;
@@ -233,6 +236,7 @@ def source_fixture() -> str:
     gobj = (BASELIB / "gobj.c").read_text(encoding="utf-8")
     eflib = (MELEE / "ef/eflib.c").read_text(encoding="utf-8")
     ifall = (MELEE / "if/ifall.c").read_text(encoding="utf-8")
+    ifcoget = (MELEE / "if/ifcoget.c").read_text(encoding="utf-8")
     nametag = (MELEE / "if/ifnametag.c").read_text(encoding="utf-8")
     gxlink = (BASELIB / "gobjgxlink.c").read_text(encoding="utf-8")
     gameplay_patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
@@ -282,6 +286,12 @@ def source_fixture() -> str:
                 "void HSD_GObj_JObjCallback(HSD_GObj* gobj, int arg1)",
             )
         ),
+        "ACTUAL_GOBJ_RETIRE": extract_function(
+            (BASELIB / "gobjplink.c").read_text(encoding="utf-8"),
+            "void HSD_GObjPLink_80390228(HSD_GObj* gobj)",
+        ).replace("    GObj_RemoveUserData(gobj);",
+                  "    if (!slippi_particle_source_gobj_retiring(gobj)) __builtin_trap();\n"
+                  "    GObj_RemoveUserData(gobj);"),
         "ACTUAL_GXLINK_SOURCE": "\n\n".join(
             extract_function(gxlink, marker)
             for marker in (
@@ -347,6 +357,10 @@ def source_fixture() -> str:
         "SOURCE_REGISTER_NAMETAG": source_registration(
             nametag, "GObj_SetupGXLinkMax(gobj, fn_802FCAC4, 6);",
             "gobj", "&nametag_camera",
+        ),
+        "SOURCE_REGISTER_IFCOGET": source_registration(
+            ifcoget, "GObj_SetupGXLinkMax(gobj_camera, HSD_GObj_803910D8, 9);",
+            "gobj_camera", "&ifcoget_camera",
         ),
         "SOURCE_REGISTER_HUD": source_registration(
             ifall, "GObj_SetupGXLinkMax(gobj, fn_802F36B8, 8);",
@@ -415,6 +429,28 @@ class ParticlePassPlanTests(unittest.TestCase):
         self.assertIn("temp_r23_2->gxlink_prios = 8;", ground_setup)
         profile_patch = (PROFILE / "patches/melee-profile-hooks.patch").read_text(encoding="utf-8")
         self.assertIn("*camera = ifAll_804A0FD8.gobj;", profile_patch)
+        ifcoget = extract_function(
+            (MELEE / "if/ifcoget.c").read_text(encoding="utf-8"),
+            "void un_802FEFAC(void)")
+        self.assertIn("GObj_Create(HSD_GOBJ_CLASS_CAMERA, 21, 0)", ifcoget)
+        self.assertIn("gobj_camera->gxlink_prios = 0x8400;", ifcoget)
+        self.assertIn("GObj_SetupGXLink(gobj_light, HSD_GObj_LObjCallback, 10, 0);", ifcoget)
+        self.assertIn("GObj_SetupGXLink(gobj_ui, HSD_GObj_JObjCallback, 15, 0);", ifcoget)
+        # Hooks are private/additive; constructor before-store refusal and actual
+        # destruction after deferred return precede original source release.
+        part = profile_patch.split("diff --git a/src/melee/if/ifcoget.c", 1)[1]
+        self.assertLess(part.index("slippi_particle_source_ifcoget_constructing"),
+                        part.index("gobj_camera = GObj_Create"))
+        self.assertLess(part.index("gobj_camera->gxlink_prios = 0x8400"),
+                        part.index("slippi_particle_source_ifcoget_created"))
+        retire = profile_patch.split("diff --git a/src/sysdolphin/baselib/gobjplink.c", 1)[1]
+        self.assertLess(retire.index("slippi_particle_source_gobj_retiring"),
+                        retire.index("GObj_RemoveUserData(gobj)"))
+        original_retire = extract_function(
+            (BASELIB / "gobjplink.c").read_text(encoding="utf-8"),
+            "void HSD_GObjPLink_80390228(HSD_GObj* gobj)")
+        self.assertLess(original_retire.index("return;"),
+                        original_retire.index("GObj_RemoveUserData(gobj)"))
         cobj = (BASELIB / "cobj.c").read_text(encoding="utf-8")
         screen_setup = extract_function(cobj, "static bool setupNormalCamera(HSD_CObj* cobj)")
         set_current = extract_function(cobj, "bool HSD_CObjSetCurrent(HSD_CObj* cobj)")

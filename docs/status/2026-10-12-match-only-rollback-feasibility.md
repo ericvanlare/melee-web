@@ -1325,20 +1325,27 @@ domains; unwritten raw pair data is not equality evidence. The initial generic
 adapter message loses the underlying refusal. The reviewed reporting repair at
 `5f0f5589` passes focused controls and the affected build; its same-input diagnostic
 attempt preserves the cause: "Source camera callback has no verified particle
-schedule." Both attempts and their distinct producers are retained. The next step
-is a reduced actual match-camera registration/dispatch control. Source inspection
-finds a typed magnify callback wrapper and the HUD's auxiliary-particle GX8 dispatch
-missing from the planner; which callback caused the captured first refusal remains
-unobserved. The subsequent reduced control passes with actual source registration
+schedule." Both attempts and their distinct producers are retained. A reduced
+actual match-camera registration/dispatch control then identifies a typed magnify callback wrapper and the HUD's auxiliary-particle GX8 dispatch
+missing from the planner; the exact captured callback was still unobserved at
+that boundary. The subsequent reduced control passes with actual source registration
 and dispatch snippets, typed magnify identity, visible/hidden HUD checks and
 refusal-before-preparation negatives. Its constructor invocation order and graphics
 leaves are explicitly modeled. Independent source/control review and the affected
 browser build pass at `5c4c78f0`; all 2,169 declared source policy entries retain
 their modes and sizes. The fixed browser attempt still refuses an unobserved camera
 callback in the first baseline sample, before any comparison. Failed controls and
-patch/type/link build repairs are retained. The next diagnostic appends the actual
-failed callback identity to this existing refusal; another inferred camera list is
-not evidence for expanding admission. No successful browser comparison is implied.
+patch/type/link build repairs are retained. The exact-identity diagnostic at
+`66cf4f1d` again refuses baseline sample 300 before comparisons. Its pinned Wasm
+table maps the callback to `HSD_GObj_803910D8`; the observed priority 9, camera kind
+and mask `0x8400` join the original IfCoGet coin/KO-counter camera constructor.
+The constructor's camera pointer is local; its published pointer belongs to the
+separate UI object. The bounded repair adds an exact constructor/retirement receipt
+and checks of the selected GX10/GX15 callbacks. Its focused dispatch/lifetime
+control and three configured translation-unit syntax checks pass. Independent
+review permits one fixed-lifetime two-tick experiment; browser validation is
+pending. Results/reinitialization without actual retirement is still unsupported.
+Generic callback admission remains refused. No successful browser comparison is implied.
 The sticky owner failure remains visible during source and renderer close. All
 launched process IDs are independently absent and all nine runtime producer
 artifacts for each attempt are retained unchanged. Unknown

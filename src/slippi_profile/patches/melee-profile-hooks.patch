@@ -2835,3 +2835,56 @@ diff --git a/src/melee/if/ifmagnify.c b/src/melee/if/ifmagnify.c
  #endif
  
  void ifMagnify_802FC3C0(s32 slot)
+diff --git a/src/melee/if/ifcoget.c b/src/melee/if/ifcoget.c
+--- a/src/melee/if/ifcoget.c
++++ b/src/melee/if/ifcoget.c
+@@ -1,4 +1,8 @@
+ #include "ifcoget.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include <melee/gm/gm_unsplit.h>
+ #include <melee/lb/lbarchive.h>
+@@ -80,12 +84,18 @@
+     HSD_GObj* gobj_light;
+     HSD_GObj* gobj_ui;
+     HSD_JObj* jobj_ui;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_ifcoget_constructing()) __builtin_trap();
++#endif
+     gobj_camera = GObj_Create(HSD_GOBJ_CLASS_CAMERA, 21, 0);
+     HSD_GObjObject_80390A70(
+         gobj_camera, HSD_GObj_CameraKind,
+         (0, HSD_CObjLoadDesc(un_804D6DA4->cameras[0].desc)));
+     GObj_SetupGXLinkMax(gobj_camera, HSD_GObj_803910D8, 9);
+     gobj_camera->gxlink_prios = 0x8400;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_ifcoget_created(gobj_camera)) __builtin_trap();
++#endif
+     gobj_light = GObj_Create(HSD_GOBJ_CLASS_LIGHT, 3, 0);
+     HSD_GObjObject_80390A70(gobj_light, HSD_GObj_LightKind,
+                             (0, lb_80011AC4(un_804D6DA4->lights)));
+diff --git a/src/sysdolphin/baselib/gobjplink.c b/src/sysdolphin/baselib/gobjplink.c
+--- a/src/sysdolphin/baselib/gobjplink.c
++++ b/src/sysdolphin/baselib/gobjplink.c
+@@ -1,4 +1,8 @@
+ #include "gobjplink.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include "debug.h"
+ #include "gobj.h"
+@@ -107,6 +111,9 @@
+         HSD_GObj_804CE3E4.b1 = 1;
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_gobj_retiring(gobj)) __builtin_trap();
++#endif
+     GObj_RemoveUserData(gobj);
+     HSD_GObjObject_80390B0C(gobj);
+     HSD_GObjProc_8038FED4(gobj);

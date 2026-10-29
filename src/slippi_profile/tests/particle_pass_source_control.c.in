@@ -133,6 +133,22 @@ int Player_GetNametagSlotID(int slot) { (void) slot; return 0x78; }
 void HSD_SisLib_803A746C(void* text, int entry, float x, float y)
 { (void) text; (void) entry; (void) x; (void) y; }
 
+/* Actual GObj destruction/deferred branch; free/release leaves are modeled. */
+#define HSD_GOBJ_GXLINK_NONE 255
+static struct { unsigned b0, b1; } HSD_GObj_804CE3E4;
+static HSD_GObj* HSD_GObj_804D781C;
+static HSD_GObj* entity_heads[64];
+static HSD_GObj** HSD_GObj_Entities = entity_heads;
+static HSD_GObj* plinklow_gobjs[64];
+static unsigned destroyed_gobjs;
+static void GObj_RemoveUserData(HSD_GObj* object) { (void) object; }
+static void HSD_GObjObject_80390B0C(HSD_GObj* object) { (void) object; }
+static void HSD_GObjProc_8038FED4(HSD_GObj* object) { (void) object; }
+static void HSD_GObjGXLink_8039084C(HSD_GObj* object) { (void) object; }
+static void HSD_ObjFree(HSD_ObjAllocData* pool, void* object)
+{ (void) pool; (void) object; ++destroyed_gobjs; }
+ACTUAL_GOBJ_RETIRE
+
 ACTUAL_CAMERA_SOURCE
 ACTUAL_GOBJ_SOURCE
 ACTUAL_GXLINK_SOURCE
@@ -215,6 +231,8 @@ static HSD_LObj hud_light;
 static HSD_JObj hud_jobj;
 static HSD_GObj main_camera, flash_camera, ground_camera, magnify_camera;
 static HSD_GObj hud_camera, nametag_camera, hud_light_gobj, hud_jobj_gobj;
+static HSD_GObj ifcoget_camera, ifcoget_jobj_gobj;
+static HSD_CObj cobj_ifcoget;
 static SlippiParticlePassSource source;
 static SlippiParticlePassVisit plan[32];
 static char error[256];
@@ -341,11 +359,13 @@ static void reset_fixture(void)
 {
     memset(heads, 0, sizeof(heads));
     memset(tails, 0, sizeof(tails));
+    cpu_active = 0;
+    assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
     memset(&source, 0, sizeof(source));
     memset(&cm_80452C68, 0, sizeof(cm_80452C68));
     memset(&gobj_alloc_data, 0, sizeof(gobj_alloc_data));
     lbl_80433658.x44 = &flash_camera;
-    gobj_alloc_data.used = 10;
+    gobj_alloc_data.used = 12;
     hsdJObj.parent.head.nb_exist = 8;
     hsdDObj.parent.head.nb_exist = 8;
     hsdMObj.parent.head.nb_exist = 8;
@@ -362,6 +382,7 @@ static void reset_fixture(void)
     draw_order_count = 0;
     cobj_init(&cobj_main); cobj_init(&cobj_flash);
     cobj_init(&cobj_ground); cobj_init(&cobj_magnify);
+    cobj_init(&cobj_ifcoget);
     cobj_init(&cobj_hud); cobj_init(&cobj_nametag);
     memset(&hud_light, 0, sizeof(hud_light));
     hud_light.parent.parent.class_info = HSD_CLASS_INFO(&hsdLObj);
@@ -407,6 +428,16 @@ static void reset_fixture(void)
     hud_jobj_gobj.hsd_obj = &hud_jobj;
     hud_jobj_gobj.render_cb = HSD_GObj_JObjCallback;
     append_link(11, &hud_jobj_gobj);
+    memset(&ifcoget_jobj_gobj, 0, sizeof(ifcoget_jobj_gobj));
+    ifcoget_jobj_gobj.obj_kind = HSD_GObj_JObjKind;
+    ifcoget_jobj_gobj.hsd_obj = &hud_jobj;
+    ifcoget_jobj_gobj.render_cb = HSD_GObj_JObjCallback;
+    append_link(15, &ifcoget_jobj_gobj);
+    camera_init(&ifcoget_camera, &cobj_ifcoget, HSD_GObj_803910D8,
+                NULL, NULL, 0);
+    ifcoget_camera.classifier = HSD_GOBJ_CLASS_CAMERA;
+    ifcoget_camera.p_link = 21;
+    ifcoget_camera.gxlink_prios = 0x8400;
     HSD_GObjLibInitData.gx_link_max = SLIPPI_PARTICLE_GX_LINK_MAX;
     /* These call statements are extracted from the source registrations;
      * the owner expressions are replaced with this fixture's camera nodes. */
@@ -416,6 +447,13 @@ SOURCE_REGISTER_MAGNIFY
 SOURCE_REGISTER_FLASH
 SOURCE_REGISTER_NAMETAG
 SOURCE_REGISTER_HUD
+SOURCE_REGISTER_IFCOGET
+    /* Modeled constructor observation at the exact patched source seam. */
+    assert(slippi_particle_source_ifcoget_constructing());
+    assert(slippi_particle_source_ifcoget_created(&ifcoget_camera));
+    source.ifcoget_camera = &ifcoget_camera;
+    source.ifcoget_cobj = &cobj_ifcoget;
+    source.ifcoget_callback = HSD_GObj_803910D8;
     source.main_camera = &main_camera;
     source.background_flash_camera = &flash_camera;
     source.hud_camera = &hud_camera;
@@ -482,8 +520,7 @@ static void test_source_schedule_and_ordinary_wrappers(void)
             102, 110, 111, 112,
         };
         assert(draw_order_count >= sizeof(expected_hud_order) / sizeof(expected_hud_order[0]));
-        assert(memcmp(draw_order + draw_order_count -
-                          sizeof(expected_hud_order) / sizeof(expected_hud_order[0]),
+        assert(memcmp(draw_order + 3,
                       expected_hud_order, sizeof(expected_hud_order)) == 0);
     }
     assert(helper_camera_begin_calls == 2 && helper_camera_end_calls == 2);
@@ -770,6 +807,9 @@ static void test_main_hud_and_zero_camera_actual_dispatch(void)
     compare_plan_and_actual(&flash_camera, HSD_GObj_803910D8,
                             SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH);
     assert(actual_count == 0);
+    compare_plan_and_actual(&ifcoget_camera, HSD_GObj_803910D8,
+                            SLIPPI_PARTICLE_CAMERA_IFCOGET_ZERO);
+    assert(actual_count == 0);
     compare_plan_and_actual(&magnify_camera,
                             slippi_particle_source_magnify_callback(),
                             SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO);
@@ -857,8 +897,81 @@ static void test_refusals_and_zero_camera_identities(void)
     puts("actual-source particle camera dispatch and planner controls passed");
 }
 
+static void test_ifcoget_constructor_receipt_and_retirement(void)
+{
+    reset_fixture();
+    assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
+    assert(slippi_particle_source_world_begin(200));
+    cpu_active = 1; cpu_token = 1200;
+    assert(!slippi_particle_source_prepare(200, cpu_token, error, sizeof(error)));
+    assert(helper_prepare_calls == 0); /* no capture-time adoption */
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(200));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(201));
+    cpu_active = 1; cpu_token = 1201;
+    assert(slippi_particle_source_prepare(201, cpu_token, error, sizeof(error)));
+    assert(!slippi_particle_source_gobj_retiring(&ifcoget_camera));
+    assert(!slippi_particle_source_ifcoget_constructing());
+    assert(!slippi_particle_source_draw_begin(201, cpu_token, error, sizeof(error)));
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(201));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(202));
+    cpu_active = 1; cpu_token = 1202;
+    ifcoget_camera.render_priority = 8;
+    assert(!slippi_particle_source_prepare(202, cpu_token, error, sizeof(error)));
+    assert(helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(202));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(203));
+    cpu_active = 1; cpu_token = 1203;
+    ifcoget_jobj_gobj.render_cb = unsupported_render_callback;
+    assert(!slippi_particle_source_prepare(203, cpu_token, error, sizeof(error)));
+    assert(helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(203));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(204));
+    cpu_active = 1; cpu_token = 1204;
+    hud_jobj.flags = JOBJ_PTCL; /* GX15 display tree, no inferred no-emitter */
+    assert(!slippi_particle_source_prepare(204, cpu_token, error, sizeof(error)));
+    assert(helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(204));
+    reset_fixture();
+    destroyed_gobjs = 0;
+    HSD_GObj_804CE3E4.b0 = HSD_GObj_804CE3E4.b1 = 0;
+    HSD_GObj_804D781C = &ifcoget_camera;
+    assert(slippi_particle_source_world_begin(205));
+    /* Actual deferred branch must not invalidate the constructor receipt. */
+    HSD_GObjPLink_80390228(&ifcoget_camera);
+    assert(HSD_GObj_804CE3E4.b1 && destroyed_gobjs == 0);
+    cpu_active = 1; cpu_token = 1205;
+    assert(slippi_particle_source_prepare(205, cpu_token, error, sizeof(error)));
+    cpu_active = 0;
+    assert(slippi_particle_source_interval_end(205, cpu_token));
+    assert(slippi_particle_source_world_end(205));
+    HSD_GObj_804CE3E4.b0 = 1;
+    HSD_GObjPLink_80390228(&ifcoget_camera);
+    assert(destroyed_gobjs == 1);
+    assert(slippi_particle_source_ifcoget_constructing());
+    HSD_GObj_804D781C = NULL;
+    reset_fixture(); /* retired identity can be reused only through constructor */
+    assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
+    assert(slippi_particle_source_ifcoget_constructing());
+    assert(slippi_particle_source_ifcoget_created(&ifcoget_camera));
+    assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
+}
+
 int main(void)
 {
+    test_ifcoget_constructor_receipt_and_retirement();
     test_main_hud_and_zero_camera_actual_dispatch();
     test_refusals_and_zero_camera_identities();
     test_source_registration_order_control();

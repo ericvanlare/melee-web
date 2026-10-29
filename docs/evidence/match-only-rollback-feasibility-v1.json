@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "KNOWN_CAMERA_CONTROLS_AND_BUILD_PASS; actual baseline still refuses unobserved camera callback, before all comparisons",
+      "status": "ACTUAL_IFCOGET_CAMERA_IDENTIFIED; strict baseline still refuses before all comparisons; bounded constructor-owner repair in progress",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9241,13 +9241,13 @@
         "Actual source allocator backing-cell query and actual restore coordinator; explicit modeled OS/owner leaves"
       ],
       "limitations": [
-        "Initial reporting attempts and known-camera completion attempt capture in command8 and refuse1204 in baseline command9; actual failed callback identity remains unobserved until bounded diagnostic run.",
+        "Initial reporting, known-camera completion and exact-identity attempts capture in command8 and refuse1204 in baseline command9. The last actual camera is source-joined to IfCoGet; no comparison has run.",
         "Zero CPU/drawn comparison domains checked; no raw pair equality claim from unwritten evidence",
         "Sticky owner failure preserved at source/renderer close; all recorded owned PIDs independently absent and all9producer pins unchanged",
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Append bounded owner/callback/mask/kind/priority identity to existing refusal and resolve exact linked WASM table entry; no admission widening from another inferred role list.",
+      "next": "Review the exact IfCoGet constructor/lifetime receipt and selected GX10/GX15 callback guards; after focused and actual-TU checks, one unchanged strict two-tick browser attempt. No generic callback widening.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9393,6 +9393,40 @@
         "unknown_identity_diagnostic_review": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-camera-bind-diagnostic-sol-review-v1.json",
           "sha256": "a33ebca875cca617c2d73efda6d244bf8c31b6d4e5cc16aa89c17c56708410a0"
+        },
+        "observed_unknown_camera": {
+          "runtime_head": "66cf4f1dd985975a8042e6c8baa17c654b52c724",
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v8/result.json",
+            "sha256": "1dd12dbf82c93799967f766db8db4d13906b8f7876a8312df199886612a50ebb"
+          },
+          "linked_configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v4/final-linked-configuration-v1.json",
+            "sha256": "205a76b3540deb6e7eed32b33b842bee0af2425c6162c31ac53c66c291481750"
+          },
+          "browser_receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v4/result-receipt.json",
+            "sha256": "be0dcd8c849b02f03c187f110911a77bfa4819cacc7ae60923ad4a0a550d5f3a"
+          },
+          "producer_archive": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-camera-identity-browser-archive/archive.json",
+            "sha256": "e9da2d68f1c5e9a46edc7dbf386995abb08f8339e7aa2c0d2327016ee784ab57"
+          },
+          "source_join": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/camera-callback-resolution-v1/v8-slot-0x1399-source-join.json",
+            "sha256": "d0e5124dba58ac2482aa8e973d2fb68fa327071dd20f609471780b0ebe4a1310"
+          },
+          "identity": "Pinned Wasm table slot5017 resolves to function9205 HSD_GObj_803910D8. Actual camera owner0x3198d40, GXlink64, renderpriority9, CameraKind1, mask0x8400 matches un_802FEFAC IfCoGet constructor reached through ifAll_802F390C. Table/function/address identities are producer-specific.",
+          "limit": "Camera pointer is constructor-local; un_803F9E08.xC is the separate UI GObj. Constructor/lifetime identity and exact selected callback checks are required before admission. Zero CPU/drawn comparisons; sticky source/renderer cleanup refusal retained, all owned PIDs absent, all nine producers unchanged."
+        },
+        "ifcoget_candidate": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/ifcoget-camera-candidate-v1/freeze.json",
+          "sha256": "4b0a0ef0f1ff36769e807bad6a0a3bf38f99055cce5828430b1a5fe606c29319",
+          "scope": "Exact constructor and actual GObj destruction observations; active-interval lifetime changes refuse before source mutation. GX10/GX15 retain bounded callback/tree checks. Focused actual-dispatch control and three configured TU syntax checks pass. Independent review permits only the strict fixed-lifetime experiment; Results/reinitialization without actual retirement remains unsupported.",
+          "review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/ifcoget-camera-luna-review-v1.json",
+            "sha256": "7e45eb0174388904287f2bedfbbd8658aae85c4f46f828523d0b934cac21933a"
+          }
         }
       }
     }
