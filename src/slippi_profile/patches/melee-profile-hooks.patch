@@ -519,8 +519,12 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
 --- a/src/sysdolphin/baselib/lobj.c
 +++ b/src/sysdolphin/baselib/lobj.c
-@@ -1,4 +1,12 @@
+@@ -1,4 +1,16 @@
  #include "lobj.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++#endif
 +#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 +#include <slippi_profile/lobj_presentation_cache.h>
 +#define LOBJ_CACHE(p, field) (slippi_lobj_cache_require(p)->field)
@@ -532,7 +536,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  #include "gameplay_lobj_writer_diagnostic.h"
  #include <stddef.h>
-@@ -35,7 +43,13 @@
+@@ -35,7 +47,13 @@
  
  u32 HSD_LObjGetFlags(HSD_LObj* lobj)
  {
@@ -546,7 +550,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  void HSD_LObjSetFlags(HSD_LObj* lobj, u32 flags)
-@@ -43,7 +57,14 @@
+@@ -43,7 +61,14 @@
      if (lobj == NULL) {
          return;
      }
@@ -561,7 +565,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  void HSD_LObjClearFlags(HSD_LObj* lobj, u32 flags)
-@@ -51,7 +72,14 @@
+@@ -51,7 +76,14 @@
      if (lobj == NULL) {
          return;
      }
@@ -576,7 +580,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  GXLightID HSD_LObjGetLightMaskDiffuse(void)
-@@ -81,6 +109,9 @@
+@@ -81,6 +113,9 @@
  
  void HSD_LObjSetActive(HSD_LObj* lobj)
  {
@@ -586,7 +590,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      int idx;
  
      if (HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
-@@ -92,7 +123,7 @@
+@@ -92,7 +127,7 @@
          idx = nb_active_lights++;
      }
      active_lights[idx] = lobj;
@@ -595,7 +599,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  }
  
  s32 HSD_LObjGetNbActive(void)
-@@ -270,6 +301,9 @@
+@@ -270,6 +305,9 @@
  
  void HSD_LObjSetup(HSD_LObj* lobj, GXColor color, f32 shininess)
  {
@@ -605,7 +609,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      f32 k0 = shininess;
  
      if (lobj->flags & LOBJ_HIDDEN || HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
-@@ -277,32 +311,32 @@
+@@ -277,32 +315,32 @@
      }
  
      if ((lobj->flags & LOBJ_DIFFUSE) != 0) {
@@ -661,7 +665,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          }
      }
  }
-@@ -324,28 +358,28 @@
+@@ -324,28 +362,28 @@
          Vec3 half, ldir;
          HSD_LObj* lobj = HSD_LObjGetActiveByIndex(i);
  
@@ -695,7 +699,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -353,15 +387,15 @@
+@@ -353,15 +391,15 @@
  {
      u32 _ = lobj->flags;
  
@@ -716,7 +720,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          break;
      case LOBJ_INFINITE:
          break;
-@@ -370,7 +404,7 @@
+@@ -370,7 +408,7 @@
      }
  
      if (lobj->flags & LOBJ_ALPHA) {
@@ -725,7 +729,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -378,41 +412,41 @@
+@@ -378,41 +416,41 @@
  {
      f32 x;
  
@@ -781,7 +785,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
          lightmask_specular |= spec_id;
      }
  }
-@@ -427,11 +461,11 @@
+@@ -427,11 +465,11 @@
      lpos.z *= 1048576.0F;
      MTXMultVec(vmtx, &lpos, &lpos);
      if (lobj->flags & LOBJ_DIFFUSE) {
@@ -796,7 +800,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -439,22 +473,22 @@
+@@ -439,22 +477,22 @@
  {
      Vec3 lpos;
  
@@ -827,7 +831,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -468,11 +502,11 @@
+@@ -468,11 +506,11 @@
      HSD_LObjGetLightVector(lobj, &ldir);
      PSMTXMultVecSR(mtx, &ldir, &ldir);
      PSVECNormalize(&ldir, &ldir);
@@ -843,7 +847,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
                          lobj->u.attn.a2, lobj->u.attn.k0, lobj->u.attn.k1,
                          lobj->u.attn.k2);
      } else {
-@@ -482,14 +516,18 @@
+@@ -482,14 +520,18 @@
          s32 spot_func = lobj->u.spot.spot_func;
          s32 dist_func = lobj->u.spot.dist_func;
  
@@ -865,7 +869,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      MtxPtr vmtx;
      int i, num, idx;
      HSD_SList* list;
-@@ -541,7 +579,7 @@
+@@ -541,7 +583,7 @@
          HSD_LObjSetActive(lobj);
          idx = HSD_LObjGetNbActive();
  
@@ -874,7 +878,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
  
          switch (type) {
          case LOBJ_INFINITE:
-@@ -563,7 +601,7 @@
+@@ -563,7 +605,7 @@
              setup_diffuse_lightobj(lobj);
              break;
          case LOBJ_SPECULAR:
@@ -883,7 +887,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
              num++;
              break;
          }
-@@ -603,7 +641,7 @@
+@@ -603,7 +645,7 @@
          if (!(lobj = HSD_LObjGetActiveByIndex(i))) {
              return;
          }
@@ -892,7 +896,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      }
  }
  
-@@ -909,6 +947,9 @@
+@@ -909,6 +951,9 @@
  
  void HSD_LObjSetDefaultClass(HSD_LObjInfo* info)
  {
@@ -902,7 +906,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      if (info != NULL) {
          HSD_ASSERT(1420, hsdIsDescendantOf(info, &hsdLObj));
      }
-@@ -1021,6 +1062,9 @@
+@@ -1021,6 +1066,9 @@
          {
              *p = HSD_LObjAlloc();
          } else {
@@ -912,7 +916,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
              *p = hsdNew(info);
              HSD_ASSERT(1644, *p);
          }
-@@ -1077,6 +1121,9 @@
+@@ -1077,6 +1125,9 @@
  
  static void LObjAmnesia(HSD_ClassInfo* info)
  {
@@ -922,7 +926,7 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
      if (info == HSD_CLASS_INFO(default_class)) {
          default_class = NULL;
      }
-@@ -1094,4 +1141,7 @@
+@@ -1094,4 +1145,17 @@
      HSD_CLASS_INFO(&hsdLObj)->release = LObjRelease;
      HSD_CLASS_INFO(&hsdLObj)->amnesia = LObjAmnesia;
      HSD_LOBJ_INFO(&hsdLObj)->load = LObjLoad;
@@ -931,6 +935,16 @@ diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
 +    slippi_lobj_descriptor_attest(&hsdLObj);
 +#endif
 +}
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++void melee_web_lobj_slist_trace_sample(u32 boundary)
++{
++    HSD_ObjAllocData* descriptor = HSD_SListGetAllocData();
++    melee_web_source_memory_slist_trace_membership(boundary, current_lights,
++        descriptor, descriptor->freehead, descriptor->used, descriptor->free);
++}
++#endif
 diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
 --- a/src/sysdolphin/baselib/class.c
 +++ b/src/sysdolphin/baselib/class.c
@@ -1408,3 +1422,166 @@ diff --git a/src/sysdolphin/baselib/jobj.c b/src/sysdolphin/baselib/jobj.c
  }
  
  void HSD_JObjSetMtxDirtySub(HSD_JObj* jobj)
+
+diff --git a/src/sysdolphin/baselib/list.c b/src/sysdolphin/baselib/list.c
+--- a/src/sysdolphin/baselib/list.c
++++ b/src/sysdolphin/baselib/list.c
+@@ -5,6 +5,18 @@
+ #include <string.h>
+ 
+ #include "debug.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++#define SLIST_TRACE_BEGIN(t, op, a, b, value) \
++    MeleeWebSListTraceTicket t = {0}; \
++    melee_web_source_memory_slist_trace_before((op), &slist_alloc_data, (a), (b), (value), &(t))
++#define SLIST_TRACE_END(t) \
++    melee_web_source_memory_slist_trace_after(&(t), slist_alloc_data.used, slist_alloc_data.free)
++#else
++#define SLIST_TRACE_BEGIN(t, op, a, b, value)
++#define SLIST_TRACE_END(t)
++#endif
+ 
+ HSD_ObjAllocData slist_alloc_data;
+ HSD_ObjAllocData dlist_alloc_data;
+@@ -32,7 +44,9 @@
+     list = HSD_ObjAlloc(HSD_SListGetAllocData());
+     HSD_ASSERT(76, list);
+ 
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_ZERO, list, NULL, NULL);
+     memset(list, 0, sizeof(HSD_SList));
++    SLIST_TRACE_END(trace);
+     return list;
+ }
+ 
+@@ -41,7 +55,9 @@
+     HSD_SList* list;
+ 
+     list = HSD_SListAlloc();
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_APPEND_DATA, list, NULL, data);
+     list->data = data;
++    SLIST_TRACE_END(trace);
+ 
+     return HSD_SListAppendList(next, list);
+ }
+@@ -51,7 +67,9 @@
+     HSD_SList* list;
+ 
+     list = HSD_SListAlloc();
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_PREPEND_DATA, list, NULL, data);
+     list->data = data;
++    SLIST_TRACE_END(trace);
+ 
+     return HSD_SListPrependList(next, list);
+ }
+@@ -61,11 +79,17 @@
+     HSD_ASSERT(179, next);
+ 
+     if (list != NULL) {
++        SLIST_TRACE_BEGIN(trace0, MELEE_WEB_SLIST_TRACE_APPEND_LIST, next, list, list->next);
+         next->next = list->next;
++        SLIST_TRACE_END(trace0);
++        SLIST_TRACE_BEGIN(trace1, MELEE_WEB_SLIST_TRACE_APPEND_LIST, list, next, next);
+         list->next = next;
++        SLIST_TRACE_END(trace1);
+         return list;
+     } else {
++        SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_APPEND_LIST, next, NULL, NULL);
+         next->next = NULL;
++        SLIST_TRACE_END(trace);
+         return next;
+     }
+ }
+@@ -73,7 +97,9 @@
+ HSD_SList* HSD_SListPrependList(HSD_SList* list, HSD_SList* prev)
+ {
+     HSD_ASSERT(202, prev);
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_PREPEND_LIST, prev, list, list);
+     prev->next = list;
++    SLIST_TRACE_END(trace);
+     return prev;
+ }
+ 
+@@ -82,8 +108,10 @@
+     HSD_SList* next;
+ 
+     if (list != NULL) {
++        SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_REMOVE, list, NULL, NULL);
+         next = list->next;
+         HSD_ObjFree(HSD_SListGetAllocData(), list);
++        SLIST_TRACE_END(trace);
+         return next;
+     }
+ 
+
+diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc.c
+--- a/src/sysdolphin/baselib/objalloc.c
++++ b/src/sysdolphin/baselib/objalloc.c
+@@ -13,6 +13,11 @@
+ #include "gameplay_source_memory_runtime.h"
+ #endif
+ #include <dolphin/os/OSAlloc.h>
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++extern HSD_ObjAllocData slist_alloc_data;
++#endif
+ 
+ static objheap obj_heap = { 0, 0, -1, -1 };
+ 
+@@ -137,6 +142,13 @@
+         }
+     }
+     cur = data->freehead;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    MeleeWebSListTraceTicket trace = {0};
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_before(MELEE_WEB_SLIST_TRACE_OBJALLOC,
++            data, cur, data->freehead, data->used, data->free, &trace);
++#endif
+     data->freehead = cur->next;
+     data->used += 1;
+     data->free -= 1;
+@@ -146,6 +158,12 @@
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_alloc(data, cur, data->size);
+ #endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_after(&trace,
++            data, cur, data->freehead, data->used, data->free);
++#endif
+     return cur;
+ }
+ 
+@@ -154,6 +172,13 @@
+     HSD_ObjAllocLink* link = obj;
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_free(0, data, obj, data->size);
++#endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    MeleeWebSListTraceTicket trace = {0};
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_before(MELEE_WEB_SLIST_TRACE_OBJFREE,
++            data, obj, data->freehead, data->used, data->free, &trace);
+ #endif
+     link->next = data->freehead;
+     data->freehead = link;
+@@ -161,6 +186,13 @@
+     data->used -= 1;
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_free(1, data, obj, data->size);
++#endif
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_after(&trace,
++            data, obj, data->freehead, data->used, data->free);
+ #endif
+ }
+ 

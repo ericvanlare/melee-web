@@ -1,0 +1,86 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Actual patched list/allocator/runtime. OS backing and canonical JObj descriptor
+ * are modeled; no live-light semantics are inferred from this fixture. */
+#include "gameplay_source_memory_runtime.h"
+extern "C" {
+#include <sysdolphin/baselib/list.h>
+#include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/jobj.h>
+}
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+extern "C" { HSD_JObjInfo hsdJObj={}; }
+/* The C source units exercise private hooks; this runtime unit needs only
+ * CPU_INTERVAL. Do not pull unrelated presentation-world providers into it. */
+#undef MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+#define MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE 0
+#include "gameplay_source_memory_runtime.cpp"
+alignas(32) static unsigned char arena[131072];
+static size_t cursor;
+extern "C" int HSD_GetHeap(){return 3;}
+extern "C" s32 OSCheckHeap(int){return sizeof(arena)-cursor;}
+extern "C" void* OSAllocFromHeap(int heap,u32 size){
+ if(size>sizeof(arena)-cursor)std::abort();auto* p=arena+cursor;cursor+=(size+31)&~31u;
+ std::memset(p,0,size);if(!melee_web_source_memory_alloc(heap,p,size))std::abort();return p;
+}
+extern "C" void OSFreeToHeap(int heap,void* p){if(!melee_web_source_memory_free(heap,p))std::abort();}
+extern "C" void __assert(char*,u32,char*){std::abort();}
+static void check(bool ok,const char* s){if(!ok){std::fprintf(stderr,"FAIL:%s\n",s);std::exit(1);}}
+static auto snap(){auto v=melee_web_source_memory_payload_snapshot_capture();check(v.snapshot,"snapshot");return v.snapshot;}
+int main(int argc,char** argv){
+ const char* mode=argc>1?argv[1]:"stores";check(melee_web_source_memory_begin(7,3),"begin");
+ // Original class cold handshake is separate from the SList allocator.
+ check(hsdAllocMemPiece(32)!=nullptr,"class warm");HSD_ListInitAllocData();
+ auto* target=HSD_SListAlloc();auto* other=HSD_SListAlloc();
+ auto* descriptor=HSD_SListGetAllocData();
+ auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(target));check(row&&row->requested==8,"actual pool target8");
+ const auto source=row->source.value();auto* pre=snap();auto anchor=melee_web_class_piece_arm();check(anchor.ready,"anchor");
+ check(melee_web_source_memory_slist_target_trace_arm(pre,anchor,source,8,0),"SList exact pool arm");
+ melee_web_source_memory_slist_trace_context(8,0,0,0);
+ melee_web_source_memory_slist_trace_membership(1,target,descriptor,descriptor->freehead,descriptor->used,descriptor->free);
+ check(slist_trace.memberships[0].current_status==1&&slist_trace.memberships[0].free_status==0,"target current and not free");
+ if(!std::strcmp(mode,"bounds")){
+  melee_web_source_memory_slist_trace_membership(2,reinterpret_cast<void*>(1),descriptor,descriptor->freehead,0,descriptor->free);
+  check(slist_trace.memberships[1].current_status==2,"zero used refuses invalid head BEFORE read");
+  other->next=reinterpret_cast<HSD_SList*>(1);
+  melee_web_source_memory_slist_trace_membership(3,other,descriptor,descriptor->freehead,descriptor->used,descriptor->free);
+  check(slist_trace.memberships[2].current_status==2,"foreign next fails pool proof before read");
+ }else if(!std::strcmp(mode,"retained")){
+  row->pool={}; // models the separately tested checked-restore diagnostic clear
+  MeleeWebSListTraceTicket ticket{};
+  melee_web_source_memory_slist_trace_before(5,descriptor,target,nullptr,nullptr,&ticket);
+  check(ticket.valid,"typed operation may use retained exact-row pool proof");
+  target->next=other;melee_web_source_memory_slist_trace_after(&ticket,descriptor->used,descriptor->free);
+  melee_web_source_memory_slist_trace_membership(2,target,descriptor,descriptor->freehead,descriptor->used,descriptor->free);
+  check(slist_trace.memberships[1].current_status==2,"missing metadata never grants whole-list authority");
+  row->pool=slist_trace.retained_pool;row->pool.descriptor++;
+  melee_web_source_memory_slist_trace_before(5,descriptor,target,nullptr,nullptr,&ticket);
+  check(!ticket.valid&&slist_trace.refusal,"present contradictory pool refuses read");
+ }else if(!std::strcmp(mode,"overflow")){
+  for(unsigned i=0;i<33;++i)HSD_SListPrependList(nullptr,target);
+  check(slist_trace.overflow&&slist_trace.count==32,"event cap explicit");
+ }else{
+  melee_web_source_memory_slist_trace_context(9,2,177,300);
+  HSD_SListPrependList(other,target);check(target->next==other,"prepend original next");
+  HSD_SListAppendList(target,other);check(target->next==other&&other->next==other,"append original alias/order");
+  other->next=nullptr;
+  auto* tail=HSD_SListRemove(target);check(tail==other,"remove original return");
+  check(slist_trace.count>=4,"actual typed stores observed");
+  melee_web_source_memory_slist_trace_membership(2,other,descriptor,descriptor->freehead,descriptor->used,descriptor->free);
+  check(slist_trace.memberships[1].current_status==0&&slist_trace.memberships[1].free_status==1,"dead target independently on free list");
+  auto* reused=HSD_SListAllocAndPrepend(other,reinterpret_cast<void*>(0x1234));
+  check(reused==target&&target->next==other&&target->data==reinterpret_cast<void*>(0x1234),"actual memset data prepend reuse");
+  HSD_SListRemove(target);
+  reused=HSD_SListAllocAndAppend(nullptr,reinterpret_cast<void*>(0x5678));
+  check(reused==target&&target->next==nullptr&&target->data==reinterpret_cast<void*>(0x5678),"actual append data reuse");
+  bool data_append=false,data_prepend=false,free_event=false;
+  for(unsigned i=0;i<slist_trace.count;++i){data_append|=slist_trace.events[i].op==2;data_prepend|=slist_trace.events[i].op==3;free_event|=slist_trace.events[i].op==8;}
+  check(data_append&&data_prepend&&free_event,"all typed writes/free covered");
+ }
+ melee_web_source_memory_slist_trace_context(11,0,0,0);
+ melee_web_source_memory_slist_trace_early_close();melee_web_source_memory_slist_trace_emit();
+ check(melee_web_source_memory_healthy(),"observer never poisons source owner");
+ return 0;
+}

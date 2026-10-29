@@ -2,7 +2,7 @@
   "schema": "match-only-rollback-feasibility-v1",
   "issue": 318,
   "pr": 319,
-  "status": "same_browser_one_tick_pass_v7_two_tick_strict1216_row113_offset272_actual_MakeTextureMtx_occurrence_fullPOST48_native_attestation_capture_time_only_lifetimeUNKNOWN_no_fix_finalpresent_unrun",
+  "status": "historical_one_tick_pass_v14_target_effect_joint_STEP_equal_two_tick_raw_vectors_equal_strict1216_slist_pool_row3138_offset0_writer_unknown_final_present_unrun",
   "source_only_baseline": {
     "boundary": "synchronous-source-only-exported-call-return",
     "sourceDrawing": false,
@@ -2429,7 +2429,7 @@
   },
   "same_instance_browser_restore_341": {
     "issue": 341,
-    "status": "same_browser_one_tick_pass_v7_two_tick_strict1216_row113_offset272_actual_MakeTextureMtx_occurrence_fullPOST48_native_attestation_capture_time_only_lifetimeUNKNOWN_no_fix_finalpresent_unrun",
+    "status": "historical_one_tick_pass_v14_target_effect_joint_STEP_equal_two_tick_raw_vectors_equal_strict1216_slist_pool_row3138_offset0_writer_unknown_final_present_unrun",
     "producer_base_commit": "130438fd2b86d00cfec98cd2ba0a5f66084ae15c",
     "producer_worktree": "uncommitted source; census runtime/harness and separate owner component sources pinned below; not a commit identity",
     "runtime_sha256": {
@@ -8986,6 +8986,44 @@
         "review_sha256": "2f0c650a65bf16db1aef753cc865258d47bad7e62c8278c021605dced6a29c09",
         "archive": "rollback-renderer-resume-20261028-155740-eef0524c/jobj-creator-writer-browser-archive/archive.json",
         "scope": "Exact joined new JObj creator prefix is efLib_Create/Attach_Pos via efSync_Spawn/QueueProcessDeferred. Original Make/Setup changes matrix only during baseline draws; CPU mismatch matches draw300 because seal_post precedes draw301. Relevant stack names observed before2048byte truncation; tail unknown. Strict1216 persists; ten raw pairs equal and finalpresent unrun."
+      }
+    },
+    "effect_matrix_v14_result_20261029": {
+      "initial_source_commit": "480c3dedbeea8caf223afa8f1a56f2330f07bcc4",
+      "mixed_list_repair_commit": "557217797b9b6828befb9cd158d59f0306176788",
+      "initial_result": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-effect-matrix-v14-v1/result-receipt.json",
+        "sha256": "ead1d0af899d06864333096b4a524b278a2be3055127f28589d7036a39ed955e"
+      },
+      "source_reproducer": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/effect-matrix-ground-fog-v1/source-reproduction.json",
+        "sha256": "81b42bd455b884a46732c9514bc78615c5ec0e9c7663ab22b1e06b332f0ad8d9"
+      },
+      "repair_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/effect-matrix-v14-mixed-list-implementation-sol-review-v1.json",
+        "sha256": "2e9808256d1c52bac6b0e2928903e6ed07ad988a9a584dc29b7d9ac3e89a6084"
+      },
+      "result": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-effect-matrix-v14-mixed-list-v1/result-receipt.json",
+        "sha256": "a92e66f5b75281cd00fc10ed620b6c97b7de80d87872d9266393ef69badd050d"
+      },
+      "raw_pairs": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-effect-matrix-v14-mixed-list-v1/raw-five-comparison.json",
+        "sha256": "001edb027885df71bf4743674cb7a8bf36add4e073799f9f7feca5429d0cc61a"
+      },
+      "producer_archive": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/effect-matrix-v14-mixed-list-browser-archive/archive.json",
+        "sha256": "3b60b7b25d72729b8e333d401a979371192ee91d65b8666215b02fc411049fbe"
+      },
+      "scope": "Incomplete private profile; all10raw vectors agree, stricttypedendpoint1216 at8byteSListpool row; finalpresent unrun. No originalhiddenjoint equivalence or browserrollback admission.",
+      "next": "Bounded source owner/lifetime/writer diagnosis; no comparison exclusion.",
+      "target_joint_step_comparison": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-effect-matrix-v14-mixed-list-v1/target-joint-step-comparison.json",
+        "sha256": "799d124112b8be9816936eae3d7a3521e9ef0f19f6b23fe3fc4a678142d27d40"
+      },
+      "result_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/effect-matrix-v14-target-result-sol-review-v1.json",
+        "sha256": "8030a3803e81713bdbc38863f24ba361b7a1160740161ebd06bf664b931ebe9a"
       }
     }
   }

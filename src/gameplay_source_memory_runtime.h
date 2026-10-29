@@ -4,6 +4,7 @@
 #include "gameplay_class_piece_diagnostic.h"
 #include "gameplay_lobj_writer_diagnostic.h"
 #include "gameplay_tobj_writer_diagnostic.h"
+#include "slippi_profile/slist_target_diagnostic.h"
 
 #include <stddef.h>
 #include <stdint.h>

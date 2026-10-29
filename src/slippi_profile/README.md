@@ -240,7 +240,9 @@ after match process callbacks, while the source callback context is still active
 This includes effects spawned and attached during the current tick. It uses the
 original matrix routines; it adds no source draw or GPU submission to correction.
 The ordinary scheduler entry remains unchanged for menus and other scenes.
-Unexpected owner shapes fail explicitly before any effect matrix preparation.
+The scheduler lists are shared: non-effect objects retain topology checks but
+are not treated as effect owners. Unsupported class-8 effect shapes fail before
+any effect matrix preparation.
 The full source payload comparison remains strict. V13 manifests and snapshots
 are refused by this candidate, which remains an incomplete diagnostic profile
 pending its browser result and later rollback gates.

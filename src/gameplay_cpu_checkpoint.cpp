@@ -81,9 +81,13 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         // Diagnostic arm is not a CPU-admission condition. It owns no source
         // memory, and its serial/table are never captured or restored.
         c->class_piece_anchor_=melee_web_class_piece_arm();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
         if(span==CpuCheckpointSpan::TwoTicks)
-            (void)melee_web_source_memory_class_piece_slab_trace_arm(
-                c->commit_.payload,c->class_piece_anchor_,0x80d2fd20u,1024u,836u);
+            (void)melee_web_source_memory_slist_target_trace_arm(
+                c->commit_.payload,c->class_piece_anchor_,0x80d349c0u,8u,0u);
+        if(span==CpuCheckpointSpan::TwoTicks)
+            melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_CAPTURE);
+#endif
 #if !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
         c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==CpuCheckpointSpan::TwoTicks?8u:1u);
 #endif
@@ -179,6 +183,10 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
            !melee_web_cpu_interval_admit(commit_.effect_token)||
            melee_web_action_interval_seal_record(commit_.actions)!=1){disarm();phase_=Phase::Failed;return false;}
         auto payload=melee_web_source_memory_payload_snapshot_capture();post_payload_=payload.snapshot;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+        if(span_==CpuCheckpointSpan::TwoTicks)
+            melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_BASELINE_SEAL);
+#endif
         post_flow_=melee_web_match_flow_cpu_snapshot_capture(owner_.flow,nullptr,0);
         if(payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||!post_payload_||!post_flow_||
            !capture_post_bytes(session,post_bytes_,audio_ranges_,audio_range_count_)||!statics_->seal_post()){
@@ -255,12 +263,20 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
             class_piece_witness_=melee_web_source_memory_class_piece_witness(post_payload_,payload,class_piece_anchor_);
             class_piece_capture_witness_=melee_web_source_memory_class_piece_capture_witness(commit_.payload,post_payload_,payload,class_piece_anchor_);
         }
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+        if(span_==CpuCheckpointSpan::TwoTicks)
+            melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_REPLAY_FINAL);
+#endif
         melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
         comparison_={static_cast<std::uint32_t>(CpuComparisonDomain::Payload),payload.status,
             static_cast<std::uint32_t>(payload.allocation_index),static_cast<std::uint32_t>(payload.byte_offset),
             payload.expected_byte,payload.actual_byte,static_cast<std::uint32_t>(payload.host_address),
             payload.requested_bytes,payload.status==1?payload.admission_status:payload.source_address};phase_=Phase::Failed;return false;
     }
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    if(span_==CpuCheckpointSpan::TwoTicks)
+        melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_REPLAY_FINAL);
+#endif
     melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Payload);
     if(!check(CpuComparisonDomain::Flow,melee_web_match_flow_cpu_snapshot_matches(owner_.flow,post_flow_,nullptr,0)==1))return false;

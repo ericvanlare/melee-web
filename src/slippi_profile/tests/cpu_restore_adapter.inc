@@ -92,9 +92,17 @@ bool cpu_native_active(){return cpu_restore.state!=CpuRestoreControl::Idle;}
 struct CpuClassPieceTraceScope {
     uint32_t command;
     CpuClassPieceTraceScope(uint32_t command_,uint32_t scope,uint32_t frame,uint32_t sample)
-      :command(command_){melee_web_source_memory_class_piece_slab_trace_context(command,scope,frame,sample);}
+      :command(command_){melee_web_source_memory_class_piece_slab_trace_context(command,scope,frame,sample);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+        melee_web_source_memory_slist_trace_context(command,scope,frame,sample);
+#endif
+    }
     ~CpuClassPieceTraceScope(){melee_web_source_memory_class_piece_slab_trace_context(
-        command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);}
+        command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    melee_web_source_memory_slist_trace_context(command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+#endif
+    }
 };
 uint32_t cpu_close(){
     if(cpu_restore.capsule)cpu_restore.capsule->disarm();
@@ -198,6 +206,9 @@ uint32_t cpu_execute_two(uint32_t command){
         int draw_result=0;{
             CpuClassPieceTraceScope trace(9,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.pre_frame+1u,300);
             draw_result=melee_web_synctest_draw_present();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+            melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_DRAW);
+#endif
         }
         if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b5u,"baseline draw300 submission refused");
@@ -221,6 +232,9 @@ uint32_t cpu_execute_two(uint32_t command){
         int draw_result=0;{
             CpuClassPieceTraceScope trace(10,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.post_frame,301);
             draw_result=melee_web_synctest_draw_present();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+            melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_DRAW);
+#endif
         }
         if(draw_result!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b9u,"baseline draw301 submission refused");
@@ -248,6 +262,9 @@ uint32_t cpu_execute_two(uint32_t command){
             int result=0;{
                 CpuClassPieceTraceScope trace(11,MELEE_WEB_CLASS_PIECE_TRACE_STEP,e.pre_frame+i,300u+i);
                 result=melee_web_snapshot_step(300u+i);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+                melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_REPLAY_STEP);
+#endif
             }
             auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
             if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+i+1u)||!cpu_two_interval())
@@ -484,6 +501,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
     melee_web_source_memory_class_piece_slab_trace_context(
         command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    melee_web_source_memory_slist_trace_context(command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+#endif
     melee_web_lobj_writer_phase(command);
     melee_web_tobj_writer_phase(command);
     cpu_restore.inflight=true;uint32_t result=0;

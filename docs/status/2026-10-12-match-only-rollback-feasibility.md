@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Browser exercised / One-tick restore-replay-and-present passed; V11 fixes the observed fighter projection dependency and replays two ticks with exact raw sample agreement. Strict source-payload equality now fails at a world-object position. Two-tick final present and full browser rollback remain unproven.**
+**Browser exercised / Historical one-tick restore-replay-and-present passed. V14 moves the observed effect-joint matrix writes into simulation, with exact two-tick target-matrix and raw-sample agreement. Strict source-payload equality now fails at an eight-byte SList-pool allocation. Two-tick final present and full browser rollback remain unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1247,10 +1247,31 @@ or a global joint sweep. Strict 1216 remains, all ten raw pairs agree, and final
 present is unrun. The source, result, producer archive and independent timing
 review are pinned in the existing structured receipt.
 
+The private V14 repair at `480c3ded` moves that effect-owner matrix preparation
+inside the live source callback context after match processes. Its first browser
+run refused at source tick 0 before the rollback interval: the guard incorrectly
+assumed shared scheduler links contained only effects. The original Ground fog
+constructor supplies a source-backed reduced repro, but the runtime did not
+identify its rejected row as fog. The reviewed correction at `55721779` checks
+list topology for every row and selects only exact class-8 effect owners. Three
+focused controls and the affected browser build pass; the 2,175 source policy
+rows retain their sizes and modes. The retained typed joint trace now shows
+original Make/Setup writes in STEP on both paths, with equal 48-byte matrices
+and flags at each tick, without diagnostic overflow or refusal. This is specific
+to that target joint. The changed-hypothesis browser run reaches
+the interval and all ten raw vector comparisons agree, but strict command 11
+still refuses 1216. The first difference is now an eight-byte pool allocation
+at row 3138, offset 0, associated with the exact producer's `slist_alloc_data`.
+That identifies the allocator, not the node's live owner or writer. Final present
+remains unrun. Both failed producers and runs are retained; snapshot close and
+renderer shutdown return 1, CPU close retains 1216, and all owned PIDs are absent.
+The next step is a bounded list-owner/writer diagnosis. Same-profile agreement
+does not establish original hidden-joint semantic equivalence.
+
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The
-structured `fighter_projection_v11_result_20261029` receipt preserves the source,
-build, configuration, raw-result and review identities. Full regression,
+structured receipt preserves each attempt’s distinct source, build,
+configuration, raw-result and review identities. Full regression,
 publication-head CI, profile admission and working browser rollback remain open.
 
 

@@ -114,6 +114,26 @@ extern "C" const void* melee_web_synctest_draw_diagnostics(){return fixture_draw
 extern "C" unsigned melee_web_synctest_draw_diagnostics_size(){return 132;}
 extern "C" unsigned melee_web_synctest_motion_boundary(unsigned){return 0;}
 extern "C" int melee_web_synctest_is_mario_kind(unsigned kind){return kind==0;}
+struct FixtureTraceContext {
+    std::uint32_t command,scope,frame,sample;
+};
+static std::array<FixtureTraceContext,512> class_piece_trace_contexts{},slist_trace_contexts{};
+static std::uint32_t class_piece_trace_context_count=0,slist_trace_context_count=0;
+static bool trace_context_overflow=false,trace_context_invalid=false;
+extern "C" void melee_web_source_memory_class_piece_slab_trace_context(
+    std::uint32_t command,std::uint32_t scope,std::uint32_t frame,std::uint32_t sample) {
+    if(!command||command>13u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
+    if(class_piece_trace_context_count<class_piece_trace_contexts.size())
+        class_piece_trace_contexts[class_piece_trace_context_count++]={command,scope,frame,sample};
+    else trace_context_overflow=true;
+}
+extern "C" void melee_web_source_memory_slist_trace_context(
+    std::uint32_t command,std::uint32_t scope,std::uint32_t frame,std::uint32_t sample) {
+    if(!command||command>13u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
+    if(slist_trace_context_count<slist_trace_contexts.size())
+        slist_trace_contexts[slist_trace_context_count++]={command,scope,frame,sample};
+    else trace_context_overflow=true;
+}
 #include "cpu_restore_adapter.inc"
 
 namespace {
@@ -412,6 +432,9 @@ void reset_fixture() {
     commit_trace={};commit_trace_count=0;admission_trace={};admission_trace_count=0;
     pre_action=pre_audio=pre_flow=pre_bootstrap=pre_context=pre_payload=pre_rng=0;
     pre_pad={};pre_transfer={};post_action=0;payload_admission_state=PayloadAdmissionState::Idle;
+    class_piece_trace_context_count=slist_trace_context_count=0;
+    class_piece_trace_contexts={};slist_trace_contexts={};
+    trace_context_overflow=trace_context_invalid=false;
 }
 bool configure_valid() {
     std::array<melee_web::CpuStaticRow,2> rows{{
@@ -460,6 +483,25 @@ void verify_successful_interval() {
     close_and_retire();
     check(capsule_disarms>0&&capsule_destroys==1&&action_destroys==1,
           "Disarm/retire/destroy sequence did not retain then release the capsule");
+    const std::array<std::uint32_t,4> expected_context_commands{1,2,3,4};
+    check(class_piece_trace_context_count==expected_context_commands.size()&&
+          !trace_context_overflow&&!trace_context_invalid,
+          "Modeled class-piece trace context was missing, invalid, or overflowed");
+    for(std::size_t i=0;i<expected_context_commands.size();++i){
+        const auto& context=class_piece_trace_contexts[i];
+        check(context.command==expected_context_commands[i]&&context.scope==0&&
+              context.frame==0&&context.sample==0,
+              "Adapter did not forward the current command boundary to class-piece diagnostics");
+    }
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    check(class_piece_trace_context_count==slist_trace_context_count&&
+          std::memcmp(class_piece_trace_contexts.data(),slist_trace_contexts.data(),
+                      class_piece_trace_context_count*sizeof(FixtureTraceContext))==0,
+          "Enabled SList trace context did not follow the same command boundary");
+#else
+    check(slist_trace_context_count==0,
+          "Default fixture unexpectedly enabled the private SList trace");
+#endif
 }
 void verify_drawn_reference_interval() {
     reset_fixture();check(configure_valid(),"Drawn configure failed");

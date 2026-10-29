@@ -1286,7 +1286,8 @@ void piece_slab_trace_emit(uint32_t close_status) {
   t.difference_valid?"true":"false",t.difference_valid?t.difference_row:0u,
   t.difference_valid?t.difference_offset:0u,t.difference_valid?t.expected_byte:0u,
   t.difference_valid?t.actual_byte:0u);
- for(uint32_t i=0;i<t.count;++i){
+ const bool slist_active=melee_web_source_memory_slist_trace_active()!=0;
+ for(uint32_t i=0;!slist_active&&i<t.count;++i){
   const auto& e=t.events[i];
   std::printf("MELEE_CLASS_PIECE_SLAB_TRACE {\"type\":\"event\",\"index\":%u,\"kind\":%u,\"kind_name\":\"%s\",\"command\":%u,\"scope\":\"%s\",\"frame\":%u,\"sample\":%u,\"row\":%u,\"row_source\":\"0x%08x\",\"row_requested\":%u,\"event_source\":\"0x%08x\",\"event_host\":\"0x%016llx\",\"row_host\":\"0x%016llx\",\"generation\":\"0x%016llx\",\"owner_epoch\":\"0x%016llx\",\"world\":\"0x%016llx\",\"requested_extent\":%u,\"physical_extent\":%u,\"target_in_event\":%u,\"target_part\":\"%s\",\"origin_site\":%u,\"stage\":%u,\"class_info\":\"0x%08x\",\"previous\":\"0x%08x\",\"inside_row\":%s}\n",
    i,e.kind,piece_slab_trace_kind_name(e.kind),e.command,piece_slab_trace_scope_name(e.scope),e.frame,e.sample,
@@ -1297,7 +1298,8 @@ void piece_slab_trace_emit(uint32_t close_status) {
    piece_slab_trace_target_part_name(e.target_part),e.origin_site,e.stage,e.class_info,e.previous,
    e.inside_row?"true":"false");
  }
- piece_jobj_trace_emit();
+ if(slist_active)melee_web_source_memory_slist_trace_emit();
+ else piece_jobj_trace_emit();
  std::fflush(stdout);
 }
 #endif
@@ -1393,6 +1395,7 @@ extern "C" void melee_web_source_memory_class_piece_slab_trace_finalize(
   else t.join_reason=witness_matches?6:5;
  }
  if(t.overflow&&t.joined)t.join_reason=7;
+ melee_web_source_memory_slist_trace_finalize();
  piece_slab_trace_emit(1);t.state=3;
 #else
  (void)pre;(void)post;(void)original;
@@ -1403,9 +1406,14 @@ extern "C" void melee_web_source_memory_class_piece_slab_trace_early_close(void)
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  auto& t=piece_slab_trace;if(!t.state||t.closed)return;
  t.closed=1;t.compare_status=UINT32_MAX;t.joined=0;t.join_reason=8;
+ melee_web_source_memory_slist_trace_early_close();
  piece_slab_trace_emit(0);t.state=3;
 #endif
 }
+
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+#include "slippi_profile/slist_target_diagnostic.inc"
+#endif
 
 #include "gameplay_lobj_writer_diagnostic.inc"
 
