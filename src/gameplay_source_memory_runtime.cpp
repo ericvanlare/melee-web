@@ -19,6 +19,18 @@
 #include <string>
 #include <vector>
 
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+#if !defined(MELEE_WEB_GAMEPLAY_COMPAT_H)
+#include "original_startup_compat.h"
+#endif
+extern "C" {
+#include <sysdolphin/baselib/jobj.h>
+}
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#endif
+#endif
+
 
 namespace {
 using melee_web::source::Address;
@@ -1233,6 +1245,8 @@ extern "C" MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_
  return r;
 }
 
+#include "slippi_profile/piece_jobj_trace.inc"
+
 namespace {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
 const char* piece_slab_trace_arm_name(uint32_t status) {
@@ -1249,6 +1263,7 @@ const char* piece_slab_trace_kind_name(uint32_t kind) {
 const char* piece_slab_trace_target_part_name(uint32_t part) {
  return part==0?"REQUESTED":(part==1?"PHYSICAL_PADDING":"UNKNOWN");
 }
+void piece_jobj_trace_emit();
 void piece_slab_trace_emit(uint32_t close_status) {
  auto& t=piece_slab_trace;
  const char* join_reason=t.overflow?"OVERFLOW_INCONCLUSIVE":
@@ -1282,6 +1297,7 @@ void piece_slab_trace_emit(uint32_t close_status) {
    piece_slab_trace_target_part_name(e.target_part),e.origin_site,e.stage,e.class_info,e.previous,
    e.inside_row?"true":"false");
  }
+ piece_jobj_trace_emit();
  std::fflush(stdout);
 }
 #endif

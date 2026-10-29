@@ -1232,9 +1232,12 @@ has no live class-piece record covering that byte; this alone does not identify
 its writer or later lifetime. All ten final raw vector comparisons agree; final
 present remains unrun. Snapshot close and renderer shutdown succeed, CPU close
 retains 1216, and all recorded owned processes are absent. Both exact producers
-and failed runs are retained. Next is a bounded target-slab allocation trace to
-distinguish later draw-time allocation from a writer without a recorded allocation,
-without changing the frozen ledger or comparing away source bytes.
+and failed runs are retained. The bounded trace at `77828017` now identifies the same post-capture joint
+allocation during the source update in both paths, with its class pointer joined
+to this producer’s `hsdJObj` symbol. The difference falls in the joint matrix.
+The trace is complete and does not overflow; the specific writer and owner
+reachability still need source assessment. Strict comparison and the frozen
+ledger remain unchanged.
 
 The two-tick final-present commands remain unrun. All recorded owned processes
 are independently absent and all nine producer pins are unchanged. The

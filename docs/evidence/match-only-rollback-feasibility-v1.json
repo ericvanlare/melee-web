@@ -8970,7 +8970,14 @@
       "next_boundary_review_sha256": "12859f799f3668ae8d2792df11d29fe935cbcce285c60bd190307077acb798b8",
       "archive": "rollback-renderer-resume-20261028-155740-eef0524c/local-tlut-v13-browser-archive/archive.json",
       "scope": "Previous palette mismatch passed; strict1216 moves to row3015 offset836 with no live piece captured. Ten raw vectors match; finalpresent unrun. No complete browser rollback.",
-      "next": "Bounded target-slab metadata trace using existing allocator hooks; preserve frozen capture ledger and strict comparisons."
+      "next": "Trace result at77828017 identifies a post-capture HSD_JObj allocation; inspect its matrix writer and existing source-update hooks before any repair.",
+      "target_slab_trace": {
+        "source_commit": "77828017fe56cb79860f9c555a2f5a292b7d2481",
+        "receipt": "rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-class-piece-slab-trace-v1/result-receipt.json",
+        "receipt_sha256": "3c3cb80a0dd3c2638b93c1f6384a6e7cd797d1e41e9613a6d7e37f04d3272ca8",
+        "archive": "rollback-renderer-resume-20261028-155740-eef0524c/class-piece-slab-trace-browser-archive/archive.json",
+        "scope": "Complete exact allocation join identifies newly created HSD_JObj during source update on both paths; specific matrix writer/reachability still needs source assessment. Strict payload1216 persists; finalpresent unrun."
+      }
     }
   }
 }

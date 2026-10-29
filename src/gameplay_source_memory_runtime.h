@@ -239,6 +239,14 @@ void melee_web_source_memory_class_piece_slab_trace_finalize(
     MeleeWebSourcePayloadComparison original);
 void melee_web_source_memory_class_piece_slab_trace_early_close(void);
 
+/* Temporary exact-target diagnostic ticket; no source pointer authority. */
+typedef struct MeleeWebPieceJObjTicket {
+    uint32_t valid, creator, allocation_event, leaf, begin_sequence, flags_before, before[12];
+} MeleeWebPieceJObjTicket;
+int melee_web_piece_jobj_begin(void* object, uint32_t leaf,
+                              MeleeWebPieceJObjTicket* ticket);
+void melee_web_piece_jobj_end(void* object, const MeleeWebPieceJObjTicket* ticket);
+
 #ifdef __cplusplus
 }
 #endif

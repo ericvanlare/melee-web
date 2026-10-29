@@ -1353,3 +1353,58 @@ diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
          HSD_ShadowRemove(lbshadow->shadow);
      }
  }
+
+diff --git a/src/sysdolphin/baselib/jobj.c b/src/sysdolphin/baselib/jobj.c
+--- a/src/sysdolphin/baselib/jobj.c
++++ b/src/sysdolphin/baselib/jobj.c
+@@ -1,4 +1,16 @@
+ #include "jobj.h"
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "gameplay_source_memory_runtime.h"
++#define PIECE_JOBJ_BEGIN(obj, leaf) \
++    MeleeWebPieceJObjTicket trace_ticket = {0}; \
++    melee_web_piece_jobj_begin((obj), (leaf), &trace_ticket)
++#define PIECE_JOBJ_END(obj) melee_web_piece_jobj_end((obj), &trace_ticket)
++#else
++#define PIECE_JOBJ_BEGIN(obj, leaf)
++#define PIECE_JOBJ_END(obj)
++#endif
+ 
+ #include <math.h>
+ #include <string.h>
+@@ -139,6 +151,8 @@
+ {
+     Vec3* scl;
+ 
++    PIECE_JOBJ_BEGIN(jobj, 1);
++
+     HSD_JObjSetupMatrix(jobj->parent);
+     if (jobj->flags & 8) {
+         if (jobj->parent != NULL && jobj->parent->scl != NULL) {
+@@ -193,6 +207,7 @@
+         jobj->mtx[1][3] = vec.y;
+         jobj->mtx[2][3] = vec.z;
+     }
++    PIECE_JOBJ_END(jobj);
+ }
+ 
+ void HSD_JObjRemoveAnimByFlags(HSD_JObj* jobj, u32 flags)
+@@ -1390,6 +1405,8 @@
+     HSD_JObj* parent;
+     HSD_RObj* robj;
+     f32 x_scale;
++
++    PIECE_JOBJ_BEGIN(jobj, 2);
+ 
+     HSD_JOBJ_METHOD(jobj)->make_mtx(jobj);
+     jobj->flags &= ~JOBJ_MTX_DIRTY;
+@@ -1440,6 +1457,7 @@
+         }
+         jobj->flags &= ~JOBJ_MTX_DIRTY;
+     }
++    PIECE_JOBJ_END(jobj);
+ }
+ 
+ void HSD_JObjSetMtxDirtySub(HSD_JObj* jobj)

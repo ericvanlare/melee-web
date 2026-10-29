@@ -86,6 +86,29 @@ class SourceClassPieceTests(OwnedWorkspaceTests):
                 self.assertEqual(len(re.findall(r"\bhsdAllocMemPiece\(size\)",body)),1,"wrapper makes one source allocator call with the evaluated size")
                 self.assertRegex(body,r"if\s*\(piece\)\s*melee_web_class_piece_origin\(piece,\s*size,\s*site\)","wrapper labels only a non-NULL source result")
                 self.assertRegex(body,r"return\s+piece\s*;","wrapper returns the exact source result")
+        # Apply ONLY the real JObj diagnostic section and prove both original
+        # math bodies are byte-identical after removing entry/exit observation.
+        jobj_rel="src/sysdolphin/baselib/jobj.c"
+        jobj_original=subprocess.check_output(["git","show",commit+":"+jobj_rel],cwd=ROOT/".deps/melee",text=True)
+        (tree/jobj_rel).write_text(jobj_original)
+        profile=SOURCE/"src/slippi_profile/patches/melee-profile-hooks.patch"
+        if not profile.is_file():profile=ROOT/"src/slippi_profile/patches/melee-profile-hooks.patch"
+        observed=subprocess.run(["git","apply","--include="+jobj_rel,str(profile)],cwd=tree,env=env,capture_output=True,text=True)
+        self.assertEqual(observed.returncode,0,observed.stdout+observed.stderr)
+        jobj_patched=(tree/jobj_rel).read_text()
+        def body(text,name):
+            start=text.index("void "+name+"("); opening=text.index("{",start); depth=1; end=opening+1
+            while depth:
+                depth += (text[end]=="{")-(text[end]=="}");end+=1
+            return text[start:end]
+        for name,leaf in (("HSD_JObjMakeMatrix",1),("HSD_JObjSetupMatrixSub",2)):
+            actual=body(jobj_patched,name)
+            self.assertEqual(actual.count("PIECE_JOBJ_BEGIN(jobj, "+str(leaf)+");"),1)
+            self.assertEqual(actual.count("PIECE_JOBJ_END(jobj);"),1)
+            stripped=actual.replace("    PIECE_JOBJ_BEGIN(jobj, "+str(leaf)+");\n\n","").replace("    PIECE_JOBJ_END(jobj);\n","")
+            self.assertEqual(stripped,body(jobj_original,name),name+" original math/order unchanged")
+        self.assertIn("MELEE_WEB_CPU_INTERVAL_ENABLED",jobj_patched)
+        self.assertIn("MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE",jobj_patched)
         # The existing source-preparation bool ABI lowering, applied only to
         # this private patched actual C TU. No source preparation command runs.
         class_header=tree/"src/sysdolphin/baselib/class.h"
@@ -110,13 +133,38 @@ class SourceClassPieceTests(OwnedWorkspaceTests):
             if active:inputs += [ROOT/"src/source_address_context.cpp",ROOT/"src/source_game_heap_context.cpp"]
             run(mode+"-link",[em/"em++","-std=c++17","-O1","-fexceptions",*common,*flags,*inputs,
                               "-Wl,--wrap=calloc","-sDISABLE_EXCEPTION_CATCHING=0","-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-o",js])
-            for case in (["origin","origin-duplicate","origin-unknown","raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm",*["capture-"+x for x in ["armed","frozen","reuse","disarm","duplicate","topology","descriptor","amnesia","serial","wrong-header","stale-row","extent","anchor","cold","driftserial","bounds","pending","null-class","raw","missing","mirror","retired","recreated","trace-positive","trace-close","trace-overflow","trace-unavailable","trace-nojoin"]]] if active else ["inactive"]):
+            for case in (["jobj-probe","jobj-probe-stale","jobj-probe-overflow","origin","origin-duplicate","origin-unknown","raw","class","drift","missing","mirror","retired","promotion","descriptor","overflow","serial","noncold","extent","oom","topology","disarm",*["capture-"+x for x in ["armed","frozen","reuse","disarm","duplicate","topology","descriptor","amnesia","serial","wrong-header","stale-row","extent","anchor","cold","driftserial","bounds","pending","null-class","raw","missing","mirror","retired","recreated","trace-positive","trace-close","trace-overflow","trace-unavailable","trace-nojoin"]]] if active else ["inactive"]):
                 result=run(mode+"-"+case,[node_runtime(),js,case])
+                if active and case.startswith("jobj-probe"):
+                    records=[json.loads(line.split(" ",1)[1]) for line in result.stdout.splitlines() if line.startswith("MELEE_CLASS_PIECE_SLAB_TRACE ")]
+                    self.assertTrue(all(len(line)<=4096 for line in result.stdout.splitlines() if line.startswith("MELEE_CLASS_PIECE_SLAB_TRACE ")))
+                    creators=[x for x in records if x["type"]=="jobj_creator"]
+                    writers=[x for x in records if x["type"]=="jobj_writer"]
+                    summary=next(x for x in records if x["type"]=="jobj_summary")
+                    self.assertEqual(len(creators),1 if case.endswith("stale") else 2)
+                    self.assertEqual(summary["creator_count"],len(creators))
+                    self.assertEqual(summary["writer_count"],len(writers))
+                    for creator in creators:
+                        self.assertRegex(creator["host"],r"^0x[0-9a-f]{16}$")
+                        self.assertIn(creator["stack_status"],(0,1,2,3))
+                    if case.endswith("stale"):
+                        self.assertTrue(summary["refused"]);self.assertFalse(writers)
+                    else:
+                        self.assertEqual([x["leaf"] for x in writers[:2]],["HSD_JObjMakeMatrix","HSD_JObjSetupMatrixSub"])
+                        self.assertEqual(writers[0]["before"][0],"00000000")
+                        self.assertEqual(writers[0]["after"][0],"3f800000")
+                        self.assertLess(writers[1]["begin_sequence"],writers[0]["begin_sequence"])
+                        self.assertLess(writers[0]["begin_sequence"],writers[0]["end_sequence"])
+                        self.assertLess(writers[0]["end_sequence"],writers[1]["end_sequence"])
+                        self.assertEqual(writers[0]["flags_after"],"00000040")
+                        self.assertEqual((writers[0]["command"],writers[0]["scope"],writers[0]["frame"],writers[0]["sample"]),(9,"STEP",176,300))
+                        self.assertEqual(summary["overflow"],case.endswith("overflow"))
                 if active and case in ("capture-trace-positive","capture-trace-close","capture-trace-overflow","capture-trace-unavailable","capture-trace-nojoin"):
                     prefix="MELEE_CLASS_PIECE_SLAB_TRACE "
                     lines=[line[len(prefix):] for line in result.stdout.splitlines() if line.startswith(prefix)]
                     self.assertTrue(lines,"trace output is present on the retained native stdout path")
-                    self.assertLessEqual(len(lines),33,"one summary plus the fixed 32-event cap")
+                    self.assertLessEqual(len(lines),34,"slab summary plus32 events and empty JObj summary")
+                    self.assertEqual(len([line for line in lines if json.loads(line).get("type")=="jobj_summary"]),1)
                     self.assertTrue(all(len(line)<=4096 for line in lines),"each record fits retained stdout bound")
                     records=[json.loads(line) for line in lines]
                     summaries=[record for record in records if record.get("type")=="summary"]

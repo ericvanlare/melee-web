@@ -17,7 +17,18 @@ struct PieceSlabTraceEvent {
  uint32_t origin_site,stage,class_info,previous,inside_row;
  uint64_t row_host,event_host,generation,epoch,world;
 };
+struct PieceJObjWriter {
+ uint32_t leaf,command,scope,frame,sample,begin_sequence,end_sequence,flags_before,flags_after,before[12],after[12];
+ uint32_t stack_status,stack_bytes;char stack[2048]{};
+};
+struct PieceJObjCreator {
+ uint32_t allocation_event,label_event,initialized=0,writer_count=0;
+ uint32_t stack_status,stack_bytes;char stack[2048]{};
+ PieceJObjWriter writers[4]{};
+};
 struct PieceSlabTrace {
+ uint32_t jobj_count=0,jobj_overflow=0,jobj_refused=0,jobj_sequence=0;
+ PieceJObjCreator jobjs[2]{};
  uint32_t state=0,arm_status=0,closed=0,count=0,overflow=0;
  uint32_t command=0,scope=MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,frame=0,sample=0;
  uint32_t row=0,source=0,requested=0,target_offset=0,target_source=0;
@@ -122,6 +133,7 @@ uint32_t piece_trace_rounded_extent(int32_t requested) {
  if(requested<=0||static_cast<uint32_t>(requested)>UINT32_MAX-31u)return 0;
  return (static_cast<uint32_t>(requested)+31u)&~31u;
 }
+void piece_jobj_creator(uint32_t index);
 void piece_slab_trace_event(uint32_t kind,void* pointer,int32_t requested,
  uint32_t physical,uint32_t origin_site,uint32_t stage,
  const void* info,const void* previous) {
@@ -147,6 +159,7 @@ void piece_slab_trace_event(uint32_t kind,void* pointer,int32_t requested,
   static_cast<uint32_t>(reinterpret_cast<uintptr_t>(info)),
   static_cast<uint32_t>(reinterpret_cast<uintptr_t>(previous)),inside?1u:0u,
   static_cast<uint64_t>(row->host),static_cast<uint64_t>(host),row->generation,owner_epoch,world_generation};
+ if(kind==5&&stage==1)piece_jobj_creator(trace.count-1);
 }
 #endif
 }

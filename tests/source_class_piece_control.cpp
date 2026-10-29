@@ -5,6 +5,7 @@ extern "C" {
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/class.h>
 #include <sysdolphin/baselib/tobj.h>
+#include <sysdolphin/baselib/jobj.h>
 #include <dolphin/os/OSAlloc.h>
 }
 #include <cstdlib>
@@ -12,6 +13,7 @@ extern "C" {
 #include <cstring>
 #include <new>
 #include <emscripten.h>
+extern "C" { HSD_JObjInfo hsdJObj = {}; } // modeled class descriptor, actual allocator under test
 static bool deny_allocation,fail_diagnostic_calloc;
 extern "C" void* __real_calloc(std::size_t,std::size_t);
 extern "C" void* __wrap_calloc(std::size_t n,std::size_t bytes){
@@ -99,6 +101,52 @@ int main(int argc,char** argv){
    auto* reused=static_cast<unsigned char*>(hsdAllocMemPieceAt(sizeof(HSD_Tlut),MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC));
    check(reused==p&&cell.generation>generation&&cell.origin_site==MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC&&!piece_owner.reason,"same-address reuse gets fresh generation and caller");
   }
+  return 0;
+ }
+ if(!std::strncmp(mode,"jobj-probe",10)){
+  ClassInfoInit(&hsdClass);
+  hsdInitClassInfo(&hsdJObj.parent.parent,&hsdClass,(char*)"fixture",(char*)"modeledJObj",
+                   sizeof(hsdJObj),sizeof(HSD_JObj));
+  auto* warm=static_cast<HSD_JObj*>(hsdNew(&hsdJObj.parent.parent));check(warm,"warm actual class allocator");
+  auto* row=find_host_allocation(reinterpret_cast<uintptr_t>(warm));check(row,"warm row");
+  const uint32_t source=row->source.value();const uint32_t extent=row->requested;
+  const uint32_t offset=uint32_t(reinterpret_cast<uintptr_t>(warm)-row->host)+offsetof(HSD_JObj,mtx);
+  hsdFreeMemPiece(warm,sizeof(HSD_JObj));auto* pre=snapshot();auto anchor=melee_web_class_piece_arm();check(anchor.ready,"probe anchor");
+  check(melee_web_source_memory_class_piece_slab_trace_arm(pre,anchor,source,extent,offset)==1,"probe arm");
+  const auto frozen=cell_hash();
+  melee_web_source_memory_class_piece_slab_trace_context(9,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+  auto* object=static_cast<HSD_JObj*>(hsdNew(&hsdJObj.parent.parent));check(object==warm,"actual allocator reuse");
+  check(piece_slab_trace.jobj_count==1,"canonical stage1 creates one incarnation without object read");
+  std::memset(object->mtx,0,sizeof(object->mtx)); // explicitly modeled constructor matrix
+  MeleeWebPieceJObjTicket ticket{},outer{};
+  check(!melee_web_piece_jobj_begin(reinterpret_cast<void*>(1),1,&ticket),"unrelated pointer not dereferenced");
+  check(!melee_web_piece_jobj_begin(object,7,&ticket),"unknown leaf refused");
+  if(!std::strcmp(mode,"jobj-probe-stale")){
+   check(melee_web_piece_jobj_begin(object,1,&ticket),"admit before free");
+   hsdFreeMemPiece(object,sizeof(HSD_JObj));melee_web_piece_jobj_end(object,&ticket);
+   check(piece_slab_trace.jobj_refused&&piece_slab_trace.jobjs[0].writer_count==0,"free invalidates ticket before read");
+  }else{
+   check(melee_web_piece_jobj_begin(object,2,&outer),"outer Setup callback");
+   check(melee_web_piece_jobj_begin(object,1,&ticket),"inner Make callback");
+   object->flags=0x40u;object->mtx[0][0]=1.0f; // modeled source writer, not original matrix arithmetic
+   melee_web_piece_jobj_end(object,&ticket);melee_web_piece_jobj_end(object,&outer);
+   check(piece_slab_trace.jobjs[0].writer_count==2,"nested changed callbacks ordered");
+   check(melee_web_piece_jobj_begin(object,1,&ticket),"unchanged callback enter");
+   melee_web_piece_jobj_end(object,&ticket);check(piece_slab_trace.jobjs[0].writer_count==2,"unchanged matrix suppressed");
+   if(!std::strcmp(mode,"jobj-probe-overflow")){
+    for(unsigned i=0;i<5;++i){check(melee_web_piece_jobj_begin(object,1,&ticket),"writer enter");object->mtx[0][0]+=1.0f;melee_web_piece_jobj_end(object,&ticket);}
+    check(piece_slab_trace.jobj_overflow&&piece_slab_trace.jobjs[0].writer_count==4,"bounded changed writer overflow");
+   }
+   hsdFreeMemPiece(object,sizeof(HSD_JObj));
+   melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_STEP,176,300);
+   auto* replay=static_cast<HSD_JObj*>(hsdNew(&hsdJObj.parent.parent));check(replay==warm,"same pointer new incarnation");
+   check(piece_slab_trace.jobj_count==2,"replay creator is separate incarnation");
+   check(!piece_jobj_live(replay,0)&&piece_jobj_live(replay,1),"old creator cannot adopt reuse");
+   std::memset(replay->mtx,0,sizeof(replay->mtx));
+  }
+  check(cell_hash()==frozen,"new diagnostics do not mutate frozen ledger");
+  melee_web_source_memory_class_piece_slab_trace_context(11,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
+  melee_web_source_memory_class_piece_slab_trace_early_close();
   return 0;
  }
  auto* raw=static_cast<unsigned char*>(hsdAllocMemPiece(160));check(raw,"raw allocation");
