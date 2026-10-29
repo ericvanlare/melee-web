@@ -22,6 +22,7 @@
     defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
     MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 #include "slippi_profile/jobj_diagnostic.h"
+#include "original_startup_compat.h"
 #include <sysdolphin/baselib/jobj.h>
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/emscripten.h>
