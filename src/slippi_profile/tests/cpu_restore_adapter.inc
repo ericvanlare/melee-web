@@ -36,9 +36,28 @@ struct CpuTwoTickEvidence {
 static_assert(offsetof(CpuTwoTickEvidence,tick_pairs)==64&&
               offsetof(CpuTwoTickEvidence,drawn_pair)==22896&&
               offsetof(CpuTwoTickEvidence,diagnostics)==34312&&sizeof(CpuTwoTickEvidence)==35368);
+/* Separate fixed seven-tick ABI. Commands 8..13 and CpuTwoTickEvidence remain
+ * byte-for-byte independent of this route. */
+struct CpuSevenTickEvidence {
+    uint32_t schema=1,bytes=sizeof(CpuSevenTickEvidence),mode=7,state=0;
+    uint32_t first_failure=0,pre_frame=0,post_frame=0,commit_result=UINT32_MAX;
+    uint32_t cpu_equality=0,drawn_equality=0,checked_cpu=0,matched_cpu=0;
+    uint32_t checked_drawn=0,matched_drawn=0,diagnostic_mask=0,last_command=0;
+    uint32_t baseline_step_no_draw_mask=0,replay_step_no_draw_mask=0;
+    std::array<CpuRestoreEvidence,7> tick_pairs{};
+    CpuRestoreEvidence drawn_pair{};
+    /* capture, seven baseline draw-idle boundaries, seven corrected no-draw
+     * boundaries, final-present idle. */
+    std::array<std::array<uint8_t,132>,16> diagnostics{};
+};
+static_assert(offsetof(CpuSevenTickEvidence,tick_pairs)==72&&
+              offsetof(CpuSevenTickEvidence,drawn_pair)==79984&&
+              offsetof(CpuSevenTickEvidence,diagnostics)==91400&&
+              sizeof(CpuSevenTickEvidence)==93512);
 struct CpuRestoreControl {
     enum State:uint32_t {Idle,Configured,Captured,Equal,DrawSubmitted,Complete,Failed,Closed,BaselineSubmitted,
-        CapturedTwo,Baseline0SubmittedTwo,Baseline1SubmittedTwo,TwoEqual,TwoDrawSubmitted};
+        CapturedTwo,Baseline0SubmittedTwo,Baseline1SubmittedTwo,TwoEqual,TwoDrawSubmitted,
+        CapturedSeven,BaselineDrawSubmittedSeven,ReplayingSeven,SevenEqual,SevenDrawSubmitted};
     State state=Idle;
     uint32_t first_failure=0,pre_phase=0,pre_expected_frame=0;
     RngProfileObservation pre_profile{};
@@ -51,6 +70,7 @@ struct CpuRestoreControl {
     CpuRestoreEvidence evidence{};
     CpuDrawnEvidence drawn{};
     CpuTwoTickEvidence two{};
+    CpuSevenTickEvidence seven{};
     MeleeWebSourcePayloadFailureWitness failure_witness{1,sizeof(MeleeWebSourcePayloadFailureWitness)};
     MeleeWebClassPieceWitness class_piece_witness{1,sizeof(MeleeWebClassPieceWitness)};
     MeleeWebClassPieceCaptureWitness class_piece_capture_witness{1,sizeof(MeleeWebClassPieceCaptureWitness),0,0,1};
@@ -58,6 +78,7 @@ struct CpuRestoreControl {
     MeleeWebLObjWriterEvidence lobj_writer_evidence{1,sizeof(MeleeWebLObjWriterEvidence)};
     MeleeWebTObjWriterEvidence tobj_writer_evidence{1,sizeof(MeleeWebTObjWriterEvidence)};
     bool two_active=false;
+    bool seven_active=false;
 } cpu_restore;
 bool cpu_drawn_diagnostics(unsigned index){
     if(index>=cpu_restore.drawn.draw_diagnostics.size()||melee_web_synctest_draw_diagnostics_size()!=132)return false;
@@ -76,6 +97,7 @@ uint32_t cpu_fail(uint32_t code,const char* message){
     cpu_restore.evidence.state=cpu_restore.state;
     if(cpu_restore.drawn.mode)cpu_restore.drawn.pair.first_failure=cpu_restore.first_failure;
     if(cpu_restore.two_active){cpu_restore.two.first_failure=cpu_restore.first_failure;cpu_restore.two.state=cpu_restore.state;}
+    if(cpu_restore.seven_active){cpu_restore.seven.first_failure=cpu_restore.first_failure;cpu_restore.seven.state=cpu_restore.state;}
     return cpu_restore.first_failure;
 }
 uint32_t cpu_checked_source_fail(uint32_t code,const char* boundary,
@@ -123,6 +145,7 @@ uint32_t cpu_close(){
      * observes source owner retirement. CLOSE is not a destruction claim. */
     cpu_restore.state=CpuRestoreControl::Closed;cpu_restore.evidence.state=cpu_restore.state;
     if(cpu_restore.two_active)cpu_restore.two.state=cpu_restore.state;
+    if(cpu_restore.seven_active)cpu_restore.seven.state=cpu_restore.state;
     return cpu_restore.first_failure;
 }
 
@@ -342,9 +365,235 @@ uint32_t cpu_execute_two(uint32_t command){
     return cpu_fail(0x4c5u,"unknown two-tick command");
 #endif
 }
+bool cpu_seven_diag(unsigned index){
+    auto& e=cpu_restore.seven;
+    if(index>=e.diagnostics.size()||melee_web_synctest_draw_diagnostics_size()!=132)return false;
+    const auto* bytes=static_cast<const uint8_t*>(melee_web_synctest_draw_diagnostics());
+    if(!bytes)return false;
+    std::memcpy(e.diagnostics[index].data(),bytes,132);e.diagnostic_mask|=1u<<index;return true;
+}
+bool cpu_seven_live_equals(const std::array<uint8_t,132>& expected){
+    if(melee_web_synctest_draw_diagnostics_size()!=132)return false;
+    const auto* bytes=static_cast<const uint8_t*>(melee_web_synctest_draw_diagnostics());
+    return bytes&&std::memcmp(bytes,expected.data(),expected.size())==0;
+}
+bool cpu_seven_safe(uint32_t expected){
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    if(!melee_web_snapshot_actual_stage_is_final_destination())return false;
+#endif
+    if(!cpu_tuple_unchanged()||match->source_frames()!=expected||observation.frame!=expected||
+       !observation.ready||observation.ending||observation.complete||observation.paused||
+       observation.stocks[0]!=4||observation.stocks[1]!=4)return false;
+    for(unsigned i=0;i<2;++i)
+        if(melee_web_synctest_motion_boundary(observation.motion[i])!=0||
+           !melee_web_synctest_is_mario_kind(observation.players[i].fighter_kind))return false;
+    return true;
+}
+/* A checked restore rewinds the authoritative session cursor immediately;
+ * the cached observer still describes the sealed endpoint until the next raw
+ * source step refreshes it. Admit that one pre-step boundary from the live
+ * session cursor and retained interactive/owner predicates, then require the
+ * ordinary full observation/frame check after the step. */
+bool cpu_seven_replay_cursor_safe(uint32_t expected){
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    if(!melee_web_snapshot_actual_stage_is_final_destination())return false;
+#endif
+    if(!cpu_tuple_unchanged()||!match||match->source_frames()!=expected||
+       !observation.ready||observation.ending||observation.complete||observation.paused||
+       observation.stocks[0]!=4||observation.stocks[1]!=4)return false;
+    for(unsigned i=0;i<2;++i)
+        if(melee_web_synctest_motion_boundary(observation.motion[i])!=0||
+           !melee_web_synctest_is_mario_kind(observation.players[i].fighter_kind))return false;
+    return true;
+}
+void cpu_seven_raw(CpuRestoreEvidence& e,bool replay){
+    if(replay){e.replay=observation;e.replay_pcm=pcm;e.replay_pad=input_bytes;
+        e.replay_profile=rng_profile_observation;e.replay_transfer=transfer_diagnostic;}
+    else{e.baseline=observation;e.baseline_pcm=pcm;e.baseline_pad=input_bytes;
+        e.baseline_profile=rng_profile_observation;e.baseline_transfer=transfer_diagnostic;}
+}
+bool cpu_seven_raw_equal(const CpuRestoreEvidence& e){
+    return !std::memcmp(&e.baseline,&e.replay,sizeof(Observation))&&
+        !std::memcmp(e.baseline_pcm.data(),e.replay_pcm.data(),sizeof(pcm))&&
+        e.baseline_pad==e.replay_pad&&
+        !std::memcmp(&e.baseline_profile,&e.replay_profile,sizeof(RngProfileObservation))&&
+        !std::memcmp(&e.baseline_transfer,&e.replay_transfer,sizeof(TransferDiagnostic));
+}
+bool cpu_seven_interval(){
+    if(!match||!cpu_restore.capsule||!cpu_restore.capsule->interval_boundary(*match)){
+        if(cpu_restore.capsule)cpu_restore.seven.tick_pairs[0].comparison=cpu_restore.capsule->comparison();
+        return false;
+    }return true;
+}
+uint32_t cpu_execute_seven(uint32_t command){
+    using C=CpuRestoreControl;auto& e=cpu_restore.seven;
+    if(command==14)cpu_restore.seven_active=true;
+#if !defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) || !MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK || \
+    !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    return cpu_fail(0x4d0u,"seven-tick route requires the private v17 particle measurement profile");
+#else
+    if(command==14){
+        if(cpu_restore.state!=C::Configured||!cpu_restore.configured_statics)
+            return cpu_fail(0x4d1u,"seven-tick CAPTURE requires one configuration");
+        if(cpu_boundary())return cpu_restore.first_failure;
+        cpu_restore.profile_owner=rng_profile_gobj;cpu_restore.profile=rng_profile_enabled;
+        cpu_restore.configured_seed=configured_source_seed;cpu_restore.initializer=native_initializer_enabled;
+        e.pre_frame=observation.frame;
+        if(e.pre_frame>UINT32_MAX-7u||!cpu_seven_safe(e.pre_frame))
+            return cpu_fail(0x4d2u,"seven-tick source frame/interactive owner refused");
+        cpu_restore.pre_phase=audio_phase;cpu_restore.pre_profile=rng_profile_observation;
+        cpu_restore.pre_expected_frame=rng_profile_expected_callback_frame;
+        payload_admission_capture_begin_frame=last_completed_frame_id;
+        payload_admission_capture_end_frame=last_completed_frame_id;
+        if(!cpu_seven_diag(0))return cpu_fail(0x4d3u,"seven-tick capture diagnostics unavailable");
+        melee_web::CpuCaptureDiagnostic diagnostic{};
+        cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture(*match,
+            std::move(cpu_restore.configured_statics),diagnostic,melee_web::CpuCheckpointSpan::SevenTicks);
+        if(!cpu_restore.capsule){e.tick_pairs[0].comparison=diagnostic.comparison;return cpu_fail(0x434u,diagnostic.message.data());}
+        if(cpu_boundary())return cpu_restore.first_failure;
+        if(!cpu_seven_live_equals(e.diagnostics[0]))return cpu_fail(0x4d3u,"seven-tick capture drew");
+        e.post_frame=e.pre_frame+7u;
+        for(unsigned i=0;i<7;++i){e.tick_pairs[i].pre_frame=e.pre_frame+i;e.tick_pairs[i].post_frame=e.pre_frame+i+1u;}
+        cpu_restore.state=C::CapturedSeven;return 0;
+    }
+    if(!cpu_restore.seven_active||!cpu_restore.capsule)
+        return cpu_fail(0x4d1u,"seven-tick command has no capsule");
+    if(command>=15&&command<=21){
+        const unsigned index=command-15u;
+        if((index==0&&cpu_restore.state!=C::CapturedSeven)||
+           (index!=0&&cpu_restore.state!=C::BaselineDrawSubmittedSeven))
+            return cpu_fail(0x4d4u,"seven-tick baseline command is out of order");
+        if(index&&payload_admission_boundary(true)!=0)
+            return cpu_fail(0x4d5u+index,"prior seven-tick draw is not idle");
+        if(cpu_boundary()||!cpu_seven_safe(e.pre_frame+index))
+            return cpu_fail(0x4d5u+index,"seven-tick baseline boundary refused");
+        if(index){
+            if(!cpu_seven_diag(index))return cpu_fail(0x4d3u,"seven-tick baseline idle diagnostics unavailable");
+        }else if(!(e.diagnostic_mask&1u))return cpu_fail(0x4d3u,"seven-tick capture diagnostics missing");
+        if(index==0&&(!cpu_restore.capsule->begin_record(*match)||!cpu_seven_interval()))
+            return cpu_fail(0x4d6u,"seven-tick record interval refused");
+        int result=0;error[0]='\0';{
+            CpuClassPieceTraceScope trace(command,MELEE_WEB_CLASS_PIECE_TRACE_STEP,
+                e.pre_frame+index,300u+index);
+            result=melee_web_snapshot_step_raw();
+        }
+        auto& pair=e.tick_pairs[index];cpu_seven_raw(pair,false);
+        if(result!=1)return cpu_checked_source_fail(0x4e0u+index,
+            "authoritative seven-tick source step refused","raw source step returned failure without a diagnostic");
+        if(cpu_restore.first_failure||cpu_boundary()||!cpu_seven_safe(e.pre_frame+index+1u)||!cpu_seven_interval())
+            return cpu_fail(0x4e0u+index,"seven-tick baseline source boundary refused");
+        const auto& before=index?e.diagnostics[index]:e.diagnostics[0];
+        if(!cpu_seven_live_equals(before))return cpu_fail(0x4e8u+index,"authoritative source step changed draw diagnostics");
+        e.baseline_step_no_draw_mask|=1u<<index;
+        if(index==6&&!cpu_restore.capsule->seal_post(*match))
+            return cpu_fail(0x4efu,"seven-tick final CPU endpoint seal refused");
+        int draw_result=0;error[0]='\0';{
+            CpuClassPieceTraceScope trace(command,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,
+                e.pre_frame+index+1u,300u+index);
+            draw_result=melee_web_synctest_draw_present();
+        }
+        if(draw_result!=1)return cpu_checked_source_fail(0x4f0u+index,
+            "authoritative seven-tick draw refused","source draw returned failure without a diagnostic");
+        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||
+           !cpu_seven_safe(e.pre_frame+index+1u))
+            return cpu_fail(0x4f0u+index,"authoritative seven-tick draw submission refused");
+        cpu_restore.state=C::BaselineDrawSubmittedSeven;return 0;
+    }
+    if(command==22){
+        if(cpu_restore.state!=C::BaselineDrawSubmittedSeven||payload_admission_boundary(true)!=0||
+           !cpu_seven_safe(e.post_frame))
+            return cpu_fail(0x4f7u,"seven-tick final baseline draw is not idle");
+        if(!cpu_seven_diag(7)||!cpu_seven_live_equals(e.diagnostics[7]))
+            return cpu_fail(0x4d3u,"seven-tick final baseline diagnostics unavailable");
+        if(!cpu_restore.capsule->seal_drawn_reference(*match)){
+            e.drawn_pair.comparison=cpu_restore.capsule->comparison();
+            return cpu_fail(0x4f8u,"seven-tick read-only drawn endpoint seal refused");
+        }
+        e.drawn_pair.pre_frame=e.post_frame;e.drawn_pair.post_frame=e.post_frame;
+        cpu_seven_raw(e.drawn_pair,false);
+        if(cpu_boundary()||!cpu_seven_safe(e.post_frame))return cpu_fail(0x4f9u,"seven-tick precommit boundary refused");
+        e.commit_result=static_cast<uint32_t>(cpu_restore.capsule->restore(*match));
+        if(e.commit_result!=static_cast<uint32_t>(melee_web::GameplayCpuCommitResult::Ok))
+            return cpu_fail(0x450u+e.commit_result,"seven-tick aggregate admission/commit refused");
+        audio_phase=cpu_restore.pre_phase;rng_profile_observation=cpu_restore.pre_profile;
+        rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
+        cpu_restore.state=C::ReplayingSeven;return 0;
+    }
+    if(command>=23&&command<=29){
+        const unsigned index=command-23u;
+        if(cpu_restore.state!=C::ReplayingSeven||!cpu_seven_interval()||
+           cpu_boundary()||!cpu_seven_replay_cursor_safe(e.pre_frame+index))
+            return cpu_fail(0x4fau,"seven-tick replay interval refused before source step");
+        int result=0;error[0]='\0';{
+            CpuClassPieceTraceScope trace(command,MELEE_WEB_CLASS_PIECE_TRACE_STEP,
+                e.pre_frame+index,300u+index);
+            result=melee_web_snapshot_step_raw();
+        }
+        auto& pair=e.tick_pairs[index];cpu_seven_raw(pair,true);pair.commit_result=e.commit_result;
+        if(result!=1)return cpu_checked_source_fail(0x4fbu+index,
+            "corrected seven-tick source step refused","raw replay step returned failure without a diagnostic");
+        if(cpu_restore.first_failure||cpu_boundary()||!cpu_seven_safe(e.pre_frame+index+1u)||!cpu_seven_interval())
+            return cpu_fail(0x4fbu+index,"seven-tick replay source boundary refused");
+        if(!cpu_seven_live_equals(e.diagnostics[7])||!cpu_seven_diag(8u+index))
+            return cpu_fail(0x503u,"corrective seven-tick source step changed draw diagnostics");
+        e.replay_step_no_draw_mask|=1u<<index;
+        if(!cpu_seven_raw_equal(pair))return cpu_fail(0x504u,"seven-tick per-sample raw evidence differs");
+        pair.equality=1;
+        if(index==6){
+            const bool matched=cpu_restore.capsule->finish_replay(*match);
+            e.checked_cpu=cpu_restore.capsule->checked_domains();e.matched_cpu=cpu_restore.capsule->matched_domains();
+            pair.checked_domains=e.checked_cpu;pair.matched_domains=e.matched_cpu;
+            pair.comparison=cpu_restore.capsule->comparison();
+            if(!matched){
+                if(pair.comparison.domain==static_cast<uint32_t>(melee_web::CpuComparisonDomain::Payload)&&
+                   pair.comparison.status==2){
+                    cpu_restore.failure_witness=cpu_restore.capsule->payload_failure_witness();
+                    cpu_restore.origin_witness=cpu_restore.capsule->allocation_origin_witness();
+                    cpu_restore.class_piece_witness=cpu_restore.capsule->class_piece_witness();
+                    cpu_restore.class_piece_capture_witness=cpu_restore.capsule->class_piece_capture_witness();
+                    if(const auto* writer=cpu_restore.capsule->lobj_writer_witness())cpu_restore.lobj_writer_evidence=*writer;
+                    if(const auto* writer=cpu_restore.capsule->tobj_writer_witness())cpu_restore.tobj_writer_evidence=*writer;
+                }
+                return cpu_fail(0x505u,"seven-tick final CPU typed equality refused");
+            }
+            e.cpu_equality=1;cpu_restore.state=C::SevenEqual;
+        }
+        return 0;
+    }
+    if(command==30){
+        if(cpu_restore.state!=C::SevenEqual||!e.cpu_equality||cpu_boundary()||!cpu_seven_safe(e.post_frame))
+            return cpu_fail(0x506u,"seven-tick final present requires accepted CPU equality");
+        error[0]='\0';const int draw_result=melee_web_synctest_draw_present();
+        if(draw_result!=1)return cpu_checked_source_fail(0x506u,"seven-tick final draw refused",
+            "source draw returned failure without a diagnostic");
+        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_seven_safe(e.post_frame))
+            return cpu_fail(0x506u,"seven-tick final draw submission refused");
+        cpu_restore.state=C::SevenDrawSubmitted;return 0;
+    }
+    if(command==31){
+        if(cpu_restore.state!=C::SevenDrawSubmitted||payload_admission_boundary(true)!=0||
+           !cpu_seven_safe(e.post_frame))return cpu_fail(0x507u,"seven-tick final present is not idle");
+        if(!cpu_seven_diag(15))return cpu_fail(0x4d3u,"seven-tick final diagnostics unavailable");
+        cpu_seven_raw(e.drawn_pair,true);e.drawn_pair.commit_result=e.commit_result;
+        const bool matched=cpu_restore.capsule->matches_drawn_reference(*match);
+        e.checked_drawn=cpu_restore.capsule->checked_domains();e.matched_drawn=cpu_restore.capsule->matched_domains();
+        e.drawn_pair.checked_domains=e.checked_drawn;e.drawn_pair.matched_domains=e.matched_drawn;
+        e.drawn_pair.comparison=cpu_restore.capsule->comparison();
+        if(!matched||!cpu_seven_raw_equal(e.drawn_pair))
+            return cpu_fail(0x508u,"seven-tick final drawn endpoint differs");
+        e.drawn_pair.equality=1;e.drawn_equality=1;cpu_restore.capsule->disarm();
+        cpu_restore.state=C::Complete;return 0;
+    }
+    return cpu_fail(0x509u,"unknown seven-tick command");
+#endif
+}
 uint32_t cpu_execute(uint32_t command){
+    if(cpu_restore.two_active&&!(command>=8&&command<=13))
+        return cpu_fail(0x4c5u,"command cannot change the active two-tick route");
+    if(cpu_restore.seven_active&&!(command>=14&&command<=31))
+        return cpu_fail(0x509u,"command cannot change the active seven-tick route");
     if(command>=8&&command<=13)return cpu_execute_two(command);
-    if(cpu_restore.two_active)return cpu_fail(0x4c5u,"legacy command cannot change two-tick route");
+    if(command>=14&&command<=31)return cpu_execute_seven(command);
     using C=CpuRestoreControl;
     if(command==1){
         if(cpu_restore.state!=C::Configured||!cpu_restore.configured_statics)
@@ -534,9 +783,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configur
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(uint32_t command){
     if(cpu_restore.inflight){if(command==5)cpu_restore.close_requested=true;return cpu_fail(0x494u,"reentrant command refused");}
     if(payload_admission_runtime_boundary()!=0)return cpu_fail(0x495u,"runtime/Asyncify boundary refused");
-    if(command==5){if(cpu_restore.two_active)cpu_restore.two.last_command=5;return cpu_close();}
+    if(command==5){
+        if(cpu_restore.two_active)cpu_restore.two.last_command=5;
+        if(cpu_restore.seven_active)cpu_restore.seven.last_command=5;
+        return cpu_close();
+    }
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
+    if((command>=14&&command<=31)||cpu_restore.seven_active)cpu_restore.seven.last_command=command;
     melee_web_source_memory_class_piece_slab_trace_context(
         command,MELEE_WEB_CLASS_PIECE_TRACE_COMMAND,0,0);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
@@ -550,6 +804,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(cpu_restore.close_requested){cpu_restore.close_requested=false;cpu_close();}
     cpu_restore.evidence.state=cpu_restore.state;
     if(cpu_restore.two_active)cpu_restore.two.state=cpu_restore.state;
+    if(cpu_restore.seven_active)cpu_restore.seven.state=cpu_restore.state;
     return cpu_restore.first_failure?cpu_restore.first_failure:result;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_restore_evidence(){return &cpu_restore.evidence;}
@@ -558,6 +813,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_drawn_evidenc
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_drawn_evidence_bytes(){return sizeof(cpu_restore.drawn);}
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_two_tick_evidence(){return &cpu_restore.two;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_two_tick_evidence_bytes(){return sizeof(cpu_restore.two);}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_seven_tick_evidence(){return &cpu_restore.seven;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_seven_tick_evidence_bytes(){return sizeof(cpu_restore.seven);}
 // Private fixed owned buffer; never export a C sret function or caller pointer.
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_payload_failure_witness(){return &cpu_restore.failure_witness;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_payload_failure_witness_bytes(){return sizeof(cpu_restore.failure_witness);}

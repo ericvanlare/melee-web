@@ -26,8 +26,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     };
     auto code=[](CpuCaptureRefusal value){return static_cast<std::uint32_t>(value);};
     const auto ticks=static_cast<std::uint32_t>(span);
-    if(span!=CpuCheckpointSpan::OneTick&&span!=CpuCheckpointSpan::TwoTicks){
-        refused(stage,code(CpuCaptureRefusal::InvalidSpan),"CPU capsule interval is not one or two ticks");return {};
+    if(span!=CpuCheckpointSpan::OneTick&&span!=CpuCheckpointSpan::TwoTicks&&
+       span!=CpuCheckpointSpan::SevenTicks){
+        refused(stage,code(CpuCaptureRefusal::InvalidSpan),"CPU capsule interval is not one, two, or seven ticks");return {};
     }
     std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(span));
     if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}

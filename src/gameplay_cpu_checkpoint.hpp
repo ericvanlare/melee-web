@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 namespace melee_web {
-/* Private fixed one/two-tick CPU capsule. It owns pre/post evidence and typed
+/* Private fixed one/two/seven-tick CPU capsule. It owns pre/post evidence and typed
  * snapshots, never a renderer or arbitrary Wasm-memory snapshot. The fixture
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
  * After begin_record, disarm BEFORE ordinary source teardown; retain this
@@ -24,7 +24,7 @@ struct CpuCaptureDiagnostic {
     CpuComparison comparison{};
     std::array<char,160> message{};
 };
-enum class CpuCheckpointSpan : std::uint32_t { OneTick=1, TwoTicks=2 };
+enum class CpuCheckpointSpan : std::uint32_t { OneTick=1, TwoTicks=2, SevenTicks=7 };
 class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(

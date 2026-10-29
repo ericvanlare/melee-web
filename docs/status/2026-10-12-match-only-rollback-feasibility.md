@@ -1388,7 +1388,7 @@ artifacts for each attempt are retained unchanged. Unknown
 particle writers, active pool reset, unproved historical projection-cache hits and
 repeated presents still refuse.
 
-The frozen private V17 candidate routes the cohesive HSD Current/Last/start-time
+The reviewed private V17 candidate routes the cohesive HSD Current/Last/start-time
 measurement group into a typed persistent owner. Original operations and all
 known reads remain; the canonical globals stay referenced and must retain their
 full strict comparison policy in the linked build. The actual-source focused
@@ -1398,14 +1398,36 @@ and sticky refusal after canonical drift also pass. Profile identity controls
 pass; V16 remains historical and is refused by the V17 route. Two mechanical
 fixture failures are retained. Overlay runtime remains unsupported; these
 controls establish neither a browser result nor profile admission. Independent
-review passes the frozen candidate for its affected build; configured translation
-units and canonical symbol retention are still build gates.
+review passes the frozen candidate. The affected build at `b095ddcc` passes.
+The linked manifest newly includes canonical LastStat144 and start_time8; a
+separate additive review gives both full strict restore/compare policies while
+preserving all 2,169 prior row modes and sizes. The configuration has 2,171
+declared rows and 2,167 wire rows, with all three canonical metric globals
+strictly covered. The browser then passes commands 8–13: restore and two
+no-draw corrective ticks agree in every checked CPU domain (`0x3fe`), the actual
+final present draw completes, and every checked drawn domain also agrees. All
+three written raw evidence pairs match observation, PCM, PAD, RNG/profile and
+transfer bytes. Final GPU idle and CPU/source/renderer cleanup pass. Independent
+raw-result review confirms all three byte pairs, no-draw diagnostic slots 4–6,
+actual present slot 7 and live final state against the drawn replay. This remains
+a fixed two-tick component.
 
-The two-tick final-present commands remain unrun. All recorded owned processes
-are independently absent and all nine producer pins are unchanged. The
-structured receipt preserves each attempt’s distinct source, build,
-configuration, raw-result and review identities. Full regression,
-publication-head CI, profile admission and working browser rollback remain open.
+All recorded owned processes are independently absent and all nine producer
+artifacts are archived unchanged. The structured receipt preserves each
+attempt’s distinct source, build, configuration, raw-result and review identities.
+The fixed seven-tick diagnostic reuses the input timeline and typed checkpoint;
+the successful two-tick route stays intact. The actual adapter control passes
+with modeled source/session/provider leaves after correcting its Sealed-phase
+admission and restored-cursor check; two fixture link failures are retained.
+The repaired JavaScript runner passes 55 focused controls with no skips, and
+the isolated-source mirror regression passes. Independent native and JavaScript
+reviews pass; affected build and browser execution remain unrun. Failed
+JavaScript fixture attempts are retained. The proposed two-instance witness separates prediction nonvacuity from
+authoritative-to-same-input replay; it cannot establish correction from a wrong
+predicted branch. That next milestone first checks actual action allocation and
+retained borrowed identities, because exact action-tape replay currently refuses
+a changed action sequence. Full regression, publication-head CI, profile
+admission, full-match and working online browser rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

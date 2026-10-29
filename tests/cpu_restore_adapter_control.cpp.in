@@ -36,6 +36,13 @@ extern "C" {
 #include <sysdolphin/baselib/gobj.h>
 #include <melee/ft/forward.h>
 }
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+/* Component leaf only: this control exercises adapter phase/cursor admission,
+ * not source pool identity or particle rendering. */
+extern "C" int slippi_particle_presentation_anchor_admit(SlippiParticlePresentationAnchor) {
+    return 1;
+}
+#endif
 /* This block is copied byte-for-byte from gameplay_snapshot_probe.cpp by the
  * Python runner, so the adapter evidence layout follows the checked-in fixture. */
 @ACTUAL_FIXTURE_OBSERVATIONS@
@@ -110,6 +117,7 @@ MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
 MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void);
 MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void);
 extern "C" int melee_web_snapshot_step(unsigned sample);
+extern "C" int melee_web_snapshot_step_raw();
 extern "C" int melee_web_synctest_draw_present();
 
 #define MELEE_WEB_SYNCTEST_CPU_RESTORE 1
@@ -126,14 +134,14 @@ static std::uint32_t class_piece_trace_context_count=0,slist_trace_context_count
 static bool trace_context_overflow=false,trace_context_invalid=false;
 extern "C" void melee_web_source_memory_class_piece_slab_trace_context(
     std::uint32_t command,std::uint32_t scope,std::uint32_t frame,std::uint32_t sample) {
-    if(!command||command>13u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
+    if(!command||command>31u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
     if(class_piece_trace_context_count<class_piece_trace_contexts.size())
         class_piece_trace_contexts[class_piece_trace_context_count++]={command,scope,frame,sample};
     else trace_context_overflow=true;
 }
 extern "C" void melee_web_source_memory_slist_trace_context(
     std::uint32_t command,std::uint32_t scope,std::uint32_t frame,std::uint32_t sample) {
-    if(!command||command>13u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
+    if(!command||command>31u||scope>2u||((frame==0u)!=(sample==0u)))trace_context_invalid=true;
     if(slist_trace_context_count<slist_trace_contexts.size())
         slist_trace_contexts[slist_trace_context_count++]={command,scope,frame,sample};
     else trace_context_overflow=true;
@@ -182,7 +190,7 @@ unsigned capsule_destroys=0;
 unsigned action_disarms=0;
 unsigned action_destroys=0;
 unsigned tick_calls=0;
-std::array<unsigned,4> tick_samples{};
+std::array<unsigned,16> tick_samples{};
 std::size_t tick_sample_count=0;
 StepInterruption interruption=StepInterruption::None;
 bool interruption_done=false;
@@ -593,7 +601,8 @@ void verify_two_tick_interval() {
     check(melee_web_synctest_cpu_restore_command(10)==0&&draw_calls==2&&tick_calls==2,"Second baseline order");
     pending_submission=false;
     check(melee_web_synctest_cpu_restore_command(11)==0&&tick_calls==4&&draw_calls==2,"Two replay refused or drew");
-    check(tick_samples==std::array<unsigned,4>{300,301,300,301},"Two literal sample order");
+    check(tick_sample_count==4&&tick_samples[0]==300&&tick_samples[1]==301&&
+          tick_samples[2]==300&&tick_samples[3]==301,"Two literal sample order");
     const auto& e=cpu_restore.two;
     check(e.cpu_equality==1&&e.checked_cpu==0x3fe&&e.matched_cpu==0x3fe&&
           e.tick_pairs[0].equality==1&&e.tick_pairs[0].checked_domains==0&&e.tick_pairs[1].equality==1,
@@ -609,6 +618,47 @@ void verify_two_tick_interval() {
     // leaves are still the explicit fixture models described at file start.
     EM_ASM({console.log("CPU_TWO_ACTUAL_WASM_EVIDENCE_BASE64="+
         Buffer.from(HEAPU8.subarray($0,$0+$1)).toString("base64"));},&cpu_restore.two,sizeof(cpu_restore.two));
+    close_and_retire();
+}
+void verify_seven_tick_phase_boundary() {
+    reset_fixture();check(configure_valid(),"Seven configure refused");
+    check(melee_web_synctest_cpu_seven_tick_evidence_bytes()==93512,"Seven ABI size drift");
+    check(melee_web_synctest_cpu_restore_command(14)==0&&
+          cpu_restore.state==CpuRestoreControl::CapturedSeven,"Seven capture refused");
+    for(unsigned index=0;index<7;++index) {
+        check(melee_web_synctest_cpu_restore_command(15u+index)==0&&
+              tick_calls==index+1u&&draw_calls==index+1u&&pending_submission,
+              "Seven authoritative tick/draw order changed");
+        pending_submission=false;
+    }
+    // Command 22 runs after command 21 sealed the capsule. It must use the
+    // sealed drawn-reference admission, not a recording/replay interval check.
+    check(melee_web_synctest_cpu_restore_command(22)==0&&
+          cpu_restore.state==CpuRestoreControl::ReplayingSeven&&
+          cpu_restore.seven.commit_result==0&&match->source_frames()==176&&
+          observation.frame==183,
+          "Seven sealed command22 or checked restore cursor refused");
+    for(unsigned index=0;index<7;++index) {
+        check(melee_web_synctest_cpu_restore_command(23u+index)==0&&
+              tick_calls==8u+index&&match->source_frames()==177u+index&&
+              observation.frame==177u+index&&draw_calls==7,
+              "Seven corrected no-draw step or post-step observation refused");
+    }
+    auto& evidence=cpu_restore.seven;
+    check(cpu_restore.state==CpuRestoreControl::SevenEqual&&evidence.cpu_equality==1&&
+          evidence.checked_cpu==0x3fe&&evidence.matched_cpu==0x3fe&&
+          evidence.replay_step_no_draw_mask==0x7fu,
+          "Seven per-tick/typed replay equality missing");
+    check(melee_web_synctest_cpu_restore_command(30)==0&&draw_calls==8&&pending_submission,
+          "Seven final present refused");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_restore_command(31)==0&&
+          cpu_restore.state==CpuRestoreControl::Complete&&evidence.drawn_equality==1&&
+          evidence.diagnostic_mask==0xffffu,
+          "Seven endpoint completion/draw diagnostics refused");
+    check(tick_sample_count==14,"Seven raw source sample count drift");
+    for(unsigned index=0;index<14;++index)
+        check(tick_samples[index]==300u+(index%7u),"Seven raw source sample order drift");
     close_and_retire();
 }
 void verify_payload_failure_retention() {
@@ -950,7 +1000,8 @@ void verify_invalid_configuration_guards() {
 
 extern "C" int melee_web_snapshot_step(unsigned sample) {
     ++step_attempts;
-    if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301))||tick_sample_count>=tick_samples.size()) return 0;
+    if(!match||(sample!=300&&!(cpu_restore.two_active&&sample==301)&&
+       !(cpu_restore.seven_active&&sample>=300&&sample<=306))||tick_sample_count>=tick_samples.size()) return 0;
     if(fail_step_attempt==step_attempts) {
         std::snprintf(error,sizeof(error),"fixture snapshot_step sample=%u sentinel",sample);
         return 0;
@@ -975,7 +1026,7 @@ extern "C" int melee_web_snapshot_step(unsigned sample) {
     for(std::size_t i=0;i<source_state.pad.size();++i) source_state.pad[i]=std::uint8_t(sample+i+source_state.payload);
     const std::array<uint8_t,44> literal0{2,0,0,0,0,0,0,0,0,0,0,1,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
     const std::array<uint8_t,44> literal1{0,0,80,0,0,0,0,0,0,0,0,0,0,176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,255,0,0,0,0,0,0,0,0,0,0,255};
-    if(cpu_restore.two_active)source_state.pad=sample==300?literal0:literal1;
+    if(cpu_restore.two_active||cpu_restore.seven_active)source_state.pad=sample==300?literal0:literal1;
     for(std::size_t i=0;i<source_state.transfer.size();++i) source_state.transfer[i]=int(source_state.payload+i);
     if(tick_calls==journal_failure_tick)fail_replay=true;
     if(tick_calls==unexpected_draw_tick)++fixture_draw_diagnostics[21];
@@ -1010,6 +1061,10 @@ extern "C" int melee_web_snapshot_step(unsigned sample) {
     rng_profile_observation.source_global_frame=observation.frame;
     return 1;
 }
+extern "C" int melee_web_snapshot_step_raw() {
+    if(!cpu_restore.seven_active)return 0;
+    return melee_web_snapshot_step(300u+static_cast<unsigned>(tick_sample_count%7u));
+}
 extern "C" int melee_web_synctest_draw_present() {
     ++draw_attempts;
     if(fail_draw_attempt==draw_attempts) {
@@ -1017,7 +1072,7 @@ extern "C" int melee_web_synctest_draw_present() {
             std::snprintf(error,sizeof(error),"fixture draw_present attempt=%u sentinel",draw_attempts);
         return 0;
     }
-    if(!match||draw_calls>=(cpu_restore.two_active?3u:2u)) return 0;
+    if(!match||draw_calls>=(cpu_restore.seven_active?8u:(cpu_restore.two_active?3u:2u))) return 0;
     if(cpu_restore.drawn.mode||cpu_restore.two_active)++source_state.flow; // Explicit modeled presentation-clock leaf.
     ++fixture_draw_diagnostics[8];++fixture_draw_diagnostics[12];
     ++draw_calls;pending_submission=true;return 1;
@@ -1029,10 +1084,15 @@ int main() {
         verify_two_tick_interval();
         verify_two_tick_refusals();
         verify_payload_failure_retention();
+        verify_seven_tick_phase_boundary();
 #else
         reset_fixture();check(configure_valid(),"V5 configure");
         check(melee_web_synctest_cpu_restore_command(8)==0x4b0u&&tick_calls==0&&draw_calls==0,
               "Default V5 admitted two-tick route or executed source work");
+        close_and_retire();
+        reset_fixture();check(configure_valid(),"V5 seven configure");
+        check(melee_web_synctest_cpu_restore_command(14)==0x4d0u&&tick_calls==0&&draw_calls==0,
+              "Default V5 admitted seven-tick route or executed source work");
         close_and_retire();
 #endif
         verify_checked_source_call_failure_reporting();

@@ -39,7 +39,7 @@ void melee_web_cpu_restore_mark_disarm();
 void melee_web_cpu_restore_mark_destroy();
 
 namespace melee_web {
-enum class CpuCheckpointSpan : std::uint32_t {OneTick=1,TwoTicks=2};
+enum class CpuCheckpointSpan : std::uint32_t {OneTick=1,TwoTicks=2,SevenTicks=7};
 class GameplayMatchSession;
 struct CpuCaptureDiagnostic {
     CpuComparison comparison{};
@@ -218,7 +218,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         include_dirs = [stubs, overlay_src, overlay_src / "slippi_profile/tests",
                         REPO_ROOT / ".deps/aurora/include", source,
                         REPO_ROOT / "tests"]
-        common = ["-O1", "-fexceptions", "-DTARGET_PC", "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1",
+        common = ["-O1", "-fexceptions", "-DTARGET_PC", "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1", "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1",
                   "-ffunction-sections", "-fdata-sections", "-ffp-contract=off"]
         for directory in include_dirs:
             common.extend(["-I", str(directory)])
@@ -313,16 +313,23 @@ console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
         write_record(output_dir/"actual-origin-js-bridge.json",origin_bridge,bridged)
         self.assertEqual(bridged.returncode,0,bridged.stdout+bridged.stderr)
         v5_object=output_dir / "control-v5.o"
-        v5_common=[part for part in common if part!="-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1"]
+        v5_common=[part for part in common if part not in ("-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1","-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1")]
+        v5_commit_object=output_dir/"gameplay-cpu-commit-v5.o"
+        v5_commit_compile=[sys.executable,str(compiler/"em++.py"),*v5_common,
+                    "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=0","-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=0",
+                    "-std=c++20","-c",str(overlay_src/"gameplay_cpu_commit.cpp"),"-o",str(v5_commit_object)]
+        result=subprocess.run(v5_commit_compile,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
+        write_record(output_dir/"compile-v5-commit.json",v5_commit_compile,result)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         v5_compile=[sys.executable,str(compiler/"em++.py"),*v5_common,
-                    "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=0","-std=c++20","-c",
+                    "-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=0","-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=0","-std=c++20","-c",
                     str(control_source),"-o",str(v5_object)]
         result=subprocess.run(v5_compile,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
         write_record(output_dir/"compile-v5.json",v5_compile,result)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         v5_output=output_dir/"control-v5.js"
         v5_link=[sys.executable,str(compiler/"em++.py"),"-O1","-fexceptions",
-                 str(output_dir/"cpp-0.o"),str(output_dir/"cpp-1.o"),str(v5_object),
+                 str(v5_commit_object),str(output_dir/"cpp-1.o"),str(v5_object),
                  "-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-sASSERTIONS=2","-sSAFE_HEAP=1",
                  "-sALLOW_MEMORY_GROWTH=1","-o",str(v5_output)]
         result=subprocess.run(v5_link,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
@@ -343,10 +350,11 @@ console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
             "actual_witness_sha256":sha256(witness_bytes),
             "generated_control_sha256": sha256(control_source),
             "receipt_path": str(output_dir),
-            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "actual-witness-js-bridge.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
+            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "actual-witness-js-bridge.json", "compile-v5-commit.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
             "checks": [
                 "actual two-tick adapter 300/301 baseline and replay; idle waits, raw/typed evidence and first replay refusal stop before next tick",
                 "default-v5 compile rejects new route before source work while legacy routes still pass",
+                "V5 commit translation unit is separately compiled with private profile macros off",
                 "sample300 fixed while modeled source frame resets 176→177→176→177",
                 "actual fixed coordinator admissions and writes execute in named order",
                 "exact fixture observation/PCM/PAD/profile/transfer equality gates one draw",

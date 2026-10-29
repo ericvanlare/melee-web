@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restore_runner.mjs';
 import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_tick_runner.mjs';
+import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_SAMPLES} from './cpu_seven_tick_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -155,31 +156,43 @@ export async function recordTobjFailureStatics(report, page, rows) {
 export function validateCpuRestoreRouteSelection(values) {
   const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
+  const sevenTick = values['--aggregate-cpu-drawn-reference-seven-tick'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
-  if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
+  const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
+  if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
+  const multiTick = twoTick || sevenTick;
+  if (sevenTick && !particle) {
+    throw new Error('The seven-tick route requires the private v17 particle measurement profile');
+  }
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
-      values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and the fixed two-tick route');
+      values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
+    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
   }
   if (values['--slippi-tobj-presentation-cache'] === true &&
-      (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v15 current light set lane requires v7 and the fixed two-tick route');
+      (values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
+    throw new Error('The v15 current light set lane requires v7 and a fixed two- or seven-tick route');
   }
-  if (values['--slippi-lobj-presentation-cache'] === true && !twoTick) {
-    throw new Error('The v7 light owner requires the fixed two-tick route');
+  if (values['--slippi-lobj-presentation-cache'] === true && !multiTick) {
+    throw new Error('The v7 light owner requires a fixed two- or seven-tick route');
   }
-  if ((oneTick || twoTick) && !values['--aggregate-cpu-restore-config']) {
+  if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
-export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false, tobjPresentationCache = false, particlePresentationCache = false) {
-  if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
-  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v15 current light set lane requires v7 and two ticks');
-  if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !twoTickDrawnReference)) {
-    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and two ticks');
+export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null,
+  lobjPresentationCache = false, tobjPresentationCache = false, particlePresentationCache = false,
+  sevenTickDrawnReference = false, sevenTickExports = null) {
+  const multiTick = twoTickDrawnReference || sevenTickDrawnReference;
+  if (lobjPresentationCache && !multiTick) throw new Error('The v7 light owner requires two or seven ticks');
+  if(tobjPresentationCache && (!lobjPresentationCache || !multiTick)) throw new Error('The v15 current light set lane requires v7 and two or seven ticks');
+  if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !multiTick)) {
+    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and two or seven ticks');
+  }
+  if (sevenTickDrawnReference && !particlePresentationCache) {
+    throw new Error('The seven-tick route requires the private v17 particle measurement profile');
   }
   const expectedProfile = particlePresentationCache ? PARTICLE_MEASUREMENT_V17_PROFILE :
     tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
@@ -190,6 +203,10 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
       twoTickExports.payloadWitness !== true || twoTickExports.payloadWitnessBytes !== true)) {
     throw new Error('Two-tick evidence exports are unavailable for the linked v6 profile');
   }
+  if (sevenTickDrawnReference && (!sevenTickExports ||
+      sevenTickExports.evidence !== true || sevenTickExports.evidenceBytes !== true)) {
+    throw new Error('Seven-tick evidence exports are unavailable for the linked v17 profile');
+  }
   return expectedProfile;
 }
 
@@ -198,7 +215,7 @@ export function parseArgs(argv) {
   const allowed = new Set(['--browser-runtime', '--assets', '--manifest', '--out', '--playwright','--aggregate-cpu-restore-config']);
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
-    '--aggregate-cpu-drawn-reference-two-tick', '--slippi-lobj-presentation-cache',
+    '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
     '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
@@ -210,7 +227,7 @@ export function parseArgs(argv) {
     }
     const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
     }
     values[key] = value;
     i += 2;
@@ -244,6 +261,13 @@ export function parseArgs(argv) {
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const fileSha = file => sha256(fs.readFileSync(file));
+function addPrefixSignature(hash, sample, result) {
+  const index=Buffer.alloc(4);index.writeUInt32LE(sample,0);hash.update(index);
+  for(const key of ['observation','pcm','pad','drawDiagnostics']){
+    const bytes=Buffer.from(result[key],'base64');
+    const length=Buffer.alloc(4);length.writeUInt32LE(bytes.length,0);hash.update(length).update(bytes);
+  }
+}
 
 function sourceHashes() {
   const files = [
@@ -280,7 +304,11 @@ function sourceHashes() {
     'src/slippi_profile/tests/cpu_restore_runner.mjs',
     'src/slippi_profile/tests/cpu_two_tick_runner.mjs',
     'src/slippi_profile/tests/test_cpu_two_tick_runner.mjs',
+    'src/slippi_profile/tests/cpu_seven_tick_runner.mjs',
+    'src/slippi_profile/tests/test_cpu_seven_tick_runner.mjs',
     'src/slippi_profile/tests/cpu_restore_adapter.inc',
+    'scripts/net_rollback_input_timeline.mjs',
+    'scripts/net_lockstep_core.mjs',
     'src/gameplay_cpu_checkpoint.cpp','src/gameplay_cpu_commit.cpp','src/gameplay_cpu_statics.cpp','src/gameplay_cpu_interval.c',
   ];
   return Object.fromEntries(files.map(name => [name, fileSha(path.join(ROOT, name))]));
@@ -394,8 +422,20 @@ export function retainCpuRestoreSample(report,sample) {
 export function recordCpuRestoreFailure(report,error) {
   if(error.cpuRestorePartial)report.execution.cpuRestore=error.cpuRestorePartial;
   if(error.cpuRestorePartialReadError)report.execution.cpuRestorePartialReadError=error.cpuRestorePartialReadError;
+  if(error.cpuSevenTickPartial)report.execution.cpuSevenTick=error.cpuSevenTickPartial;
+  if(error.cpuSevenTickPartialReadError)report.execution.cpuSevenTickPartialReadError=error.cpuSevenTickPartialReadError;
+  if(error.cpuSevenTickPredictedPartial)report.execution.predictedInstanceProgress=error.cpuSevenTickPredictedPartial;
+  if(error.cpuSevenTickPredictedPartialReadError)report.execution.predictedInstanceProgressReadError=error.cpuSevenTickPredictedPartialReadError;
   if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
   report.execution.cpuOuterValidation='failed';
+  return report;
+}
+export function retainCpuSevenTickSample(report,sample) {
+  report.cpuRawSample=sample;
+  report.execution.cpuSevenTick=sample.cpuSevenTick;
+  report.execution.restorePerformed=sample.cpuSevenTick?.nativeEvidence?.state===5&&
+    sample.cpuSevenTick?.commands?.find(record=>record.command===31)?.result===0 ? true : 'not-proven';
+  report.execution.cpuOuterValidation='pending';
   return report;
 }
 export function validateCpuRestoreDrawSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
@@ -458,6 +498,57 @@ export function validateCpuTwoTickDrawSample(sample,beforeDiagnostics,previousFr
     baselineFrames:[first.frame,second.frame],baselineFighters:[fighters300,fighters301]};
 }
 
+export function validateCpuSevenTickDrawSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
+  const seven=sample.cpuSevenTick;
+  if(!seven||seven.route!=='drawn-reference-no-draw-seven-tick-v1'||seven.commands?.length!==18||
+     seven.timeline?.maxPredictionTicks!==7||seven.timeline?.predictionLimit?.tick!==307||
+     seven.timeline?.predictionLimit?.reason!=='prediction_limit'||seven.timeline?.earliestChangedTick!==300||
+     seven.timeline?.remoteContiguousThrough!==306||seven.timeline?.dirtyFromAfterCommit!==null||
+     seven.timeline?.originalLocalPadsPreserved!==true||!Array.isArray(seven.baselineRows)||seven.baselineRows.length!==7||
+     !Array.isArray(seven.predictedRows)||seven.predictedRows.length!==7||
+     !Array.isArray(seven.correctedRows)||seven.correctedRows.length!==7)
+    throw new Error('Seven-tick timeline or command-sequence evidence missing');
+  const checkpointSourceFrame=seven.checkpointSourceFrame;
+  validateCpuSevenTickFinalEvidence(seven.nativeEvidence,checkpointSourceFrame);
+  if(seven.nativeEvidence.tickPairs.some((pair,index)=>pair.baselinePad!==seven.timeline.replayFrames[index]?.frameBase64||
+      pair.replayPad!==seven.timeline.replayFrames[index]?.frameBase64))
+    throw new Error('Seven-tick actual/corrected PAD frames differ from the committed timeline plan');
+  const baselineFrames=[],baselineFighters=[];
+  let frame=previousFrame,diagnostics=beforeDiagnostics;
+  let previousDrawBytes=null;
+  for(let index=0;index<7;index++){
+    const row=seven.baselineRows[index],sampleNumber=CPU_SEVEN_TICK_SAMPLES[index];
+    if(row?.sample!==sampleNumber||row.boundary?.sourceFrame!==checkpointSourceFrame+index+1||
+       row.pad44Base64!==seven.nativeEvidence.tickPairs[index].baselinePad||!row.boundary?.interactive)
+      throw new Error(`Seven-tick baseline source boundary drift at ${sampleNumber}`);
+    const before=Buffer.from(row.drawBeforeBase64||'','base64');
+    if(before.length!==132||!before.equals(Buffer.from(seven.nativeEvidence.diagnostics[index].base64,'base64'))||
+       (index===0 ? JSON.stringify(decodeDrawDiagnostics(before))!==JSON.stringify(beforeDiagnostics) :
+         !before.equals(previousDrawBytes)))
+      throw new Error(`Seven-tick baseline pre-draw diagnostics drift at ${sampleNumber}`);
+    const drawn={status:row.gpuStatus,drawDiagnostics:row.drawAfterBase64,pad:row.pad44Base64,boundary:row.boundary};
+    const validated=validateDrawSampleBoundary(drawn,sampleNumber,diagnostics,frame);
+    const fighters=validateSelectedDrawPath(diagnostics,validated.diagnostics,row.boundary.players,expectedInputMapping);
+    if(JSON.stringify(fighters)!==JSON.stringify(row.selectedDraw))
+      throw new Error(`Seven-tick selected draw boundary changed at ${sampleNumber}`);
+    baselineFrames.push(validated.frame);baselineFighters.push(fighters);
+    previousDrawBytes=Buffer.from(row.drawAfterBase64,'base64');
+    frame=validated.frame;diagnostics=validated.diagnostics;
+  }
+  const finalValidation=validateDrawSampleBoundary(sample,306,diagnostics,frame);
+  const finalFighters=validateSelectedDrawPath(diagnostics,finalValidation.diagnostics,
+    sample.boundary?.players,expectedInputMapping);
+  if(!sample.boundary?.interactive||sample.boundary.sourceFrame!==checkpointSourceFrame+7||
+     sample.pad!==seven.nativeEvidence.drawnPair.replayPad)
+    throw new Error('Seven-tick final-present source boundary or raw PAD mismatch');
+  const remoteMotion=seven.timeline.remoteMotionByTick;
+  if(!Array.isArray(remoteMotion)||remoteMotion.length!==7||
+     !remoteMotion.some(row=>row.differs===true&&Number.isInteger(row.predicted)&&Number.isInteger(row.authoritative)))
+    throw new Error('Seven-tick prediction did not establish nonvacuous remote fighter divergence');
+  return {frame:finalValidation.frame,diagnostics:finalValidation.diagnostics,fighters:finalFighters,
+    baselineFrames,baselineFighters,remoteMotion};
+}
+
 export function validateDrawnRestoreSample(sample,beforeDiagnostics,previousFrame,expectedInputMapping) {
   const labels=['before-cpu-baseline-and-replay','after-cpu-capture-before-step','after-cpu-reference-before-baseline-draw',
     'after-baseline-draw-and-quiescence','after-correction-before-final-present','after-final-source-present-and-quiescence'];
@@ -511,6 +602,7 @@ function changedSummary(transitions) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const twoTickDrawnReference=options['--aggregate-cpu-drawn-reference-two-tick']===true;
+  const sevenTickDrawnReference=options['--aggregate-cpu-drawn-reference-seven-tick']===true;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const particlePresentationCache=options['--slippi-particle-presentation-cache']===true;
@@ -616,18 +708,26 @@ async function main() {
       report.schema='melee-web-same-browser-drawn-reference-no-draw-two-tick-component-v1';
       report.statement='Fixed source samples300/301 drawn-reference, one typed CPU restore, two no-draw correction ticks and one phase-matched final present. Private component evidence only; no renderer rewind.';
       report.execution={status:'incomplete',prefixSamples:300,samples:[300,301],cpuRestore:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
+    }else if(sevenTickDrawnReference){
+      report.schema='melee-web-two-instance-seven-tick-delayed-remote-input-component-v1';
+      report.statement='Two identically warmed private browser instances exercise seven withheld-remote predictions for non-vacuity and a separate seven-tick authoritative-input branch with typed CPU restore, corrected-input replay, per-tick CPU evidence, and one phase-matched final present. The authoritative branch is corrected from authoritative inputs; the predicted branch is not restored. Component evidence only; no live packet delivery, renderer rewind, repeated rollback, or whole-Wasm restore.';
+      report.execution={status:'incomplete',prefixSamples:300,samples:CPU_SEVEN_TICK_SAMPLES,
+        cpuSevenTick:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
     }else if(options['--aggregate-cpu-drawn-reference']){
       report.schema='melee-web-same-browser-drawn-reference-no-draw-one-tick-component-v1';
       report.statement='Fixed sample300 drawn-reference, typed CPU restore, same no-draw correction and phase-matched finalpresent. Incomplete private profile only; no renderer rewind.';
     }
     report.cpuConfiguration=cpuConfiguration;
-    report.exclusions=['No #341 milestone closure',...((twoTickDrawnReference||options['--aggregate-cpu-drawn-reference'])?['No whole-profile or vanilla original acceptance']:['No drawn-original versus no-draw coverage claim']),'No seven-tick/H1/whole-session acceptance','No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    report.exclusions=['No #341 milestone closure',...((twoTickDrawnReference||sevenTickDrawnReference||options['--aggregate-cpu-drawn-reference'])?['No whole-profile or vanilla original acceptance']:['No drawn-original versus no-draw coverage claim']),
+      ...(sevenTickDrawnReference?['No H1 or whole-session acceptance']:['No seven-tick/H1/whole-session acceptance']),
+      ...(sevenTickDrawnReference?['No restore from the predicted instance; no changed-action, live-packet, or repeated rollback claim']:[]),
+      'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
   }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
 
   let server = null, browserServer = null, browserProcess = null;
-  let browser = null, browserCdp = null, context = null, page = null;
+  let browser = null, browserCdp = null, context = null, page = null, predictedPage = null;
   let browserProcessPid = null, profileDirectory = null;
   const ownedChromePids = new Set();
   const pageErrors = [];
@@ -712,9 +812,16 @@ async function main() {
         payloadWitness: typeof module._melee_web_synctest_cpu_payload_failure_witness === 'function',
         payloadWitnessBytes: typeof module._melee_web_synctest_cpu_payload_failure_witness_bytes === 'function'};
     }) : null;
+    const sevenTickExports = sevenTickDrawnReference ? await page.evaluate(() => {
+      const {module} = window.__slippiSynctest;
+      return {evidence: typeof module._melee_web_synctest_cpu_seven_tick_evidence === 'function',
+        evidenceBytes: typeof module._melee_web_synctest_cpu_seven_tick_evidence_bytes === 'function'};
+    }) : null;
     validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports,
-      lobjPresentationCache, tobjPresentationCache, particlePresentationCache);
+      lobjPresentationCache, tobjPresentationCache, particlePresentationCache,
+      sevenTickDrawnReference, sevenTickExports);
     if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;
+    if (sevenTickDrawnReference) report.profile.sevenTickEvidenceExports = sevenTickExports;
     if (init.source !== fileSha(path.join(ROOT, 'tests/gameplay_snapshot_probe.cpp'))) {
       throw new Error('Runtime fixture identity differs from current gameplay_snapshot_probe.cpp');
     }
@@ -728,6 +835,36 @@ async function main() {
         sourceSlot, initializerPort: player.port, rawController: player.controller,
       })), drawDiagnostics.slotCount);
     const expectedStocks = initializer.players.map(player => player.stocks);
+    let predictedInit=null,predictedDiagnostics=null,predictedFrame=null,predictedInputMapping=null;
+    if(sevenTickDrawnReference){
+      predictedPage=await context.newPage();
+      predictedPage.setDefaultTimeout(120000);
+      predictedPage.on('pageerror',error=>pageErrors.push(`predicted instance: ${String(error)}`));
+      predictedPage.on('console',message=>{if(message.type()==='error')pageErrors.push(`predicted instance: ${message.text()}`);});
+      await predictedPage.goto(serving.origin,{waitUntil:'domcontentloaded'});
+      predictedInit=await runBrowserInit(predictedPage,serving.origin,path.basename(runtime));
+      predictedDiagnostics=decodeDrawDiagnostics(Buffer.from(predictedInit.drawDiagnostics,'base64'));
+      assertDrawDiagnosticsClear(predictedDiagnostics,'predicted instance initialization');
+      const predictedInitializer=JSON.parse(predictedInit.initializer);
+      predictedInputMapping=validateSourceInputMapping(predictedInitializer.players.map((player,sourceSlot)=>({
+        sourceSlot,initializerPort:player.port,rawController:player.controller})),predictedDiagnostics.slotCount);
+      if(predictedInit.profile!==init.profile||predictedInit.source!==init.source||
+         predictedInit.rngHelper!==init.rngHelper||predictedInit.stageBridge!==init.stageBridge||
+         predictedInit.initializer!==init.initializer||JSON.stringify(predictedInputMapping)!==JSON.stringify(expectedInputMapping)||
+         JSON.stringify(predictedDiagnostics)!==JSON.stringify(drawDiagnostics)||
+         predictedInit.backend.backend!==init.backend.backend||predictedInit.featureAvailable!==init.featureAvailable||
+         JSON.stringify(predictedInit.initial)!==JSON.stringify(init.initial))
+        throw new Error('Seven-tick predicted instance did not share the authoritative profile, initializer, mapping, and initial source signature');
+      predictedFrame={beginFrameId:predictedInit.backend.lastBeginFrameId||0,endFrameId:predictedInit.backend.lastEndFrameId||0};
+      report.warmPrefix.predictedInstance={profile:predictedInit.profile,source:predictedInit.source,
+        rngHelper:predictedInit.rngHelper,stageBridge:predictedInit.stageBridge,seed:SOURCE_SEED,
+        initializerSha256:sha256(Buffer.from(predictedInit.initializer)),inputMapping:predictedInputMapping,
+        initialObservationSha256:sha256(Buffer.from(predictedInit.initial.observation,'base64')),
+        initialPcmSha256:sha256(Buffer.from(predictedInit.initial.pcm,'base64')),
+        initialPadSha256:sha256(Buffer.from(predictedInit.initial.pad,'base64'))};
+      report.execution.predictedInstance={status:'initialized',profile:predictedInit.profile,
+        source:predictedInit.source,initializerSha256:sha256(Buffer.from(predictedInit.initializer))};
+    }
     report.initialization = {
       exactProfileSeedAndInitializer: true,
       initializer,
@@ -744,11 +881,15 @@ async function main() {
     let previousFrame = {beginFrameId: init.backend.lastBeginFrameId || 0,
       endFrameId: init.backend.lastEndFrameId || 0};
     let previousDiagnostics = drawDiagnostics;
+    const authoritativePrefixSignature=crypto.createHash('sha256');
+    const predictedPrefixSignature=sevenTickDrawnReference?crypto.createHash('sha256'):null;
+    let predictedPreviousDiagnostics=predictedDiagnostics;
     let checkpoint = null;
     for (let sample = 0; sample < PREFIX_SAMPLES; sample++) {
       const result = await runBrowserSample(page, sample, expectedInputMapping, expectedStocks);
       const validated = validateCensusDrawSample(result, sample, previousDiagnostics,
         previousFrame, expectedInputMapping);
+      addPrefixSignature(authoritativePrefixSignature,sample,result);
       previousFrame = validated.frame;
       previousDiagnostics = validated.diagnostics;
       report.warmPrefix.drawSamples.push({sample,
@@ -757,6 +898,33 @@ async function main() {
       const consumedPad = Buffer.from(result.pad, 'base64');
       report.warmPrefix.consumedInputs.push({sample, rawPad44Base64: result.pad,
         rawPad44Sha256: sha256(consumedPad)});
+      let predictedResult=null;
+      if(predictedPage){
+        predictedResult=await runBrowserSample(predictedPage,sample,predictedInputMapping,expectedStocks);
+        const predictedValidated=validateDrawSampleBoundary(predictedResult,sample,
+          predictedPreviousDiagnostics,predictedFrame);
+        for(const key of ['observation','pcm','pad','drawDiagnostics'])
+          if(!Buffer.from(result[key],'base64').equals(Buffer.from(predictedResult[key],'base64')))
+            throw new Error(`Seven-tick two-instance warm prefix differs at sample ${sample}: ${key}`);
+        addPrefixSignature(predictedPrefixSignature,sample,predictedResult);
+        predictedFrame=predictedValidated.frame;predictedPreviousDiagnostics=predictedValidated.diagnostics;
+        report.warmPrefix.predictedSamplesCompleted=sample+1;
+        report.warmPrefix.predictedDrawSamples=report.warmPrefix.predictedDrawSamples||[];
+        report.warmPrefix.predictedDrawSamples.push({sample,sourceFrame:predictedResult.boundary.sourceFrame,
+          drawDiagnostics:predictedValidated.diagnostics,gpuFrame:predictedValidated.frame});
+        if(sample===PREFIX_SAMPLES-1){
+          if(JSON.stringify(predictedResult.boundary)!==JSON.stringify(result.boundary))
+            throw new Error('Seven-tick two-instance checkpoint interactive boundary differs');
+          const authSig=authoritativePrefixSignature.copy().digest('hex');
+          const predictedSig=predictedPrefixSignature.copy().digest('hex');
+          if(authSig!==predictedSig)throw new Error('Seven-tick two-instance warm-prefix signatures differ');
+          report.warmPrefix.authoritativePrefixSignatureSha256=authSig;
+          report.warmPrefix.predictedPrefixSignatureSha256=predictedSig;
+          report.warmPrefix.sameWarmPrefixSignature=true;
+          report.warmPrefix.predictedCheckpointSample299=rawLaneRecord(browserSampleLane(predictedResult));
+          report.warmPrefix.predictedCheckpointBoundary=predictedResult.boundary;
+        }
+      }
       report.warmPrefix.samplesCompleted = sample + 1;
       writeReport();
       if (sample === PREFIX_SAMPLES - 1) {
@@ -775,6 +943,43 @@ async function main() {
       const helpers={checkedSource:checkedAsyncCcall.toString(),inputMappingSource:validateSourceInputMapping.toString(),
         inspectSource:inspectInteractiveObservation.toString(),selectedDrawSource:validateSelectedDrawPath.toString(),
         decodeDrawSource:decodeDrawDiagnostics.toString()};
+      if(sevenTickDrawnReference){
+        if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
+        const sample=await runBrowserCpuSevenTick(predictedPage,page,cpuWire,checkpoint,
+          expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,helpers);
+        retainCpuSevenTickSample(report,sample);writeReport();
+        const validated=validateCpuSevenTickDrawSample(sample,previousDiagnostics,previousFrame,expectedInputMapping);
+        const seven=sample.cpuSevenTick;
+        report.execution={status:'completed',prefixSamples:300,samples:CPU_SEVEN_TICK_SAMPLES,
+          sample:306,cpuSevenTick:seven,restorePerformed:true,
+          scope:'two-instance seven-tick input-prediction and authoritative-input typed-restore component only',
+          predictionInstance:'seven native no-draw ticks acknowledged one at a time; not restored',
+          authoritativeInstance:'seven drawn-reference ticks, typed CPU restore, seven corrected-input no-draw ticks, one final present',
+          cpuOuterValidation:'passed'};
+        report.input={initialRemotePadBase64:seven.timeline.initialRemotePad,
+          predictionLimit:seven.timeline.predictionLimit,
+          samples:seven.timeline.replayFrames.map((row,index)=>{
+            const bytes=Buffer.from(row.frameBase64,'base64');
+            return {sample:CPU_SEVEN_TICK_SAMPLES[index],rawPad44Base64:row.frameBase64,
+              rawPad44Sha256:sha256(bytes),predictedPad44Base64:seven.predictedRows[index].pad44Base64,
+              predictedBoundaryAcknowledged:seven.predictedRows[index].timelineAcknowledged===true,
+              authoritativeRemotePadBase64:Buffer.from(seven.baselineRows[index].pad44Base64,'base64')
+                .subarray(seven.timeline.remotePort*11,(seven.timeline.remotePort+1)*11).toString('base64'),
+              correctedPad44Base64:seven.correctedRows[index].pad44Base64};
+          }),
+          earliestChangedTick:seven.timeline.earliestChangedTick,
+          originalLocalPadsPreserved:seven.timeline.originalLocalPadsPreserved,
+          sourceSchedule:'literal samples300..306 only; tick307 is a prediction-limit query and no native source step is issued'};
+        report.cpuResult={observation:rawLaneRecord(browserSampleLane(sample)),boundary:sample.boundary,
+          gpuStatus:sample.status,finalFrame:validated.frame,drawDiagnostics:validated.diagnostics,
+          selectedFighterPaths:validated.fighters,baselineFrames:validated.baselineFrames,
+          baselineFighterPaths:validated.baselineFighters,remoteMotionByTick:validated.remoteMotion,
+          screenshot:await screenshotRecord(page,options['--out'],'browser-cpu-seven-tick-sample-306.png')};
+        report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,
+          sourceStateManifestComplete:false,wasmAndMapBound:true,staticRows:cpuWire.length};
+        if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+        report.result='passed';writeReport();return;
+      }
       const sample=twoTickDrawnReference?
         await runBrowserCpuTwoTick(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,helpers):
         await runBrowserCpuRestore(page,cpuWire,checkpoint,expectedInputMapping,expectedStocks,{
@@ -937,6 +1142,13 @@ async function main() {
     throw error;
   } finally {
     const cleanupFailures = [];
+    if(predictedPage){
+      try{
+        const closed=await closeBrowser(predictedPage,false,false);
+        if(!closed?.closed)cleanupFailures.push({step:'predicted-renderer-close',error:JSON.stringify(closed)});
+        report.cleanup={...(report.cleanup||{}),predictedRenderer:closed};
+      }catch(error){cleanupFailures.push({step:'predicted-renderer-close',error:String(error)});}
+    }
     if (page) {
       try {
         const closed = await closeBrowser(page,

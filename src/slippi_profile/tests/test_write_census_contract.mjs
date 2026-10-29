@@ -1904,7 +1904,7 @@ test('canonical LObj v7 route is explicit and cannot silently accept v6 or other
   assert.equal(validateBrowserProfileForRoute(v7,true,exports,true),v7.profile);
   assert.throws(()=>validateBrowserProfileForRoute(v7,true,exports),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute({profile:'slippi-render-dependencies-logical-frame-v6'},true,exports,true),/Unexpected profile identity/);
-  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-lobj-presentation-cache':true}),/requires.*two-tick/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-lobj-presentation-cache':true}),/requires a fixed two- or seven-tick route/);
   assert.equal(validateCpuRestoreRouteSelection({'--aggregate-cpu-drawn-reference-two-tick':true,
     '--aggregate-cpu-restore-config':'config.json','--slippi-lobj-presentation-cache':true}),
     'drawn-reference-no-draw-two-tick-v1');
@@ -1968,6 +1968,32 @@ test('particle measurement v17 is explicit atop the unchanged v15 route and refu
   assert.equal(validateCpuRestoreRouteSelection(route),'drawn-reference-no-draw-two-tick-v1');
   assert.throws(()=>parseArgs(['--browser-runtime','runtime.mjs','--assets','assets','--manifest','manifest.json','--out','new-output',
     '--slippi-particle-presentation-cache']),/requires v15 TObj/);
+});
+
+test('seven-tick route requires the exact private v17 profile and keeps its ABI selection explicit', () => {
+  const config='config.json';
+  const route={'--aggregate-cpu-drawn-reference-seven-tick':true,
+    '--aggregate-cpu-restore-config':config,'--slippi-lobj-presentation-cache':true,
+    '--slippi-tobj-presentation-cache':true,'--slippi-particle-presentation-cache':true};
+  assert.equal(validateCpuRestoreRouteSelection(route),'drawn-reference-no-draw-seven-tick-v1');
+  assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--slippi-particle-presentation-cache':false}),
+    /seven-tick route requires the private v17/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--aggregate-cpu-drawn-reference-two-tick':true}),
+    /mutually exclusive/);
+  assert.throws(()=>parseArgs(['--browser-runtime','runtime.mjs','--assets','assets','--manifest','manifest.json','--out','new-output',
+    '--aggregate-cpu-drawn-reference-seven-tick','--aggregate-cpu-restore-config',config,
+    '--slippi-lobj-presentation-cache','--slippi-tobj-presentation-cache']),/seven-tick route requires the private v17/);
+
+  const exports={evidence:true,evidenceBytes:true};
+  const v17={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17'};
+  assert.equal(validateBrowserProfileForRoute(v17,false,null,true,true,true,true,exports),v17.profile);
+  assert.throws(()=>validateBrowserProfileForRoute(v17,false,null,true,true,false,true,exports),
+    /seven-tick route requires the private v17/);
+  assert.throws(()=>validateBrowserProfileForRoute(
+    {profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'},
+    false,null,true,true,true,true,exports),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v17,false,null,true,true,true,true,{evidence:true,evidenceBytes:false}),
+    /evidence exports are unavailable/);
 });
 
 

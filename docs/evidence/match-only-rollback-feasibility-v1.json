@@ -9592,7 +9592,7 @@
       }
     },
     "performance_measurement_v17_candidate": {
-      "status": "REVIEWED_FOCUSED_CONTROLS_PASS_AFFECTED_BUILD_PENDING",
+      "status": "PASS_PRIVATE_FIXED_TWO_TICK_NO_DRAW_RESTORE_AND_ACTUAL_PRESENT",
       "contract": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/hsd-performance-measurement-v17-contract-sol-v1.json",
         "sha256": "f64d3c649e86844dd70d8cba990654a9d381646ae948c0f4dc2be0f300619413"
@@ -9603,11 +9603,77 @@
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-measurement-v17-focused/freeze-v17.json",
         "sha256": "19ef4eb52a1a15b8e0c767f2913ed35acb32a4c09e3568bc4ad0e6979b455dd4"
       },
-      "focused_controls": "Actual perf.c, perf.h inline, lbshadow counter branch and hsd_392A Last reader with deterministic clock leaves: ordinary/private metric bytes and clock calls exact; repeated/zero-delta Draw, unsigned counter wrap, negative elapsed time, Init, persistence, active-world refusal and sticky drift pass. One native test, one profile C identity test, two Node identity tests pass. Two mechanical fixture failures retained. No affected browser build or capture yet.",
+      "focused_controls": "Actual perf.c, perf.h inline, lbshadow counter branch and hsd_392A Last reader with deterministic clock leaves: ordinary/private metric bytes and clock calls exact; repeated/zero-delta Draw, unsigned counter wrap, negative elapsed time, Init, persistence, active-world refusal and sticky drift pass. One native test, one profile C identity test, two Node identity tests pass. Two mechanical fixture failures retained. Subsequent affected build and browser result are separately pinned below.",
       "review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-measurement-v17-sol-review-v1.json",
         "sha256": "129600330ac5904fcd0642f61c951c68757bfc4626c560cbbbb147f09444580b"
+      },
+      "producer": "b095ddccfc592b2d3e3f33a3a0def745cc6d8bb1",
+      "actual_browser": {
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-performance-v17-v1/result-receipt.json",
+          "sha256": "b5c36934a6838d54da80b19bfd45167b78b5e0f284f2626043addc9644b4481e"
+        },
+        "build": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-performance-v17-v1/result.json",
+          "sha256": "235afe26e42ed53325e5531959c2bd60637bb0d4930db13fb53fe6d6348a66cf"
+        },
+        "configuration": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-performance-v17-v1/final-linked-configuration-v1.json",
+          "sha256": "82f0be514b8909fe6ba646355cdd296b433156823b9f090c8158dda9655cca06"
+        },
+        "row_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-performance-v17-v1/row-review.json",
+          "sha256": "9b9ae46dd5e61cc7c76c5d7eaf002c926fca4501c6c883b8812a3cf742b32256"
+        },
+        "archive": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-v17-browser-archive/archive.json",
+          "sha256": "c52288e77d1c4d5dbf14ea483f089f6f42c041404f947358769a573ade8064d4"
+        },
+        "scope": "Commands8..13 pass, two source ticks176\u2192178 corrected without draw, all checked CPU and drawn domains0x3fe match, all three written raw evidence pairs match five byte categories, actual final draw and GPU idle pass. Added Last144/start8 full strict restore+compare, all2169prior modes unchanged,2171declared/2167wire. Source/renderer/CPU close pass, all recordedPIDs absent. Independent raw review passes all three written raw pairs, no-draw slots4/5/6, final present slot7 and live final state against drawn replay. Seven-tick delayed input, live rollback, network, full profile and acceptance remain unrun.",
+        "independent_result_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-performance-v17-v1-independent-result-review.json",
+          "sha256": "d49d50fe04f598bbf976b5a4b36a2fe11d8e345957cbcebdfd3cd57326332132"
+        }
       }
+    },
+    "fixed_seven_tick_v17_component": {
+      "status": "SOURCE_REVIEW_AND_FOCUSED_CONTROLS_PASS_BUILD_AND_BROWSER_UNRUN",
+      "plan": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-browser-next-step-plan-v1.json",
+        "sha256": "2774a689cf620df79180582aaacd53c229514163540fd7c47eb6fd9af07b2273"
+      },
+      "native_control": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-control-luna-v1-final/cpu-restore-adapter-sxpjgm6k/receipt.json",
+        "sha256": "3a3f9868106c46bfa5f01d318432f3709dd5d81bfeee6e40dd9a02ea284ed076"
+      },
+      "retained_fixture_failures": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-control-luna-v1/native-control-attempts-receipt.json",
+        "sha256": "8a4ceb3bec3bbef437a400b9efadce5ece37618d368c50a75c86306e9ad9a4b2"
+      },
+      "scope": "Fixed private V17 diagnostic. Separate prediction instance demonstrates a different remote action; authoritative instance records seven drawn ticks, restores, replays the same authoritative inputs without draw, then presents. This does not restore from the wrong-predicted branch. Actual adapter control uses modeled source/session/provider leaves; actual seven-tick source-world browser result remains unrun.",
+      "next_true_correction_contract": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/action-corrected-branch-contract-sol-v2.json",
+        "sha256": "0428e9df33c58c167ae21832755940419cab1b045cc081da16e87312ca00ec27"
+      },
+      "next_true_correction_gate": "Held until this seven-tick step is accepted or checkpointed. Before new corrected-tape APIs, reduce actual action allocation/retention identity under identical-layout Wasm state; no arbitrary native-pointer comparison, pointer mask, allocator rewind or warming exemption.",
+      "native_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-native-sol-review-v1.json",
+        "sha256": "dad8891daa45d06e7360b2eaf3e9a126811ab658691f8dec8c8c252879b65771"
+      },
+      "js_freeze": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/js-seven-scheduler-api-repair-sol-v1/freeze.json",
+        "sha256": "a295bdf7cb0ac9b667ab1f1862cd2ea0b66c4d01e3abda4e295a1724ee0ed6da"
+      },
+      "mirror_boundary": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-mirrored-regression-boundary.json",
+        "sha256": "ee4b1bd0a5b85010e5f8b95c8ef973d7f84ec99a2add494434db61bf76a8d263"
+      },
+      "final_js_review": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/v17-seven-final-js-independent-review-v1.json",
+        "sha256": "5602a5287f83879016e6f65fc2a7971ad99dad7dc71c0c3d2d6acb6c483d3744"
+      },
+      "focused_summary": "Native actual-adapter modeled-provider control passes; 55/55 Node controls pass with zero skips; actual isolated-mirror unittest method passes once. All failed fixture attempts retained. No actual seven-tick source-world/browser result yet."
     }
   }
 }
