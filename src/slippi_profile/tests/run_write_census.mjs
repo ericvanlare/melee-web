@@ -26,7 +26,7 @@ const SAMPLE = PREFIX_SAMPLES;
 const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
-const TOBJ_GROUND_MATRIX_V10_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10';
+const FIGHTER_PROJECTION_V11_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-fighter-projection-v11';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -128,7 +128,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v10 ground matrix lane requires v7 and the fixed two-tick route');
+    throw new Error('The v11 fighter projection lane requires v7 and the fixed two-tick route');
   }
   if (values['--slippi-lobj-presentation-cache'] === true && !twoTick) {
     throw new Error('The v7 light owner requires the fixed two-tick route');
@@ -142,8 +142,8 @@ export function validateCpuRestoreRouteSelection(values) {
 
 export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false, tobjPresentationCache = false) {
   if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
-  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v10 ground matrix lane requires v7 and two ticks');
-  const expectedProfile = tobjPresentationCache ? TOBJ_GROUND_MATRIX_V10_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v11 fighter projection lane requires v7 and two ticks');
+  const expectedProfile = tobjPresentationCache ? FIGHTER_PROJECTION_V11_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
   if (twoTickDrawnReference && (!twoTickExports ||
@@ -540,7 +540,7 @@ async function main() {
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
       seed: SOURCE_SEED, name: SYNCTEST_PROFILE,
       sourceTextureMatrixWriterDiagnostic: tobjPresentationCache
-        ? 'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V10'
+        ? 'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V11'
         : 'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',
       sourceLvecWriterDiagnostic: lobjPresentationCache
         ? 'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'
@@ -627,16 +627,6 @@ async function main() {
       if (message.type() === 'error') pageErrors.push(message.text());
     });
     await page.goto(serving.origin, {waitUntil: 'domcontentloaded'});
-    if (twoTickDrawnReference && tobjPresentationCache) {
-      // Temporary joint-writer attribution: retain outer source callers beyond
-      // V8's default ten frames. Native observation/output caps are unchanged.
-      report.jointWriterStackDiagnostic = await page.evaluate(() => {
-        const priorLimit = Error.stackTraceLimit;
-        Error.stackTraceLimit = 64;
-        return {priorLimit, limit: Error.stackTraceLimit,
-          scope: 'private two-tick diagnostic; no simulation or timing claim'};
-      });
-    }
     const init = await runBrowserInit(page, serving.origin, path.basename(runtime));
     report.browser = {
       name: 'headless installed Chrome through scripts/browser_tools.mjs',
@@ -657,7 +647,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: tobjPresentationCache ? TOBJ_GROUND_MATRIX_V10_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+      name: tobjPresentationCache ? FIGHTER_PROJECTION_V11_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache};
     const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {

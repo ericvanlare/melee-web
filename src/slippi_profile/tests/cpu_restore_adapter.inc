@@ -1,7 +1,6 @@
 /* Private browser adapter; included only by the existing Aurora diagnostic
  * synctest. Default fixture/Node/player paths have no activation or exports. */
 #if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
-#include "slippi_profile/jobj_diagnostic.h"
 extern "C" unsigned char __global_base;
 extern "C" unsigned char __data_end;
 namespace {
@@ -47,9 +46,6 @@ struct CpuRestoreControl {
     uint32_t configured_seed=0;
     bool initializer=false,profile=false,inflight=false,close_requested=false;
     bool source_close_inflight=false;
-    bool jobj_diag_armed=false,jobj_diag_overflow=false,jobj_diag_total_overflow=false;
-    uint32_t jobj_diag_frame=0,jobj_diag_frame_valid=0,jobj_diag_stage=0,jobj_diag_events=0;
-    uint8_t jobj_diag_counts[4][4][MELEE_WEB_JOBJ_DIAG_SITE_COUNT]{};
     std::unique_ptr<melee_web::GameplayCpuStatics> configured_statics;
     std::unique_ptr<melee_web::GameplayCpuCheckpoint> capsule;
     CpuRestoreEvidence evidence{};
@@ -63,61 +59,6 @@ struct CpuRestoreControl {
     MeleeWebTObjWriterEvidence tobj_writer_evidence{1,sizeof(MeleeWebTObjWriterEvidence)};
     bool two_active=false;
 } cpu_restore;
-void cpu_jobj_diag_arm(uint32_t frame){
-    cpu_restore.jobj_diag_armed=true;cpu_restore.jobj_diag_overflow=false;
-    cpu_restore.jobj_diag_total_overflow=false;cpu_restore.jobj_diag_events=0;
-    std::memset(cpu_restore.jobj_diag_counts,0,sizeof(cpu_restore.jobj_diag_counts));
-    cpu_restore.jobj_diag_frame=frame;cpu_restore.jobj_diag_frame_valid=1;
-    cpu_restore.jobj_diag_stage=MELEE_WEB_JOBJ_DIAG_STAGE_CAPTURE;
-}
-void cpu_jobj_diag_stage(uint32_t stage,uint32_t frame,uint32_t valid){
-    if(!cpu_restore.jobj_diag_armed)return;
-    cpu_restore.jobj_diag_stage=stage;cpu_restore.jobj_diag_frame=frame;
-    cpu_restore.jobj_diag_frame_valid=valid;
-}
-void cpu_jobj_diag_command(uint32_t command){
-    if(command<8||command>11){cpu_restore.jobj_diag_armed=false;return;}
-    if(cpu_restore.jobj_diag_armed){
-        cpu_restore.jobj_diag_stage=MELEE_WEB_JOBJ_DIAG_STAGE_COMMAND;
-        cpu_restore.jobj_diag_frame_valid=0;
-    }
-}
-extern "C" int melee_web_synctest_cpu_jobj_diag_reserve(
-    uint32_t site,MeleeWebJObjDiagnosticContext* out){
-    if(!out||site<1||site>MELEE_WEB_JOBJ_DIAG_SITE_COUNT||
-       !cpu_restore.jobj_diag_armed||!cpu_restore.two_active||
-       !cpu_restore.inflight)return 0;
-    const uint32_t command=cpu_restore.two.last_command;
-    if(command<8||command>11)return 0;
-    const uint32_t frame_bucket=cpu_restore.jobj_diag_frame_valid&&
-        cpu_restore.jobj_diag_frame>=cpu_restore.two.pre_frame&&
-        cpu_restore.jobj_diag_frame-cpu_restore.two.pre_frame<3?
-        cpu_restore.jobj_diag_frame-cpu_restore.two.pre_frame:3;
-    auto& count=cpu_restore.jobj_diag_counts[command-8][frame_bucket][site-1];
-    out->command=command;out->frame=cpu_restore.jobj_diag_frame;
-    out->frame_valid=cpu_restore.jobj_diag_frame_valid;out->stage=cpu_restore.jobj_diag_stage;
-    if(count>=16){
-        if(count!=16)return 0;
-        count=17;cpu_restore.jobj_diag_overflow=true;
-        if(cpu_restore.jobj_diag_events>=255){
-            if(cpu_restore.jobj_diag_total_overflow)return 0;
-            cpu_restore.jobj_diag_total_overflow=true;out->status=3;
-        }else out->status=2;
-    }else if(cpu_restore.jobj_diag_events>=255){
-        if(cpu_restore.jobj_diag_total_overflow)return 0;
-        cpu_restore.jobj_diag_total_overflow=true;cpu_restore.jobj_diag_overflow=true;
-        out->status=3;
-    }else{
-        ++count;out->status=1;
-    }
-    ++cpu_restore.jobj_diag_events;out->sequence=cpu_restore.jobj_diag_events;
-    return static_cast<int>(out->status);
-}
-extern "C" int melee_web_synctest_cpu_jobj_diag_enabled(){
-    const uint32_t command=cpu_restore.two.last_command;
-    return cpu_restore.jobj_diag_armed&&cpu_restore.two_active&&cpu_restore.inflight&&
-        command>=8&&command<=11;
-}
 bool cpu_drawn_diagnostics(unsigned index){
     if(index>=cpu_restore.drawn.draw_diagnostics.size()||melee_web_synctest_draw_diagnostics_size()!=132)return false;
     const auto* bytes=static_cast<const uint8_t*>(melee_web_synctest_draw_diagnostics());
@@ -149,7 +90,6 @@ uint32_t cpu_boundary(){
 }
 bool cpu_native_active(){return cpu_restore.state!=CpuRestoreControl::Idle;}
 uint32_t cpu_close(){
-    cpu_restore.jobj_diag_armed=false;
     if(cpu_restore.capsule)cpu_restore.capsule->disarm();
     cpu_restore.configured_statics.reset();
     if(cpu_restore.state!=CpuRestoreControl::Complete&&cpu_restore.state!=CpuRestoreControl::Failed&&
@@ -232,12 +172,6 @@ uint32_t cpu_execute_two(uint32_t command){
         if(!live||std::memcmp(live,e.diagnostics[0].data(),132))return cpu_fail(0x4c4u,"two-tick capture drew");
         e.post_frame=e.pre_frame+2u;
         for(unsigned i=0;i<2;++i){e.tick_pairs[i].pre_frame=e.pre_frame+i;e.tick_pairs[i].post_frame=e.pre_frame+i+1u;}
-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
-    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
-    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-        cpu_jobj_diag_arm(e.pre_frame);
-        melee_web_profile_jobj_diag_arm();
-#endif
         cpu_restore.state=C::CapturedTwo;return 0;
     }
     if(!cpu_restore.two_active||!cpu_restore.capsule)return cpu_fail(0x4b1u,"two-tick command has no capsule");
@@ -246,39 +180,31 @@ uint32_t cpu_execute_two(uint32_t command){
             return cpu_fail(0x4b3u,"first baseline boundary refused");
         if(!cpu_restore.capsule->begin_record(*match)||!cpu_two_interval())
             return cpu_fail(0x4b3u,"two-tick record interval refused");
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP,e.pre_frame,1);
         const int result=melee_web_snapshot_step(300);cpu_two_raw(e.tick_pairs[0],false);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP_DONE,e.pre_frame+1u,1);
         if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())
             return cpu_fail(0x4b4u,"baseline sample300 refused");
         if(!cpu_two_diag(1)||e.diagnostics[0]!=e.diagnostics[1])return cpu_fail(0x4c4u,"baseline CPU300 drew");
         melee_web_tobj_writer_boundary(1,observation.frame);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW,e.pre_frame+1u,1);
         if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.pre_frame+1u)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b5u,"baseline draw300 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW_DONE,e.pre_frame+1u,1);
         cpu_restore.state=C::Baseline0SubmittedTwo;return 0;
     }
     if(command==10){
         if(cpu_restore.state!=C::Baseline0SubmittedTwo||payload_admission_boundary(true)!=0||
            !cpu_two_safe(e.pre_frame+1u)||!cpu_two_interval())return cpu_fail(0x4b6u,"baseline300 native idle refused");
         if(!cpu_two_diag(2))return cpu_fail(0x4c4u,"baseline300 idle diagnostics unavailable");
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP,e.pre_frame+1u,1);
         const int result=melee_web_snapshot_step(301);cpu_two_raw(e.tick_pairs[1],false);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP_DONE,e.pre_frame+2u,1);
         if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.post_frame)||!cpu_two_interval())
             return cpu_fail(0x4b7u,"baseline sample301 refused");
         if(!cpu_two_diag(3)||e.diagnostics[2]!=e.diagnostics[3])return cpu_fail(0x4c4u,"baseline CPU301 drew");
         if(!cpu_restore.capsule->seal_post(*match))return cpu_fail(0x4b8u,"two-tick final CPU endpoint seal refused");
         melee_web_tobj_writer_boundary(2,observation.frame);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW,e.pre_frame+2u,1);
         if(melee_web_synctest_draw_present()!=1||cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_two_safe(e.post_frame)){
             melee_web_tobj_writer_boundary(0,0);return cpu_fail(0x4b9u,"baseline draw301 submission refused");
         }
         melee_web_tobj_writer_boundary(0,0);
-        cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW_DONE,e.pre_frame+2u,1);
         cpu_restore.state=C::Baseline1SubmittedTwo;return 0;
     }
     if(command==11){
@@ -298,10 +224,7 @@ uint32_t cpu_execute_two(uint32_t command){
         rng_profile_expected_callback_frame=cpu_restore.pre_expected_frame;
         for(unsigned i=0;i<2;++i){
             if(!cpu_two_interval())return cpu_fail(0x4bdu,"two-tick replay interval refused before step");
-            cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_CORRECTION_STEP,e.pre_frame+i,1);
-            const int result=melee_web_snapshot_step(300u+i);
-            cpu_jobj_diag_stage(MELEE_WEB_JOBJ_DIAG_STAGE_CORRECTION_STEP_DONE,e.pre_frame+i+1u,1);
-            auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
+            const int result=melee_web_snapshot_step(300u+i);auto& pair=e.tick_pairs[i];cpu_two_raw(pair,true);pair.commit_result=e.commit_result;
             if(result!=1||cpu_restore.first_failure||cpu_boundary()||!cpu_two_safe(e.pre_frame+i+1u)||!cpu_two_interval())
                 return cpu_fail(0x4bdu+i,"two-tick replay source boundary refused");
             if(!cpu_two_diag(5u+i)||e.diagnostics[4]!=e.diagnostics[5u+i])return cpu_fail(0x4c4u,"corrective CPU tick drew");
@@ -530,7 +453,6 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configur
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(uint32_t command){
     if(cpu_restore.inflight){if(command==5)cpu_restore.close_requested=true;return cpu_fail(0x494u,"reentrant command refused");}
-    cpu_jobj_diag_command(command);
     if(payload_admission_runtime_boundary()!=0)return cpu_fail(0x495u,"runtime/Asyncify boundary refused");
     if(command==5){if(cpu_restore.two_active)cpu_restore.two.last_command=5;return cpu_close();}
     if(cpu_restore.first_failure)return cpu_restore.first_failure;

@@ -1160,137 +1160,6 @@ diff --git a/src/melee/gr/grizumi.c b/src/melee/gr/grizumi.c
      PSMTXCopy(refl->texture_matrix, tobj->mtx);
      grDisplay_801C5DB0(gobj, renderpass);
  }
---- a/src/sysdolphin/baselib/jobj.c
-+++ b/src/sysdolphin/baselib/jobj.c
-@@ -1,5 +1,29 @@
- #include "jobj.h"
- 
-+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
-+    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
-+    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-+#include <slippi_profile/jobj_diagnostic.h>
-+#define MELEE_WEB_JOBJ_DIAG_BEGIN(ticket, obj, site) \
-+    MeleeWebJObjDiagnosticTicket ticket = { 0 }; \
-+    int ticket##_enabled = melee_web_profile_jobj_diag_begin( \
-+        (obj), sizeof(*(obj)), (site), &(ticket))
-+#define MELEE_WEB_JOBJ_DIAG_INPUT_BITS(name, value) \
-+    uint32_t name[3]; \
-+    memcpy(name, (value), sizeof(name))
-+#define MELEE_WEB_JOBJ_DIAG_RECORD(ticket, event, obj, input, root, detail) \
-+    do { \
-+        if (ticket##_enabled) \
-+            melee_web_profile_jobj_diag_record( \
-+                &(ticket), (event), (obj), (input), (uintptr_t) (root), \
-+                (detail)); \
-+    } while (0)
-+#else
-+#define MELEE_WEB_JOBJ_DIAG_BEGIN(ticket, obj, site)
-+#define MELEE_WEB_JOBJ_DIAG_INPUT_BITS(name, value)
-+#define MELEE_WEB_JOBJ_DIAG_RECORD(ticket, event, obj, input, root, detail)
-+#endif
-+
- #include <math.h>
- #include <string.h>
- 
-@@ -138,6 +162,7 @@
- void HSD_JObjMakeMatrix(HSD_JObj* jobj)
- {
-     Vec3* scl;
-+    MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_MAKE_ENTRY);
- 
-     HSD_JObjSetupMatrix(jobj->parent);
-     if (jobj->flags & 8) {
-@@ -193,6 +218,7 @@
-         jobj->mtx[1][3] = vec.y;
-         jobj->mtx[2][3] = vec.z;
-     }
-+    MELEE_WEB_JOBJ_DIAG_RECORD(diag, 3, jobj, NULL, NULL, 0);
- }
- 
- void HSD_JObjRemoveAnimByFlags(HSD_JObj* jobj, u32 flags)
-@@ -485,26 +511,42 @@
-                 ptcltgt_callback(jobj, val->iv);
-             }
-             break;
--        case 0x32:
-+        case 0x32: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_32);
-+            MELEE_WEB_JOBJ_DIAG_INPUT_BITS(input_bits, &val->p);
-             jobj->mtx[0][0] = val->p.x;
-             jobj->mtx[1][0] = val->p.y;
-             jobj->mtx[2][0] = val->p.z;
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag, 1, jobj, input_bits, NULL, 50);
-             break;
--        case 0x33:
-+        }
-+        case 0x33: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_33);
-+            MELEE_WEB_JOBJ_DIAG_INPUT_BITS(input_bits, &val->p);
-             jobj->mtx[0][1] = val->p.x;
-             jobj->mtx[1][1] = val->p.y;
-             jobj->mtx[2][1] = val->p.z;
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag, 1, jobj, input_bits, NULL, 51);
-             break;
--        case 0x34:
-+        }
-+        case 0x34: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_34);
-+            MELEE_WEB_JOBJ_DIAG_INPUT_BITS(input_bits, &val->p);
-             jobj->mtx[0][2] = val->p.x;
-             jobj->mtx[1][2] = val->p.y;
-             jobj->mtx[2][2] = val->p.z;
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag, 1, jobj, input_bits, NULL, 52);
-             break;
--        case 0x35:
-+        }
-+        case 0x35: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_35);
-+            MELEE_WEB_JOBJ_DIAG_INPUT_BITS(input_bits, &val->p);
-             jobj->mtx[0][3] = val->p.x;
-             jobj->mtx[1][3] = val->p.y;
-             jobj->mtx[2][3] = val->p.z;
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag, 1, jobj, input_bits, NULL, 53);
-             break;
-+        }
-         case 0x36:
-         case 0x37:
-         case 0x38:
-@@ -1390,17 +1432,24 @@
-     HSD_JObj* parent;
-     HSD_RObj* robj;
-     f32 x_scale;
-+    MELEE_WEB_JOBJ_DIAG_BEGIN(diag, jobj, MELEE_WEB_JOBJ_DIAG_SITE_SETUP_ENTRY);
- 
-     HSD_JOBJ_METHOD(jobj)->make_mtx(jobj);
-     jobj->flags &= ~JOBJ_MTX_DIRTY;
-     if (!(jobj->flags & JOBJ_USER_DEF_MTX)) {
-         switch (jobj->flags & JOBJ_JOINT) {
--        case JOBJ_JOINT1:
-+        case JOBJ_JOINT1: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag_ik, jobj, MELEE_WEB_JOBJ_DIAG_SITE_IK1_WRITE);
-             resolveIKJoint1(jobj);
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag_ik, 1, jobj, NULL, NULL, JOBJ_JOINT1);
-             break;
--        case JOBJ_JOINT2:
-+        }
-+        case JOBJ_JOINT2: {
-+            MELEE_WEB_JOBJ_DIAG_BEGIN(diag_ik, jobj, MELEE_WEB_JOBJ_DIAG_SITE_IK2_WRITE);
-             resolveIKJoint2(jobj);
-+            MELEE_WEB_JOBJ_DIAG_RECORD(diag_ik, 1, jobj, NULL, NULL, JOBJ_JOINT2);
-             break;
-+        }
-         case JOBJ_EFFECTOR:
-             parent = jobj->parent;
-             x_scale = 1.0F;
-@@ -1440,6 +1489,7 @@
-         }
-         jobj->flags &= ~JOBJ_MTX_DIRTY;
-     }
-+    MELEE_WEB_JOBJ_DIAG_RECORD(diag, 3, jobj, NULL, NULL, 0);
- }
- 
- void HSD_JObjSetMtxDirtySub(HSD_JObj* jobj)
-diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
 @@ -1,5 +1,9 @@
@@ -1315,3 +1184,83 @@ diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
 +    slippi_profile_refresh_ground_matrices((HSD_JObj *) gobj->hsd_obj);
 +#endif
  }
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "fighter.h"
+ #if defined(MELEE_WEB_GAMEPLAY)
+ #include "gameplay_fighter_assets.h"
+@@ -952,6 +955,11 @@
+         }
+     }
+     ftLib_800867E8(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_created(fp, &fighter_alloc_data, sizeof(*fp))) {
++        __builtin_trap();
++    }
++#endif
+     return gobj;
+ }
+ 
+@@ -3189,6 +3197,11 @@
+     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
+     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
+     HSD_ObjFree(&fighter_dat_attrs_alloc_data, fp->dat_attrs_backup);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_retiring(fp)) {
++        __builtin_trap();
++    }
++#endif
+     if (!melee_web_source_memory_fighter_release(fp)) {
+         __builtin_trap();
+     }
+diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
+--- a/src/melee/ft/ftlib.c
++++ b/src/melee/ft/ftlib.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "ftlib.h"
+ 
+ #ifdef MELEE_WEB_SLIPPI_PROFILE
+@@ -520,6 +523,11 @@
+     HSD_GObj* camera_gobj;
+ 
+     Fighter* fp = GET_FIGHTER(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_require(fp)) {
++        __builtin_trap();
++    }
++#endif
+     if (!fp->x2229_b3 && !fp->x2220_b7) {
+         camera_gobj = Camera_80030A50();
+         if (camera_gobj != NULL) {
+--- a/src/melee/ft/ftdemo.c
++++ b/src/melee/ft/ftdemo.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "ftdemo.h"
+ 
+ #if defined(MELEE_WEB_GAMEPLAY)
+@@ -153,6 +156,14 @@
+         on_create_fighter[alloc_info->unk8](gobj);
+     }
+     ftLib_800867E8(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        Fighter* fp = gobj->user_data;
++        if (!slippi_fighter_projection_created(fp, &fighter_alloc_data, sizeof(*fp))) {
++            __builtin_trap();
++        }
++    }
++#endif
+     return gobj;
+ }
+ 

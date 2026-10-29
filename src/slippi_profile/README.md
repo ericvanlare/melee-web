@@ -194,3 +194,16 @@ MENU, legacy flow-only restore, ordinary and default v5 paths are unchanged.
 Reduced clock controls with modeled service leaves do not establish gameplay,
 seven-tick, whole-profile or rollback milestone acceptance. No browser interval
 is enabled by this option alone.
+
+### Private V11 fighter projection view
+
+V11 is a port presentation adaptation for no-draw experiments, not an upstream
+Slippi patch equivalence claim. It preserves original projection arithmetic,
+current-camera gates and late magnifier consumers inside the complete source
+draw. Only the coordinate pair and the magnifier bit are temporarily supplied
+from an actual Fighter-lifecycle-owned presentation view, then canonical source
+values are restored. Prior coordinates remain available when original projection
+returns without writing. Actual create receipts and current main-pool allocation
+and Fighter identities are required; no capture-time owner adoption is allowed.
+The ordinary profile remains unchanged. The fixed strict payload comparison is
+retained, and focused view controls do not establish browser/visual correctness.

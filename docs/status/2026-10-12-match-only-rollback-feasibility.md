@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Browser exercised / One-tick restore-replay-and-present passed; V9 restores and replays two ticks with raw sample agreement, but strict source-payload equality fails on a draw-updated joint matrix. Final present and full browser rollback remain unproven.**
+**Browser exercised / One-tick restore-replay-and-present passed; V10 fixes the observed Ground matrix dependency and replays two ticks with exact raw sample agreement, but strict source-payload equality now fails later in the fighter pool. Final present and full browser rollback remain unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1135,12 +1135,30 @@ instance or continuous class-piece lifetime. Both diagnostic runs retain raw
 sample agreement, strict refusal and final-present exclusion. Their owned
 processes are independently absent and exact producer bytes are retained.
 
-The next candidate moves this derived-matrix refresh into the actual Ground
-update path for the private profile, after its authored priority-four callback.
-It must preserve original math, traversal and callback order, and pass the
-unchanged strict comparison. No fix is yet claimed. The structured
-`jobj_ground_writer_reduction_20261028` receipt preserves the initial observer
-compile failure, its compatibility repair, both captures and their reviews.
+The reviewed V10 repair at `971e45af` moves this derived-matrix refresh into
+the actual Ground update path for the private profile, after its authored
+priority-four callback. It uses the original matrix routine and follows the
+registered root and child/sibling tree, excluding the unrelated root sibling.
+Focused controls, the affected browser build and the unchanged-policy exact
+address relink pass. The fresh two-tick capture observes identical selected
+Ground setup results during both forward source ticks and both no-draw
+corrections. Actual restore and both raw-five byte comparisons pass.
+
+The strict whole owned-payload comparison still refuses with 1216, now at row
+568, offset `0x2188`, extent `0x23ec`. Its allocation-pool descriptor joins
+`fighter_alloc_data` in this exact producer map; the source layout names the
+field `Fighter.x2188`, a cached screen position. This pool attribution does not
+prove continuous object lifetime or the dynamic writer. The next source
+reduction follows the projection and magnifier consumers before changing that
+presentation dependency. Final present remains unrun. Snapshot close and
+renderer shutdown pass; CPU CLOSE retains the comparison failure. All recorded
+owned processes are independently absent and producer hashes are unchanged.
+The structured `ground_matrix_v10_result_20261029` receipt records the exact
+producer, review, byte checks and new failure. The earlier
+`jobj_ground_writer_reduction_20261028` receipt retains the observer compile
+failure, compatibility repair and two diagnostic captures. No full regression,
+publication-head CI, online profile admission or complete browser rollback is
+claimed for V10.
 
 
 ## Stage decision dependencies, issue #333

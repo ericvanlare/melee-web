@@ -1,3 +1,4 @@
+#include "slippi_profile/fighter_projection.h"
 #include "gameplay_source_memory_runtime.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "stadium_registration_observer.h"
@@ -10,29 +11,12 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
-#include <cstdio>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <new>
 #include <string>
 #include <vector>
-
-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
-    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
-    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-#include "slippi_profile/jobj_diagnostic.h"
-#include "original_startup_compat.h"
-#include <sysdolphin/baselib/jobj.h>
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/emscripten.h>
-#endif
-/* Other private HSD fixtures link this runtime without the browser adapter. */
-extern "C" int melee_web_synctest_cpu_jobj_diag_reserve(
-    uint32_t, MeleeWebJObjDiagnosticContext*) __attribute__((weak));
-extern "C" int melee_web_synctest_cpu_jobj_diag_enabled(void)
-    __attribute__((weak));
-#endif
 
 
 namespace {
@@ -172,349 +156,6 @@ FighterLease* find_fighter(uintptr_t host)
 
 #include "gameplay_class_piece_diagnostic.inc"
 
-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
-    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
-    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-namespace {
-struct JObjDiagnosticAllocation {
-    const HostAllocation* row = nullptr;
-    uintptr_t host = 0;
-    uint32_t source = 0;
-    uint32_t offset = 0;
-    uint32_t matches = 0;
-};
-
-const char* jobj_diag_site(uint32_t site)
-{
-    switch (site) {
-    case MELEE_WEB_JOBJ_DIAG_SITE_TARGET: return "target";
-    case MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_32: return "update_32";
-    case MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_33: return "update_33";
-    case MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_34: return "update_34";
-    case MELEE_WEB_JOBJ_DIAG_SITE_UPDATE_35: return "update_35";
-    case MELEE_WEB_JOBJ_DIAG_SITE_MAKE_ENTRY: return "make_entry";
-    case MELEE_WEB_JOBJ_DIAG_SITE_MAKE_EXIT: return "make_exit";
-    case MELEE_WEB_JOBJ_DIAG_SITE_SETUP_ENTRY: return "setup_entry";
-    case MELEE_WEB_JOBJ_DIAG_SITE_SETUP_EXIT: return "setup_exit";
-    case MELEE_WEB_JOBJ_DIAG_SITE_IK1_WRITE: return "ik1_write";
-    case MELEE_WEB_JOBJ_DIAG_SITE_IK2_WRITE: return "ik2_write";
-    case MELEE_WEB_JOBJ_DIAG_SITE_REFRESH_VISIT: return "refresh_visit";
-    default: return "unknown";
-    }
-}
-
-const char* jobj_diag_stage(uint32_t stage)
-{
-    switch (stage) {
-    case MELEE_WEB_JOBJ_DIAG_STAGE_CAPTURE: return "capture";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP: return "source_step";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_SOURCE_STEP_DONE: return "source_step_done";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW: return "present_draw";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_PRESENT_DRAW_DONE: return "present_draw_done";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_CORRECTION_STEP: return "correction_step";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_CORRECTION_STEP_DONE: return "correction_step_done";
-    case MELEE_WEB_JOBJ_DIAG_STAGE_COMMAND: return "command";
-    default: return "unknown";
-    }
-}
-
-const char* jobj_diag_event(uint32_t event)
-{
-    switch (event) {
-    case 1: return "write";
-    case 2: return "enter";
-    case 3: return "exit";
-    case 4: return "visit";
-    default: return "unknown";
-    }
-}
-
-JObjDiagnosticAllocation jobj_diag_map_object(const void* pointer, uint32_t bytes)
-{
-    JObjDiagnosticAllocation result{};
-    if (!active || !healthy || !pointer || !bytes) return result;
-    const uintptr_t host = reinterpret_cast<uintptr_t>(pointer);
-    for (const auto& row : allocations) {
-        if (host < row.host) continue;
-        const uintptr_t delta = host - row.host;
-        if (delta > row.requested || bytes > row.requested - delta) continue;
-        ++result.matches;
-        result.row = &row;
-        result.host = host;
-        result.offset = static_cast<uint32_t>(delta);
-        const uint64_t source = static_cast<uint64_t>(row.source.value()) + delta;
-        if (source <= UINT32_MAX) result.source = static_cast<uint32_t>(source);
-        else result.row = nullptr;
-    }
-    if (result.matches != 1) result.row = nullptr;
-    return result;
-}
-
-JObjDiagnosticAllocation jobj_diag_map_target()
-{
-    JObjDiagnosticAllocation result{};
-    if (!active || !healthy) return result;
-    constexpr uint32_t source = MELEE_WEB_JOBJ_DIAG_CAPTURE_SOURCE_ADDRESS;
-    for (const auto& row : allocations) {
-        const uint32_t begin = row.source.value();
-        if (source < begin) continue;
-        const uint32_t delta = source - begin;
-        if (delta > row.requested ||
-            MELEE_WEB_JOBJ_DIAG_OBJECT_BYTES > row.requested - delta)
-            continue;
-        ++result.matches;
-        result.row = &row;
-        result.offset = delta;
-        result.source = source;
-        result.host = row.host + delta;
-    }
-    if (result.matches != 1) result.row = nullptr;
-    return result;
-}
-
-void jobj_diag_sample(const HSD_JObj* jobj, MeleeWebJObjDiagnosticSample* out)
-{
-    std::memcpy(out->matrix, jobj->mtx, sizeof(out->matrix));
-    std::memcpy(out->rotate, &jobj->rotate, sizeof(out->rotate));
-    std::memcpy(out->scale, &jobj->scale, sizeof(out->scale));
-    std::memcpy(out->translate, &jobj->translate, sizeof(out->translate));
-    out->flags = jobj->flags;
-    out->class_info = reinterpret_cast<uintptr_t>(jobj->object.parent.class_info);
-    out->parent = reinterpret_cast<uintptr_t>(jobj->parent);
-}
-
-void jobj_diag_json_string(const char* value)
-{
-    std::putchar('"');
-    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(value);
-         p && *p; ++p) {
-        switch (*p) {
-        case '"': std::fputs("\\\"", stdout); break;
-        case '\\': std::fputs("\\\\", stdout); break;
-        case '\n': std::fputs("\\n", stdout); break;
-        case '\r': std::fputs("\\r", stdout); break;
-        case '\t': std::fputs("\\t", stdout); break;
-        default:
-            if (*p < 0x20) std::printf("\\u%04x", static_cast<unsigned>(*p));
-            else std::putchar(*p);
-            break;
-        }
-    }
-    std::putchar('"');
-}
-
-void jobj_diag_print_sample(const MeleeWebJObjDiagnosticSample& sample)
-{
-    const auto parent = jobj_diag_map_object(
-        reinterpret_cast<const void*>(sample.parent),
-        MELEE_WEB_JOBJ_DIAG_OBJECT_BYTES);
-    std::fputs("{\"matrix\":[", stdout);
-    for (unsigned i = 0; i < 12; ++i)
-        std::printf("%s\"0x%08x\"", i ? "," : "", sample.matrix[i]);
-    std::fputs("],\"rotate\":[", stdout);
-    for (unsigned i = 0; i < 4; ++i)
-        std::printf("%s\"0x%08x\"", i ? "," : "", sample.rotate[i]);
-    std::fputs("],\"scale\":[", stdout);
-    for (unsigned i = 0; i < 3; ++i)
-        std::printf("%s\"0x%08x\"", i ? "," : "", sample.scale[i]);
-    std::fputs("],\"translate\":[", stdout);
-    for (unsigned i = 0; i < 3; ++i)
-        std::printf("%s\"0x%08x\"", i ? "," : "", sample.translate[i]);
-    std::printf("],\"flags\":\"0x%08x\",\"class_info\":\"0x%llx\",\"parent\":\"0x%llx\",\"parent_source\":",
-        sample.flags, static_cast<unsigned long long>(sample.class_info),
-        static_cast<unsigned long long>(sample.parent));
-    if (parent.row) std::printf("\"0x%08x\"", parent.source);
-    else std::fputs("null", stdout);
-    std::printf(",\"parent_allocation_generation\":%llu}",
-        static_cast<unsigned long long>(parent.row ? parent.row->generation : 0));
-}
-
-void jobj_diag_print_overflow(const MeleeWebJObjDiagnosticContext& context,
-                              uint32_t site)
-{
-    std::printf("MELEE_JOBJ_DIAG {\"event\":\"overflow\",\"site\":\"%s\","
-                "\"command\":%u,\"frame\":%u,\"frame_valid\":%u,"
-                "\"frame_scope\":\"adapter_declared_outer_boundary\","
-                "\"stage\":\"%s\",\"sequence\":%llu,\"count\":%llu,"
-                "\"inconclusive\":true,\"limit\":\"%s\"}\n",
-        jobj_diag_site(site), context.command, context.frame, context.frame_valid,
-        jobj_diag_stage(context.stage),
-        static_cast<unsigned long long>(context.sequence),
-        static_cast<unsigned long long>(context.sequence),
-        context.status == 2 ? "site_command_frame_16" : "total_256");
-    std::fflush(stdout);
-}
-
-void jobj_diag_print_target(const MeleeWebJObjDiagnosticContext& context,
-                            const JObjDiagnosticAllocation& target)
-{
-    const char* resolution = !active ? "inactive" : !healthy ? "unhealthy" :
-        target.matches == 1 && target.row ? "unique" :
-        target.matches ? "ambiguous" : "not_live";
-    std::printf("MELEE_JOBJ_DIAG {\"event\":\"target\",\"site\":\"target\","
-                "\"resolution\":\"%s\",\"command\":%u,\"frame\":%u,"
-                "\"frame_valid\":%u,\"frame_scope\":\"adapter_declared_outer_boundary\","
-                "\"stage\":\"%s\",\"sequence\":%llu,"
-                "\"class_piece_lifetime\":\"unknown\","
-                "\"source\":\"0x%08x\",\"host\":\"0x%llx\","
-                "\"row_host\":\"0x%llx\",\"row_source\":\"0x%08x\","
-                "\"row_bytes\":%u,\"offset\":%u,\"allocation_generation\":%llu}\n",
-        resolution, context.command, context.frame, context.frame_valid,
-        jobj_diag_stage(context.stage),
-        static_cast<unsigned long long>(context.sequence),
-        MELEE_WEB_JOBJ_DIAG_CAPTURE_SOURCE_ADDRESS,
-        static_cast<unsigned long long>(target.row ? target.host : 0),
-        static_cast<unsigned long long>(target.row ? target.row->host : 0),
-        target.row ? target.row->source.value() : 0,
-        target.row ? target.row->requested : 0, target.offset,
-        static_cast<unsigned long long>(target.row ? target.row->generation : 0));
-    std::fflush(stdout);
-}
-}
-
-extern "C" void melee_web_profile_jobj_diag_arm(void)
-{
-    if (!melee_web_synctest_cpu_jobj_diag_reserve ||
-        !melee_web_synctest_cpu_jobj_diag_enabled ||
-        !melee_web_synctest_cpu_jobj_diag_enabled()) return;
-    MeleeWebJObjDiagnosticContext context{};
-    const int status = melee_web_synctest_cpu_jobj_diag_reserve(
-        MELEE_WEB_JOBJ_DIAG_SITE_TARGET, &context);
-    if (status == 2 || status == 3) {
-        jobj_diag_print_overflow(context, MELEE_WEB_JOBJ_DIAG_SITE_TARGET);
-        return;
-    }
-    if (status == 1)
-        jobj_diag_print_target(context, jobj_diag_map_target());
-}
-
-extern "C" int melee_web_profile_jobj_diag_begin(
-    const void* object, uint32_t object_bytes, uint32_t site,
-    MeleeWebJObjDiagnosticTicket* out)
-{
-    if (out) std::memset(out, 0, sizeof(*out));
-    if (!out || object_bytes != sizeof(HSD_JObj) ||
-        object_bytes != MELEE_WEB_JOBJ_DIAG_OBJECT_BYTES ||
-        !melee_web_synctest_cpu_jobj_diag_reserve ||
-        !melee_web_synctest_cpu_jobj_diag_enabled ||
-        !melee_web_synctest_cpu_jobj_diag_enabled())
-        return 0;
-    const auto allocation = jobj_diag_map_object(object, object_bytes);
-    if (!allocation.row ||
-        allocation.source != MELEE_WEB_JOBJ_DIAG_CAPTURE_SOURCE_ADDRESS)
-        return 0;
-    MeleeWebJObjDiagnosticContext context{};
-    const int status = melee_web_synctest_cpu_jobj_diag_reserve(site, &context);
-    if (status == 2 || status == 3) {
-        jobj_diag_print_overflow(context, site);
-        return 0;
-    }
-    if (status != 1) return 0;
-    out->status = 1;
-    out->command = context.command;
-    out->frame = context.frame;
-    out->frame_valid = context.frame_valid;
-    out->stage = context.stage;
-    out->site = site;
-    out->sequence = context.sequence;
-    out->source_address = allocation.source;
-    out->row_source = allocation.row->source.value();
-    out->row_requested = allocation.row->requested;
-    out->object_bytes = object_bytes;
-    out->current_host = allocation.host;
-    out->row_host = allocation.row->host;
-    out->allocation_generation = allocation.row->generation;
-    jobj_diag_sample(static_cast<const HSD_JObj*>(object), &out->before);
-    return 1;
-}
-
-extern "C" void melee_web_profile_jobj_diag_record(
-    const MeleeWebJObjDiagnosticTicket* ticket, uint32_t event,
-    const void* object, const uint32_t input_bits[3], uintptr_t root,
-    uint32_t detail)
-{
-    if (!ticket || ticket->status != 1) return;
-    const auto allocation = jobj_diag_map_object(object, ticket->object_bytes);
-    const bool same_owner = allocation.row &&
-        allocation.host == ticket->current_host &&
-        allocation.source == ticket->source_address &&
-        allocation.row->host == ticket->row_host &&
-        allocation.row->source.value() == ticket->row_source &&
-        allocation.row->generation == ticket->allocation_generation;
-    MeleeWebJObjDiagnosticSample after{};
-    if (same_owner) jobj_diag_sample(static_cast<const HSD_JObj*>(object), &after);
-    const auto root_row = jobj_diag_map_object(
-        reinterpret_cast<const void*>(root), MELEE_WEB_JOBJ_DIAG_OBJECT_BYTES);
-    char stack[2048] = {};
-    int stack_status = 0; /* 0 unavailable, 1 complete, 2 truncated, 3 API error */
-    int stack_bytes = 0;
-#if defined(__EMSCRIPTEN__)
-    if (same_owner) {
-        const int length = emscripten_get_callstack(EM_LOG_C_STACK, stack,
-                                                    static_cast<int>(sizeof(stack) - 1));
-        if (length < 0) {
-            stack_status = 3;
-            stack[0] = '\0';
-        } else {
-            stack_bytes = length < static_cast<int>(sizeof(stack) - 1) ?
-                length : static_cast<int>(sizeof(stack) - 1);
-            stack_status = length < static_cast<int>(sizeof(stack) - 1) ? 1 : 2;
-        }
-        stack[sizeof(stack) - 1] = '\0';
-    }
-#endif
-    std::printf("MELEE_JOBJ_DIAG {\"event\":\"%s\",\"site\":\"%s\","
-                "\"command\":%u,\"frame\":%u,\"frame_valid\":%u,"
-                "\"frame_scope\":\"adapter_declared_outer_boundary\","
-                "\"stage\":\"%s\",\"sequence\":%llu,"
-                "\"source\":\"0x%08x\",\"host\":\"0x%llx\","
-                "\"row_host\":\"0x%llx\",\"row_source\":\"0x%08x\","
-                "\"row_bytes\":%u,\"object_bytes\":%u,"
-                "\"allocation_generation\":%llu,\"same_allocation\":%u,"
-                "\"identity_scope\":\"tracked_allocation_only\","
-                "\"class_piece_lifetime\":\"unknown\","
-                "\"detail\":%u,\"root\":\"0x%llx\",\"root_source\":",
-        same_owner ? jobj_diag_event(event) : "after_owner_changed",
-        jobj_diag_site(ticket->site), ticket->command, ticket->frame,
-        ticket->frame_valid, jobj_diag_stage(ticket->stage),
-        static_cast<unsigned long long>(ticket->sequence), ticket->source_address,
-        static_cast<unsigned long long>(ticket->current_host),
-        static_cast<unsigned long long>(ticket->row_host), ticket->row_source,
-        ticket->row_requested, ticket->object_bytes,
-        static_cast<unsigned long long>(ticket->allocation_generation),
-        same_owner ? 1u : 0u, detail, static_cast<unsigned long long>(root));
-    if (root_row.row) std::printf("\"0x%08x\"", root_row.source);
-    else std::fputs("null", stdout);
-    std::fputs(",\"root_allocation_generation\":", stdout);
-    std::printf("%llu,\"input\":[",
-        static_cast<unsigned long long>(root_row.row ? root_row.row->generation : 0));
-    for (unsigned i = 0; i < 3; ++i)
-        std::printf("%s\"0x%08x\"", i ? "," : "", input_bits ? input_bits[i] : 0);
-    std::fputs("],\"before\":", stdout);
-    jobj_diag_print_sample(ticket->before);
-    std::fputs(",\"after\":", stdout);
-    if (same_owner) jobj_diag_print_sample(after);
-    else std::fputs("null", stdout);
-    std::printf(",\"stack_status\":%d,\"stack_bytes\":%d", stack_status,
-                stack_bytes);
-    std::fputs(",\"stack\":", stdout);
-    jobj_diag_json_string(stack);
-    std::fputs("}\n", stdout);
-    std::fflush(stdout);
-}
-
-extern "C" void melee_web_profile_jobj_diag_visit(const void* object,
-                                                   const void* root)
-{
-    MeleeWebJObjDiagnosticTicket ticket{};
-    if (melee_web_profile_jobj_diag_begin(object,
-            MELEE_WEB_JOBJ_DIAG_OBJECT_BYTES,
-            MELEE_WEB_JOBJ_DIAG_SITE_REFRESH_VISIT, &ticket))
-        melee_web_profile_jobj_diag_record(&ticket, 4, object, nullptr,
-                                           reinterpret_cast<uintptr_t>(root), 0);
-}
-#endif
-
 extern "C" int melee_web_source_memory_begin(uint64_t generation,
                                               int heap_handle)
 {
@@ -544,6 +185,8 @@ extern "C" int melee_web_source_memory_begin(uint64_t generation,
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     melee_web_stadium_registration_world_begin(generation);
 #endif
+    if (!slippi_fighter_projection_world_begin(generation))
+        return fail("fighter presentation world begin refused");
     return 1;
 }
 
@@ -551,6 +194,8 @@ extern "C" int melee_web_source_memory_end(uint64_t generation)
 {
     if (!active || !generation || generation != world_generation)
         return fail("source address heap world owner changed during teardown");
+    if (!slippi_fighter_projection_world_end(generation))
+        return fail("fighter presentation world ended during draw");
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     melee_web_stadium_registration_world_end(generation);
 #endif
@@ -759,6 +404,69 @@ extern "C" int melee_web_source_memory_fighter_read(
     out->allocation_generation = lease->allocation_generation;
     out->live = 1;
     return 1;
+}
+
+extern "C" int melee_web_source_memory_fighter_projection_identity(
+    void* fighter, const void* descriptor, size_t extent,
+    MeleeWebFighterProjectionIdentity* out)
+{
+    if (out) *out = {};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (!out || !active || !healthy || !fighter || !descriptor || !extent)
+        return 0;
+    const uintptr_t host = reinterpret_cast<uintptr_t>(fighter);
+    FighterLease* lease = find_fighter(host);
+    HostAllocation* row = find_host_allocation(host);
+    if (!lease || !lease->live || lease->world_generation != world_generation ||
+        !row || row->pool.state != 1 || row->pool.descriptor !=
+            reinterpret_cast<uintptr_t>(descriptor) ||
+        row->pool.generation != row->generation || row->pool.epoch != owner_epoch ||
+        row->pool.world != world_generation || row->pool.stride != extent ||
+        host < row->host || (host-row->host) % row->pool.stride ||
+        host-row->host > row->requested || extent > row->requested-(host-row->host) ||
+        lease->source != row->source.value() + host-row->host)
+        return 0;
+    *out = {world_generation,owner_epoch,row->generation,
+            lease->allocation_generation,row->host,lease->source,
+            static_cast<uint32_t>(host-row->host)};
+    return 1;
+#else
+    (void)fighter; (void)descriptor; (void)extent;
+    return 0;
+#endif
+}
+
+extern "C" int melee_web_source_memory_fighter_projection_matches(
+    void* fighter, const void* descriptor, size_t extent,
+    const MeleeWebFighterProjectionIdentity* expected)
+{
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (!expected || !active || !healthy || !fighter || !descriptor || !extent ||
+        expected->world!=world_generation || expected->epoch!=owner_epoch)
+        return 0;
+    const uintptr_t host=reinterpret_cast<uintptr_t>(fighter);
+    const FighterLease* lease=find_fighter(host);
+    const HostAllocation* row=find_host_allocation(host);
+    if (!lease || !lease->live || lease->world_generation!=world_generation ||
+        lease->allocation_generation!=expected->fighter || !row ||
+        row->host!=expected->pool || row->generation!=expected->allocation ||
+        lease->source!=expected->source || host-row->host!=expected->cell_offset ||
+        host<row->host || (host-row->host)%extent || host-row->host>row->requested ||
+        extent>row->requested-(host-row->host) ||
+        lease->source!=row->source.value()+host-row->host)
+        return 0;
+    /* A checked source restore intentionally clears diagnostic pool metadata.
+     * The caller's actual create receipt retains the original pool proof;
+     * current authoritative allocation/lifetime identities must still match.
+     * Any present association must agree, never override a contradiction. */
+    if (row->pool.state && (row->pool.state!=1 ||
+        row->pool.descriptor!=reinterpret_cast<uintptr_t>(descriptor) ||
+        row->pool.stride!=extent || row->pool.generation!=row->generation ||
+        row->pool.world!=world_generation || row->pool.epoch!=owner_epoch)) return 0;
+    return 1;
+#else
+    (void)fighter;(void)descriptor;(void)extent;(void)expected;return 0;
+#endif
 }
 
 extern "C" int melee_web_source_memory_fighter_release(void* host_fighter)

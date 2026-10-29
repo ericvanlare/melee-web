@@ -199,6 +199,20 @@ int melee_web_source_memory_fighter_read(void* host_fighter,
                                          MeleeWebSourceFighterAddress* out);
 int melee_web_source_memory_fighter_release(void* host_fighter);
 
+/* Private presentation provenance: actual create receipt + current main-heap
+ * pool association, not FighterLease alone. No memory restoration authority. */
+typedef struct MeleeWebFighterProjectionIdentity {
+    uint64_t world, epoch, allocation, fighter;
+    uintptr_t pool;
+    uint32_t source, cell_offset;
+} MeleeWebFighterProjectionIdentity;
+int melee_web_source_memory_fighter_projection_identity(
+    void*, const void* descriptor, size_t extent,
+    MeleeWebFighterProjectionIdentity*);
+int melee_web_source_memory_fighter_projection_matches(
+    void*, const void* descriptor, size_t extent,
+    const MeleeWebFighterProjectionIdentity*);
+
 /* Read-only private diagnostic, paired with the original strict comparison. */
 MeleeWebClassPieceCaptureWitness melee_web_source_memory_class_piece_capture_witness(
  const MeleeWebSourceMemoryPayloadSnapshot* pre,const MeleeWebSourceMemoryPayloadSnapshot* post,

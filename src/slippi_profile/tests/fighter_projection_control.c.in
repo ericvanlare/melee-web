@@ -1,0 +1,91 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <assert.h>
+#include <string.h>
+#include <melee/ft/types.h>
+#include <sysdolphin/baselib/gobj.h>
+#include "slippi_profile/fighter_projection.h"
+#include "gameplay_source_memory_runtime.h"
+typedef int32_t s32;
+#define GET_FIGHTER(g) ((Fighter*)(g)->user_data)
+#define GET_COBJ(g) ((HSD_CObj*)(g)->hsd_obj)
+#define PAD_STACK(n)
+typedef struct { int dummy; } HSD_CObj;
+typedef struct { int left,right,top,bottom; } Scissor;
+static HSD_CObj camera, other_camera;
+static HSD_GObj camera_gobj={0,0,&camera};
+static HSD_GObj* current_camera=&camera_gobj;
+static HSD_CObj* selected_camera=&camera;
+static struct { HSD_GObj* gobj; } cm_80452C68={&camera_gobj};
+static int project_ready=1, fallback=0,valid=1;
+static Vec3 projected={10,20,0};
+static MeleeWebFighterProjectionIdentity identity={1,2,3,4,16,32,0};
+FixtureEntities entities;
+FixtureEntities* HSD_GObj_Entities=&entities;
+static HSD_GObj* Camera_80030A50(void){return current_camera;}
+static HSD_CObj* HSD_CObjGetCurrent(void){return selected_camera;}
+static Vec3* lbVector_WorldToScreen(HSD_CObj* c,Vec3* in,Vec3* out,int mode)
+{(void)c;(void)in;assert(mode==1);if(!project_ready)return NULL;*out=projected;return out;}
+static void HSD_CObjGetScissor(HSD_CObj* c,Scissor* s)
+{(void)c;*s=(Scissor){0,640,0,480};}
+static int Camera_80030CFC(CmSubject* s,float n){(void)s;assert(n==15);return fallback;}
+int melee_web_source_memory_fighter_projection_identity(void* f,const void* d,size_t e,
+ MeleeWebFighterProjectionIdentity* out)
+{assert(f&&d&&e==sizeof(Fighter));if(!valid)return 0;*out=identity;return 1;}
+int melee_web_source_memory_fighter_projection_matches(void* f,const void* d,size_t e,
+ const MeleeWebFighterProjectionIdentity* expected)
+{assert(f&&d&&e==sizeof(Fighter));return valid&&memcmp(expected,&identity,sizeof(identity))==0;}
+ORIGINAL_FUNCTIONS
+int main(void)
+{
+ Fighter fp={0}; CmSubject subject={0}; fp.x890_cameraBox=&subject;
+ fp.x2188=(S32Vec2){123,456};fp.neighbor=1;
+ HSD_GObj fighter={0,&fp,0};entities.fighters=&fighter;
+ assert(slippi_fighter_projection_world_begin(1));
+ int descriptor=1;
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ assert(slippi_fighter_projection_draw_begin());
+ assert(slippi_fighter_projection_require(&fp));
+ assert(ftLib_80086A8C(&fighter));
+ S32Vec2 late={0};ftLib_80086A58(&fighter,&late);
+ assert(late.x==10&&late.y==20&&!ftLib_80086B64(&fighter));
+ fp.neighbor=0; // This unrelated source bit must not be restored.
+ assert(slippi_fighter_projection_draw_end());
+ assert(fp.x2188.x==123&&fp.x2188.y==456&&!fp.x221F_b0&&!fp.neighbor);
+ // Original no-write failure retains the last presented coordinate pair.
+ project_ready=0;
+ assert(slippi_fighter_projection_draw_begin());
+ assert(!ftLib_80086A8C(&fighter));
+ ftLib_80086A58(&fighter,&late);
+ assert(late.x==10&&late.y==20&&ftLib_80086B64(&fighter));
+ assert(slippi_fighter_projection_draw_end());
+ assert(fp.x2188.x==123&&fp.x2188.y==456&&!fp.x221F_b0);
+ // Coordinates are written even when the scissor result is false.
+ project_ready=1;projected=(Vec3){700,600,0};
+ assert(slippi_fighter_projection_draw_begin());assert(!ftLib_80086A8C(&fighter));
+ ftLib_80086A58(&fighter,&late);assert(late.x==700&&late.y==600);
+ assert(slippi_fighter_projection_draw_end());
+ // Other current camera and ineligible fighter reset b0 without replacing coords.
+ selected_camera=&other_camera;
+ assert(slippi_fighter_projection_draw_begin());assert(ftLib_80086A8C(&fighter));
+ assert(!ftLib_80086B64(&fighter));assert(slippi_fighter_projection_draw_end());
+ selected_camera=&camera;fp.x2229_b3=1;
+ assert(slippi_fighter_projection_draw_begin());assert(ftLib_80086A8C(&fighter));
+ assert(!ftLib_80086B64(&fighter));assert(slippi_fighter_projection_draw_end());
+ fp.x2229_b3=0;
+ // Unknown/stale provenance refuses admission before any swap.
+ valid=0;assert(!slippi_fighter_projection_draw_begin());
+ assert(fp.x2188.x==123&&fp.x2188.y==456&&!fp.x221F_b0);
+ assert(slippi_fighter_projection_world_end(1));
+ // Same address, new authenticated actual creation resets presentation history.
+ valid=1;identity.world=2;identity.fighter=5;
+ assert(slippi_fighter_projection_world_begin(2));fp.x2188=(S32Vec2){8,9};
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ project_ready=0;assert(slippi_fighter_projection_draw_begin());
+ assert(!ftLib_80086A8C(&fighter));ftLib_80086A58(&fighter,&late);
+ assert(late.x==8&&late.y==9);
+ // Retirement/world teardown cannot invalidate a live view; end still restores.
+ assert(!slippi_fighter_projection_retiring(&fp));
+ assert(!slippi_fighter_projection_draw_end());assert(!fp.x221F_b0);
+ assert(slippi_fighter_projection_world_end(2));
+ return 0;
+}

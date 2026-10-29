@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "Observed Ground display lazy JObj matrix writer. Review a profile-only refresh after the original Ground priority4 update, keeping strict typed payload comparison and owner/lifetime exclusions.",
+    "current_next_boundary": "Ground V10 selected source/correction matrix updates agree. Reduce the fighter-pool screen-projection mismatch at offset0x2188, preserving strict owned payload and raw comparison; then complete the fixed two-tick present boundary.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8749,6 +8749,52 @@
           "sha256": "a3fc554b64d86330e80697563ecbda4566874d96ee7cd39ad2c5e18e445bfc1b",
           "bytes": 1609
         }
+      }
+    },
+    "ground_matrix_v10_result_20261029": {
+      "producer_commit": "971e45af1bf509263b728598ae530da047acecb4",
+      "harness_commit": "971e45af1bf509263b728598ae530da047acecb4",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10",
+      "result": "strict comparison refusal1216 after successful restore and two no-draw corrections",
+      "raw_pairs_equal": true,
+      "ground_selected_updates_equal": true,
+      "first_failure": {
+        "row": 568,
+        "offset": 8584,
+        "extent": 9196,
+        "source": "0x80c6b960",
+        "pool_descriptor": "0x1bc7b4",
+        "pool_symbol": "fighter_alloc_data"
+      },
+      "scope": "Exact pool descriptor/source-layout attribution only; no continuous object lifetime or dynamic writer proof. Final present unrun. Not full rollback or profile admission. Full regression and publication-head CI pending.",
+      "receipt": {
+        "path": "browser-two-tick-ground-v10-v1/result-receipt.json",
+        "sha256": "515d67978561ec216144a46732018c30742130b27883d1c334cdef03aefd52ac"
+      },
+      "review": {
+        "path": "result-review.json",
+        "sha256": "b66c24ed61f68fb049a119948cdcafb4a8d7e34510ddbc3411fbf7f76d1b318d"
+      },
+      "build": {
+        "path": "browser-build-ground-v10-v1/artifact-inventory.json",
+        "sha256": "0347dfea8e8246d757a2be48e8871a7dbd33a51f58d56b8ca6acbc11c58235ba"
+      },
+      "source_review": {
+        "path": "ground-v10-source-review-v2.json",
+        "sha256": "d02d689e1ab9fb3e94bff631fea19659094e84a4f256787c7d0496f7845d625f"
+      },
+      "configuration_review": {
+        "path": "linked-config-ground-v10-v1/row-review.json",
+        "sha256": "04b269800fa70a404f113ddeefb4dddab76bec2cfefa41bec1b48eae93394a35"
+      },
+      "preserved_producer": {
+        "path": "pre-fighter-projection-ground-v10-browser-archive/inventory.json",
+        "sha256": "0347dfea8e8246d757a2be48e8871a7dbd33a51f58d56b8ca6acbc11c58235ba"
+      },
+      "evidence_run": "rollback-renderer-resume-20261028-155740-eef0524c",
+      "pool_attribution": {
+        "path": "browser-two-tick-ground-v10-v1/fighter-pool-attribution.json",
+        "sha256": "5cc12c1939b05874a3d8c4f051a3a6d9e7e72c41b0744a8b125ac3ab5525547a"
       }
     }
   }

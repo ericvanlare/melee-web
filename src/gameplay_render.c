@@ -1,3 +1,4 @@
+#include "slippi_profile/fighter_projection.h"
 #include "gameplay_render.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_stage_context.h"
@@ -173,7 +174,10 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     GXRenderModeObj mode=old_mode;
     mode.fbWidth=mode.viWidth=h->settings.width;
     mode.efbHeight=mode.xfbHeight=mode.viHeight=h->settings.height;
-    mode.aa=0;mode.field_rendering=0;*HSD_VIGetRenderMode()=mode;
+    mode.aa=0;mode.field_rendering=0;
+    if(!slippi_fighter_projection_draw_begin())
+        return fail(e,n,"Fighter presentation view admission failed");
+    *HSD_VIGetRenderMode()=mode;
     h->drawing=1;
     BOUNDARY("start render");
     HSD_StartRender(HSD_RP_SCREEN);
@@ -239,7 +243,9 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     }
     int restored=camera_owned&&melee_web_native_camera_restore_current(final_camera,previous);
     *HSD_VIGetRenderMode()=old_mode;HSD_StartRender(pass);
+    const int projection_restored=slippi_fighter_projection_draw_end();
     h->drawing=0;
+    if(!projection_restored)return fail(e,n,"Fighter presentation view restoration failed");
     if(!accepted)return fail(e,n,"Original HSD camera rejected the render target");
     if(!restored)return fail(e,n,"Source callback changed the current camera without restoration");
     return ok(e,n);
