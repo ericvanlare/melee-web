@@ -46,7 +46,7 @@ uint8_t HSD_GObj_CameraKind = 0x13;
 uint8_t HSD_GObj_JObjKind = 3;
 uint8_t HSD_GObj_LightKind = 4;
 HSD_CObjInfo hsdCObj;
-HSD_LObjInfo hsdLobj;
+HSD_LObjInfo hsdLObj;
 HSD_JObjInfo hsdJObj;
 HSD_DObjInfo hsdDObj;
 HSD_MObjInfo hsdMObj;
@@ -364,7 +364,7 @@ static void reset_fixture(void)
     cobj_init(&cobj_ground); cobj_init(&cobj_magnify);
     cobj_init(&cobj_hud); cobj_init(&cobj_nametag);
     memset(&hud_light, 0, sizeof(hud_light));
-    hud_light.parent.parent.class_info = HSD_CLASS_INFO(&hsdLobj);
+    hud_light.parent.parent.class_info = HSD_CLASS_INFO(&hsdLObj);
     memset(&hud_jobj, 0, sizeof(hud_jobj));
     hud_jobj.object.parent.class_info = HSD_CLASS_INFO(&hsdJObj);
     actual_count = 0;

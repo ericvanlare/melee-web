@@ -28,6 +28,8 @@
 
 extern HSD_ObjAllocData gobj_alloc_data;
 extern HSD_CObjInfo hsdCObj;
+/* Match lobj.c's definition; its upstream header spells this differently. */
+extern HSD_LObjInfo hsdLObj;
 /* eflib.c exports this callback but does not declare it in eflib.h. */
 extern void efLib_render_callback(HSD_GObj*, int);
 
@@ -402,7 +404,7 @@ static int snapshot_selected_links(Schedule* schedule,
                     const HSD_LObj* light = object->hsd_obj;
                     if (object->obj_kind != HSD_GObj_LightKind ||
                         !light || HSD_OBJECT_METHOD(light) !=
-                            HSD_CLASS_INFO(&hsdLobj))
+                            HSD_CLASS_INFO(&hsdLObj))
                         return refuse(error, error_size,
                                       "HUD GX10 callback does not own a base LObj");
                 } else if (!slippi_profile_particle_pass_jobj_display_safe(
