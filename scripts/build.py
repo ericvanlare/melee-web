@@ -1229,7 +1229,7 @@ def main():
     parser.add_argument("--slippi-lobj-presentation-cache", action="store_true",
                         help="Enable the isolated private Release v7 canonical light presentation owner")
     parser.add_argument("--slippi-tobj-presentation-cache", action="store_true",
-                        help="Enable the isolated private incomplete v8 canonical UV/TOON owner")
+                        help="Enable the isolated private incomplete v9 stateless texture matrix presentation")
     parser.add_argument("--stage-arena-owner-diagnostic", action="store_true",
                         help="Enable the private Release Slippi stage-arena owner inventory")
     args = parser.parse_args()

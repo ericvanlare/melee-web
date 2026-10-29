@@ -88,7 +88,7 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         if(span==CpuCheckpointSpan::TwoTicks)
             c->tobj_writer_session_=melee_web_tobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,8,c->owner_.frame);
 #endif
-        // v8 relocates managed UV/TOON matrix: its historical source-writer
+        // v9 uses stack-local texture matrices: the historical source-writer
         // diagnostic is inapplicable, not a successful source-write proof.
         // v7 relocates lvec: the historical SOURCE writer diagnostic is
         // inapplicable, not a successful source-write observation. Session 0

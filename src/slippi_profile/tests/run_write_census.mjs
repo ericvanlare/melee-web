@@ -24,8 +24,9 @@ import {
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const SAMPLE = PREFIX_SAMPLES;
 const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
-const TOBJ_PRESENTATION_V8_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-v8';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
+// The historical TObj option now identifies stateless canonical matrix presentation.
+const TOBJ_PRESENTATION_STATELESS_V9_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -85,8 +86,9 @@ export async function recordCensusFailurePageState(report, page) {
 }
 
 export function selectTobjFailureStatics(manifest) {
-  return [['first_failure', 4], ['owner_world', 8], ['owners', 4],
-    ['active_token', 8], ['owner_count', 4]].map(([name, size]) => {
+  // V9 keeps only bounded diagnostic scalars; never follow former owner arrays.
+  return [['first_failure', 4], ['first_failure_line', 4],
+    ['first_failure_detail', 4], ['owner_world', 8], ['active_token', 8]].map(([name, size]) => {
     const rows = manifest.mutable_input_sections.filter(row =>
       row.source === 'src/slippi_profile/tobj_presentation_cache.c' &&
       row.input_object === 'libhsd_native_runtime.a(tobj_presentation_cache.c.o)' &&
@@ -94,7 +96,7 @@ export function selectTobjFailureStatics(manifest) {
     if (rows.length !== 1 || rows[0].size !== size ||
         !Number.isSafeInteger(rows[0].address) || rows[0].address <= 0 ||
         rows[0].address + size > 0x100000000) {
-      throw new Error(`TObj failure diagnostic manifest row refused: ${name}`);
+      throw new Error(`V9 stateless TObj failure diagnostic manifest row refused: ${name}`);
     }
     return {name, address: rows[0].address, size};
   });
@@ -104,13 +106,13 @@ export async function recordTobjFailureStatics(report, page, rows) {
   if (!page || !rows) return;
   try {
     // The caller has matched this manifest/map to the exact linked Wasm.
-    // Copy only named static bytes; do not follow owners or call native code.
+    // Copy only V9's named scalar bytes; never follow pointers or call native code.
     report.tobjFailureStatics = await page.evaluate(selected => {
       const heap = window.__slippiSynctest?.module?.HEAPU8;
       if (!(heap instanceof Uint8Array)) throw new Error('Wasm memory unavailable after failure');
       return selected.map(row => {
         if (row.address + row.size > heap.byteLength) {
-          throw new Error(`TObj diagnostic outside current Wasm memory: ${row.name}`);
+          throw new Error(`V9 stateless TObj diagnostic outside current Wasm memory: ${row.name}`);
         }
         return {...row, bytes: Array.from(heap.slice(row.address, row.address + row.size))};
       });
@@ -126,7 +128,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if (oneTick && twoTick) throw new Error('One-tick and two-tick drawn-reference routes are mutually exclusive');
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !twoTick)) {
-    throw new Error('The v8 UV/TOON owner requires v7 and the fixed two-tick route');
+    throw new Error('The v9 stateless TObj presentation lane requires v7 and the fixed two-tick route');
   }
   if (values['--slippi-lobj-presentation-cache'] === true && !twoTick) {
     throw new Error('The v7 light owner requires the fixed two-tick route');
@@ -140,8 +142,8 @@ export function validateCpuRestoreRouteSelection(values) {
 
 export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null, lobjPresentationCache = false, tobjPresentationCache = false) {
   if (lobjPresentationCache && !twoTickDrawnReference) throw new Error('The v7 light owner requires two ticks');
-  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('v8 requires v7 and two ticks');
-  const expectedProfile = tobjPresentationCache ? TOBJ_PRESENTATION_V8_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+  if(tobjPresentationCache && (!lobjPresentationCache || !twoTickDrawnReference)) throw new Error('The v9 stateless TObj presentation lane requires v7 and two ticks');
+  const expectedProfile = tobjPresentationCache ? TOBJ_PRESENTATION_STATELESS_V9_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
   if (twoTickDrawnReference && (!twoTickExports ||
@@ -538,7 +540,7 @@ async function main() {
     profile: {identity: null, sourceIdentity: null, rngHelper: null, stageBridge: null,
       seed: SOURCE_SEED, name: SYNCTEST_PROFILE,
       sourceTextureMatrixWriterDiagnostic: tobjPresentationCache
-        ? 'NOT_APPLICABLE_MANAGED_UV_TOON_CACHE_RELOCATED_V8'
+        ? 'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V9'
         : 'SOURCE_WRITE_OCCURRENCE_ONLY_CAPTURE_TIME_JOIN',
       sourceLvecWriterDiagnostic: lobjPresentationCache
         ? 'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'
@@ -645,7 +647,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: tobjPresentationCache ? TOBJ_PRESENTATION_V8_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
+      name: tobjPresentationCache ? TOBJ_PRESENTATION_STATELESS_V9_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache};
     const twoTickExports = twoTickDrawnReference ? await page.evaluate(() => {

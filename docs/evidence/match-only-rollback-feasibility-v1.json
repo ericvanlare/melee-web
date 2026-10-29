@@ -8190,7 +8190,7 @@
         "No claim all earlier LObj bytes passed, no final-present/pixel/whole-session/seven-tick/competitive acceptance."
       ]
     },
-    "current_next_boundary": "Preserve the reviewed V8 source/component/build/full/config checkpoint and actual initialization failure. Further texture-guard investigation was blocked by an automated security check; no retry, rerouting, production repair or browser capture is released. Independent Stadium work continues.",
+    "current_next_boundary": "Current-main private browser initializes and completes 300 warm samples; baseline source step300 constructs a TObj during the fixed-owner cache interval and aborts. Reduce the lifecycle dependency without weakening equality before another capture. Full browser rollback remains open.",
     "tobj_v8_presentation_cache_initialization_v1": {
       "status": "COMPONENT_BUILD_FULL_CONFIG_PASS_BROWSER_INITIALIZATION_FAILED",
       "source": {
@@ -8315,7 +8315,7 @@
         "Original parity, complete owner coverage, seven-tick budget, relay rollback and acceptance remain open.",
         "Default-off private incomplete profile; no comparison weakening or renderer rewind."
       ],
-      "followup_status": "NODE_INITIALIZATION_REPAIR_PASS_BROWSER_RESTORE_PENDING",
+      "followup_status": "BROWSER_INIT_AND_WARM_PREFIX_PASS_BASELINE_SOURCE_CONSTRUCTION_REFUSED",
       "initialization_repair_20261028": {
         "status": "REVIEWED_COMPONENT_AND_PRIVATE_NODE_INIT_PASS",
         "evidence_root": "rollback-renderer-resume-20261028-155740-eef0524c",
@@ -8435,7 +8435,169 @@
           "Historical full suite/five builds do not validate this repair. Current-main integration, full regression and exact-head CI remain pending.",
           "No complete rollback, original parity or acceptance claim."
         ]
+      },
+      "browser_current_main_followup_20261028": {
+        "status": "BROWSER_INIT_AND_WARM_PREFIX_PASS_BASELINE_SOURCE_CONSTRUCTION_REFUSED",
+        "source_head": "7475b3f9175b36efe9ad2474b6d7cb57a122ab4b",
+        "current_main_integrated": "a870fd44f5ebf961d04ace93adbdc80e067bfe24",
+        "runtime_sha256": {
+          "gameplay_slippi_synctest_browser.mjs": "f8276ff1ac85e0a5dedf6ec49b03a61868b54d942d095ac9bc334955f34361f8",
+          "gameplay_slippi_synctest_browser.wasm": "7683dbb23fab4868db19ad5435e1fb614adf11931c4b8e1deafdc3cc71e45b48",
+          "gameplay_slippi_synctest_browser.data": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+        },
+        "harness_sha256": {
+          "src/slippi_profile/tests/run_write_census.mjs": "c2d6534d9d2740ff03578e2b221cc47de4e1aa4d8d91cf8f4bc7159462461043",
+          "src/slippi_profile/tests/run_synctest.mjs": "42beb1e36234556a48a6b367220d38cf040f5442753b13dd08b9daf1720b5d8a",
+          "src/slippi_profile/tests/runner_contract.mjs": "1040d4c0104fd27eb8df2b7fa9e568d9da3b3cef721d4e553b4dc0c67c44ed9b",
+          "src/slippi_profile/tests/synctest_browser.cpp": "6d1cc5c82693c286c9e2781ef9cb632edfabb8d4bd8ceb51cd1bd3da074ccef5",
+          "src/native_dat.hpp": "91948d59a02e89c54a949c7a34622c16086223aedf388da7a68141a3a915c36d",
+          "src/native_dat.cpp": "c595ca59f993587e20b0b8b65b7fb4d930e4618d0a60c83760259d105bc2e10d",
+          "src/gameplay_world.hpp": "2cdd1c1256b61fb3fc91ddb56f6a294c61b99ad158dfa88b158787f0834316b0",
+          "src/gameplay_world.cpp": "e72e20339ff62f6b7d1f92fa0cbd1b1dba40005e57350daf1888dc5352e5d01b",
+          "src/gameplay_match_session.hpp": "fcf344b61534ebdd83ba0bc49bfde0b5c93afcf15f7bcc4963fab794bc54437a",
+          "src/gameplay_match_session.cpp": "0a8d1f079ad4d3676b9549395cbf913275fd259467b5e9ef80c0e04399d8282b",
+          "src/slippi_profile/tests/test_write_census_contract.mjs": "0bb0b8e8e014ca02c975dce45adbdf0accbd1f4ea715f57f4170761bbcebbf61",
+          "tests/native_dat_checkpoint_test.cpp": "1c8c744757df11f658910b0160ec9c1b9d84cc3b22baa1edbcd1a8a8be5255d2",
+          "tests/test_native_dat_checkpoint.py": "bdbcd497fcd52b99bf09328a5617648fa0cc8d121db5d7bd1ccbf11b108e45a2",
+          "tests/gameplay_snapshot_probe.cpp": "122a2a6d4e5361b0733c9d2b22c2865e01a81d960848bb79e82ce120b5cef271",
+          "tests/gameplay_match_context_trace.c": "595dccecd4c4c8f35dc22e7f85454311f6de0d97380b701563f5298f61da893f",
+          "src/gameplay_match_context.h": "777b8072aadb770fa38cb1cfd9a81c2d9dde59e4143217321929a8d6d74041d9",
+          "src/gameplay_match_context.c": "dae23df9b8b31007f1b4605b21cfc67ad893d62c74b8c3949e26fe16486a2ca7",
+          "src/gameplay_audio.h": "9b1d28f7ba6e990893d7ea15b504635d22dae4de6e59874ed13f04117a506a0d",
+          "src/gameplay_audio.c": "49a7161c6520cb5554f07a450cedd04c0853488ed3174226df4e8c54a9b6dafb",
+          "src/gameplay_audio_fx.h": "202b01270291f9523dc2a2e927efb72cdc5e73a7e04023ead2c6c17f5e639398",
+          "src/gameplay_audio_fx.c": "99f9996faf37a069a500cc19d24ed6748dab1a8e6b90834445f3bb4efba84255",
+          "src/gameplay_bootstrap.c": "510d3db41c2e6b0f7c4c0ff3ada7eb3c6994f80dde1057a8c313a6e36a6f25a1",
+          "src/gameplay_bootstrap.h": "9583ed0d13d08773d4b8e4fde1716c69f97f786b99153e69df2a0a4df011082d",
+          "cmake/FighterRuntime.cmake": "239b8b0493454046ed87238385b26e8a9b5fe714bbceb420630ebe3d1c2892ac",
+          "patches/aurora-browser.patch": "e1a5c9f078197129ee046983df36fa97a1c753457bf8e3835d514c47d1ca3418",
+          "scripts/build.py": "586cbc729eaf77f8ad6b87bd71f181ebdff31d9798a48a2ffdfb7f06c6651eb8",
+          "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+          "scripts/source_state_manifest.py": "c337c54b60205197d6cc130e00a1aad3fd53bb5f40a37a15d7429e41f4e9fd74",
+          "src/slippi_profile/tests/cpu_restore_runner.mjs": "9f4d7271cb10d190ba4c5241d332f02974de9ec69dc6a311adbe0b539f0acd0e",
+          "src/slippi_profile/tests/cpu_two_tick_runner.mjs": "4237fe0a6a6be125d6866cbc407fab57a84f54f789dc3cd1c9b7446abde87058",
+          "src/slippi_profile/tests/test_cpu_two_tick_runner.mjs": "825d2484f2a88a1a2f1545cadb0401fc2e77b0d46647b3f20bb20f275826ac02",
+          "src/slippi_profile/tests/cpu_restore_adapter.inc": "eb08af9aa525a051f0200bbf2c4f009c4380ffb379ec0b5d802646a2b3fa9dd4",
+          "src/gameplay_cpu_checkpoint.cpp": "b9845500a257242867abf7f065610969cbd304dc32647c3f95100dc1a389875a",
+          "src/gameplay_cpu_commit.cpp": "492e6c060a91454c163ff0eebb07fd4f9b3a16c213d1fa0727c9b30d3dd9f33e",
+          "src/gameplay_cpu_statics.cpp": "cbed8104704377c2e9c023323de1b2acc037903eed9ab4c7019707ed4c0f85cf",
+          "src/gameplay_cpu_interval.c": "fc173e6266d7143667decfbc2851413d0b6835b513da13001f273db346b42652"
+        },
+        "manifest_sha256": "30ec73d56fe234c3654df13e902140a765490c7de7cf01242ad4d315a367154e",
+        "configuration_sha256": "5dc6751faf8a9d1f8ac1e47984af2d55491140715b3a3e0ffb518497632b0b11",
+        "result": {
+          "browser_backend": 7,
+          "warm_samples": 300,
+          "command8_result": 0,
+          "command9_outcome": "threw",
+          "last_command": 9,
+          "diagnostic_mask": 1,
+          "first_failure": {
+            "code": 5,
+            "line": 136,
+            "detail": 0,
+            "source": "src/slippi_profile/tobj_presentation_cache.c",
+            "meaning": "Canonical TObj construction while active_token is set; source step300 aborts before diagnostic slot1 or reference draw."
+          },
+          "restore_and_replay_reached": false,
+          "native_cleanup": {
+            "closed": false,
+            "renderer": true,
+            "errors": [
+              "CPU restore CLOSE returned 1172",
+              "Error: snapshot close: CPU command still owns the source-close boundary",
+              "Error: renderer shutdown: CPU command still owns the source-close boundary"
+            ],
+            "cpuRestoreClose": {
+              "status": "returned-nonzero",
+              "result": 1172
+            },
+            "snapshotClose": {
+              "status": "checked-call-failed",
+              "error": "Error: snapshot close: CPU command still owns the source-close boundary"
+            },
+            "rendererShutdown": {
+              "status": "checked-call-failed",
+              "error": "Error: renderer shutdown: CPU command still owns the source-close boundary"
+            }
+          },
+          "owned_os_process_cleanup": "PASS; supervisor and independent recorded-PID postflight"
+        },
+        "configuration_scope": "2170 previous policy rows retain sizes and modes; six new source rows baseline equality only, no rewind. Six new private rows and enlarged RNG observation buffer remain nonwire. Exact linked validator and negative controls pass.",
+        "validation_scope": "Affected browser Release target and separate manifest target pass; focused controls 7 pass and 1 unavailable-fixture skip. Full regression and exact-head CI pending.",
+        "references": {
+          "browser-two-tick-main-v1/runner/evidence.json": {
+            "sha256": "234eac952390889177957e1294472c3f858d0d3a5d027fec967abe6a10d9c759",
+            "bytes": 896725
+          },
+          "browser-two-tick-main-v1/owner.json": {
+            "sha256": "bd02c10fc028d89265aadb7e17ac3fa7e00c2d7ef5556cc2fb6328fc46ee7ca0",
+            "bytes": 92981
+          },
+          "browser-two-tick-main-v1/independent-postflight.json": {
+            "sha256": "d9ae919083a94c78a084be17ed615c445e045fb05309c486a446b4685354d75a",
+            "bytes": 444
+          },
+          "browser-build-main-v2/result.json": {
+            "sha256": "181bd6b0975a23597fead77086a4ae4105e30af44e5799363c54fd9e6278fa30",
+            "bytes": 4347
+          },
+          "browser-build-main-v2/artifact-inventory-final.json": {
+            "sha256": "0e5f033188c29a725a489b370b59b4ceff40cae320b24c6b258a0cceca14edc9",
+            "bytes": 11128
+          },
+          "linked-config-main-v1/row-review.json": {
+            "sha256": "c5ecaac39378767dee49bcfff1654ac61289a2a3eba1b2a259e4204cdd72dc88",
+            "bytes": 3449
+          },
+          "linked-config-main-v1/validation-result.json": {
+            "sha256": "af767a9f2330ee2e0aa052f1a2d26098728c80df43a927866638524c27bbef8c",
+            "bytes": 682
+          },
+          "merge-focused-v1/result.json": {
+            "sha256": "218c93dc1f47c2534a082b4a5a5fa1f1aa7279e0c6c9767e63a31d340dc70b27",
+            "bytes": 3164
+          }
+        }
       }
+    },
+    "tobj_stateless_v9_candidate_20261028": {
+      "status": "FOCUSED_ACTUAL_SOURCE_CONTROLS_PASS_BROWSER_NOT_YET_RUN",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9",
+      "design": "Canonical UV/Reflection matrix Setup uses a full stack-local TObj copy with the original dirty condition and original Make/Setup arithmetic. Toon keeps its original early return after admission; Shadow keeps its original path. No per-object presentation allocation survives source allocation/reuse.",
+      "admission": "World, exact canonical class/method/extent attestation, one-use token and sticky unsupported/custom/rebind/active-amnesia failures remain. Anchor no longer claims per-object inventory or completed Load provenance. Existing source allocator/payload/static/PCM/input comparisons are unchanged.",
+      "controls": "Actual source original/active output comparison, 172-byte active draw invariance, dirty-clear non-SRT matrices, animation/reload, canonical construction/reuse during active interval, original repeat/TIMG assertions, Toon negative gates, ordinary class-library teardown/rebegin and active amnesia. Fixture models memory/null-AObj, identity Shadow camera and GX sink; no full renderer or CPU restore claim.",
+      "references": {
+        "tobj-stateless-scratch-contract-v1.json": {
+          "sha256": "5cf4b8d839d6d8563411dcc5a03858ee382e2e91ebabcba47ed32cb3f28b6df2",
+          "bytes": 7314
+        },
+        "tobj-v9-focused-final/result.json": {
+          "sha256": "d40204d60c8d4cb6e76476ed68f58f23b81a3f6907518e67cb9708f92a1db9c8",
+          "bytes": 422
+        },
+        "tobj-v9-focused-final/test.log": {
+          "sha256": "37aa73afe2676c34cb11702d2dfead9fe270580e4841ed4dafc41bcf5bc2fc8e",
+          "bytes": 461
+        },
+        "tobj-v9-focused-final/tobj-scratch-x9zu4aje/input-pins.json": {
+          "sha256": "31f3c12b66f4a3437a0ddbf5cec5ca688862e20bd7c40969323f94010fbd6896",
+          "bytes": 1828
+        },
+        "tobj-v9-profile-identity-v1/focused-node-contract-v2.log": {
+          "sha256": "6e6faec8e105bec56669a32c3e8b169341bb414552b3e90865b192f495035cc2",
+          "bytes": 11480
+        },
+        "pre-stateless-v9-browser-archive/inventory.json": {
+          "sha256": "d08a7907e33cc33362859eb43c8121bb5847bba78c7facf38cf5ef2e58819faf",
+          "bytes": 1634
+        },
+        "tobj-v9-source-review-v2.json": {
+          "sha256": "274bdb207ede8245eb63a726f121b0512b18a30e6717b701d664dc359c57e20f",
+          "bytes": 3838
+        }
+      },
+      "review": "INDEPENDENT_SOURCE_AND_FOCUSED_CONTROLS_GO"
     }
   }
 }

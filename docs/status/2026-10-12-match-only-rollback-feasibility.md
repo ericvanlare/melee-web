@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216; V8 presentation-cache candidate passes five builds and regression but aborts during browser initialization; full browser rollback remains unproven**
+**Compiled / One-tick drawn-reference CPU restore-replay-and-present passed; V7 two-tick remains strict 1216; V8 initialization repaired on current main; two-tick baseline source construction is refused; full browser rollback remains unproven**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -988,7 +988,7 @@ makes the source control use the actual bool-before-profile composition APIs;
 the reduced composition check proves the final TObj source byte-exact. Source
 math, inputs, comparison policy and strict failure were not relaxed.
 
-### V8 presentation cache: Node initialization repaired; browser restore remains open
+### V8 presentation cache: browser initialization repaired; dynamic lifetime remains open
 
 Source checkpoint `019fa3171bbff8dff645a5586d8fb03d2f278940` adds the
 default-off private UV/TOON matrix and derived-dirty presentation cache. Its
@@ -1058,13 +1058,56 @@ local cache source, build inputs and actual binary hashes are separately pinned
 in `initialization_repair_20261028` in the structured receipt. Previous binaries
 and producer inputs were archived and verified before overwrite.
 
-The browser binary remains the earlier failed producer. There is no repaired
-browser run, two-tick comparison, corrective interval or final-present result.
-The historical five builds and full regression above do not validate this new
-repair; full regression, current-main integration and exact-head CI remain
-pending. V7's earlier strict mismatch remains unresolved by actual V8 browser
-evidence. Full owner coverage, seven corrective ticks, relay rollback, original
+The repaired browser producer `7475b3f9` incorporates current main `a870fd44`.
+Its affected Release target and separate linked manifest target pass. The fresh
+configuration preserves all previous policy modes and adds only reviewed baseline
+equality guards for new source rows; it grants no new restore authority. Focused
+controls pass with one unavailable-fixture skip. The previous artifacts and the
+first profile-patch context failure remain retained.
+
+The first current-main headless WebGPU run initializes successfully and consumes
+all 300 literal warm-prefix samples. Command 8 captures the two-tick checkpoint.
+Command 9 aborts inside source step 300: canonical texture construction reaches
+`slippi_tobj_constructed` with an active cache interval (first failure 5, line
+136). The retained diagnostic mask is 1, so the post-step diagnostic and first
+reference draw have not run. The exact creator is not yet identified. This
+exposes the fixed-owner cache assumption during actual simulation; it does not
+establish a restore or comparison result.
+
+Native CLOSE returns 1172 and source/renderer shutdown refuse because the aborted
+command still owns their boundary. Separately, the supervisor and an independent
+postflight confirm every recorded owned OS process is absent. Preserve this
+native-cleanup failure alongside the process-cleanup pass. Raw evidence, exact
+runtime/harness/configuration pins and the first-failure receipt are indexed in
+`browser_current_main_followup_20261028` in the structured receipt.
+
+Next, reduce the actual constructor path and determine the smallest safe handling
+of presentation state across simulation object lifetimes. Do not remove the
+lifetime guard or change literal inputs to pass. No two-tick comparison, corrective
+interval or final-present result is claimed. Full regression and exact-head CI
+remain pending; historical validation does not validate this repaired producer.
+Full owner coverage, seven browser corrective ticks, relay rollback, original
 parity and acceptance remain open.
+
+The successor candidate uses explicit profile identity
+`slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9`. Its matrix leaf
+copies a canonical UV/Reflection object onto the stack and executes the original
+dirty conditional and matrix code on that copy. Source-authored clean matrices
+are retained exactly. Toon preserves its original early return after admission;
+Shadow retains the original path. Per-object presentation cache storage and its
+fixed lifetime assumption are removed; world/descriptor/token and unsupported
+writer checks remain. The existing simulation restore admission is unchanged.
+
+The final actual-source controls pass: strict original/active graphics output,
+whole-object draw invariance, construction/reuse, source assertions and negative
+admission cases. Ordinary class-library teardown and world recreation pass; active
+amnesia remains sticky. Earlier fixture setup, double-destruction and result-label
+failures are retained. These controls use declared memory/audio/camera/GX providers
+and do not prove browser rollback. The old V8 browser and linked metadata were
+archived and verified before any rebuild. The driver requires the new identity;
+its observed failure fields now match the stateless implementation. A fresh V9
+browser build, linked configuration and unchanged two-tick run are next.
+
 
 ## Stage decision dependencies, issue #333
 

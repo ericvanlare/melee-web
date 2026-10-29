@@ -39,7 +39,7 @@ if(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE AND
   message(FATAL_ERROR "LObj presentation cache requires the private Release logical-frame Slippi synctest")
 endif()
 option(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-  "Enable the private incomplete v8 canonical UV/TOON presentation owner" OFF)
+  "Enable the private incomplete v9 stateless canonical texture matrix presentation" OFF)
 if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
   message(FATAL_ERROR "TObj presentation cache requires the private v7 logical-frame light owner profile")
 endif()
