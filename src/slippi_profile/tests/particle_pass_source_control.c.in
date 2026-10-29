@@ -235,6 +235,10 @@ static HSD_GObj main_camera, flash_camera, ground_camera, magnify_camera;
 static HSD_GObj hud_camera, nametag_camera, hud_light_gobj, hud_jobj_gobj;
 static HSD_GObj ifcoget_camera, ifcoget_jobj_gobj;
 static HSD_CObj cobj_ifcoget;
+static HSD_GObj devtext_camera, devtext_display;
+static HSD_CObj cobj_devtext;
+static HSD_GObj* devtext_gobj;
+static unsigned devtext_create_calls, devtext_setup_calls, devtext_draw_calls;
 #define SOURCE_GRAPH_NODE_CAPACITY 160
 typedef struct SourceGraphSnapshot {
     HSD_GObj* nodes[SOURCE_GRAPH_NODE_CAPACITY];
@@ -305,6 +309,32 @@ void grDisplay_801C5F60(HSD_GObj* gobj, int code)
 void ifMagnify_802FBBDC(HSD_GObj* gobj) { (void) gobj; }
 void efLib_Update(HSD_GObj* gobj) { (void) gobj; }
 void efLib_remove_user_data(void* data) { (void) data; }
+
+/* Actual DevText constructor and callback; allocation/graphics/text leaves
+ * are modeled. The draw-local CObj and text arithmetic are not emulated. */
+#define PAD_STACK(n)
+enum { HSD_RP_BOTTOMHALF = 2 };
+typedef struct DevText { struct DevText* next; } DevText;
+typedef struct HSD_CObjDesc { unsigned placeholder; } HSD_CObjDesc;
+static HSD_CObjDesc devtext_CObjDesc;
+static DevText devtext_item;
+static DevText* devtext_drawlist;
+static void DevText_SetupCObj(void) { ++devtext_setup_calls; }
+static void DevText_Draw(DevText* text) { assert(text == &devtext_item); ++devtext_draw_calls; }
+static HSD_GObj* GObj_Create(int classifier, int p_link, int priority)
+{
+    ++devtext_create_calls;
+    memset(&devtext_camera, 0, sizeof(devtext_camera));
+    devtext_camera.classifier = classifier; devtext_camera.p_link = p_link;
+    devtext_camera.p_priority = priority;
+    devtext_camera.obj_kind = devtext_camera.user_data_kind = 255;
+    return &devtext_camera;
+}
+static HSD_CObj* HSD_CObjLoadDesc(HSD_CObjDesc* desc)
+{ assert(desc == &devtext_CObjDesc); return &cobj_devtext; }
+static void HSD_GObjObject_80390A70(HSD_GObj* object, unsigned kind, void* data)
+{ object->obj_kind = kind; object->hsd_obj = data; }
+ACTUAL_DEVTEXT_SOURCE
 
 static void cobj_init(HSD_CObj* cobj)
 {
@@ -405,6 +435,8 @@ static void source_graph_snapshot(SourceGraphSnapshot* snapshot,
     source_graph_add(snapshot, &hud_camera);
     source_graph_add(snapshot, &nametag_camera);
     source_graph_add(snapshot, &ifcoget_camera);
+    source_graph_add(snapshot, &devtext_camera);
+    source_graph_add(snapshot, &devtext_display);
     source_graph_add(snapshot, &hud_light_gobj);
     source_graph_add(snapshot, &hud_jobj_gobj);
     source_graph_add(snapshot, &ifcoget_jobj_gobj);
@@ -431,12 +463,13 @@ static void reset_fixture(void)
     memset(tails, 0, sizeof(tails));
     cpu_active = 0;
     assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
+    assert(slippi_particle_source_gobj_retiring(&devtext_camera));
     memset(&source, 0, sizeof(source));
     memset(diagnostic_link_nodes, 0, sizeof(diagnostic_link_nodes));
     memset(&cm_80452C68, 0, sizeof(cm_80452C68));
     memset(&gobj_alloc_data, 0, sizeof(gobj_alloc_data));
     lbl_80433658.x44 = &flash_camera;
-    gobj_alloc_data.used = 12;
+    gobj_alloc_data.used = 14;
     hsdJObj.parent.head.nb_exist = 8;
     hsdDObj.parent.head.nb_exist = 8;
     hsdMObj.parent.head.nb_exist = 8;
@@ -454,6 +487,10 @@ static void reset_fixture(void)
     cobj_init(&cobj_main); cobj_init(&cobj_flash);
     cobj_init(&cobj_ground); cobj_init(&cobj_magnify);
     cobj_init(&cobj_ifcoget);
+    cobj_init(&cobj_devtext);
+    devtext_create_calls = devtext_setup_calls = devtext_draw_calls = 0;
+    devtext_item.next = NULL;
+    devtext_drawlist = &devtext_item;
     cobj_init(&cobj_hud); cobj_init(&cobj_nametag);
     memset(&hud_light, 0, sizeof(hud_light));
     hud_light.parent.parent.class_info = HSD_CLASS_INFO(&hsdLObj);
@@ -522,6 +559,17 @@ SOURCE_REGISTER_IFCOGET
     /* Modeled constructor observation at the exact patched source seam. */
     assert(slippi_particle_source_ifcoget_constructing());
     assert(slippi_particle_source_ifcoget_created(&ifcoget_camera));
+    DevText_CreateCObj(21, 24, 0, 17, 11);
+    assert(devtext_create_calls == 1);
+    memset(&devtext_display, 0, sizeof(devtext_display));
+    devtext_display.classifier = 0x15; devtext_display.p_link = 24;
+    devtext_display.obj_kind = devtext_display.user_data_kind = 255;
+    devtext_display.render_cb = DevText_DrawAll;
+    append_link(17, &devtext_display);
+    devtext_gobj = &devtext_display;
+    source.devtext_camera = &devtext_camera;
+    source.devtext_cobj = &cobj_devtext;
+    source.devtext_display = &devtext_display;
     source.ifcoget_camera = &ifcoget_camera;
     source.ifcoget_cobj = &cobj_ifcoget;
     source.ifcoget_callback = HSD_GObj_803910D8;
@@ -699,7 +747,7 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
         append_link(17, &invalid_link);
         append_link(17, unvisited_link);
         invalid_link.prev_gx = &objects[0];
-        gobj_alloc_data.used = 14;
+        gobj_alloc_data.used = 16;
         ground_camera.render_cb = HSD_GObj_803910D8;
         ground_camera.gxlink_prios = 0x20000;
         source_graph_snapshot(&graph, &invalid_link);
@@ -728,7 +776,7 @@ static void test_source_schedule_revalidation_and_ptcl_refusal(void)
         link_node->render_cb = HSD_GObj_JObjCallback;
         append_link(17, link_node);
     }
-    gobj_alloc_data.used = 12 + (unsigned) (sizeof(diagnostic_link_nodes) /
+    gobj_alloc_data.used = 14 + (unsigned) (sizeof(diagnostic_link_nodes) /
                                              sizeof(diagnostic_link_nodes[0]));
     ground_camera.render_cb = HSD_GObj_803910D8;
     ground_camera.gxlink_prios = 0x20000;
@@ -935,6 +983,9 @@ static void test_main_hud_and_zero_camera_actual_dispatch(void)
     compare_plan_and_actual(&flash_camera, HSD_GObj_803910D8,
                             SLIPPI_PARTICLE_CAMERA_BACKGROUND_FLASH);
     assert(actual_count == 0);
+    compare_plan_and_actual(&devtext_camera, HSD_GObj_803910D8,
+                            SLIPPI_PARTICLE_CAMERA_DEVTEXT_ZERO);
+    assert(actual_count == 0 && devtext_setup_calls == 1 && devtext_draw_calls == 1);
     compare_plan_and_actual(&ifcoget_camera, HSD_GObj_803910D8,
                             SLIPPI_PARTICLE_CAMERA_IFCOGET_ZERO);
     assert(actual_count == 0);
@@ -1097,8 +1148,87 @@ static void test_ifcoget_constructor_receipt_and_retirement(void)
     assert(slippi_particle_source_gobj_retiring(&ifcoget_camera));
 }
 
+static void test_devtext_receipt_and_exact_dispatch(void)
+{
+    reset_fixture();
+    /* Actual constructor did not confuse camera, render GObj or lazy CObj. */
+    assert(DevText_GetGObj() == &devtext_display);
+    assert(devtext_camera.hsd_obj == &cobj_devtext);
+    assert(&devtext_camera != DevText_GetGObj());
+    unsigned allocations = devtext_create_calls;
+    assert(!slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
+    assert(devtext_create_calls == allocations); /* duplicate refusal before allocation */
+    assert(slippi_particle_source_gobj_retiring(&devtext_camera));
+    assert(!slippi_particle_source_devtext_constructing(19, 24, 0, 17, 11));
+    assert(devtext_create_calls == allocations);
+    assert(slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
+    /* Actual constructor is executed again by the next fixture reset after
+     * clearing the modeled source lists; no capture-time receipt adoption. */
+    HSD_CObj* correct_cobj = devtext_camera.hsd_obj;
+    HSD_CObj invalid_cobj = { 0 };
+    devtext_camera.hsd_obj = &invalid_cobj;
+    assert(!slippi_particle_source_devtext_created(&devtext_camera));
+    devtext_camera.hsd_obj = correct_cobj;
+    devtext_camera.render_priority = 10;
+    assert(!slippi_particle_source_devtext_created(&devtext_camera));
+    devtext_camera.render_priority = 11;
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(300));
+    cpu_active = 1; cpu_token = 1300;
+    assert(!slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
+    assert(!slippi_particle_source_gobj_retiring(&devtext_camera));
+    assert(!slippi_particle_source_draw_begin(300, cpu_token, error, sizeof(error)));
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(300));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(304));
+    assert(slippi_particle_source_gobj_retiring(&devtext_camera));
+    cpu_active = 1; cpu_token = 1304;
+    allocations = devtext_create_calls;
+    assert(!slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
+    assert(devtext_create_calls == allocations); /* active, no duplicate receipt */
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(304));
+
+    reset_fixture();
+    assert(slippi_particle_source_gobj_retiring(&devtext_camera));
+    assert(slippi_particle_source_world_begin(303));
+    cpu_active = 1; cpu_token = 1303;
+    assert(!slippi_particle_source_prepare(303, cpu_token, error, sizeof(error)));
+    assert(strstr(error, "no verified particle schedule") && helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(303));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(301));
+    cpu_active = 1; cpu_token = 1301;
+    devtext_display.render_cb = unsupported_render_callback;
+    assert(!slippi_particle_source_prepare(301, cpu_token, error, sizeof(error)));
+    assert(strstr(error, "DevText GX17") && helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(301));
+
+    reset_fixture();
+    assert(slippi_particle_source_world_begin(302));
+    cpu_active = 1; cpu_token = 1302;
+    devtext_gobj = &hud_jobj_gobj;
+    assert(!slippi_particle_source_prepare(302, cpu_token, error, sizeof(error)));
+    assert(strstr(error, "DevText GX17") && helper_prepare_calls == 0);
+    cpu_active = 0;
+    assert(!slippi_particle_source_world_end(302));
+
+    reset_fixture();
+    /* Actual destruction branch retires this independent receipt as well. */
+    HSD_GObj_804CE3E4.b0 = 1;
+    HSD_GObjPLink_80390228(&devtext_camera);
+    assert(slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
+}
+
 int main(void)
 {
+    test_devtext_receipt_and_exact_dispatch();
     test_ifcoget_constructor_receipt_and_retirement();
     test_main_hud_and_zero_camera_actual_dispatch();
     test_refusals_and_zero_camera_identities();

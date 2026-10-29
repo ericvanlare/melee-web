@@ -2888,3 +2888,37 @@ diff --git a/src/sysdolphin/baselib/gobjplink.c b/src/sysdolphin/baselib/gobjpli
      GObj_RemoveUserData(gobj);
      HSD_GObjObject_80390B0C(gobj);
      HSD_GObjProc_8038FED4(gobj);
+diff --git a/src/melee/if/textdraw.c b/src/melee/if/textdraw.c
+--- a/src/melee/if/textdraw.c
++++ b/src/melee/if/textdraw.c
+@@ -1,4 +1,8 @@
+ #include "textdraw.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -282,6 +286,11 @@
+ void DevText_CreateCObj(int classifier, int p_link, int gobj_priority,
+                         int gx_link, u8 gx_priority)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_devtext_constructing(
++            classifier, p_link, gobj_priority, gx_link, gx_priority))
++        __builtin_trap();
++#endif
+     HSD_GObj* gobj = GObj_Create(classifier, p_link, gobj_priority);
+     if (gobj) {
+         HSD_CObj* cobj = HSD_CObjLoadDesc((HSD_CObjDesc*) &devtext_CObjDesc);
+@@ -289,6 +298,9 @@
+             HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
+             GObj_SetupGXLinkMax(gobj, HSD_GObj_803910D8, gx_priority);
+             gobj->gxlink_prios = 1LL << gx_link;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_source_devtext_created(gobj)) __builtin_trap();
++#endif
+         } else {
+             HSD_GObjPLink_80390228(gobj);
+         }

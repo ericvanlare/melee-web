@@ -1345,9 +1345,16 @@ and checks of the selected GX10/GX15 callbacks. Its focused dispatch/lifetime
 control and three configured translation-unit syntax checks pass. Independent
 review permits one fixed-lifetime two-tick experiment. The affected build passes
 at `7a1827e3`; the actual baseline then moves past IfCoGet and refuses the next
-camera (priority 11, mask `0x20000`), still before any comparison. The next reduced
-diagnostic will identify the complete remaining camera chain to avoid another
-one-camera-at-a-time capture loop. Results/reinitialization without actual
+camera (priority 11, mask `0x20000`), still before any comparison. The reviewed
+failure-only diagnostic builds at `cf856c6d` and records all seven current camera
+nodes, nine authored-mask lists and 40 callback nodes without truncation. All 38
+distinct render/process table entries resolve against that exact producer. The
+last camera has classifier 21 and process link 24, matching DevText rather than
+the debug-menu alternative. This closes the current camera inventory; original
+special-camera dispatch is still covered separately. Baseline comparison remains
+unrun pending the bounded DevText browser test. Its exact constructor receipt and
+existing render-owner getter preserve original draw behavior; focused controls,
+configured source-unit syntax and independent fixed-interval review pass. Results/reinitialization without actual
 retirement is still unsupported.
 Generic callback admission remains refused. No successful browser comparison is implied.
 The sticky owner failure remains visible during source and renderer close. All

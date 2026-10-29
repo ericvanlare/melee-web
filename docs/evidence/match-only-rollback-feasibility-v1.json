@@ -9210,7 +9210,7 @@
       "next": "Original camera/dispatcher equivalence control, then canonical post-entire-scheduler preparation plus coherent draw deduplication and typed presentation ownership; no runtime activation yet."
     },
     "particle_v16_candidate_20261029": {
-      "status": "IFCOGET_FIXED_INTERVAL_BUILD_PASS; actual baseline now refuses next camera before comparison",
+      "status": "COMPLETE_CURRENT_CAMERA_BOUNDARY_OBSERVED; strict baseline still refuses DevText before comparisons",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16",
       "runtime_baseline_head": "d0e76f594af0bf40e06c3d07863fa9ae979e4b05",
       "helper_freeze": {
@@ -9247,7 +9247,7 @@
         "No final present, longer correction, public profile admission or online rollback result",
         "Initial capability refusals and exact strict policy remain unchanged"
       ],
-      "next": "Reduce complete actual match camera chain and finite source roles once, preserve first refusal; avoid per-camera capture loop.",
+      "next": "Finish bounded source closure of complete observed camera chain and implement exact DevText camera role, then one unchanged strict two-tick attempt.",
       "composed_review": {
         "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/particle-v16-composed-luna-review-v1.json",
         "sha256": "48fffb3f238cc7954a5002c5bc681b774c9104326db1bb6e745a5a1aa07db93b"
@@ -9455,7 +9455,40 @@
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/complete-camera-chain-diagnostic-sol-review-v1.json",
             "sha256": "e4cb023b9ba6a8a09a6aa83cf9d332f37166ac914679274f0f98c29d5443b53d"
           },
-          "scope": "Failure-only complete camera and authored-mask callback topology observer. Focused control passes complete/invalid/truncated semantics and unchanged refusal/source graph/helper/draw counts. Initial harness expected-world failure retained. No callback or preparation invocation; no admission or comparison changes. One diagnostic browser observation pending."
+          "scope": "Complete actual current-boundary camera chain: seven cameras, nine authored-mask lists, 40 nodes, 38 distinct render/process table entries resolved in exact producer. All per-list rows/counts/indices reconcile, no overflow or invalid chains. Final camera classifier21/p_link24/priority11/mask0x20000 distinguishes DevText. Authored masks are not complete actual special-camera dispatch (main-tail behavior remains separately source-joined). Baseline still refuses before all comparisons; no rollback result.",
+          "runtime_head": "cf856c6d5de4b1251a8ba83d871483bd7be24a8e",
+          "build": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-particle-v16-v10/result.json",
+            "sha256": "43b98e0660387b85f2bcf5abece8cfc1709e9841b60c576fba483c9df68b7f3a"
+          },
+          "browser_receipt": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v6/result-receipt.json",
+            "sha256": "0fbaa02c3ed2a080b60049de3e53bc4d35b76fc9e5b4ef1696998f7fb1b9fe97"
+          },
+          "linked_configuration": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-particle-v16-v6/final-linked-configuration-v1.json",
+            "sha256": "5d00b073f6e306f1f65b04b295d8b882fa04abe4b2925da1a325f73f1685c395"
+          },
+          "resolved_inventory": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v6/resolved-camera-inventory.json",
+            "sha256": "30c0c4d1710313c13e195526cceb35a64a870320b12e4b1330d8776ba5d0e59a"
+          },
+          "closure_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/complete-camera-boundary-source-closure-luna-v1.json",
+            "sha256": "e9eda3b425aafc941b3ac1d1008f0b714ac4a059b1a5ec9c0e5a3ba9d79b19b5"
+          },
+          "next_contract": "Separate DevText constructor camera/CObj receipt, real destructor invalidation, exact observed camera tuple, exact same-unit devtext_gobj+DrawAll GX17 tuple and frozen topology; preserve lazy CObj setup and cursor source writes. Fixed interval only."
+        },
+        "devtext_candidate": {
+          "freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/devtext-camera-candidate-v1/freeze.json",
+            "sha256": "a4c43c3bd4f01a2feea82828f727e0e4609b39a1d842761fafeba3a19c3ddadd"
+          },
+          "scope": "Exact constructor camera/CObj receipt, existing real destruction hook, existing DevText_GetGObj selected render-owner getter and exact GX17 node/callback identity. Original lazy CObj setup and cursor writes unchanged. Focused actual-constructor/dispatch test and configured schedule/pass-plan/textdraw TU syntax pass; independent review GO for fixed interval. No broader lifecycle or rollback acceptance.",
+          "review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/devtext-camera-luna-review-v1.json",
+            "sha256": "edfaebebcc93a39f3a224343569658d78ab52534f61527b833fe8bf8040e99c0"
+          }
         }
       }
     }

@@ -25,6 +25,7 @@ typedef enum {
     SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO,
     SLIPPI_PARTICLE_CAMERA_HUD,
     SLIPPI_PARTICLE_CAMERA_IFCOGET_ZERO,
+    SLIPPI_PARTICLE_CAMERA_DEVTEXT_ZERO,
     SLIPPI_PARTICLE_CAMERA_NAMETAG_ZERO,
 } SlippiParticleCameraKind;
 
@@ -45,6 +46,8 @@ typedef struct {
     const HSD_GObj* background_flash_camera;
     const HSD_GObj* hud_camera;
     const HSD_GObj* ifcoget_camera;
+    const HSD_GObj* devtext_camera;
+    const HSD_GObj* devtext_display;
     const HSD_GObj* nametag_camera;
     const HSD_GObj* ground_camera;
     const HSD_GObj* magnify_camera;
@@ -52,6 +55,7 @@ typedef struct {
     const void* background_flash_cobj;
     const void* hud_cobj;
     const void* ifcoget_cobj;
+    const void* devtext_cobj;
     const void* nametag_cobj;
     const void* ground_cobj;
     const void* magnify_cobj;

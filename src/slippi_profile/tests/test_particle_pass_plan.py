@@ -20,6 +20,7 @@ SOURCE_PINS = {
     MELEE / "ef/eflib.c": "5450ecd99821f09ea4b9706d400d84b9a42d9d55d2864f530b2a98ce7481dbd4",
     MELEE / "gr/grdisplay.c": "6b1058e4cb5b979dbb8e38a238148d58ce20b47facc39ea241a6b567267cdb37",
     MELEE / "if/ifmagnify.c": "42c8a7477d15836e4771c4b77944b3e2b136b5203e01ecfa91dc314415d38a2b",
+    MELEE / "if/textdraw.c": "5086ba8ff2449cc31c02824cabd4b85d61638dc74e10ef9f6d91430889ac71b0",
     MELEE / "if/ifcoget.c": "33c87ce9f2ab4068cca892c1e64bde31545f632138f44f618e833382dba99df0",
     MELEE / "if/ifall.c": "545d32d9a4ca3f88bd7ab8d73a5c3c68e404f60f188a5935590f9c043fd7f879",
     MELEE / "if/ifnametag.c": "5b1975b769609ed6bf43cd324056faaf84cd25a0bd7c41d8936974e6e383a225",
@@ -261,6 +262,7 @@ def source_fixture() -> str:
     gobj = (BASELIB / "gobj.c").read_text(encoding="utf-8")
     eflib = (MELEE / "ef/eflib.c").read_text(encoding="utf-8")
     ifall = (MELEE / "if/ifall.c").read_text(encoding="utf-8")
+    textdraw = (MELEE / "if/textdraw.c").read_text(encoding="utf-8")
     ifcoget = (MELEE / "if/ifcoget.c").read_text(encoding="utf-8")
     nametag = (MELEE / "if/ifnametag.c").read_text(encoding="utf-8")
     gxlink = (BASELIB / "gobjgxlink.c").read_text(encoding="utf-8")
@@ -311,6 +313,17 @@ def source_fixture() -> str:
                 "void HSD_GObj_JObjCallback(HSD_GObj* gobj, int arg1)",
             )
         ),
+        "ACTUAL_DEVTEXT_SOURCE": "\n\n".join([
+            extract_function(textdraw, "HSD_GObj* DevText_GetGObj(void)"),
+            extract_function(textdraw, "void DevText_DrawAll(HSD_GObj* gobj, int pass)"),
+            extract_function(textdraw, "void DevText_CreateCObj(int classifier,")
+                .replace("    HSD_GObj* gobj = GObj_Create(classifier, p_link, gobj_priority);",
+                         "    if (!slippi_particle_source_devtext_constructing(classifier, p_link, gobj_priority, gx_link, gx_priority)) __builtin_trap();\n"
+                         "    HSD_GObj* gobj = GObj_Create(classifier, p_link, gobj_priority);")
+                .replace("            gobj->gxlink_prios = 1LL << gx_link;",
+                         "            gobj->gxlink_prios = 1LL << gx_link;\n"
+                         "            if (!slippi_particle_source_devtext_created(gobj)) __builtin_trap();"),
+        ]),
         "ACTUAL_GOBJ_RETIRE": extract_function(
             (BASELIB / "gobjplink.c").read_text(encoding="utf-8"),
             "void HSD_GObjPLink_80390228(HSD_GObj* gobj)",
@@ -476,6 +489,15 @@ class ParticlePassPlanTests(unittest.TestCase):
             "void HSD_GObjPLink_80390228(HSD_GObj* gobj)")
         self.assertLess(original_retire.index("return;"),
                         original_retire.index("GObj_RemoveUserData(gobj)"))
+        devtext = extract_function(
+            (MELEE / "if/textdraw.c").read_text(encoding="utf-8"),
+            "void DevText_CreateCObj(int classifier,")
+        part = profile_patch.split("diff --git a/src/melee/if/textdraw.c", 1)[1]
+        self.assertLess(part.index("slippi_particle_source_devtext_constructing"),
+                        part.index("HSD_GObj* gobj = GObj_Create"))
+        self.assertLess(part.index("gobj->gxlink_prios = 1LL << gx_link"),
+                        part.index("slippi_particle_source_devtext_created"))
+        self.assertIn("GObj_SetupGXLinkMax(gobj, HSD_GObj_803910D8, gx_priority);", devtext)
         cobj = (BASELIB / "cobj.c").read_text(encoding="utf-8")
         screen_setup = extract_function(cobj, "static bool setupNormalCamera(HSD_CObj* cobj)")
         set_current = extract_function(cobj, "bool HSD_CObjSetCurrent(HSD_CObj* cobj)")
@@ -555,7 +577,7 @@ class ParticlePassPlanTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("actual-source particle camera dispatch", result.stdout)
             diagnostics = particle_source_diagnostics(result.stdout)
-            self.assertEqual({102, 105, 109, 110, 200, 202}, set(diagnostics))
+            self.assertEqual({102, 105, 109, 110, 200, 202, 303}, set(diagnostics))
             for world, rows in diagnostics.items():
                 block_bytes = sum(len(PARTICLE_SOURCE_DIAG_PREFIX + " " +
                                       " ".join(f"{key}={value}" for key, value in row.items())) + 1
@@ -570,8 +592,8 @@ class ParticlePassPlanTests(unittest.TestCase):
             self.assertEqual("bind-camera-refusal", begin["boundary"])
             self.assertEqual("105", begin["world"])
             camera_rows = [row for row in complete if row.get("event") == "camera"]
-            self.assertEqual(7, len(camera_rows))
-            self.assertEqual("6", camera_rows[-1]["idx"])
+            self.assertEqual(8, len(camera_rows))
+            self.assertEqual("7", camera_rows[-1]["idx"])
             self.assertTrue({"owner", "cobj", "classifier", "p_link", "p_priority",
                              "gx_link", "render_priority", "obj_kind", "mask",
                              "render_entry", "process_gobj", "process_entry"}
@@ -601,7 +623,7 @@ class ParticlePassPlanTests(unittest.TestCase):
             self.assertEqual("1", invalid_end["invalid_chain"])
             invalid_gx17 = next(row for row in invalid
                                 if row.get("event") == "gx-link" and row.get("link") == "17")
-            self.assertEqual("1", invalid_gx17["visited"])
+            self.assertEqual("2", invalid_gx17["visited"])
             self.assertEqual("0", invalid_gx17["tail_reached"])
             self.assertEqual("0", invalid_gx17["topology_complete"])
 
@@ -613,7 +635,7 @@ class ParticlePassPlanTests(unittest.TestCase):
             self.assertEqual("0", truncated_end["invalid_chain"])
             truncated_gx17 = next(row for row in truncated
                                   if row.get("event") == "gx-link" and row.get("link") == "17")
-            self.assertEqual("128", truncated_gx17["visited"])
+            self.assertEqual("129", truncated_gx17["visited"])
             self.assertEqual("1", truncated_gx17["tail_reached"])
             self.assertEqual("1", truncated_gx17["topology_complete"])
             self.assertEqual("0", truncated_gx17["records_complete"])

@@ -18,9 +18,13 @@ extern "C" {
 /* Runtime wrappers for the source-owned match schedule. The source adapter
  * must build its complete camera/callback signature before prepare performs
  * any canonical source preparation. These calls own no game snapshot. */
-/* Exact IfCoGet constructor and actual GObj destruction observations. No
+/* Exact IfCoGet/DevText constructors and actual GObj destruction observations. No
  * capture-time adoption; the single receipt ends before the source owner frees. */
 int slippi_particle_source_ifcoget_constructing(void);
+int slippi_particle_source_devtext_constructing(int classifier, int p_link,
+                                                int priority, int gx_link,
+                                                unsigned camera_priority);
+int slippi_particle_source_devtext_created(struct HSD_GObj* camera);
 int slippi_particle_source_ifcoget_created(struct HSD_GObj* camera);
 int slippi_particle_source_gobj_retiring(const struct HSD_GObj* object);
 int slippi_particle_source_world_begin(uint64_t world_generation);
@@ -48,6 +52,14 @@ int slippi_particle_source_interval_end(uint64_t world_generation,
 #else
 
 static inline int slippi_particle_source_ifcoget_constructing(void) { return 1; }
+static inline int slippi_particle_source_devtext_constructing(
+    int classifier, int p_link, int priority, int gx_link, unsigned camera_priority)
+{
+    (void) classifier; (void) p_link; (void) priority; (void) gx_link;
+    (void) camera_priority; return 1;
+}
+static inline int slippi_particle_source_devtext_created(struct HSD_GObj* camera)
+{ (void) camera; return 1; }
 static inline int slippi_particle_source_ifcoget_created(struct HSD_GObj* camera)
 { (void) camera; return 1; }
 static inline int slippi_particle_source_gobj_retiring(const struct HSD_GObj* object)

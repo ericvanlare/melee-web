@@ -278,6 +278,20 @@ static int select_camera(const HSD_GObj* camera,
         selection->known_zero = source->hud_hidden != 0;
         return 1;
     }
+    if (camera == source->devtext_camera && source->devtext_camera &&
+        camera->render_cb == HSD_GObj_803910D8 &&
+        camera->hsd_obj == source->devtext_cobj && source->devtext_cobj) {
+        if (camera->classifier != 0x15 || camera->p_link != 24 ||
+            camera->p_priority != 0 ||
+            camera->gx_link != SLIPPI_PARTICLE_GX_LINK_MAX + 1 ||
+            camera->render_priority != 11 || camera->gxlink_prios != 0x20000)
+            return refuse(error, error_size,
+                          "DevText camera differs from exact source registration");
+        selection->kind = SLIPPI_PARTICLE_CAMERA_DEVTEXT_ZERO;
+        selection->gx_mask = 0;
+        selection->known_zero = 1;
+        return 1;
+    }
     if (camera == source->ifcoget_camera && source->ifcoget_camera &&
         camera->render_cb == source->ifcoget_callback &&
         source->ifcoget_callback == HSD_GObj_803910D8 &&

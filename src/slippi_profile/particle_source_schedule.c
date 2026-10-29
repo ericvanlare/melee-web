@@ -47,6 +47,8 @@ extern void slippi_particle_source_nametag_identity(
     HSD_GObj** camera, GObj_RenderFunc* render_callback);
 extern GObj_RenderFunc slippi_particle_source_magnify_callback(void);
 extern HSD_GObj* melee_web_bg_flash_camera_owner(void);
+extern HSD_GObj* DevText_GetGObj(void);
+extern void DevText_DrawAll(HSD_GObj*, int);
 extern void fn_802F9680(HSD_GObj*, int);
 extern void fn_802F94E0(HSD_GObj*, int);
 extern void fn_802F95E8(HSD_GObj*, int);
@@ -109,7 +111,7 @@ typedef struct Schedule {
     size_t visit_count;
     NodeProof* selected_nodes;
     size_t selected_node_count;
-    size_t link_first[5], link_count[5];
+    size_t link_first[6], link_count[6];
 } Schedule;
 
 static struct {
@@ -211,6 +213,12 @@ static struct {
     const void* cobj;
 } ifcoget_receipt;
 
+/* Distinct from devtext_gobj and the lazy draw-local devtext_cobj. */
+static struct {
+    const HSD_GObj* camera;
+    const void* cobj;
+} devtext_receipt;
+
 static int cobj_is_canonical(const HSD_GObj* camera)
 {
     const HSD_CObj* cobj;
@@ -248,14 +256,47 @@ int slippi_particle_source_ifcoget_created(HSD_GObj* camera)
     return 1;
 }
 
+int slippi_particle_source_devtext_constructing(
+    int classifier, int p_link, int priority, int gx_link, unsigned camera_priority)
+{
+    if (melee_web_cpu_interval_active() || devtext_receipt.camera ||
+        classifier != 0x15 || p_link != 24 || priority != 0 ||
+        gx_link != 17 || camera_priority != 11) {
+        state.failed = 1;
+        return 0;
+    }
+    return 1;
+}
+
+int slippi_particle_source_devtext_created(HSD_GObj* camera)
+{
+    if (melee_web_cpu_interval_active() || devtext_receipt.camera ||
+        !cobj_is_canonical(camera) || camera->classifier != 0x15 ||
+        camera->p_link != 24 || camera->p_priority != 0 ||
+        camera->gx_link != SLIPPI_PARTICLE_GX_LINK_MAX + 1 ||
+        camera->render_priority != 11 ||
+        camera->render_cb != HSD_GObj_803910D8 ||
+        camera->gxlink_prios != 0x20000) {
+        state.failed = 1;
+        return 0;
+    }
+    devtext_receipt.camera = camera;
+    devtext_receipt.cobj = camera->hsd_obj;
+    return 1;
+}
+
 int slippi_particle_source_gobj_retiring(const HSD_GObj* object)
 {
-    if (object != ifcoget_receipt.camera) return 1;
+    if (object != ifcoget_receipt.camera && object != devtext_receipt.camera)
+        return 1;
     if (melee_web_cpu_interval_active()) {
         state.failed = 1;
         return 0;
     }
-    memset(&ifcoget_receipt, 0, sizeof(ifcoget_receipt));
+    if (object == ifcoget_receipt.camera)
+        memset(&ifcoget_receipt, 0, sizeof(ifcoget_receipt));
+    if (object == devtext_receipt.camera)
+        memset(&devtext_receipt, 0, sizeof(devtext_receipt));
     return 1;
 }
 
@@ -280,6 +321,9 @@ static void source_base(SlippiParticlePassSource* source,
                                             &source->nametag_callback);
     source->hud_camera = hud_camera;
     source->nametag_camera = nametag_camera;
+    source->devtext_camera = devtext_receipt.camera;
+    source->devtext_cobj = devtext_receipt.cobj;
+    source->devtext_display = DevText_GetGObj();
     source->ifcoget_camera = ifcoget_receipt.camera;
     source->ifcoget_cobj = ifcoget_receipt.cobj;
     source->ifcoget_callback = HSD_GObj_803910D8;
@@ -569,6 +613,19 @@ static int bind_camera_role(HSD_GObj* camera,
         *kind = SLIPPI_PARTICLE_CAMERA_HUD;
         return 1;
     }
+    if (camera == source->devtext_camera) {
+        if (camera->hsd_obj != source->devtext_cobj ||
+            camera->classifier != 0x15 || camera->p_link != 24 ||
+            camera->p_priority != 0 ||
+            camera->gx_link != SLIPPI_PARTICLE_GX_LINK_MAX + 1 ||
+            camera->render_priority != 11 ||
+            camera->render_cb != HSD_GObj_803910D8 ||
+            camera->gxlink_prios != 0x20000)
+            return refuse(error, error_size,
+                          "DevText constructor owner or exact registration changed");
+        *kind = SLIPPI_PARTICLE_CAMERA_DEVTEXT_ZERO;
+        return 1;
+    }
     if (camera == source->ifcoget_camera) {
         if (camera->hsd_obj != source->ifcoget_cobj ||
             camera->classifier != HSD_GOBJ_CLASS_CAMERA ||
@@ -652,7 +709,10 @@ static int source_roles_unchanged(const SlippiParticlePassSource* source)
                                        &hud_hidden);
     slippi_particle_source_nametag_identity(&nametag_camera,
                                            &nametag_callback);
-    return ifcoget_receipt.camera == source->ifcoget_camera &&
+    return devtext_receipt.camera == source->devtext_camera &&
+           devtext_receipt.cobj == source->devtext_cobj &&
+           DevText_GetGObj() == source->devtext_display &&
+           ifcoget_receipt.camera == source->ifcoget_camera &&
            ifcoget_receipt.cobj == source->ifcoget_cobj &&
            hud_camera == source->hud_camera &&
            hud_callback == source->hud_callback &&
@@ -700,10 +760,10 @@ static int snapshot_selected_links(Schedule* schedule,
                                    char* error, size_t error_size)
 {
     unsigned links[] = { SLIPPI_PARTICLE_GX_MODEL, SLIPPI_PARTICLE_GX_AUX,
-                         10, 11, 15 };
+                         10, 11, 15, 17 };
     unsigned index;
     size_t total = 0;
-    for (index = 0; index < 5; ++index) {
+    for (index = 0; index < 6; ++index) {
         unsigned link = links[index];
         const HSD_GObj* object;
         const HSD_GObj* previous = NULL;
@@ -715,6 +775,17 @@ static int snapshot_selected_links(Schedule* schedule,
                 object->prev_gx != previous)
                 return refuse(error, error_size,
                               "Selected GX link changed during schedule preflight");
+            if (link == 17 &&
+                (object != source->devtext_display ||
+                 object->render_cb != DevText_DrawAll ||
+                 object->classifier != 0x15 || object->p_link != 24 ||
+                 object->p_priority != 0 || object->render_priority != 0 ||
+                 object->obj_kind != HSD_GOBJ_OBJ_NONE || object->hsd_obj ||
+                 object->proc || object->user_data ||
+                 object->user_data_kind != 0xFF ||
+                 object->user_data_remove_func))
+                return refuse(error, error_size,
+                              "DevText GX17 display identity or source tuple changed");
             if (object->render_cb && (link == 10 || link == 11 || link == 15)) {
                 if (!(link == 15 ? object->render_cb == HSD_GObj_JObjCallback
                                 : hud_display_callback_is_known(link, object->render_cb)))
@@ -735,6 +806,9 @@ static int snapshot_selected_links(Schedule* schedule,
             ++total;
             previous = object;
         }
+        if (link == 17 && count != 1)
+            return refuse(error, error_size,
+                          "DevText GX17 requires its unique live source display owner");
         if (source->gx_tails[link] != previous)
             return refuse(error, error_size,
                           "Selected GX link tail changed during schedule preflight");
@@ -749,7 +823,7 @@ static int snapshot_selected_links(Schedule* schedule,
         return refuse(error, error_size,
                       "Selected GX link snapshot allocation failed");
     schedule->selected_node_count = total;
-    for (index = 0; index < 5; ++index) {
+    for (index = 0; index < 6; ++index) {
         unsigned link = links[index];
         const HSD_GObj* object;
         size_t offset = schedule->link_first[index];
@@ -872,6 +946,8 @@ static int build_schedule(Schedule* output, uint64_t world,
             output->selected_links |= (1u << 10) | (1u << 11);
         if (kind == SLIPPI_PARTICLE_CAMERA_IFCOGET_ZERO)
             output->selected_links |= (1u << 10) | (1u << 15);
+        if (kind == SLIPPI_PARTICLE_CAMERA_DEVTEXT_ZERO)
+            output->selected_links |= (1u << 17);
     }
     free(one_visits);
     output->camera_node_count = camera_count;
