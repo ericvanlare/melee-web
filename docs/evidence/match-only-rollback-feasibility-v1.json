@@ -10618,6 +10618,15 @@
             "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interval-authorization-sol-v1/root-review.json",
             "scope": "The same actual HPS first refill completes under the exact healthy stream snapshot/token binding. All68stream ranges restore exactly. Valid0x22 relay and cancellation attempts remain refused before changing stream bytes; failed exact bindings clean up. Focused actual closed-barrier control passes. Original scheduler globals/AX/output replay and browser composition remain unproven.",
             "retained_failure": "First trace syntax check failed on original ssize_t/callback ABI; fixed with existing compatibility header and actual source boolean ABI; logs retained."
+          },
+          "browser_host_owner_failure": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v7/first-audio-owner-failure.json",
+              "sha256": "d48248eac1439f5e2723a407012032c05da6d4859460e79c957c059a6c77e5b6"
+            },
+            "scope": "V7sourcebba581a4 failed at firstPRE hostvalidation before capsule source advances. FX ranges7..9 own a separate object/generation; newhostvalidator incorrectlyrequired baseaudioidentity. Exactnativecontract repaired without weakening cross-lane comparison;13focusedJS controls pass and rootindependentdelta reviewGO.",
+            "cleanup": "13recordedPIDsabsent and9producerpinsunchanged. BothnativeCPUclose return1073; snapshotclose andrenderershutdown return1. Failednativeclose retained.",
+            "repair_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-host-fx-owner-sol-v1/root-review.json"
           }
         }
       }

@@ -90,7 +90,11 @@ function overrides(domain, kind, index, audioKinds) {
   if (kind === 'AudioOwnedRange') {
     const rangeKind=audioKinds[index];
     set('Kind',rangeKind);set('Address',30000+index*16);set('Extent',3);
-    set('OwnerIdentity',25000);set('Generation',rangeKind>=CPU_ENDPOINT_AUDIO_RANGE.streamBase?4:3);
+    // Actual FX provider uses its own object identity/generation for kinds7..9.
+    const effects=rangeKind>=7&&rangeKind<=9;
+    set('OwnerIdentity',effects?27000:25000);
+    set('Generation',effects?13:(rangeKind>=CPU_ENDPOINT_AUDIO_RANGE.streamBase?4:3));
+    if(rangeKind===7)set('Address',27000);
   }
   if (kind === 'AudioCommandBudget' || kind === 'AudioSoundMode') set('Extent',4);
   if (kind === 'StaticRow') { set('Index',index); set('Extent',5); }
@@ -289,16 +293,57 @@ test('one synchronous page callback walks every named domain and copies borrowed
     'the historical one-row audio fixture remains supported');
 });
 
-test('legacy six- and nine-row audio inventories remain valid without a stream',async()=>{
-  for(const count of [6,9]){
+test('native-shaped six/nine/77 audio inventories preserve distinct FX ownership',async()=>{
+  for(const count of [6,9,77]){
     const fixture=makeFixture({audioRangeCount:count});
     const raw=await fixture.page.evaluate(collectCpuEndpointInPage,{view:1,provenance:1});
     const endpoint=decodeCpuEndpointResult(toWire(raw));
     const audio=endpoint.domains[7];
     assert.equal(audio.records.filter(item=>item.kindName==='AudioOwnedRange').length,count);
-    assert.deepEqual(audio.records.filter(item=>item.kindName==='AudioOwnedRange')
-      .map(item=>item.fields[0]),Array.from({length:count},(_,index)=>String(index+1)));
+    const ranges=audio.records.filter(item=>item.kindName==='AudioOwnedRange');
+    assert.deepEqual(ranges.map(item=>item.fields[0]),makeAudioRangeKinds(count).map(String));
+    for(const row of ranges.slice(0,6)){
+      assert.equal(row.fields[3],'25000');assert.equal(row.fields[4],'3');
+    }
+    if(count>=9){
+      assert.equal(ranges[6].fields[1],'27000');
+      for(const row of ranges.slice(6,9)){
+        assert.equal(row.fields[3],'27000');assert.equal(row.fields[4],'13');
+      }
+    }
   }
+});
+
+test('FX owner proof follows actual source and rejects mismatched FX metadata in page and offline',async()=>{
+  const source=readFileSync(new URL('../../gameplay_audio_fx.c',import.meta.url),'utf8');
+  assert.match(source,/MELEE_WEB_AUDIO_RANGE_EFFECTS_OWNER,effects,sizeof\(\*effects\),effects,effects->generation/);
+  assert.match(source,/MELEE_WEB_AUDIO_RANGE_EFFECTS_REVERB_HEAP,effects->reverb_heap,REVERB_HEAP_BYTES,effects,effects->generation/);
+  assert.match(source,/MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP,effects->delay_heap,DELAY_HEAP_BYTES,effects,effects->generation/);
+  for(const count of [9,77]){
+    const good=await collect(makeFixture({audioRangeCount:count}));
+    for(const [index,field,value,pattern] of [
+      [7,3,27001n,/effects ranges disagree on owner identity or generation/],
+      [8,3,27001n,/effects ranges disagree on owner identity or generation/],
+      [7,4,14n,/effects ranges disagree on owner identity or generation/],
+      [8,4,14n,/effects ranges disagree on owner identity or generation/],
+      [6,1,27001n,/effects owner range address differs from its owner identity/],
+    ]){
+      const fixture=makeFixture({audioRangeCount:count});
+      updateRawRecord(fixture,keyOf(8,1,index),record=>record.fields[field]=value);
+      await assert.rejects(()=>collect(fixture),pattern);
+      assert.equal(fixture.calls.at(-1)[0],'end');
+      const corrupted=toWire(good);
+      corrupted.domains[7].records.filter(row=>row.kindName==='AudioOwnedRange')[index].fields[field]=String(value);
+      assert.throws(()=>decodeCpuEndpointResult(corrupted),pattern);
+    }
+  }
+  const reference=await collect(makeFixture({view:2,provenance:2,audioRangeCount:9}),2,2);
+  const corrected=await collect(makeFixture({view:2,provenance:3,audioRangeCount:9}),2,3);
+  assert.equal(compareCpuEndpoints(reference,corrected).equal,true);
+  for(const row of corrected.domains[7].records.filter(row=>row.kindName==='AudioOwnedRange').slice(6,9))
+    row.fields[4]='14';
+  assert.throws(()=>compareCpuEndpoints(reference,corrected),/metadata\[Generation\]/,
+    'a valid distinct FX generation stays exact between reference and corrected endpoints');
 });
 
 test('audio endpoint validates the authored HPS kind/index set through the 77-row limit',async()=>{

@@ -56,7 +56,7 @@ function validateAudioOwnedRanges(records, generation, audioOwner, failWith) {
   if (audioOwner === 0n || audioOwner > BigInt(U32_MAX))
     failWith('audio owner identity is invalid');
   const seen = new Set(), legacyKinds = new Set(), streamRows = new Map();
-  let streamOwner = null, streamGeneration = null;
+  let streamOwner = null, streamGeneration = null, effectsOwner = null, effectsGeneration = null;
   for (const record of records) {
     const field = name => {
       const index = record.fieldNames.indexOf(name);
@@ -73,9 +73,17 @@ function validateAudioOwnedRanges(records, generation, audioOwner, failWith) {
       failWith('audio owned-range address, extent, owner, or generation is invalid');
     if (CPU_ENDPOINT_AUDIO_RANGE.legacyKinds.includes(Number(kind))) {
       legacyKinds.add(Number(kind));
-      if (owner !== audioOwner) failWith('legacy audio owned-range owner differs from the CPU owner row');
-      if (rowGeneration !== generation)
-        failWith('legacy audio owned-range generation differs from its header');
+      if (kind <= 6n) {
+        if (owner !== audioOwner) failWith('base audio owned-range owner differs from the CPU owner row');
+        if (rowGeneration !== generation)
+          failWith('base audio owned-range generation differs from its header');
+      } else {
+        if (effectsOwner === null) { effectsOwner=owner;effectsGeneration=rowGeneration; }
+        else if (effectsOwner!==owner || effectsGeneration!==rowGeneration)
+          failWith('audio effects ranges disagree on owner identity or generation');
+        if (kind === 7n && address !== owner)
+          failWith('audio effects owner range address differs from its owner identity');
+      }
       continue;
     }
     const encoded = kind - BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase);
@@ -388,7 +396,7 @@ export function collectCpuEndpointInPage(request) {
       failPage('audio owned-range count is outside its authored bound');
     if(audioOwner===0n||audioOwner>BigInt(u32max))failPage('audio owner identity is invalid');
     const seen=new Set(),legacyKinds=new Set(),streamRows=new Map();
-    let streamOwner=null,streamGeneration=null;
+    let streamOwner=null,streamGeneration=null,effectsOwner=null,effectsGeneration=null;
     for(const item of ranges){
       const value=name=>fieldValue(item,name);
       const kind=value('Kind'),address=value('Address'),extent=value('Extent');
@@ -400,8 +408,16 @@ export function collectCpuEndpointInPage(request) {
         failPage('audio owned-range address, extent, owner, or generation is invalid');
       if(audioLegacyKinds.has(Number(kind))){
         legacyKinds.add(Number(kind));
-        if(owner!==audioOwner)failPage('legacy audio owned-range owner differs from the CPU owner row');
-        if(rowGeneration!==generation)failPage('legacy audio owned-range generation differs from its header');
+        if(kind<=6n){
+          if(owner!==audioOwner)failPage('base audio owned-range owner differs from the CPU owner row');
+          if(rowGeneration!==generation)failPage('base audio owned-range generation differs from its header');
+        }else{
+          if(effectsOwner===null){effectsOwner=owner;effectsGeneration=rowGeneration;}
+          else if(effectsOwner!==owner||effectsGeneration!==rowGeneration)
+            failPage('audio effects ranges disagree on owner identity or generation');
+          if(kind===7n&&address!==owner)
+            failPage('audio effects owner range address differs from its owner identity');
+        }
         continue;
       }
       const encoded=kind-BigInt(audioStreamBase);

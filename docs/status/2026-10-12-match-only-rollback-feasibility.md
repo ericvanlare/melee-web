@@ -1636,7 +1636,14 @@ not source scheduler/AX state or replay output. A second bounded control now
 crosses that refill under an exact healthy snapshot/token binding, restores the
 same leaf bytes, and verifies that relay initialization and cancellation remain
 forbidden without changing stream storage. The actual closed-barrier control
-also passes. Composed browser replay remains unrun. The initial leaf review findings, bounded Sol repair
+also passes. The first composed attempt, V7 (`bba581a4`), stops at PRE before
+advancing a capsule: the new host validator incorrectly forces FX ranges 7–9
+to use the mixer owner and generation. The native FX contract already specifies
+a separate owner. The repaired validator preserves that distinction and exact
+cross-lane metadata/byte comparisons; 13 focused checks pass with independent
+review. V7's CPU-close refusals remain retained; both snapshot and renderer
+shutdowns succeed, all 13 recorded PIDs are absent and nine producer pins match.
+Composed refill progress remains unproved. The initial leaf review findings, bounded Sol repair
 and corrected reviewer finding are retained with the exact producer. Native capsule
 cleanup still refuses; in V5 the reference snapshot close also aborts and renderer
 shutdown fails. Owned-process absence and all nine producer pins pass. Focused
