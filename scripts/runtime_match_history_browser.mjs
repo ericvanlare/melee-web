@@ -423,7 +423,9 @@ try{
   await configureControls();
   await driver.selectDisc(discPath);
   await driver.waitForStart();
-  await page.waitForFunction(()=>Module._melee_web_native_menu_cache_idle()===1,null,{timeout:90000});
+  // waitForStart is the loader's prepared-state gate. cache_idle instead
+  // requires every source owner to be unloaded and cannot admit a loaded disc.
+  await observePageHealth('prepared local disc before source profile export');
   profileSnapshot=await hashProfileSnapshot();
   assert.equal(profileSnapshot.bytes,CARD_BYTES);
   const loadedIdentity=await page.evaluate(()=>window.meleeNetPeerIdentity());
