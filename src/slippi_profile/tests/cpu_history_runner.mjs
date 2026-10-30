@@ -23,11 +23,17 @@ const fields=['schema','bytes','phase','lastCommand','firstFailure','preFrame','
 const decode=value=>Buffer.from(value,'base64');
 
 export function requireCpuHistoryMotor(value,{preFrame,span,selectedLane,baseline=null}){
+  // Endpoint frames use the uint64 decimal ABI; motor journals use uint32.
+  // Join only canonical, exactly representable frame values across those ABIs.
+  if(typeof preFrame!=='string'||!/^(0|[1-9][0-9]*)$/.test(preFrame)||
+     BigInt(preFrame)>0xffffffffn)
+    throw new Error('History endpoint PRE frame is outside the motor ABI');
+  const motorPreFrame=Number(preFrame);
   if(value?.mode!==2||value.failure!==0||value.commitState!==0||value.published!==0||value.selectedLane!==selectedLane)
     throw new Error('History motor capture-only owner refused');
   const a=value.baseline,b=value.selected;
   if(a.state!==1||a.framesSeen!==a.span||a.span<1||a.span>span||
-     b.state!==1||b.framesSeen!==span||b.span!==span||a.firstFrame!==preFrame||b.firstFrame!==preFrame)
+     b.state!==1||b.framesSeen!==span||b.span!==span||a.firstFrame!==motorPreFrame||b.firstFrame!==motorPreFrame)
     throw new Error('History motor selected prefix extent drift');
   for(const key of ['token','world','contextEpoch'])
     if(a[key]==='0'||a[key]!==b[key])throw new Error(`History motor ${key} owner drift`);
@@ -190,7 +196,8 @@ export async function runBrowserCpuHistory(predictedPage,referencePage,wire,chec
       validateSelectedDrawPath(before,draw,result.boundary.players,mapping);gpu.set(page,next);
     }
     diagnostics.set(page,draw);
-    const record={command,metadata,timing:result.timing};report.commands[lane(page)].push(record);
+    const record={command,metadata,timing:result.timing,
+      ...(result.motorBase64?{motorBase64:result.motorBase64}:{})};report.commands[lane(page)].push(record);
     current?.commands.push({lane:lane(page),...record});
     return {...result,metadata};
   };

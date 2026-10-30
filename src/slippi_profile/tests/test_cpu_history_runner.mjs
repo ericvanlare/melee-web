@@ -44,8 +44,11 @@ test('history permits a longer selected prefix while keeping its original motor 
   const baseline={state:1,span:2,framesSeen:2,firstFrame:176,token:'9',world:'10',contextEpoch:'11',events:[],eventCount:0};
   const value={mode:2,failure:0,commitState:0,published:0,selectedLane:3,baseline,
     selected:{...baseline,span:3,framesSeen:3}};
-  const options={preFrame:176,span:3,selectedLane:3,baseline:structuredClone(baseline)};
+  const options={preFrame:'176',span:3,selectedLane:3,baseline:structuredClone(baseline)};
   assert.equal(requireCpuHistoryMotor(value,options),value);
+  for(const preFrame of [176,'0176','176.0','-1','4294967296','9007199254740993'])
+    assert.throws(()=>requireCpuHistoryMotor(value,{...options,preFrame}),/motor ABI/);
+  assert.throws(()=>requireCpuHistoryMotor(value,{...options,preFrame:'177'}),/prefix extent/);
   assert.throws(()=>requireCpuHistoryMotor({...value,selected:{...value.selected,token:'12'}},options),/owner/);
   assert.throws(()=>requireCpuHistoryMotor({...value,baseline:{...baseline,eventCount:1}},options),/original journal/);
   assert.throws(()=>requireCpuHistoryMotor({...value,published:1},options),/capture-only/);
