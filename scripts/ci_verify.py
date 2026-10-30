@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GROUPS = {
     "unit-0": (),
     "unit-1": (),
+    "unit-2": (),
     "runtime": ("gameplay_menu_browser",),
     "graphics": ("gx_probe",),
     "gameplay": ("gameplay_checks",),
@@ -28,7 +29,17 @@ GROUPS = {
     "effects": ("gameplay_effect_banks_trace", "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"),
     "menus": ("native_menu_scene_trace", "dat_menu_support_trace"),
 }
-UNIT_GROUPS = ("unit-0", "unit-1")
+UNIT_GROUPS = ("unit-0", "unit-1", "unit-2")
+# Preserve the existing two-way hash ownership for ordinary modules and move
+# only the complete slow modules observed on unit-0 to a third lane. The
+# retained CI attempt spent 229s in joined audio, 144s in first-results, and
+# was cancelled partway through whole-session comparison at the 15m bound.
+BASE_UNIT_SHARD_COUNT = 2
+UNIT_SHARD_OVERRIDES = {
+    "test_source_lbaudio_joined_runtime": 2,
+    "test_first_results_state_compare": 2,
+    "test_whole_session_state_compare": 2,
+}
 
 # These trace suites need linked artifacts and have a single owner partition.
 # Keep every case, but run it beside the target instead of compiling the same
@@ -97,7 +108,7 @@ REQUIRED_TESTS = {
 
 def check_inventory():
     if not set(UNIT_GROUPS).issubset(GROUPS):
-        raise ValueError("CI partitions must include both unit-0 and unit-1")
+        raise ValueError("CI partitions must include every configured unit shard")
     from build import BUILD_TARGETS
     expected = set(BUILD_TARGETS["all"]) | set(BUILD_TARGETS["fighter"])
     actual = [target for targets in GROUPS.values() for target in targets]
@@ -127,8 +138,15 @@ def _test_module(test):
 
 def unit_shard(module):
     """Assign a test module to a stable unit shard."""
+    if module in UNIT_SHARD_OVERRIDES:
+        return UNIT_SHARD_OVERRIDES[module]
+    return _stable_unit_shard(module)
+
+
+def _stable_unit_shard(module):
+    """Return the original two-way hash assignment for unchanged modules."""
     digest = hashlib.sha256(module.encode("utf-8")).digest()
-    return int.from_bytes(digest, "big") % len(UNIT_GROUPS)
+    return int.from_bytes(digest, "big") % BASE_UNIT_SHARD_COUNT
 
 
 def _shard_index(group):

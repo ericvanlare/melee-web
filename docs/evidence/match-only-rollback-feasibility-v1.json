@@ -11548,7 +11548,7 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/focused-profile-result.json",
             "sha256": "c551ee9be81bc5d735248d2cc8314c84142849a7b1878d4eec77be5111176af6"
           },
-          "publication_head_ci": "pending",
+          "publication_head_ci": "Initial92d8044 run41107947034 unit-0 cancelled at existing15-minute cap; no assertion failure before cancellation. Current head pending after reviewed three-shard rebalance.",
           "failed_full_regression": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v1/result.json",
             "sha256": "12fd24eb2c3f11a2e9f50f06d7851da61467797f176a92f08c8b0aa22532aa39"
@@ -11559,6 +11559,21 @@
           "publication_review": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/publication-review.json",
             "sha256": "f6382dbdae601265041e13315aea5a50824ebba5ea2230bbf17321e8e718be7f"
+          },
+          "ci_timeout_repair": {
+            "candidate": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/ci-partition-rebalance-v1/candidate-receipt.json",
+              "sha256": "ce94dbee6f400aa1f175c74ac8832aeb1eac6b9085ffd219672e120d1c83fb42"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/ci-partition-rebalance-v1/root-review.json",
+              "sha256": "9bf51eed08cc19ad4dd21258097cfb9190f360914073d072305fba9d4eddaaaf"
+            },
+            "failed_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/ci-unit-0-attempt-1.log",
+              "sha256": "b4330086cd5bcd9f45554e5f9bf462c046f7e5bc10a99e14ce1ad22114ee3361"
+            },
+            "scope": "Same full test inventory, existing15-minute deadline and compiler-job settings; three slow complete modules gain their own unit shard."
           }
         }
       }

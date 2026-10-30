@@ -1846,7 +1846,10 @@ SDL revision string); it is not represented as the captured binary.
 Final-present raw lanes are independently replayable; the saved command68 GPU
 return object is null, so its original online validation cannot be replayed
 from that field. The full regression passes 3,082 tests with 238 skips, and
-both Release builds pass at `a0fec4bd`; publication-head CI and merge are still pending in
+both Release builds pass at `a0fec4bd`. Initial publication CI exhausted the
+existing 15-minute unit-0 budget while assertions were passing. A reviewed
+three-shard rebalance preserves the full test inventory, compiler settings and
+deadline; its focused controls pass. New-head CI and merge remain pending in
 `retained_history_integration_v1`.
 
 This remains a four-tick component with Node-held local Worker sockets and
