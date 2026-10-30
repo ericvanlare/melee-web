@@ -6,6 +6,10 @@
 #include <new>
 #include <cstdlib>
 #include <cstdio>
+extern "C" int melee_web_action_interval_retire_admit(
+    const MeleeWebActionInterval*);
+extern "C" int melee_web_action_interval_retire_confirmed(
+    MeleeWebActionInterval*);
 namespace melee_web {
 namespace {
 bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& b) noexcept {
@@ -418,7 +422,64 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
     if(comparison_.status)return false;
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Statics);return true;
 }
+bool GameplayCpuCheckpoint::retire_confirmed(
+    const GameplayMatchSession& session) noexcept {
+    // A host-side result is not restore or ownership authority. It must first
+    // complete the CPU/DRAW/raw comparison and GPU/Asyncify idle boundary;
+    // this method independently proves only live native release safety.
+    // Exact-replay Finished carries its full accepted native comparison.
+    // Sealed and CorrectedSealed carry no comparison claim and require zero
+    // native comparison masks before release.
+    constexpr std::uint32_t full_domain_mask=(1u<<
+        (static_cast<std::uint32_t>(CpuComparisonDomain::Statics)+1u))-2u;
+    const bool exact_terminal=phase_==Phase::Finished&&
+                              checked_domains_==full_domain_mask&&
+                              matched_domains_==full_domain_mask;
+    const bool clean_uncompared_terminal=
+                                  (phase_==Phase::Sealed||
+                                   phase_==Phase::CorrectedSealed)&&
+                                  checked_domains_==0&&matched_domains_==0;
+    if((!exact_terminal&&!clean_uncompared_terminal)||!source_step_possible_||
+       comparison_.status!=0)
+        return false;
+
+    // Verify the complete checkpoint owner tuple and endpoint before asking
+    // the live session to check its exact source RuntimeFiles scope.
+    const auto live=session.diagnostic_cpu_owners();
+    if(!live.storage||live.storage!=owner_.storage||live.context!=owner_.context||
+       live.flow!=owner_.flow||live.audio!=owner_.audio||live.world!=owner_.world||
+       live.context_epoch!=owner_.context_epoch||live.frame!=post_frame_||
+       session.source_frames()!=post_frame_)
+        return false;
+    if(!session.diagnostic_source_files_quiescent())
+        return false;
+
+    if(melee_web_cpu_interval_admit(commit_.effect_token)!=1)
+        return false;
+    if(slippi_lobj_anchor_admit(commit_.lobj_anchor)!=1||
+       slippi_tobj_anchor_admit(commit_.tobj_anchor)!=1||
+       slippi_particle_presentation_anchor_admit(commit_.particle_anchor)!=1)
+        return false;
+
+    // ActionStore first performs a pure, exact-catalog release-safety proof.
+    // Its commit operation must leave all leases intact when it refuses.
+    if(!commit_.actions||
+       melee_web_action_interval_retire_admit(commit_.actions)!=1)
+        return false;
+    if(melee_web_action_interval_retire_confirmed(commit_.actions)!=1)
+        return false;
+
+    // All remaining operations revoke routing/anchors and are non-failing.
+    // Keep this terminal distinct from source-owner teardown: the match stays
+    // live and may begin a later, independently captured interval.
+    disarm();
+    confirmed_disarmed_=true;
+    phase_=Phase::ConfirmedDetached;
+    source_step_possible_=false;
+    return true;
+}
 void GameplayCpuCheckpoint::disarm() noexcept {
+    if(confirmed_disarmed_)return;
     melee_web_source_memory_class_piece_slab_trace_early_close();
     // Cleanup revokes host routing even after a failed interval. Its result is
     // not a source comparison or successful rollback assertion.

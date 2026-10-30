@@ -12,6 +12,7 @@
 #include <cstring>
 #include <iostream>
 #include <new>
+#include <vector>
 
 namespace {
 std::atomic<bool> watch_allocations{false};
@@ -902,6 +903,206 @@ void verify_corrected_recording()
           "Corrected endpoint witness lost the different authored action key");
 }
 
+void verify_confirmed_action_retirement()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    constexpr auto action_a = std::uint32_t(ftMr_SM_SpecialN);
+    constexpr auto action_b = std::uint32_t(ftCo_SM_AttackS4);
+    static_assert(action_a < 303 && action_b < 303 && action_a != action_b);
+    check(!melee_web_action_interval_retire_admit(nullptr) &&
+              !melee_web_action_interval_retire_confirmed(nullptr),
+          "Null ActionStore retirement was admitted");
+
+    std::uint64_t resident_destroys = 0;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        MeleeWebActionFighterClipState baseline_p1{}, baseline_p2{};
+        check(melee_web_action_fighter_clip_state(h.p1, &baseline_p1) &&
+                  melee_web_action_fighter_clip_state(h.p2, &baseline_p2),
+              "Could not save live Fighter fields before confirmed retirement");
+        melee_web::GameplayActionStore::ResidentCatalogTestRow s1_attack{}, s1_alias{}, s1_empty{}, s2_attack{};
+        check(h.store1.interval_test_resident_catalog_row(action_b, &s1_attack) &&
+                  h.store1.interval_test_resident_catalog_row(8, &s1_alias) &&
+                  h.store1.interval_test_resident_catalog_row(0, &s1_empty) &&
+                  h.store2.interval_test_resident_catalog_row(action_b, &s2_attack) &&
+                  s1_attack.clip == s1_alias.clip && s1_attack.tree == s1_alias.tree &&
+                  s1_attack.animation == s1_alias.animation && s1_empty.clip &&
+                  !s1_empty.animation && !s1_empty.tree && s1_attack.clip != s2_attack.clip,
+              "Could not pin exact source catalog Clip/alias/empty identities before retirement");
+        auto* interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval),
+              "Could not begin corrected retirement fixture");
+        const State pre = state(h);
+        check(!melee_web_action_interval_retire_admit(interval) &&
+                  !melee_web_action_interval_retire_confirmed(interval) &&
+                  melee_web_action_interval_active_failure(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
+                  same(state(h), pre),
+              "Recording phase retirement refusal changed the live ActionStore interval");
+
+        // Actual source transfer, aliased authored row, and null-tree empty
+        // row all remain represented in the retained action tapes.
+        melee_web_action_load(h.p2, h.p1, int(action_b), 1);
+        h.load(h.p1, 0, 0);
+        h.load(h.p2, 8, 1);
+        const auto predicted = gate_slot(h.p2, 1, 8);
+        check(melee_web_action_interval_seal_record(interval) == 1 &&
+                  melee_web_action_interval_admit(interval) == 1 &&
+                  melee_web_action_interval_retire_admit(interval) == 1,
+              "Sealed resident transfer/alias/empty-row tape did not prove catalog ownership");
+        check(melee_web_action_interval_admit_corrected(interval) == 1 &&
+                  melee_web_action_interval_restore_corrected(interval) == 1,
+              "Resident predicted tape could not restore before corrected retirement");
+        melee_web_action_interval_test_set_fighter_clip_state(h.p1, &baseline_p1);
+        melee_web_action_interval_test_set_fighter_clip_state(h.p2, &baseline_p2);
+        check(same(state(h), pre),
+              "Modeled source payload did not restore the ActionStore prestate before correction");
+        h.load(h.p2, 14, 1);
+        h.load(h.p2, 0, 1);
+        melee_web_action_load(h.p2, h.p1, int(action_b), 1);
+        check(melee_web_action_interval_seal_corrected(interval) == 1 &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Corrected resident transfer tape did not seal cleanly");
+
+        const State endpoint = state(h);
+        const auto endpoint_tree = gate_slot(h.p2, 1, action_b);
+        std::vector<std::byte> p1_bytes(gate_fighter_bytes), p2_bytes(gate_fighter_bytes);
+        std::memcpy(p1_bytes.data(), h.p1_storage.bytes.data(), p1_bytes.size());
+        std::memcpy(p2_bytes.data(), h.p2_storage.bytes.data(), p2_bytes.size());
+        const auto creates_before_retire = melee_web_action_interval_test_clip_create_count();
+        resident_destroys = melee_web_action_interval_test_clip_destroy_count();
+        watched_allocations = 0;
+        watched_deallocations = 0;
+        watch_allocations = true;
+        const int retirement_admitted = melee_web_action_interval_retire_admit(interval);
+        const int retirement_detached = melee_web_action_interval_retire_confirmed(interval);
+        const int repeated_admission = melee_web_action_interval_retire_admit(interval);
+        const int repeated_detach = melee_web_action_interval_retire_confirmed(interval);
+        watch_allocations = false;
+        check(retirement_admitted == 1 && retirement_detached == 1 &&
+                  repeated_admission == 0 && repeated_detach == 0 &&
+                  watched_allocations == 0 && watched_deallocations == 0 &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
+                  melee_web_action_interval_active_failure(interval) == MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,
+              "Confirmed retirement was not a zero-allocation, one-time detach");
+        melee_web_action_interval_disarm(interval);
+        check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
+                  same(state(h), endpoint),
+              "Generic disarm after confirmed retirement latched failure or changed source state");
+        melee_web_action_interval_destroy(interval);
+        melee_web::GameplayActionStore::ResidentCatalogTestRow s1_attack_after{}, s1_alias_after{}, s1_empty_after{}, s2_attack_after{};
+        check(melee_web_action_interval_test_clip_destroy_count() == resident_destroys &&
+                  melee_web_action_interval_test_clip_create_count() == creates_before_retire &&
+                  same(state(h), endpoint) &&
+                  same_gate_tree(endpoint_tree, gate_slot(h.p2, 1, action_b)) &&
+                  h.store1.interval_test_resident_catalog_row(action_b, &s1_attack_after) &&
+                  h.store1.interval_test_resident_catalog_row(8, &s1_alias_after) &&
+                  h.store1.interval_test_resident_catalog_row(0, &s1_empty_after) &&
+                  h.store2.interval_test_resident_catalog_row(action_b, &s2_attack_after) &&
+                  s1_attack.clip == s1_attack_after.clip && s1_attack.animation == s1_attack_after.animation &&
+                  s1_attack.tree == s1_attack_after.tree &&
+                  s1_alias.clip == s1_alias_after.clip && s1_alias.animation == s1_alias_after.animation &&
+                  s1_alias.tree == s1_alias_after.tree &&
+                  s1_empty.clip == s1_empty_after.clip && !s1_empty_after.animation && !s1_empty_after.tree &&
+                  s2_attack.clip == s2_attack_after.clip && s2_attack.animation == s2_attack_after.animation &&
+                  s2_attack.tree == s2_attack_after.tree &&
+                  std::memcmp(p1_bytes.data(), h.p1_storage.bytes.data(), p1_bytes.size()) == 0 &&
+                  std::memcmp(p2_bytes.data(), h.p2_storage.bytes.data(), p2_bytes.size()) == 0,
+              "Destroying a confirmed capsule changed a live Fighter/Clip tree or released catalog ownership");
+
+        // A second capsule on the same source owners proves the first detach
+        // removed the one global callback route and did not retain its tape.
+        auto* next = melee_web_action_interval_capture();
+        check(next && melee_web_action_interval_begin_record(next) == 1,
+              "A fresh ActionStore capsule could not start after confirmed retirement");
+        h.load(h.p2, int(action_a), 1);
+        check(melee_web_action_interval_seal_record(next) == 1 &&
+                  melee_web_action_interval_admit(next) == 1 &&
+                  melee_web_action_interval_restore(next) == 1,
+              "Sequential capsule could not enter exact replay from its resident tape");
+        h.load(h.p2, int(action_a), 1);
+        check(melee_web_action_interval_finish_replay(next) == 1 &&
+                  melee_web_action_interval_retire_admit(next) == 1 &&
+                  melee_web_action_interval_retire_confirmed(next) == 1 &&
+                  melee_web_action_interval_failure_code(next) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Finished exact-replay capsule could not retire from its terminal phase");
+        melee_web_action_interval_destroy(next);
+        check(melee_web_action_interval_test_clip_destroy_count() == resident_destroys,
+              "Sequential capsule destruction released a Clip still owned by the resident catalog");
+    }
+    check(melee_web_action_interval_test_clip_destroy_count() > resident_destroys,
+          "Final source-owner teardown did not release resident Clip storage");
+
+    // A valid Clip owned by another live source catalog must not authorize
+    // retirement of this source's event tape, even with both stores alive.
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        auto* interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not begin provenance-refusal control");
+        h.load(h.p2, int(action_a), 1);
+        check(melee_web_action_interval_seal_record(interval) == 1 &&
+                  melee_web_action_interval_retire_admit(interval) == 1 &&
+                  melee_web_action_interval_test_rehome_first_selection_clip(interval) == 1,
+              "Could not prepare wrong-source resident Clip provenance control");
+        const State endpoint = state(h);
+        check(!melee_web_action_interval_retire_admit(interval) &&
+                  !melee_web_action_interval_retire_confirmed(interval) &&
+                  same(state(h), endpoint) &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Wrong-source Clip provenance refusal mutated or failed the sealed capsule");
+        melee_web_action_interval_disarm(interval);
+        check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_DISARMED,
+              "Ordinary disarm semantics changed after retirement refusal");
+        h.store1.unbind(); h.store2.unbind();
+        melee_web_action_interval_destroy(interval);
+    }
+
+    // Legacy mode remains ineligible even when its sealed endpoint is clean.
+    {
+        Harness h(Policy::Legacy);
+        h.prepare_wait_only();
+        auto* interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not begin Legacy retirement refusal control");
+        h.load(h.p2, int(action_a), 1);
+        check(melee_web_action_interval_seal_record(interval) == 1 &&
+                  !melee_web_action_interval_retire_admit(interval) &&
+                  !melee_web_action_interval_retire_confirmed(interval) &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Legacy source storage entered proof-backed confirmed retirement");
+        melee_web_action_interval_disarm(interval);
+        h.store1.unbind(); h.store2.unbind();
+        melee_web_action_interval_destroy(interval);
+    }
+
+    // A changed six-row binding ledger refuses before it can inspect a stale
+    // Store pointer, while leaving the original phase/failure state untouched.
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        auto* interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not begin stale-binding retirement refusal control");
+        h.load(h.p2, int(action_a), 1);
+        check(melee_web_action_interval_seal_record(interval) == 1,
+              "Stale-binding interval did not seal before unbind");
+        check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Fresh sealed interval reported a preexisting failure before stale-binding check");
+        h.store2.unbind();
+        const auto stale_status = melee_web_action_interval_failure_code(interval);
+        check(!melee_web_action_interval_retire_admit(interval) &&
+                  !melee_web_action_interval_retire_confirmed(interval) &&
+                  stale_status == MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED &&
+                  melee_web_action_interval_failure_code(interval) == stale_status,
+              "Stale binding retirement refusal changed phase or latched an additional failure");
+        h.store1.unbind();
+        melee_web_action_interval_destroy(interval);
+    }
+}
+
 void verify_corrected_recording_failure_refuses_publication()
 {
     using Policy = melee_web::GameplayActionStorePolicy;
@@ -1054,6 +1255,12 @@ void verify_corrected_retired_store_refusal()
         check(melee_web_action_interval_seal_record(interval) == 1,
               "Retired-store predicted endpoint did not seal");
     } // Binding rows retire and the actual C++ stores are destroyed here.
+    const auto status_before_retirement_refusal = melee_web_action_interval_failure_code(interval);
+    check(status_before_retirement_refusal == MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED &&
+              !melee_web_action_interval_retire_admit(interval) &&
+              !melee_web_action_interval_retire_confirmed(interval) &&
+              melee_web_action_interval_failure_code(interval) == status_before_retirement_refusal,
+          "Pure retirement refusal after Store destruction changed the capsule failure status");
     check(melee_web_action_interval_endpoint_admit(interval) == MELEE_WEB_ACTION_ENDPOINT_OWNER,
           "Endpoint full admission accepted retired stores");
     endpoint_refusal_zero(melee_web_action_interval_endpoint_binding(interval, 0), MELEE_WEB_ACTION_ENDPOINT_OWNER);
@@ -1107,8 +1314,11 @@ void verify_event_allocation_failure_refuses_admission()
     check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED &&
           melee_web_action_interval_active_failure(interval)==MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
           "Event-storage allocation failure was not reported");
-    check(melee_web_action_interval_admit(interval) == 0,
-          "An incomplete selection trace reached restore admission");
+    check(melee_web_action_interval_admit(interval) == 0 &&
+              !melee_web_action_interval_retire_admit(interval) &&
+              !melee_web_action_interval_retire_confirmed(interval) &&
+              melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+          "An incomplete selection trace reached replay or retirement admission");
     melee_web_action_interval_destroy(interval);
 }
 
@@ -1336,6 +1546,7 @@ int main(int argc, char** argv)
         verify_resident_action_catalog();
         verify_action_endpoint_getters();
         verify_corrected_recording();
+        verify_confirmed_action_retirement();
         verify_corrected_recording_failure_refuses_publication();
         verify_corrected_admission_refusals();
         verify_corrected_retired_store_refusal();

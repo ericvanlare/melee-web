@@ -575,6 +575,287 @@ struct MeleeWebActionInterval {
         }
         return live != 0;
     }
+    static bool same_runtime_action(const melee_web::DatRuntimeAction& a,
+                                    const melee_web::DatRuntimeAction& b) noexcept
+    {
+        return a.motion_id == b.motion_id && a.descriptor_offset == b.descriptor_offset &&
+            a.motion_flags == b.motion_flags && a.container_offset == b.container_offset &&
+            a.archive_bytes == b.archive_bytes && a.symbol == b.symbol &&
+            a.blend_dynamics == b.blend_dynamics && a.command_offset == b.command_offset;
+    }
+    static bool runtime_owns_row(const melee_web::DatFighterRuntime* runtime,
+                                 const melee_web::DatRuntimeAction* row) noexcept
+    {
+        if (!runtime || !row) return false;
+        const auto& actions = runtime->actions();
+        for (std::size_t i = 0; i < actions.size(); ++i) {
+            if (&actions[i] == row) return actions[i].motion_id == i;
+        }
+        return false;
+    }
+    static bool resident_animation_matches(const Store* source,
+        const melee_web::DatRuntimeAction& row,
+        const melee_web::DatAnimation* animation) noexcept
+    {
+        if (!row.archive_bytes) return animation == nullptr;
+        if (!source || !animation || !source->store_.resident_native_actions_ready_) return false;
+        std::size_t matches = 0;
+        for (const auto& decoded : source->store_.resident_native_actions_) {
+            const auto& key = decoded.first;
+            if (std::get<0>(key) == row.container_offset &&
+                std::get<1>(key) == row.archive_bytes &&
+                std::get<2>(key) == row.symbol && std::get<3>(key) &&
+                decoded.second.get() == animation) ++matches;
+        }
+        return matches == 1;
+    }
+    bool resident_store_base(const Store* source) const noexcept
+    {
+        if (!source || source->policy_ != melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions ||
+            !source->resident_catalog_ready_ || source->nana_popo_fallback_ ||
+            source->result_motion_ || source->result_rows_ || !source->runtime_ ||
+            source->runtime_->costume().fighter_kind == 11 || !source->rows_ ||
+            !source->store_.resident_native_actions_ready_ ||
+            source->store_.fighter_.get() != source->runtime_.get() ||
+            source->resident_clips_.size() != source->runtime_->actions().size() ||
+            !source->fighter_ ||
+            melee_web_action_fighter_table(source->fighter_) != melee_web_action_rows(source->rows_.get()))
+            return false;
+        return true;
+    }
+    bool clip_matches_catalog(const Store* source, std::uint32_t motion,
+                              const Clip* candidate) const noexcept
+    {
+        if (!resident_store_base(source) || !candidate ||
+            motion >= source->resident_clips_.size() ||
+            source->resident_clips_[motion].get() != candidate) return false;
+        // Dereference only the pointer reached through the exact live source
+        // catalog after pointer membership above has been proved.
+        const Clip& clip = *source->resident_clips_[motion];
+        const auto& actions = source->runtime_->actions();
+        const auto& row = actions[motion];
+        if (row.motion_id != motion || !clip.identity_rows ||
+            clip.identity_rows.get() != source->rows_.get() ||
+            clip.command_owner.get() != source->commands_.get() ||
+            clip.selected.action.motion_id >= actions.size()) return false;
+        const auto& selected_row = actions[clip.selected.action.motion_id];
+        if (!same_runtime_action(clip.selected.action, selected_row) ||
+            row.container_offset != selected_row.container_offset ||
+            row.archive_bytes != selected_row.archive_bytes || row.symbol != selected_row.symbol ||
+            !resident_animation_matches(source, selected_row, clip.selected.animation.get()) ||
+            bool(clip.native) != bool(clip.selected.animation) ||
+            clip.selected.commands.has_value() != selected_row.command_offset.has_value()) return false;
+        if (clip.selected.commands &&
+            clip.selected.commands->offset() != *selected_row.command_offset) return false;
+        return true;
+    }
+    bool resident_store_complete(const Store* source) const noexcept
+    {
+        if (!resident_store_base(source)) return false;
+        const auto& actions = source->runtime_->actions();
+        for (std::size_t i = 0; i < actions.size(); ++i) {
+            if (!clip_matches_catalog(source, static_cast<std::uint32_t>(i),
+                    source->resident_clips_[i].get())) return false;
+        }
+        return true;
+    }
+    bool clip_has_one_live_source(std::uint32_t motion, const Clip* candidate) const noexcept
+    {
+        std::size_t matches = 0;
+        for (const auto& binding : stores) if (binding.store) {
+            const Store* source = binding.store;
+            if (motion < source->resident_clips_.size() &&
+                source->resident_clips_[motion].get() == candidate) {
+                if (!clip_matches_catalog(source, motion, candidate)) return false;
+                ++matches;
+            }
+        }
+        return matches == 1;
+    }
+    bool retirement_slot_state_matches(const Store* destination,
+                                       const SlotState& state) const noexcept
+    {
+        if (!destination || state.table != melee_web_action_rows(destination->rows_.get())) return false;
+        for (unsigned slot = 0; slot < 2; ++slot) {
+            const Clip* candidate = state.active[slot].get();
+            const auto motion = state.motions[slot];
+            if (!candidate) {
+                if (motion != UINT32_MAX || state.trees[slot] || state.identities[slot]) return false;
+                continue;
+            }
+            if (motion == UINT32_MAX || !clip_has_one_live_source(motion, candidate)) return false;
+            // The source catalog membership above makes this Clip and its row
+            // owner safe to inspect; compare the complete retained slot view.
+            if (state.trees[slot] != melee_web_native_clip_tree(candidate->native.get()) ||
+                state.identities[slot] != melee_web_action_identity(
+                    candidate->identity_rows.get(), motion)) return false;
+        }
+        return true;
+    }
+    bool retirement_slot_retained_clips_match(const Store* destination,
+                                              const SlotState& state) const noexcept
+    {
+        if (!destination || state.table != melee_web_action_rows(destination->rows_.get())) return false;
+        for (unsigned slot = 0; slot < 2; ++slot) {
+            const Clip* candidate = state.active[slot].get();
+            const auto motion = state.motions[slot];
+            if (!candidate) {
+                if (motion != UINT32_MAX) return false;
+                continue;
+            }
+            // Restore swaps only active/motions. The tree and identity fields
+            // in `before` are intentionally the old view, so prove the
+            // retained Clip through the live catalog without reading them.
+            if (motion == UINT32_MAX || !clip_has_one_live_source(motion, candidate)) return false;
+        }
+        return true;
+    }
+    bool retirement_cache_entry_matches(const Store* source,
+                                        const CacheEntry& entry) const noexcept
+    {
+        if (!entry.animation)
+            return entry.offset == 0 && entry.size == 0 && entry.symbol.empty() &&
+                !entry.native_action;
+        if (!entry.native_action || !entry.size || entry.symbol.empty()) return false;
+        const auto& actions = source->runtime_->actions();
+        for (const auto& row : actions) {
+            if (row.container_offset == entry.offset && row.archive_bytes == entry.size &&
+                row.symbol == entry.symbol &&
+                resident_animation_matches(source, row, entry.animation.get())) return true;
+        }
+        return false;
+    }
+    bool retirement_animation_is_catalogued(const Store* source,
+        const melee_web::DatAnimation* animation) const noexcept
+    {
+        if (!animation) return true;
+        if (!resident_store_base(source)) return false;
+        for (const auto& row : source->runtime_->actions()) {
+            if (row.archive_bytes && resident_animation_matches(source, row, animation)) return true;
+        }
+        return false;
+    }
+    bool retirement_cache_state_matches(const CacheState& saved) const noexcept
+    {
+        const auto* owner = saved.owner;
+        if (!owner || saved.root != owner || saved.cache != &owner->store_ ||
+            saved.runtime.get() != owner->runtime_.get()) return false;
+        for (std::size_t i = 0; i < saved.before.size(); ++i) {
+            if (!retirement_cache_entry_matches(owner, saved.before[i]) ||
+                !retirement_cache_entry_matches(owner, saved.after[i]) ||
+                !retirement_animation_is_catalogued(owner, saved.before_animation_leases[i].get())) return false;
+            if (phase == Phase::Sealed) {
+                if (saved.before_animation_leases[i].get() != saved.before[i].animation.get()) return false;
+            } else if (!same_cache_entry(saved.before[i], saved.after[i])) {
+                // The swap left the displaced cache in `before`; the saved
+                // post-record snapshot is its independent identity check.
+                return false;
+            }
+            if (correction_used && !retirement_cache_entry_matches(owner, saved.corrected_after[i])) return false;
+        }
+        return true;
+    }
+    bool retirement_event_matches(const Event& event) const noexcept
+    {
+        if (event.kind == EventKind::ActionSelection) {
+            const auto* destination_state = store_state(event.destination);
+            const auto* source_state = store_state(event.source);
+            if (!destination_state || !source_state || !destination_state->store || !source_state->store)
+                return false;
+            const Store* destination = destination_state->store;
+            const Store* source = source_state->store;
+            return !event.cache && !event.runtime && !event.row && !event.runtime_owner &&
+                !event.animation && !event.cache_hit && !event.result_domain && event.slot < 2 &&
+                event.destination_generation == destination_state->binding.generation &&
+                event.source_generation == source_state->binding.generation &&
+                event.source_table == melee_web_action_rows(source->rows_.get()) &&
+                event.row_owner.get() == source->rows_.get() &&
+                event.motion < source->resident_clips_.size() &&
+                clip_matches_catalog(source, event.motion, event.clip.get());
+        }
+        if (event.kind != EventKind::CacheHit && event.kind != EventKind::CacheMiss) return false;
+        const CacheState* cache_state = nullptr;
+        for (const auto& saved : caches) if (saved.cache == event.cache) {
+            cache_state = &saved;
+            break;
+        }
+        if (!cache_state || !cache_state->owner || cache_state->root != cache_state->owner ||
+            cache_state->cache != &cache_state->owner->store_ ||
+            event.runtime_owner.get() != cache_state->runtime.get() ||
+            event.runtime != cache_state->runtime.get() ||
+            event.policy != melee_web::DatAnimationPolicy::NativeFighterAction ||
+            event.cache_hit != (event.kind == EventKind::CacheHit) ||
+            event.destination || event.source || event.source_table || event.row_owner ||
+            event.clip || event.result_domain || !runtime_owns_row(event.runtime, event.row) ||
+            !event.row->archive_bytes ||
+            !resident_animation_matches(cache_state->owner, *event.row, event.animation.get())) return false;
+        return true;
+    }
+    bool retirement_provenance_matches() const noexcept
+    {
+        for (const auto& binding : stores) if (binding.store) {
+            const Store* destination = binding.store;
+            if (!resident_store_complete(destination) ||
+                !retirement_slot_state_matches(destination, binding.before_lease) ||
+                !(phase == Phase::Sealed
+                    ? retirement_slot_state_matches(destination, binding.before)
+                    : retirement_slot_retained_clips_match(destination, binding.before)) ||
+                !retirement_slot_state_matches(destination, binding.after) ||
+                (correction_used &&
+                 !retirement_slot_state_matches(destination, binding.corrected_after))) return false;
+            for (unsigned slot = 0; slot < 2; ++slot) {
+                const Clip* current = destination->active_[slot].get();
+                const auto motion = destination->motions_[slot];
+                if ((current && (motion == UINT32_MAX || !clip_has_one_live_source(motion, current))) ||
+                    (!current && motion != UINT32_MAX)) return false;
+            }
+            for (const auto& entry : destination->store_.cache_) {
+                if (!retirement_cache_entry_matches(destination, entry)) return false;
+            }
+        }
+        for (const auto& saved : caches) if (!retirement_cache_state_matches(saved)) return false;
+        for (const auto& event : events) if (!retirement_event_matches(event)) return false;
+        for (const auto& event : corrected_events) if (!retirement_event_matches(event)) return false;
+        return true;
+    }
+    int retirement_admit() const noexcept
+    {
+        if (failure) return 0;
+        if (phase == Phase::CorrectedSealed) {
+            if (active_interval != this) return 0;
+        } else if ((phase == Phase::Sealed || phase == Phase::Finished) && !active_interval) {
+            // These terminal paths have already revoked ActionStore routing.
+        } else return 0;
+        // The binding ledger is the authority for every raw Store pointer.
+        // Do not inspect a captured Store until this exact-row check passes.
+        if (!live_bindings() || !live_cache_owners()) return 0;
+        for (const auto& binding : stores) if (binding.store &&
+            !resident_store_base(binding.store)) return 0;
+        if (!retirement_provenance_matches()) return 0;
+        if (phase == Phase::CorrectedSealed) {
+            return corrected_validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
+        }
+        return validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
+    }
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    bool test_rehome_first_selection_clip_to_other_catalog() noexcept
+    {
+        auto rehome = [this](std::vector<Event>& tape) {
+            for (auto& event : tape) if (event.kind == EventKind::ActionSelection && event.source) {
+                for (const auto& binding : stores) if (binding.store && binding.store != event.source &&
+                    event.motion < binding.store->resident_clips_.size()) {
+                    const auto& replacement = binding.store->resident_clips_[event.motion];
+                    if (replacement && replacement.get() != event.clip.get()) {
+                        event.clip = replacement;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+        return rehome(events) || rehome(corrected_events);
+    }
+#endif
     int admit_corrected() const noexcept
     {
         return phase == Phase::Sealed && !failure && !active_interval &&
@@ -858,6 +1139,14 @@ struct MeleeWebActionInterval {
     }
 
 };
+
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+extern "C" int melee_web_action_interval_test_rehome_first_selection_clip(
+    MeleeWebActionInterval* interval)
+{
+    return interval && interval->test_rehome_first_selection_clip_to_other_catalog();
+}
+#endif
 
 namespace {
 void action_interval_cache_hit_hook(const melee_web::DatFighterAnimationStore* cache,
@@ -1515,6 +1804,19 @@ extern "C" uint32_t melee_web_action_interval_failure_code(const MeleeWebActionI
 extern "C" void melee_web_action_interval_disarm(MeleeWebActionInterval* interval)
 {
     if (interval) interval->disarm();
+}
+extern "C" int melee_web_action_interval_retire_admit(const MeleeWebActionInterval* interval)
+{
+    return interval && interval->retirement_admit() == 1;
+}
+extern "C" int melee_web_action_interval_retire_confirmed(MeleeWebActionInterval* interval)
+{
+    if (!interval || !interval->retirement_admit()) return 0;
+    // All ownership and endpoint checks finished above. This is only a
+    // routing/phase detach: it does not release leases or alter source state.
+    if (active_interval == interval) active_interval = nullptr;
+    interval->phase = MeleeWebActionInterval::Phase::Disarmed;
+    return 1;
 }
 extern "C" void melee_web_action_interval_destroy(MeleeWebActionInterval* interval)
 {

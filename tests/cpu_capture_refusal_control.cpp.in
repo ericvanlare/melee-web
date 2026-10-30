@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <memory>
 #include <new>
@@ -25,13 +26,14 @@ enum class GameplayCpuCommitResult : std::uint32_t {
     Statics, UnexpectedWriterFailure, LObj, TObj, Particle
 };
 }
+namespace { void retirement_step(unsigned); }
 @ACTUAL_COMPARISON@
 static unsigned class_arms=0,class_disarms=0;
 static bool class_unavailable=false;
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 static bool tobj_ok=true;static unsigned tobj_owner_disarms=0;
 extern "C" SlippiTObjAnchor slippi_tobj_anchor_capture(){return {1,1,1,1,0};}
-extern "C" int slippi_tobj_anchor_admit(SlippiTObjAnchor){return tobj_ok;}
+extern "C" int slippi_tobj_anchor_admit(SlippiTObjAnchor){retirement_step(7);return tobj_ok;}
 extern "C" uint32_t slippi_tobj_failure(){return tobj_ok?0:9;}
 extern "C" void slippi_tobj_anchor_disarm(SlippiTObjAnchor a){if(a.token)++tobj_owner_disarms;}
 #endif
@@ -40,9 +42,25 @@ static void reset_tobj_owner_model(){
  tobj_ok=true;tobj_owner_disarms=0;
 #endif
 }
+namespace {
+bool source_quiescent=true,runtime_files_owner_live=true,world_live=true,retirement_trace=false;
+bool session_complete=true,session_match=true,session_flow=true,session_bank=true;
+unsigned source_quiescence_calls=0;
+std::uint64_t active_source_interval=0;
+unsigned source_interval_end_calls=0,source_interval_end_mismatches=0;
+bool retire_admit_ok=true,retire_confirm_ok=true;
+unsigned retire_admit_calls=0,retire_confirm_calls=0,action_disarm_calls=0;
+std::array<unsigned,16> retirement_order{};unsigned retirement_order_count=0;
+void retirement_step(unsigned value){
+ if(!retirement_trace)return;
+ assert(retirement_order_count<retirement_order.size());
+ retirement_order[retirement_order_count++]=value;
+}
+void reset_retirement_trace(){retirement_order.fill(0);retirement_order_count=0;retirement_trace=true;}
+}
 static bool lobj_ok=true;static unsigned lobj_disarms=0;
 extern "C" SlippiLObjAnchor slippi_lobj_anchor_capture(){return {1,1,1,1,0};}
-extern "C" int slippi_lobj_anchor_admit(SlippiLObjAnchor){return lobj_ok;}
+extern "C" int slippi_lobj_anchor_admit(SlippiLObjAnchor){retirement_step(6);return lobj_ok;}
 extern "C" uint32_t slippi_lobj_failure(){return lobj_ok?0:9;}
 extern "C" void slippi_lobj_anchor_disarm(SlippiLObjAnchor a){if(a.token)++lobj_disarms;}
 MeleeWebClassPieceAnchor melee_web_class_piece_arm(){++class_arms;return {1,1,1,0,class_unavailable?0u:1u,class_unavailable?1u:0u};}
@@ -85,6 +103,8 @@ extern "C" void melee_web_source_memory_class_piece_slab_trace_early_close() {
 }
 namespace {
 unsigned refuse_leaf=0,throw_leaf=0,created=0,destroyed=0,static_destroys=0;
+unsigned live_action_intervals=0,max_live_action_intervals=0;
+unsigned live_capsules=0,max_live_capsules=0;
 bool capsule_alloc_failure=false,owner_missing=false,frame_wrap=false;
 std::uint32_t live_frame=176;
 bool effect_ok=true,action_ok=true,payload_ok=true,flow_ok=true,bytes_ok=true;
@@ -99,9 +119,15 @@ bool profile_reset_ok=true;
 bool particle_anchor_ok=true,particle_reset_ok=true,corrected_action_ok=true;
 SlippiLObjAnchor last_profile_reset_anchor{};
 SlippiParticlePresentationAnchor fixture_particle_anchor_capture(){return {1,1,1,1,1};}
-int fixture_particle_anchor_admit(SlippiParticlePresentationAnchor a){return particle_anchor_ok&&a.world==1&&a.token==1;}
+int fixture_particle_anchor_admit(SlippiParticlePresentationAnchor a){retirement_step(8);return particle_anchor_ok&&a.world==1&&a.token==1;}
 void fixture_particle_anchor_disarm(SlippiParticlePresentationAnchor a){if(a.token)++particle_anchor_disarms;}
 int fixture_particle_source_reset_after_restore(SlippiParticlePresentationAnchor a){++particle_reset_calls;return particle_reset_ok&&a.world==1&&a.token==1;}
+int fixture_particle_source_interval_end(std::uint64_t,std::uint64_t interval){
+ ++source_interval_end_calls;
+ if(active_source_interval&&active_source_interval!=interval){
+  ++source_interval_end_mismatches;active_source_interval=0;return 0;}
+ active_source_interval=0;return 1;
+}
 void visit(unsigned leaf){trace[count++]=leaf;if(throw_leaf==leaf)throw std::bad_alloc();}
 Snapshot* snapshot(unsigned leaf){visit(leaf);if(refuse_leaf==leaf)return nullptr;++created;return new Snapshot{leaf};}
 void destroy(Snapshot* p){if(p){++destroyed;delete p;}}
@@ -119,16 +145,16 @@ Snapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*){return snapshot(4);}
 MeleeWebSourceMemoryPayloadSnapshotCaptureResult melee_web_source_memory_payload_snapshot_capture(){
  auto* p=snapshot(5);return {p?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED,p};
 }
-Snapshot* melee_web_action_interval_capture(){return snapshot(6);}
+Snapshot* melee_web_action_interval_capture(){auto* p=snapshot(6);if(p){++live_action_intervals;max_live_action_intervals=std::max(max_live_action_intervals,live_action_intervals);}return p;}
 std::uint64_t melee_web_audio_generation(MeleeWebAudio*){visit(8);return refuse_leaf==8?0:17;}
-void melee_web_action_interval_destroy(Snapshot* p){destroy(p);}
+void melee_web_action_interval_destroy(Snapshot* p){if(p){assert(live_action_intervals>0);--live_action_intervals;}destroy(p);}
 void melee_web_audio_snapshot_destroy(Snapshot* p){destroy(p);}
 void melee_web_match_flow_cpu_snapshot_destroy(Snapshot* p){destroy(p);}
 void melee_web_match_context_snapshot_destroy(Snapshot* p){destroy(p);}
 void melee_web_gameplay_bootstrap_snapshot_destroy(Snapshot* p){destroy(p);}
 void melee_web_source_memory_payload_snapshot_destroy(Snapshot* p){destroy(p);}
-void melee_web_action_interval_disarm(Snapshot*){}
-int melee_web_cpu_interval_admit(std::uint64_t){return effect_ok;}
+void melee_web_action_interval_disarm(Snapshot*){++action_disarm_calls;}
+int melee_web_cpu_interval_admit(std::uint64_t){retirement_step(5);return effect_ok;}
 std::uint32_t melee_web_cpu_interval_failure(){return effect_ok?0:99;}
 int melee_web_action_interval_admit(Snapshot*){return action_ok;}
 int melee_web_action_interval_matches_finished(Snapshot*){return action_ok;}
@@ -137,15 +163,39 @@ std::uint32_t melee_web_action_interval_active_failure(Snapshot*){return action_
 int melee_web_action_interval_seal_corrected(Snapshot*){++corrected_seal_calls;return corrected_action_ok;}
 int melee_web_action_interval_finish_replay(Snapshot*){++finish_replay_calls;return action_ok;}
 std::uint32_t melee_web_action_interval_failure_code(Snapshot*){return corrected_action_ok?(action_ok?0:99):98;}
+int melee_web_action_interval_retire_admit(const Snapshot* p){retirement_step(9);++retire_admit_calls;return p&&retire_admit_ok;}
+int melee_web_action_interval_retire_confirmed(Snapshot* p){retirement_step(10);++retire_confirm_calls;return p&&retire_confirm_ok;}
 MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(const Snapshot*){return payload_ok?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;}
 struct Compare{std::uint32_t status=0,allocation_index=0,byte_offset=0,expected_byte=0,actual_byte=0;std::uintptr_t host_address=0;std::uint32_t requested_bytes=0,admission_status=0,source_address=0;};
 Compare melee_web_source_memory_payload_snapshot_compare_live(Snapshot*){Compare c;c.status=payload_ok?0:2;return c;}
 int melee_web_match_flow_cpu_snapshot_matches(MeleeWebMatchFlow*,Snapshot*,char*,std::size_t){return flow_ok;}
 int melee_web_cpu_interval_end(std::uint64_t){return 1;}
+extern "C" int melee_web_gameplay_world_exists(void){return world_live;}
 namespace melee_web {
 struct GameplayMatchCpuOwners{const void* storage;MeleeWebMatchContext* context;MeleeWebMatchFlow* flow;MeleeWebAudio* audio;std::uint64_t world;std::uint64_t context_epoch;std::uint32_t frame;};
-class GameplayMatchSession{public:std::uint32_t source_frames()const{return live_frame;}GameplayMatchCpuOwners diagnostic_cpu_owners() const noexcept{
- return {owner_missing?nullptr:this,nullptr,nullptr,nullptr,1,1,frame_wrap?UINT32_MAX:live_frame};}};
+class GameplayWorld{public:
+ void ensure_source_files_quiescent(){++source_quiescence_calls;retirement_step(4);
+  if(!source_quiescent||!runtime_files_owner_live)throw std::runtime_error("fixture exact RuntimeFiles busy or retired");}
+};
+struct SessionStorage{std::unique_ptr<GameplayWorld> world=std::make_unique<GameplayWorld>();};
+class GameplayMatchSession{public:
+ GameplayMatchSession():storage_(std::make_unique<SessionStorage>()){}
+ std::uint32_t source_frames()const{retirement_step(2);return live_frame;}
+ bool construction_complete()const{return session_complete;}
+ GameplayMatchCpuOwners diagnostic_cpu_owners() const noexcept{
+  retirement_step(retirement_order_count==0?1:3);
+  if(owner_missing||!storage_||!storage_->world||!session_match||!session_flow||
+     !session_bank||!construction_complete())return {};
+  return {storage_.get(),reinterpret_cast<MeleeWebMatchContext*>(1),
+          reinterpret_cast<MeleeWebMatchFlow*>(1),reinterpret_cast<MeleeWebAudio*>(1),
+          1,1,frame_wrap?UINT32_MAX:live_frame};}
+ bool diagnostic_source_files_quiescent()const noexcept;
+ void fixture_remove_storage(){storage_.reset();}
+ void fixture_remove_world(){if(storage_)storage_->world.reset();}
+private:
+ std::unique_ptr<SessionStorage> storage_;
+};
+@ACTUAL_SESSION_SOURCE_QUIESCENT@
 class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool capture(){visit(7);return refuse_leaf!=7;}bool seal_post(){return bytes_ok;}
  CpuComparison capture_expected(std::vector<std::byte>& out)const{out.assign(1,std::byte{0x5a});CpuComparison c;if(!bytes_ok)c.status=2;return c;}
  CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
@@ -160,8 +210,8 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const Commit&) noexcept {
  return modeled_corrected_commit_result;
 }
 class GameplayCpuCheckpoint{public:
- static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {return capsule_alloc_failure?nullptr:std::malloc(n);}
- static void operator delete(void* p) noexcept {std::free(p);}
+ static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {if(capsule_alloc_failure)return nullptr;void* p=std::malloc(n);if(p){++live_capsules;max_live_capsules=std::max(max_live_capsules,live_capsules);}return p;}
+ static void operator delete(void* p) noexcept {if(p){assert(live_capsules>0);--live_capsules;}std::free(p);}
  static std::unique_ptr<GameplayCpuCheckpoint> capture(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
  ~GameplayCpuCheckpoint();
  const CpuComparison& comparison()const{return comparison_;}
@@ -172,11 +222,21 @@ class GameplayCpuCheckpoint{public:
  bool finish_corrected(const GameplayMatchSession&) noexcept;
  bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
  bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
+ bool retire_confirmed(const GameplayMatchSession&) noexcept;
+ bool source_owners_retired(const GameplayMatchSession*) noexcept;
  void fixture_sealed(){phase_=Phase::Sealed;post_frame_=176;commit_.effect_token=1;}
  void fixture_recording(){phase_=Phase::Recording;commit_.effect_token=1;}
  void fixture_replaying(){phase_=Phase::Replaying;}
  void fixture_correcting(){phase_=Phase::Correcting;post_frame_=live_frame;commit_.effect_token=1;}
  void fixture_finished(){phase_=Phase::Finished;}
+ void fixture_retirement_terminal(bool corrected=false,std::uint64_t interval=1){phase_=corrected?Phase::CorrectedSealed:Phase::Finished;post_frame_=live_frame;commit_.effect_token=interval;source_step_possible_=true;comparison_={};checked_domains_=matched_domains_=corrected?0u:0x3feu;}
+ void fixture_clean_reference_retirement_terminal(std::uint64_t interval=1){phase_=Phase::Sealed;post_frame_=live_frame;commit_.effect_token=interval;source_step_possible_=true;comparison_={};checked_domains_=matched_domains_=0;}
+ bool fixture_confirmed_detached()const{return phase_==Phase::ConfirmedDetached;}
+ bool fixture_source_step_possible()const{return source_step_possible_;}
+ bool fixture_phase_terminal()const{return phase_==Phase::Finished||phase_==Phase::CorrectedSealed;}
+ void fixture_wrong_phase(){phase_=Phase::Sealed;}
+ void fixture_comparison_status(std::uint32_t status){comparison_.status=status;}
+ void fixture_domain_masks(std::uint32_t checked,std::uint32_t matched){checked_domains_=checked;matched_domains_=matched;}
  bool fixture_failed()const{return phase_==Phase::Failed;}
  bool fixture_is_replaying()const{return phase_==Phase::Replaying;}
  bool fixture_is_correcting()const{return phase_==Phase::Correcting;}
@@ -188,7 +248,7 @@ class GameplayCpuCheckpoint{public:
 private:
  explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
  const CpuCheckpointSpan span_;
- enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed};Phase phase_=Phase::Captured;
+ enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed,ConfirmedDetached,Retired};Phase phase_=Phase::Captured;
  bool same_owner(const GameplayMatchSession&)const{return !owner_missing&&fixture_particle_anchor_admit(commit_.particle_anchor);}
  using AudioRanges=std::array<int,16>;
  bool capture_post_bytes(const GameplayMatchSession&,std::vector<std::byte>& b,AudioRanges&,std::size_t& n){b.assign(1,std::byte{0x5a});n=1;return bytes_ok;}
@@ -196,7 +256,7 @@ private:
  Snapshot *drawn_payload_{},*drawn_flow_{};std::vector<std::byte> drawn_bytes_,drawn_statics_;
  std::vector<std::byte> post_bytes_;AudioRanges audio_ranges_{};std::size_t audio_range_count_{};
  AudioRanges drawn_audio_ranges_{};std::size_t drawn_audio_range_count_{};bool drawn_sealed_=false;
- std::uint32_t post_frame_{},checked_domains_{},matched_domains_{};CpuComparison comparison_{};
+ std::uint32_t post_frame_{},checked_domains_{},matched_domains_{};CpuComparison comparison_{};bool confirmed_disarmed_=false;
  std::uint64_t lobj_writer_session_=0,tobj_writer_session_=0;
  MeleeWebClassPieceAnchor class_piece_anchor_{};
  GameplayMatchCpuOwners owner_{};std::unique_ptr<GameplayCpuStatics> statics_;Commit commit_{};std::uint64_t audio_generation_{};bool source_step_possible_=false;Snapshot *post_payload_{},*post_flow_{};
@@ -237,6 +297,8 @@ void melee_web_tobj_writer_disarm(uint64_t session){assert(session==0);++tobj_di
 @ACTUAL_FINISH_CORRECTED@
 @ACTUAL_DRAWN_SEAL@
 @ACTUAL_DRAWN_MATCH@
+@ACTUAL_RETIRE_CONFIRMED@
+@ACTUAL_SOURCE_OWNERS_RETIRED@
 @ACTUAL_RELEASE_FUNCTION@
 @ACTUAL_DISARM_FUNCTION@
 @ACTUAL_DESTRUCTOR@
@@ -249,8 +311,28 @@ int main(){
 #if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
  const auto disabled_tobj=slippi_tobj_anchor_capture();assert(disabled_tobj.token==0&&slippi_tobj_anchor_admit(disabled_tobj)==1&&slippi_tobj_failure()==0);slippi_tobj_anchor_disarm(disabled_tobj);
 #endif
- auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=corrected_commit_calls=profile_reset_calls=particle_reset_calls=particle_anchor_disarms=corrected_seal_calls=finish_replay_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;modeled_corrected_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=particle_anchor_ok=particle_reset_ok=corrected_action_ok=true;last_profile_reset_anchor={};};
+ auto reset=[](){assert(live_capsules==0&&live_action_intervals==0);live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;live_action_intervals=max_live_action_intervals=0;live_capsules=max_live_capsules=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;source_quiescent=runtime_files_owner_live=world_live=true;session_complete=session_match=session_flow=session_bank=true;source_quiescence_calls=0;active_source_interval=0;source_interval_end_calls=source_interval_end_mismatches=0;retirement_trace=false;retire_admit_ok=retire_confirm_ok=true;retire_admit_calls=retire_confirm_calls=action_disarm_calls=0;retirement_order.fill(0);retirement_order_count=0;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=corrected_commit_calls=profile_reset_calls=particle_reset_calls=particle_anchor_disarms=corrected_seal_calls=finish_replay_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;modeled_corrected_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=particle_anchor_ok=particle_reset_ok=corrected_action_ok=true;last_profile_reset_anchor={};};
  const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
+ reset();
+ const auto source_calls_before=source_quiescence_calls;
+ assert(session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+1);
+ source_quiescent=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+2);source_quiescent=true;
+ session_complete=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+2);session_complete=true;
+ session_match=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+2);session_match=true;
+ session_flow=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+2);session_flow=true;
+ session_bank=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+2);session_bank=true;
+ runtime_files_owner_live=false;assert(!session.diagnostic_source_files_quiescent());
+ assert(source_quiescence_calls==source_calls_before+3);runtime_files_owner_live=true;
+ GameplayMatchSession absent_storage;absent_storage.fixture_remove_storage();
+ assert(!absent_storage.diagnostic_source_files_quiescent());
+ GameplayMatchSession absent_world;absent_world.fixture_remove_world();
+ assert(!absent_world.diagnostic_source_files_quiescent());
  for(unsigned failure=1;failure<=8;++failure){reset();refuse_leaf=failure;CpuCaptureDiagnostic d;
   auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
   assert(d.comparison.domain==domains[failure-1]&&d.comparison.status==1&&d.comparison.row==UINT32_MAX&&d.comparison.offset==UINT32_MAX);
@@ -476,6 +558,171 @@ int main(){
    owner_missing=false;live_frame=176;lobj_ok=true;particle_anchor_ok=effect_ok=action_ok=corrected_action_ok=true;
    candidate.reset();unchanged();
  }
+ auto retirement_candidate=[&](bool corrected=false){
+   auto candidate=sealed_checkpoint();candidate->fixture_retirement_terminal(corrected);return candidate;
+ };
+ auto assert_retirement_order=[&](std::initializer_list<unsigned> expected){
+   assert(retirement_order_count==expected.size());unsigned i=0;
+   for(unsigned step:expected)assert(retirement_order[i++]==step);
+ };
+ auto normal_fallback_cleanup=[&](std::unique_ptr<GameplayCpuCheckpoint>& candidate){
+   retirement_trace=false;assert(lobj_disarms==0&&particle_anchor_disarms==0&&
+       class_disarms==0&&action_disarm_calls==0);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+   assert(tobj_owner_disarms==0);
+#endif
+   owner_missing=true;world_live=true;
+   assert(!candidate->source_owners_retired(&session));
+   assert(candidate->fixture_source_step_possible());
+   world_live=false;assert(candidate->source_owners_retired(&session));
+   assert(!candidate->fixture_source_step_possible());
+   owner_missing=false;world_live=true;live_frame=176;
+   candidate.reset();assert(action_disarm_calls==2);
+ };
+ reset();auto wrong_phase_retirement=retirement_candidate();wrong_phase_retirement->fixture_wrong_phase();
+ reset_retirement_trace();assert(!wrong_phase_retirement->retire_confirmed(session));retirement_trace=false;
+ assert(!wrong_phase_retirement->fixture_confirmed_detached()&&wrong_phase_retirement->fixture_source_step_possible());
+ assert(retire_admit_calls==0&&retire_confirm_calls==0&&action_disarm_calls==0&&retirement_order_count==0);
+ normal_fallback_cleanup(wrong_phase_retirement);unchanged();
+
+ reset();auto quiescence_refusal=retirement_candidate();source_quiescent=false;
+ reset_retirement_trace();assert(!quiescence_refusal->retire_confirmed(session));retirement_trace=false;
+ assert_retirement_order({1,2,3,4});assert(retire_admit_calls==0&&retire_confirm_calls==0&&action_disarm_calls==0);
+ assert(quiescence_refusal->fixture_source_step_possible());normal_fallback_cleanup(quiescence_refusal);unchanged();
+
+ reset();auto owner_refusal=retirement_candidate();owner_missing=true;
+ reset_retirement_trace();assert(!owner_refusal->retire_confirmed(session));retirement_trace=false;owner_missing=false;
+ assert_retirement_order({1});assert(retire_admit_calls==0&&retire_confirm_calls==0&&action_disarm_calls==0);
+ assert(owner_refusal->fixture_source_step_possible());normal_fallback_cleanup(owner_refusal);unchanged();
+
+ reset();auto frame_refusal=retirement_candidate();++live_frame;
+ reset_retirement_trace();assert(!frame_refusal->retire_confirmed(session));retirement_trace=false;live_frame=176;
+ assert_retirement_order({1});assert(retire_admit_calls==0&&retire_confirm_calls==0&&action_disarm_calls==0);
+ assert(frame_refusal->fixture_source_step_possible());normal_fallback_cleanup(frame_refusal);unchanged();
+
+ reset();auto comparison_refusal=retirement_candidate();comparison_refusal->fixture_comparison_status(1);
+ reset_retirement_trace();assert(!comparison_refusal->retire_confirmed(session));retirement_trace=false;
+ assert(retirement_order_count==0&&retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(comparison_refusal);unchanged();
+
+ reset();auto partial_domains=retirement_candidate();
+ partial_domains->fixture_domain_masks(0x1feu,0x1feu);
+ reset_retirement_trace();assert(!partial_domains->retire_confirmed(session));retirement_trace=false;
+ assert(retirement_order_count==0&&retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(partial_domains);unchanged();
+
+ reset();auto sealed_nonzero_mask=sealed_checkpoint();sealed_nonzero_mask->fixture_clean_reference_retirement_terminal();
+ sealed_nonzero_mask->fixture_domain_masks(1u,0u);
+ reset_retirement_trace();assert(!sealed_nonzero_mask->retire_confirmed(session));retirement_trace=false;
+ assert(retirement_order_count==0&&retire_admit_calls==0&&retire_confirm_calls==0);
+ assert(sealed_nonzero_mask->fixture_source_step_possible());normal_fallback_cleanup(sealed_nonzero_mask);unchanged();
+
+ reset();auto clean_sealed_reference=sealed_checkpoint();clean_sealed_reference->fixture_clean_reference_retirement_terminal();
+ const auto clean_sealed_count=count;reset_retirement_trace();
+ assert(clean_sealed_reference->retire_confirmed(session));retirement_trace=false;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert_retirement_order({1,2,3,4,5,6,7,8,9,10});
+#else
+ assert_retirement_order({1,2,3,4,5,6,8,9,10});
+#endif
+ assert(clean_sealed_reference->fixture_confirmed_detached()&&!clean_sealed_reference->fixture_source_step_possible());
+ assert(retire_admit_calls==1&&retire_confirm_calls==1&&action_disarm_calls==1);
+ assert(count==clean_sealed_count&&commit_calls==0&&corrected_commit_calls==0);unchanged();
+ clean_sealed_reference.reset();assert(live_capsules==0&&live_action_intervals==0);
+ std::puts("clean Sealed reference releases with zero comparison masks; nonzero mask refuses");
+
+ reset();auto effects_refusal=retirement_candidate();effect_ok=false;
+ reset_retirement_trace();assert(!effects_refusal->retire_confirmed(session));retirement_trace=false;
+ assert_retirement_order({1,2,3,4,5});assert(retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(effects_refusal);unchanged();
+
+ reset();auto light_refusal=retirement_candidate();lobj_ok=false;
+ reset_retirement_trace();assert(!light_refusal->retire_confirmed(session));retirement_trace=false;
+ assert_retirement_order({1,2,3,4,5,6});assert(retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(light_refusal);unchanged();
+
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ reset();auto texture_refusal=retirement_candidate();tobj_ok=false;
+ reset_retirement_trace();assert(!texture_refusal->retire_confirmed(session));retirement_trace=false;
+ assert_retirement_order({1,2,3,4,5,6,7});assert(retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(texture_refusal);unchanged();
+#endif
+
+ reset();auto particle_refusal=retirement_candidate();particle_anchor_ok=false;
+ reset_retirement_trace();assert(!particle_refusal->retire_confirmed(session));retirement_trace=false;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert_retirement_order({1,2,3,4,5,6,7,8});
+#else
+ assert_retirement_order({1,2,3,4,5,6,8});
+#endif
+ assert(retire_admit_calls==0&&retire_confirm_calls==0);
+ normal_fallback_cleanup(particle_refusal);unchanged();
+
+ reset();auto action_admission_refusal=retirement_candidate();retire_admit_ok=false;
+ reset_retirement_trace();assert(!action_admission_refusal->retire_confirmed(session));retirement_trace=false;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert_retirement_order({1,2,3,4,5,6,7,8,9});
+#else
+ assert_retirement_order({1,2,3,4,5,6,8,9});
+#endif
+ assert(retire_admit_calls==1&&retire_confirm_calls==0&&action_disarm_calls==0);
+ assert(action_admission_refusal->fixture_source_step_possible());normal_fallback_cleanup(action_admission_refusal);unchanged();
+
+ reset();auto action_commit_refusal=retirement_candidate(true);retire_confirm_ok=false;
+ reset_retirement_trace();assert(!action_commit_refusal->retire_confirmed(session));retirement_trace=false;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert_retirement_order({1,2,3,4,5,6,7,8,9,10});
+#else
+ assert_retirement_order({1,2,3,4,5,6,8,9,10});
+#endif
+ assert(retire_admit_calls==1&&retire_confirm_calls==1&&action_disarm_calls==0);
+ assert(action_commit_refusal->fixture_source_step_possible());normal_fallback_cleanup(action_commit_refusal);unchanged();
+
+ // Two sequential checkpoints use the same live match/session. Destroy the
+ // first only after its permanent-catalog proof, then capture/retire the next.
+ for(bool corrected:{false,true}){
+   reset();auto confirmed=retirement_candidate(corrected);const auto before_count=count;
+   reset_retirement_trace();assert(confirmed->retire_confirmed(session));retirement_trace=false;
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+   assert_retirement_order({1,2,3,4,5,6,7,8,9,10});
+#else
+   assert_retirement_order({1,2,3,4,5,6,8,9,10});
+#endif
+   assert(confirmed->fixture_confirmed_detached()&&!confirmed->fixture_source_step_possible());
+   assert(retire_admit_calls==1&&retire_confirm_calls==1&&action_disarm_calls==1);
+   assert(lobj_disarms==1&&particle_anchor_disarms==1&&class_disarms==1);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+   assert(tobj_owner_disarms==1);
+#endif
+   assert(count==before_count&&commit_calls==0&&corrected_commit_calls==0);unchanged();
+   confirmed.reset();assert(live_action_intervals==0&&max_live_action_intervals==1&&
+       live_capsules==0&&max_live_capsules==1&&action_disarm_calls==1);
+ }
+ reset();
+ auto retained_old=retirement_candidate();active_source_interval=1;
+ assert(retained_old->retire_confirmed(session));
+ assert(active_source_interval==0&&source_interval_end_calls==1&&
+        source_interval_end_mismatches==0&&action_disarm_calls==1);
+ auto current=retirement_candidate();current->fixture_retirement_terminal(false,2);
+ active_source_interval=2;
+ const auto cleanup_calls_before_old_disarm=source_interval_end_calls;
+ retained_old->disarm();
+ assert(active_source_interval==2&&source_interval_end_calls==cleanup_calls_before_old_disarm&&
+        action_disarm_calls==1&&lobj_disarms==1&&particle_anchor_disarms==1&&
+        class_disarms==1);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert(tobj_owner_disarms==1);
+#endif
+ retained_old.reset();
+ assert(active_source_interval==2&&source_interval_end_calls==cleanup_calls_before_old_disarm&&
+        action_disarm_calls==1&&lobj_disarms==1&&particle_anchor_disarms==1&&
+        class_disarms==1);
+ assert(current->retire_confirmed(session));
+ assert(active_source_interval==0&&source_interval_end_calls==cleanup_calls_before_old_disarm+1&&
+        source_interval_end_mismatches==0&&action_disarm_calls==2);
+ current.reset();assert(live_capsules==0&&live_action_intervals==0);
+ std::puts("retained confirmed disarm cannot clear a newer live interval route");
+ std::puts("confirmed retirement refuses before detaching and permits bounded live-owner reuse");
  reset();CpuCaptureDiagnostic early;auto t=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),early,CpuCheckpointSpan::TwoTicks);assert(t);
  t->fixture_recording();++live_frame;assert(!t->seal_post(session));t.reset();unchanged();
  std::puts("Actual one/two span bounds, interval owner/effect/journal refusals and exact seal endpoints passed (named leaves modeled)");

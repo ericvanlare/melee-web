@@ -9,8 +9,8 @@ class GameplayCpuEndpointReader;
 /* Private fixed one/two/seven-tick CPU capsule. It owns pre/post evidence and typed
  * snapshots, never a renderer or arbitrary Wasm-memory snapshot. The fixture
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
- * After begin_record, disarm BEFORE ordinary source teardown; retain this
- * capsule until source_owners_retired succeeds, then destroy it. */
+ * After begin_record, retain this capsule through ordinary teardown unless a
+ * clean confirmed endpoint proves its action leases have permanent owners. */
 /* Private capture-only refusal evidence. status1 is a refusal, not a byte
  * mismatch. detail is CpuCaptureRefusal except Payload domain, where it is
  * the actual MeleeWebSourceMemoryPayloadSnapshotStatus. Opaque null results
@@ -42,6 +42,9 @@ public:
     bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
+    // Release-safety proof only; host independently admits CPU/DRAW/raw
+    // comparisons and GPU/Asyncify idle before calling this method.
+    bool retire_confirmed(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
     const MeleeWebTObjWriterEvidence* tobj_writer_witness() const noexcept {return melee_web_tobj_writer_evidence(tobj_writer_session_);}
     const MeleeWebLObjWriterEvidence* lobj_writer_witness() const noexcept {return melee_web_lobj_writer_evidence(lobj_writer_session_);}
@@ -59,7 +62,7 @@ private:
     friend struct GameplayCpuEndpointTestFixture;
 #endif
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
-                       Finished, Failed, Retired };
+                       Finished, Failed, ConfirmedDetached, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
     const CpuCheckpointSpan span_;
@@ -88,6 +91,7 @@ private:
     std::uint32_t post_frame_{};
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false;
+    bool confirmed_disarmed_=false;
     CpuComparison comparison_{};
     std::uint64_t lobj_writer_session_=0,tobj_writer_session_=0;
     MeleeWebClassPieceAnchor class_piece_anchor_{};

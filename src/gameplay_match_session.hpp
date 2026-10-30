@@ -106,6 +106,9 @@ public:
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
     [[nodiscard]] GameplayMatchCpuOwners diagnostic_cpu_owners() const noexcept;
+    // Exact source RuntimeFiles quiescence for this live match world only.
+    // Does not establish GPU/Asyncify idleness or network confirmation.
+    [[nodiscard]] bool diagnostic_source_files_quiescent() const noexcept;
     MeleeWebMatchContextRangeResult diagnostic_match_context_range(
         MeleeWebMatchContextRange*,char*,size_t) const;
     [[nodiscard]] GameplayWorldStageArenaInventory diagnostic_stage_arena_allocations(

@@ -707,6 +707,20 @@ GameplayMatchCpuOwners GameplayMatchSession::diagnostic_cpu_owners() const noexc
     return {storage_.get(),storage_->match,storage_->flow,storage_->bank->get(),
             range.world_generation,range.owner_epoch,source_frames()};
 }
+bool GameplayMatchSession::diagnostic_source_files_quiescent() const noexcept {
+    // Re-read the complete live session tuple before following the private
+    // world owner. The exact RuntimeFiles scope check can throw on a stale or
+    // retired owner, so refusal is represented as false and has no side effect.
+    const auto owners=diagnostic_cpu_owners();
+    if(!owners.storage||owners.storage!=storage_.get()||!storage_||!storage_->world)
+        return false;
+    try {
+        storage_->world->ensure_source_files_quiescent();
+        return true;
+    } catch(...) {
+        return false;
+    }
+}
 MeleeWebMatchContextRangeResult GameplayMatchSession::diagnostic_match_context_range(
     MeleeWebMatchContextRange* range,char* error,size_t size)const{
     if(!storage_||!storage_->match){
