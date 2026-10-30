@@ -18,8 +18,15 @@ PROFILE_PATCH = ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch"
 WHISPY_SOURCE = MELEE / "src/melee/ft/ftlib.c"
 EXPECTED_MELEE_COMMIT = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
 EXPECTED_WHISPY_SOURCE_SHA256 = "78bc9c9a87439b1db063bf033b8f18869d43105917308f6efcf08d83fc7b6693"
-EXPECTED_BASE_COMPOSED_WHISPY_SHA256 = "28a31dbb5508b1fef5a873c880c74d72b1c1c885d50c19f64ad0dc519110795f"
-EXPECTED_PROFILE_WHISPY_SHA256 = "ebb815cc9fc4a09ac0342bea4b1dd48f38b8101e2dfe181b8ae81370d07a6fdf"
+WHISPY_PROFILE_GUARD = """#ifdef MELEE_WEB_SLIPPI_PROFILE
+            if (!slippi_profile_whispy_zero_direction_contribution(
+                    cur_fp->motion_id))
+            {
+                result += sgn(vec.x - v->x);
+            }
+#else
+            result += sgn(vec.x - v->x);
+#endif"""
 
 
 def _sha(data):
@@ -113,9 +120,10 @@ def _materialize_whispy(output):
         Path(target), source_path.read_text(encoding="utf-8"),
     )
     source_path.write_text(transformed, encoding="utf-8")
+    # Other reviewed hooks also edit ftlib.c. Keep whole-file digests as
+    # provenance below; gate the original and profile Whispy function itself.
     base_composed_bytes = source_path.read_bytes()
-    if _sha(base_composed_bytes) != EXPECTED_BASE_COMPOSED_WHISPY_SHA256:
-        raise AssertionError("ftlib.c post-base/boolean bytes changed")
+    base_composed_source = base_composed_bytes.decode("utf-8")
 
     subprocess.run(
         ["git", "-C", str(source_repo), "apply", "--check",
@@ -126,9 +134,10 @@ def _materialize_whispy(output):
          str(PROFILE_PATCH)], cwd=ROOT, check=True, timeout=30,
     )
     profile_bytes = source_path.read_bytes()
-    if _sha(profile_bytes) != EXPECTED_PROFILE_WHISPY_SHA256:
-        raise AssertionError("ftlib.c profile target differs from reviewed overlay bytes")
     original_source = original_bytes.decode("utf-8")
+    base_function = _function(
+        base_composed_source, "float ftLib_800864A8(Vec3* v, HSD_GObj* gobj)",
+    )
     profile_source = profile_bytes.decode("utf-8")
     sign = _function(original_source, "static inline s32 sgn(float x)")
     original_function = _function(
@@ -140,6 +149,16 @@ def _materialize_whispy(output):
     query = "ftLib_800866DC(cur, &vec);"
     state_read = "cur_fp->motion_id"
     contribution = "result += sgn(vec.x - v->x);"
+    if base_function != original_function:
+        raise AssertionError("Whispy target function changed in the base gameplay overlay")
+    if original_function.count(contribution) != 1:
+        raise AssertionError("Whispy original contribution source count changed")
+    contribution_line = "            " + contribution
+    expected_profile_function = original_function.replace(
+        contribution_line, WHISPY_PROFILE_GUARD, 1,
+    )
+    if profile_function != expected_profile_function:
+        raise AssertionError("Whispy target function differs from the reviewed profile hook")
     if profile_function.index(query) >= profile_function.index(state_read):
         raise AssertionError("Whispy profile reads motion before the original bone query")
     if profile_function.index(state_read) >= profile_function.index(contribution):
@@ -149,19 +168,7 @@ def _materialize_whispy(output):
     if "ftLib_800866DC(cur, &vec);\n#ifdef MELEE_WEB_SLIPPI_PROFILE" not in profile_function:
         raise AssertionError("Whispy motion filter is not after the source bone query")
 
-    omitted = profile_function.replace(
-        """#ifdef MELEE_WEB_SLIPPI_PROFILE
-            if (!slippi_profile_whispy_zero_direction_contribution(
-                    cur_fp->motion_id))
-            {
-                result += sgn(vec.x - v->x);
-            }
-#else
-            result += sgn(vec.x - v->x);
-#endif""",
-        contribution,
-        1,
-    )
+    omitted = profile_function.replace(WHISPY_PROFILE_GUARD, contribution_line, 1)
     if omitted == profile_function:
         raise AssertionError("could not remove exactly the Whispy profile contribution hook")
 
@@ -176,6 +183,10 @@ def _materialize_whispy(output):
             "profile_function_sha256": _sha(profile_function.encode()),
             "omitted_hook_function_sha256": _sha(omitted.encode()),
             "source_patch_sha256": _sha(PROFILE_PATCH.read_bytes()),
+            "whispy_comparison_scope": (
+                "Exact ftLib_800864A8 function bytes against the pinned original "
+                "and reviewed profile transform; whole-file digests are provenance only."
+            ),
         }, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )

@@ -29,6 +29,9 @@ PROFILE_TEST_CLASSES = (
     ("src.slippi_profile.tests.test_dbooc_binary32_oracle", "DboocBinary32OracleTests"),
     ("src.slippi_profile.tests.test_dbooc_scalar_helper", "DboocScalarHelperTests"),
     ("src.slippi_profile.tests.test_ucf_shield_drop", "UcfShieldDropTests"),
+    ("src.slippi_profile.tests.test_fighter_projection", "FighterProjectionTests"),
+    ("src.slippi_profile.tests.test_effect_matrix", "EffectMatrixTests"),
+    ("src.slippi_profile.tests.test_slist_target_diagnostic", "SListTargetDiagnosticTests"),
 )
 
 

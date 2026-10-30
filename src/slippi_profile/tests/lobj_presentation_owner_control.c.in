@@ -1,0 +1,383 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#ifndef __cplusplus
+#include <stdint.h>
+#include <string.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <slippi_profile/lobj_presentation_cache.h>
+
+static uint32_t append_field(uint8_t* out, uint32_t offset,
+                             const void* field, uint32_t size)
+{
+    memcpy(out + offset, field, size);
+    return offset + size;
+}
+
+/* Compare only declared source/effective fields.  No object padding or
+ * pointer identity is treated as presentation state. */
+uint32_t slippi_lobj_control_snapshot(HSD_LObj* object, uint8_t* out)
+{
+    uint32_t offset = 0;
+    uint32_t source_flags = object->flags & ~0x180u;
+    uint32_t effective_flags = HSD_LObjGetFlags(object);
+    offset = append_field(out, offset, &source_flags, sizeof(source_flags));
+    offset = append_field(out, offset, &object->color, sizeof(object->color));
+    offset = append_field(out, offset, &effective_flags,
+                          sizeof(effective_flags));
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    SlippiLObjCache* cache = slippi_lobj_cache_require(object);
+    offset = append_field(out, offset, &cache->hw_color, sizeof(cache->hw_color));
+    offset = append_field(out, offset, &cache->shininess,
+                          sizeof(cache->shininess));
+    offset = append_field(out, offset, &cache->lvec, sizeof(cache->lvec));
+    offset = append_field(out, offset, &cache->id, sizeof(cache->id));
+    offset = append_field(out, offset, &cache->lightobj,
+                          sizeof(cache->lightobj));
+    offset = append_field(out, offset, &cache->spec_id,
+                          sizeof(cache->spec_id));
+    offset = append_field(out, offset, &cache->spec_lightobj,
+                          sizeof(cache->spec_lightobj));
+    offset = append_field(out, offset, &cache->dirty, sizeof(cache->dirty));
+#else
+    uint16_t dirty = object->flags & 0x180u;
+    offset = append_field(out, offset, &object->hw_color,
+                          sizeof(object->hw_color));
+    offset = append_field(out, offset, &object->shininess,
+                          sizeof(object->shininess));
+    offset = append_field(out, offset, &object->lvec, sizeof(object->lvec));
+    offset = append_field(out, offset, &object->id, sizeof(object->id));
+    offset = append_field(out, offset, &object->lightobj,
+                          sizeof(object->lightobj));
+    offset = append_field(out, offset, &object->spec_id,
+                          sizeof(object->spec_id));
+    offset = append_field(out, offset, &object->spec_lightobj,
+                          sizeof(object->spec_lightobj));
+    offset = append_field(out, offset, &dirty, sizeof(dirty));
+#endif
+    return offset;
+}
+
+#else
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+extern "C" {
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/debug.h>
+#include <sysdolphin/baselib/list.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <sysdolphin/baselib/memory.h>
+#include <sysdolphin/baselib/wobj.h>
+#include <dolphin/os.h>
+}
+#include <slippi_profile/lobj_presentation_cache.h>
+#include <slippi_profile/profile.h>
+
+extern "C" uint32_t slippi_lobj_control_snapshot(HSD_LObj*, uint8_t*);
+extern "C" HSD_LObjInfo hsdLObj;
+
+namespace aurora::gx::fifo::detail {
+uint8_t* sBufferData = nullptr;
+uint32_t sBufferSize = 0;
+uint32_t sBufferCapacity = 0;
+bool sInDisplayList = false;
+uint8_t* sDlBuffer = nullptr;
+uint32_t sDlSize = 0;
+uint32_t sDlWritePos = 0;
+}
+
+namespace aurora::gx::fifo {
+void write_data_grow(const void*, uint32_t)
+{
+    std::fputs("CONTROL_FAILURE unexpected GX FIFO growth\n", stderr);
+    std::abort();
+}
+}
+
+alignas(32) static uint8_t source_heap[1u << 20];
+static size_t source_heap_used;
+static uint8_t gx_fifo[4096];
+static HSD_SList slist_pool[8];
+static unsigned slist_used;
+static HSD_WObj position_wobj;
+static HSD_WObj interest_wobj;
+static bool track_allocations;
+static uint32_t interval_mallocs;
+static uint32_t interval_frees;
+
+extern "C" void* __real_malloc(size_t);
+extern "C" void __real_free(void*);
+extern "C" void* __wrap_malloc(size_t size)
+{
+    if (track_allocations)
+        ++interval_mallocs;
+    return __real_malloc(size);
+}
+extern "C" void __wrap_free(void* pointer)
+{
+    if (track_allocations)
+        ++interval_frees;
+    __real_free(pointer);
+}
+
+[[noreturn]] static void control_fail(const char* message)
+{
+    std::fprintf(stderr, "CONTROL_FAILURE %s\n", message);
+    std::exit(1);
+}
+
+#define CONTROL_CHECK(condition, message) \
+    do { if (!(condition)) control_fail(message); } while (0)
+
+extern "C" void* HSD_MemAlloc(ssize_t size)
+{
+    CONTROL_CHECK(size > 0, "non-positive modeled source allocation");
+    const size_t start = (source_heap_used + 31u) & ~size_t(31u);
+    const size_t count = (size_t) size;
+    if (start > sizeof(source_heap) || count > sizeof(source_heap) - start)
+        return nullptr;
+    source_heap_used = start + count;
+    return source_heap + start;
+}
+
+extern "C" void HSD_Free(void*)
+{
+    control_fail("unexpected HSD_Free in bounded source allocator model");
+}
+
+extern "C" void HSD_AObjRemove(HSD_AObj* object)
+{
+    if (object != nullptr)
+        control_fail("unexpected non-null animation removal");
+}
+
+extern "C" HSD_WObj* HSD_WObjLoadDesc(HSD_WObjDesc*)
+{
+    control_fail("unexpected source WObj descriptor load");
+    return nullptr;
+}
+
+extern "C" void HSD_WObjGetPosition(HSD_WObj* object, Vec3* output)
+{
+    CONTROL_CHECK(output != nullptr, "null WObj position output");
+    CONTROL_CHECK(object == &position_wobj || object == &interest_wobj,
+                  "WObj lookup outside the two explicit position fixtures");
+    CONTROL_CHECK(object->flags == 0 && object->aobj == nullptr &&
+                      object->robj == nullptr,
+                  "WObj fixture left the modeled plain-position scope");
+    *output = object->pos;
+}
+
+extern "C" HSD_SList* HSD_SListAllocAndPrepend(HSD_SList* next, void* data)
+{
+    CONTROL_CHECK(slist_used < sizeof(slist_pool) / sizeof(slist_pool[0]),
+                  "modeled SList arena exhausted");
+    HSD_SList* node = &slist_pool[slist_used++];
+    node->next = next;
+    node->data = data;
+    return node;
+}
+
+extern "C" HSD_SList* HSD_SListRemove(HSD_SList* node)
+{
+    CONTROL_CHECK(node != nullptr, "null SList removal");
+    return node->next;
+}
+
+extern "C" void OSReport(const char*, ...)
+{
+    control_fail("unexpected source diagnostic output");
+}
+
+extern "C" void HSD_Panic(char*, u32, char*)
+{
+    control_fail("unexpected HSD_Panic");
+}
+
+extern "C" void __assert(char*, u32, char*)
+{
+    control_fail("unexpected source assertion");
+}
+
+static void set_fifo()
+{
+    using namespace aurora::gx::fifo::detail;
+    sBufferData = gx_fifo;
+    sBufferSize = 0;
+    sBufferCapacity = sizeof(gx_fifo);
+    sInDisplayList = false;
+    sDlBuffer = nullptr;
+    sDlSize = 0;
+    sDlWritePos = 0;
+}
+
+static void emit_hex(const char* name, const uint8_t* bytes, size_t size)
+{
+    std::printf("%s=", name);
+    for (size_t i = 0; i < size; ++i)
+        std::printf("%02x", bytes[i]);
+    std::putchar('\n');
+}
+
+static uint32_t read_u32(const uint8_t* bytes)
+{
+    uint32_t value;
+    std::memcpy(&value, bytes, sizeof(value));
+    return value;
+}
+
+static void attach_inputs(HSD_LObj* object)
+{
+    object->flags = LOBJ_INFINITE | LOBJ_DIFFUSE | LOBJ_SPECULAR;
+    object->priority = 3;
+    object->color = GXColor{17, 53, 109, 255};
+    object->position = &position_wobj;
+    object->interest = &interest_wobj;
+    object->aobj = nullptr;
+}
+
+static void draw_and_record(HSD_LObj* object, const char* label,
+                            uint64_t* anchor_token)
+{
+    HSD_CObj camera{};
+    camera.view_mtx[0][0] = 1.0f;
+    camera.view_mtx[1][1] = 1.0f;
+    camera.view_mtx[2][2] = 1.0f;
+    camera.view_mtx[0][3] = 0.25f;
+    camera.view_mtx[1][3] = 0.5f;
+    camera.view_mtx[2][3] = 1.0f;
+
+    SlippiLObjAnchor anchor = slippi_lobj_anchor_capture();
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    CONTROL_CHECK(anchor.world == 0x51u && anchor.token != 0 &&
+                      anchor.count == 1 && slippi_lobj_anchor_admit(anchor),
+                  "actual constructed owner did not admit its anchor");
+    *anchor_token = anchor.token;
+#else
+    (void) anchor_token;
+#endif
+
+    using namespace aurora::gx::fifo::detail;
+    sBufferSize = 0;
+    interval_mallocs = 0;
+    interval_frees = 0;
+    track_allocations = true;
+    HSD_LObjSetupInit(&camera);
+    track_allocations = false;
+
+    CONTROL_CHECK(interval_mallocs == 0 && interval_frees == 0,
+                  "actual LObj setup allocated or freed during the anchor");
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    CONTROL_CHECK(slippi_lobj_anchor_admit(anchor),
+                  "actual draw changed admitted owner identity");
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "actual draw poisoned the presentation owner");
+    slippi_lobj_anchor_disarm(anchor);
+#endif
+
+    CONTROL_CHECK(sBufferSize == 138,
+                  "actual draw did not emit two complete 69-byte GX light records");
+    uint8_t snapshot[192]{};
+    const uint32_t snapshot_size =
+        slippi_lobj_control_snapshot(object, snapshot);
+    CONTROL_CHECK(snapshot_size == 170,
+                  "effective semantic field projection has unexpected extent");
+    CONTROL_CHECK(object->flags == (LOBJ_INFINITE | LOBJ_DIFFUSE | LOBJ_SPECULAR),
+                  "draw changed authored non-cache source flags");
+    CONTROL_CHECK(HSD_LObjGetFlags(object) ==
+                      (LOBJ_INFINITE | LOBJ_DIFFUSE | LOBJ_SPECULAR),
+                  "effective flags did not settle after source setup");
+    CONTROL_CHECK(snapshot[12] == 17 && snapshot[13] == 53 &&
+                      snapshot[14] == 109 && snapshot[15] == 255,
+                  "effective hardware color differs from authored input");
+    CONTROL_CHECK(snapshot[168] == 0 && snapshot[169] == 0,
+                  "effective dirty state did not settle after GX load");
+    CONTROL_CHECK(read_u32(snapshot + 32) == 1 &&
+                      read_u32(snapshot + 100) == 2,
+                  "actual diffuse/specular light IDs are not the first pair");
+
+    emit_hex(label, snapshot, snapshot_size);
+    char fifo_label[32];
+    std::snprintf(fifo_label, sizeof(fifo_label), "FIFO_%s", label);
+    emit_hex(fifo_label, sBufferData, sBufferSize);
+}
+
+int main()
+{
+    static_assert(sizeof(GXLightObj) == 64, "actual GX light ABI");
+    position_wobj.parent.ref_count = 2;
+    position_wobj.pos = Vec3{0.25f, 0.5f, 0.75f};
+    interest_wobj.parent.ref_count = 2;
+    interest_wobj.pos = Vec3{1.25f, 1.5f, 1.75f};
+    set_fifo();
+
+    CONTROL_CHECK(std::strcmp(
+                      slippi_profile_identity_name(SLIPPI_PROFILE_ACTIVE_IDENTITY),
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+                      SLIPPI_PROFILE_LOBJ_PRESENTATION_V7_ID
+#else
+                      SLIPPI_PROFILE_LOGICAL_FRAME_V6_ID
+#endif
+                      ) == 0,
+                  "compiled profile identity does not match enabled cache route");
+    CONTROL_CHECK(slippi_lobj_world_begin(0x51u),
+                  "presentation world did not begin");
+
+    HSD_LObj* first = static_cast<HSD_LObj*>(hsdNew((HSD_ClassInfo*) &hsdLObj));
+    CONTROL_CHECK(first != nullptr, "actual canonical hsdNew failed");
+    CONTROL_CHECK(first->parent.parent.class_info ==
+                      (HSD_ClassInfo*) &hsdLObj,
+                  "actual hsdNew returned an unexpected class");
+    attach_inputs(first);
+    HSD_LObjAddCurrent(first);
+
+    uint64_t first_token = 0;
+    draw_and_record(first, "SNAP_A", &first_token);
+    char first_pointer[32];
+    std::snprintf(first_pointer, sizeof(first_pointer), "%p", (void*) first);
+
+    HSD_LObjDeleteCurrent(first);
+    hsdDelete(first);
+    CONTROL_CHECK(position_wobj.parent.ref_count == 1 && interest_wobj.parent.ref_count == 1,
+                  "actual inline WObj unref did not preserve external owners");
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "actual object retirement poisoned the owner world");
+
+    position_wobj.parent.ref_count = 2;
+    interest_wobj.parent.ref_count = 2;
+    set_fifo();
+    HSD_LObj* second = static_cast<HSD_LObj*>(hsdNew((HSD_ClassInfo*) &hsdLObj));
+    CONTROL_CHECK(second != nullptr, "actual canonical second hsdNew failed");
+    CONTROL_CHECK(second == first,
+                  "actual class free-list did not reuse the retired piece");
+    attach_inputs(second);
+    HSD_LObjAddCurrent(second);
+
+    uint64_t second_token = 0;
+    draw_and_record(second, "SNAP_B", &second_token);
+    char second_pointer[32];
+    std::snprintf(second_pointer, sizeof(second_pointer), "%p", (void*) second);
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    CONTROL_CHECK(second_token != first_token,
+                  "retired and reused source pointer retained its old anchor");
+#endif
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "actual reused object poisoned the owner world");
+
+    HSD_LObjDeleteCurrent(second);
+    hsdDelete(second);
+    slippi_lobj_world_end(0x51u);
+    CONTROL_CHECK(slippi_lobj_failure() == 0,
+                  "normal source teardown did not end cleanly");
+
+    std::printf("CONTROL_OK profile=%s source_piece_reused=%d first=%s second=%s first_token=%llu second_token=%llu fifo_a=%zu fifo_b=%u\n",
+                slippi_profile_identity_name(SLIPPI_PROFILE_ACTIVE_IDENTITY),
+                first == second, first_pointer, second_pointer,
+                (unsigned long long) first_token,
+                (unsigned long long) second_token,
+                (size_t) 138u, (unsigned) 138u);
+    return 0;
+}
+#endif

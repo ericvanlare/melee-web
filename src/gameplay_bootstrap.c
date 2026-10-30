@@ -1,3 +1,9 @@
+#include "slippi_profile/lobj_presentation_cache.h"
+#include "slippi_profile/tobj_presentation_cache.h"
+#include "slippi_profile/particle_source_schedule.h"
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include "slippi_profile/perf_measurement.h"
+#endif
 #include "gameplay_bootstrap.h"
 #include "gameplay_source_context.h"
 #include "gameplay_source_memory_runtime.h"
@@ -192,6 +198,24 @@ int melee_web_gameplay_session_arena(const void** base, size_t* bytes)
     return 1;
 }
 
+int melee_web_gameplay_active_arena_view(const void** base, size_t* bytes)
+{
+    if (!base || !bytes || !arena || !arena_bytes || !tables_live || stepping ||
+        shutting_down || startup_in_progress || vs_startup_pending ||
+        HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814 ||
+        !melee_web_gameplay_heap_owns(arena) || !melee_web_source_memory_healthy())
+        return 0;
+    MeleeWebSourceMemoryContext source_owner;
+    if (melee_web_source_memory_context_read(&source_owner) !=
+            MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        source_owner.world_generation != generation ||
+        source_owner.source_heap_handle != (int)heap)
+        return 0;
+    *base = arena;
+    *bytes = arena_bytes;
+    return 1;
+}
+
 int melee_web_gameplay_session_end(char* error, size_t error_size)
 {
     if (!session_arena) return success(error, error_size);
@@ -240,7 +264,30 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     const uint64_t previous_world_generation = generation;
     uint64_t next_world_generation = generation + 1;
     if (next_world_generation == 0) next_world_generation = 1;
-    if (!melee_web_source_memory_begin(next_world_generation, heap)) {
+    const int lobj_world_started = slippi_lobj_world_begin(next_world_generation);
+    const int tobj_world_started = lobj_world_started && slippi_tobj_world_begin(next_world_generation);
+    const int particle_world_started = tobj_world_started &&
+        slippi_particle_source_world_begin(next_world_generation);
+    const int source_memory_started = particle_world_started &&
+        melee_web_source_memory_begin(next_world_generation, heap);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    const int perf_measurement_world_started = source_memory_started &&
+        slippi_hsd_perf_measurement_world_begin(next_world_generation);
+#else
+    const int perf_measurement_world_started = 1;
+#endif
+    if (!source_memory_started || !perf_measurement_world_started) {
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+        if (perf_measurement_world_started &&
+            !slippi_hsd_perf_measurement_world_end(next_world_generation)) {
+            return fail(error, error_size, "HSD performance measurement owner failed before startup");
+        }
+#endif
+        if (source_memory_started)
+            (void) melee_web_source_memory_end(next_world_generation);
+        if (particle_world_started) (void) slippi_particle_source_world_end(next_world_generation);
+        if (tobj_world_started) slippi_tobj_world_end(next_world_generation);
+        if (lobj_world_started) slippi_lobj_world_end(next_world_generation);
         OSDestroyHeap(heap);
         heap = -1;
         OSSetCurrentHeap(-1);
@@ -280,6 +327,15 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             startup_in_progress = 0;
             HSD_ObjSetHeap(0, NULL);
             HSD_SetHeap(-1);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+            const int perf_measurement_world_ok =
+                slippi_hsd_perf_measurement_world_end(generation);
+#else
+            const int perf_measurement_world_ok = 1;
+#endif
+            (void) slippi_particle_source_world_end(generation);
+            slippi_tobj_world_end(generation);
+            slippi_lobj_world_end(generation);
             const int source_memory_ok = melee_web_source_memory_end(generation);
             OSDestroyHeap(heap);
             heap = -1;
@@ -297,6 +353,9 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
             if (!source_memory_ok)
                 return fail(error, error_size,
                             "Source main-heap allocation mirror failed while rejecting VS startup");
+            if (!perf_measurement_world_ok)
+                return fail(error, error_size,
+                            "HSD performance measurement owner failed while rejecting VS startup");
             if (error && error_size && !error[0])
                 snprintf(error, error_size, "Original VS scene-manager preparation failed");
             return 0;
@@ -463,7 +522,9 @@ int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
     return success(error, error_size);
 }
 
-int melee_web_gameplay_step(char* error, size_t error_size)
+static int gameplay_step(MeleeWebGameplayPostSourceCallback post_source,
+                         void* post_source_context,
+                         char* error, size_t error_size)
 {
     if (!tables_live) return fail(error, error_size, "Gameplay bootstrap is not initialized");
     if (!melee_web_gameplay_heap_owns(arena))
@@ -478,13 +539,38 @@ int melee_web_gameplay_step(char* error, size_t error_size)
         return fail(error, error_size, "Source PPC callback context is unavailable for this scheduler tick");
     stepping = 1;
     HSD_GObj_80390CFC();
+    int source_healthy = !post_source || melee_web_source_memory_healthy();
+    char post_source_error[192] = {0};
+    int post_source_ok = 1;
+    if (source_healthy && post_source)
+        post_source_ok = post_source(post_source_context, post_source_error,
+                                     sizeof(post_source_error));
     stepping = 0;
-    if (!melee_web_source_context_end_tick())
+    int context_balanced = melee_web_source_context_end_tick();
+    if (!post_source_ok)
+        return fail(error, error_size,
+                    post_source_error[0] ? post_source_error :
+                    "Private source post-step callback refused");
+    if (!context_balanced)
         return fail(error, error_size, "Source PPC callback frames did not balance at scheduler return");
-    if (!melee_web_source_memory_healthy())
+    if (!source_healthy || !melee_web_source_memory_healthy())
         return fail(error, error_size, "Source main-heap allocation mirror rejected a scheduler allocation");
     ++ticks;
     return success(error, error_size);
+}
+
+int melee_web_gameplay_step(char* error, size_t error_size)
+{
+    return gameplay_step(NULL, NULL, error, error_size);
+}
+
+int melee_web_gameplay_step_post_source(
+    MeleeWebGameplayPostSourceCallback callback, void* context,
+    char* error, size_t error_size)
+{
+    if (!callback)
+        return fail(error, error_size, "Private source post-step callback is required");
+    return gameplay_step(callback, context, error, error_size);
 }
 
 int melee_web_gameplay_world_exists(void) { return arena != NULL; }
@@ -581,6 +667,15 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     _HSD_ObjAllocForgetMemory(NULL, NULL);
     HSD_ObjSetHeap(0, NULL);
     HSD_SetHeap(-1);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    const int perf_measurement_world_ok =
+        slippi_hsd_perf_measurement_world_end(generation);
+#else
+    const int perf_measurement_world_ok = 1;
+#endif
+    const int particle_world_ok = slippi_particle_source_world_end(generation);
+    slippi_tobj_world_end(generation);
+    slippi_lobj_world_end(generation);
     const int source_memory_ok = melee_web_source_memory_end(generation);
     OSDestroyHeap(heap);
     heap = -1;
@@ -604,6 +699,10 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
         shutting_down = 0;
         if (!source_memory_ok)
             return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+        if (!perf_measurement_world_ok)
+            return fail(error, error_size, "HSD performance measurement owner failed before teardown");
+        if (!particle_world_ok)
+            return fail(error, error_size, "Particle presentation owner failed before teardown");
         return success(error, error_size);
     }
     if (!melee_web_gameplay_heap_release(arena, error, error_size)) {
@@ -618,5 +717,103 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     shutting_down = 0;
     if (!source_memory_ok)
         return fail(error, error_size, "Source main-heap allocation mirror failed before teardown");
+    if (!perf_measurement_world_ok)
+        return fail(error, error_size, "HSD performance measurement owner failed before teardown");
+    if (!particle_world_ok)
+        return fail(error, error_size, "Particle presentation owner failed before teardown");
     return success(error, error_size);
+}
+
+
+struct MeleeWebGameplayBootstrapSnapshot {
+    MeleeWebGameplayBootstrapState state;
+    MeleeWebGameplayHeapGuard* heap_guard;
+    void* base;
+    size_t bytes;
+};
+static int snapshot_boundary(char* error, size_t error_size)
+{
+    if (!arena || !tables_live || stepping || shutting_down || startup_in_progress ||
+        vs_startup_pending || HSD_GObj_804D781C || HSD_GObj_804D7818 || HSD_GObj_804D7814 ||
+        !melee_web_gameplay_heap_owns(arena) || !melee_web_source_memory_healthy())
+        return fail(error, error_size, "Bootstrap snapshot requires a quiescent healthy live world");
+    return 1;
+}
+MeleeWebGameplayBootstrapSnapshot* melee_web_gameplay_bootstrap_snapshot_capture(
+    char* error, size_t error_size)
+{
+    if (!snapshot_boundary(error, error_size)) return NULL;
+    MeleeWebGameplayBootstrapSnapshot* snapshot = malloc(sizeof(*snapshot));
+    if (!snapshot) {
+        fail(error, error_size, "Cannot allocate bootstrap owner snapshot");
+        return NULL;
+    }
+    if (!melee_web_gameplay_bootstrap_state(&snapshot->state, sizeof(snapshot->state))) {
+        free(snapshot);
+        fail(error, error_size, "Cannot capture complete bootstrap owner state");
+        return NULL;
+    }
+    snapshot->heap_guard=melee_web_gameplay_heap_guard_capture(arena,error,error_size);
+    if (!snapshot->heap_guard) {free(snapshot);return NULL;}
+    snapshot->base = arena;
+    snapshot->bytes = arena_bytes;
+    success(error, error_size);
+    return snapshot;
+}
+int melee_web_gameplay_bootstrap_snapshot_admit(
+    const MeleeWebGameplayBootstrapSnapshot* snapshot, char* error, size_t error_size)
+{
+    if (!snapshot) return fail(error, error_size, "Bootstrap snapshot is missing");
+    if (!snapshot_boundary(error, error_size)) return 0;
+    if (!melee_web_gameplay_heap_guard_admit(snapshot->heap_guard,error,error_size)) return 0;
+    MeleeWebGameplayBootstrapState current;
+    if (!melee_web_gameplay_bootstrap_state(&current, sizeof(current)))
+        return fail(error, error_size, "Cannot observe complete bootstrap owner state");
+    current.ticks = snapshot->state.ticks;
+    current.disabled_links = snapshot->state.disabled_links;
+    if (snapshot->base != arena || snapshot->bytes != arena_bytes ||
+        memcmp(&current, &snapshot->state, sizeof(current)))
+        return fail(error, error_size, "Bootstrap lifecycle or backing owner changed since checkpoint");
+    return success(error, error_size);
+}
+int melee_web_gameplay_bootstrap_snapshot_restore(
+    const MeleeWebGameplayBootstrapSnapshot* snapshot, char* error, size_t error_size)
+{
+    if (!melee_web_gameplay_bootstrap_snapshot_admit(snapshot, error, error_size)) return 0;
+    ticks = snapshot->state.ticks;
+    disabled_links = snapshot->state.disabled_links;
+    return success(error, error_size);
+}
+int melee_web_gameplay_bootstrap_snapshot_arena(
+    const MeleeWebGameplayBootstrapSnapshot* snapshot, const void** base, size_t* bytes,
+    char* error, size_t error_size)
+{
+    if (!base || !bytes) return fail(error, error_size, "Bootstrap arena outputs are required");
+    if (!melee_web_gameplay_bootstrap_snapshot_admit(snapshot, error, error_size)) return 0;
+    *base = snapshot->base;
+    *bytes = snapshot->bytes;
+    return success(error, error_size);
+}
+void melee_web_gameplay_bootstrap_snapshot_destroy(MeleeWebGameplayBootstrapSnapshot* snapshot)
+{
+    if (!snapshot) return;
+    melee_web_gameplay_heap_guard_destroy(snapshot->heap_guard);
+    free(snapshot);
+}
+
+
+int melee_web_gameplay_clock_mask_admit(const void* saved_pointer,uint64_t saved_value)
+{
+    return arena && tables_live && generation && !stepping && !shutting_down &&
+        saved_pointer == &disabled_links && saved_value == disabled_links;
+}
+
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void)
+{
+    MeleeWebBootstrapCpuStorage result={0};
+    if (!snapshot_boundary(NULL,0))return result;
+    result.ticks=&ticks;result.ticks_bytes=sizeof(ticks);
+    result.disabled_links=&disabled_links;
+    result.disabled_links_bytes=sizeof(disabled_links);
+    return result;
 }

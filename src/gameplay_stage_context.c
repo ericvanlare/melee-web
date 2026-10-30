@@ -121,7 +121,12 @@ int melee_web_stage_lights_stats(MeleeWebStageLights* h,uint32_t* count,uint16_t
     *count=0;
     for(HSD_LObj* l=h->owner->hsd_obj;l;l=l->next){
         if(*count>=capacity)return fail(e,n,"Original light chain exceeds capacity");
-        flags[*count]=l->flags;memcpy(rgba+4*(*count),&l->color,4);++*count;
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+        flags[*count]=(uint16_t)HSD_LObjGetFlags(l);
+#else
+        flags[*count]=l->flags;
+#endif
+        memcpy(rgba+4*(*count),&l->color,4);++*count;
     }
     return ok(e,n);
 }

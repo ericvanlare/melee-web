@@ -1,0 +1,503 @@
+#include <cstdint>
+#include <atomic>
+// Select the actual browser-only declarations while compiling this asset-free native control.
+#define __EMSCRIPTEN__ 1
+#include <aurora/gfx.h>
+#undef __EMSCRIPTEN__
+#include <cstdio>
+#include <cstring>
+#include <string>
+
+#define EMSCRIPTEN_KEEPALIVE
+#define MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY 1
+#define EM_JS_DEPS(name, ...) static_assert(true, "fixture EM_JS_DEPS")
+#define EM_JS(result, name, arguments, ...) \
+    result name arguments { ++asyncify_idle_queries; return asyncify_state_idle ? 1 : 0; }
+
+static uint32_t owner_reads = 0;
+static uint32_t asyncify_setting_queries = 0;
+static uint32_t runtime_thread_queries = 0;
+static uint32_t browser_thread_queries = 0;
+static uint32_t asyncify_idle_queries = 0;
+static uint32_t capture_calls = 0;
+static uint32_t admit_calls = 0;
+static uint32_t destroy_calls = 0;
+static uint32_t source_step_calls = 0;
+static uint32_t source_draw_calls = 0;
+static uint32_t restore_calls = 0;
+static uint32_t quiescent_calls = 0;
+static uint32_t fail_admit_at = 0;
+static uint32_t capture_status = 0;
+static bool capture_returns_pointer_on_failure = false;
+static bool source_step_fails = false;
+static bool source_step_leaves_asyncify_busy = false;
+static bool source_draw_fails = false;
+static bool draw_leaves_aurora_busy = false;
+static bool transfer_busy = false;
+static bool main_browser_thread = true;
+static bool main_runtime_thread = true;
+static int asyncify_mode = 1;
+static bool asyncify_state_idle = true;
+static bool descriptor_unavailable = false;
+static bool reenter_step_close = false;
+static bool reenter_step_shutdown = false;
+static bool reentrant_cleanup_early = false;
+static bool reentrant_shutdown_cleanup_early = false;
+static bool renderer_teardown_with_snapshot_alive = false;
+static uint32_t reentrant_result = 0;
+static int reentrant_shutdown_result = -1;
+static uint32_t reentrant_owner_reads = 0;
+static uint32_t renderer_shutdown_calls = 0;
+static uint32_t renderer_shutdown_refusals = 0;
+static uint32_t renderer_teardown_calls = 0;
+static bool owner_unhealthy = false;
+static uint32_t source_frame = 299;
+static char error[256]{};
+static bool renderer_ready = true;
+static uint32_t renderer_error_count = 0;
+static uint64_t last_completed_frame_id = 20;
+
+extern "C" uint32_t melee_web_synctest_payload_admission_command(uint32_t command);
+extern "C" int melee_web_synctest_renderer_shutdown(void);
+int emscripten_has_asyncify() { ++asyncify_setting_queries; return asyncify_mode; }
+bool emscripten_is_main_runtime_thread() { ++runtime_thread_queries; return main_runtime_thread; }
+bool emscripten_is_main_browser_thread() { ++browser_thread_queries; return main_browser_thread; }
+
+struct Match {
+    bool ready() { ++owner_reads; return true; }
+    bool complete() { ++owner_reads; return false; }
+    bool paused() { ++owner_reads; return false; }
+    uint32_t source_frames() { ++owner_reads; return source_frame; }
+};
+static Match match_storage;
+static Match *match = &match_storage;
+struct Observation { uint32_t frame, rng, ready, ending, complete, paused; };
+static Observation observation{299, 1, 1, 0, 0, 0};
+struct MeleeWebSourceMemoryPayloadSnapshot {};
+using MeleeWebSourceMemoryPayloadSnapshotStatus = uint32_t;
+constexpr uint32_t MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK = 0;
+struct MeleeWebSourceMemoryPayloadSnapshotCaptureResult {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    MeleeWebSourceMemoryPayloadSnapshot *snapshot;
+};
+// Use actual Aurora types and production header/extent producers; no invented ABI.
+static size_t fixture_frame_count = 4, fixture_staging_count = 4;
+static bool descriptor_size_unavailable = false;
+struct FixtureStats {
+    uint32_t queuedPipelines = 0, createdPipelines = 0, drawCallCount = 1;
+    uint64_t lastBeginFrameId = 20, lastEndFrameId = 20;
+};
+static struct { FixtureStats stats; } g_resources;
+static uint32_t g_frameIndex = 0;
+static std::atomic_uint64_t g_browserStagingGeneration{1}, g_browserSubmissionSequence{0},
+    g_browserCallbackSequence{0}, g_browserStaleCallbackCount{0};
+static size_t active_frame_slot_count() { return fixture_frame_count; }
+static size_t active_staging_buffer_count() { return fixture_staging_count; }
+static uint32_t browser_pipeline_cache_status() { return 0; }
+static bool browser_quiescence_supported() { return !descriptor_size_unavailable; }
+// AURORA_HEADER_PRODUCER
+size_t aurora_browser_quiescence_descriptor_bytes() {
+    return browser_quiescence_descriptor_bytes();
+}
+static AuroraBrowserQuiescenceDescriptor make_fixture_descriptor() {
+    AuroraBrowserQuiescenceDescriptor result{};
+    fill_quiescence_header(result, AuroraBrowserSubmissionStatus{});
+    return result;
+}
+static AuroraBrowserQuiescenceDescriptor descriptor = make_fixture_descriptor();
+static MeleeWebSourceMemoryPayloadSnapshot fake_snapshot;
+
+uint32_t melee_web_source_memory_healthy() { ++owner_reads; return owner_unhealthy ? 0 : 1; }
+int melee_web_snapshot_quiescent() { ++owner_reads; ++quiescent_calls; return transfer_busy ? 0 : 1; }
+const void *aurora_browser_quiescence_observe_descriptor() {
+    ++owner_reads;
+    return descriptor_unavailable ? nullptr : &descriptor;
+}
+MeleeWebSourceMemoryPayloadSnapshotCaptureResult
+melee_web_source_memory_payload_snapshot_capture() {
+    ++capture_calls;
+    return {capture_status, (capture_status == 0 || capture_returns_pointer_on_failure) ? &fake_snapshot : nullptr};
+}
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_admit(const MeleeWebSourceMemoryPayloadSnapshot *snapshot) {
+    ++admit_calls;
+    if (!snapshot) return 6;
+    return fail_admit_at == admit_calls ? 5u : 0u;
+}
+void melee_web_source_memory_payload_snapshot_destroy(MeleeWebSourceMemoryPayloadSnapshot *snapshot) {
+    if (snapshot) ++destroy_calls;
+}
+MeleeWebSourceMemoryPayloadSnapshotStatus
+melee_web_source_memory_payload_snapshot_restore(const MeleeWebSourceMemoryPayloadSnapshot *) {
+    ++restore_calls;
+    return 0;
+}
+int melee_web_snapshot_step(unsigned sample) {
+    ++source_step_calls;
+    if (reenter_step_close) {
+        asyncify_state_idle = false;
+        const uint32_t before_reads = owner_reads;
+        reentrant_result = melee_web_synctest_payload_admission_command(5);
+        reentrant_owner_reads = owner_reads - before_reads;
+        reentrant_cleanup_early = destroy_calls != 0;
+        asyncify_state_idle = true;
+    }
+    if (reenter_step_shutdown) {
+        asyncify_state_idle = false;
+        const uint32_t before_reads = owner_reads;
+        reentrant_shutdown_result = melee_web_synctest_renderer_shutdown();
+        reentrant_owner_reads = owner_reads - before_reads;
+        reentrant_shutdown_cleanup_early = destroy_calls != 0;
+        asyncify_state_idle = true;
+    }
+    if (sample != 300 || source_step_fails) {
+        std::snprintf(error, sizeof(error), "synthetic source step failure");
+        return 0;
+    }
+    ++source_frame;
+    observation.frame = source_frame;
+    if (source_step_leaves_asyncify_busy) asyncify_state_idle = false;
+    return 1;
+}
+int melee_web_synctest_draw_present() {
+    ++source_draw_calls;
+    if (source_draw_fails) {
+        std::snprintf(error, sizeof(error), "synthetic source draw failure");
+        return 0;
+    }
+    ++last_completed_frame_id;
+    descriptor.lastBeginFrameId = last_completed_frame_id;
+    if (draw_leaves_aurora_busy) {
+        descriptor.pendingFramePackets = 1;
+        descriptor.pendingStagingBuffers = 1;
+        descriptor.workerBusy = 1;
+    } else {
+        descriptor.lastEndFrameId = last_completed_frame_id;
+    }
+    return 1;
+}
+
+// ADAPTER_BLOCK
+
+extern "C" int melee_web_synctest_renderer_shutdown(void) {
+    ++renderer_shutdown_calls;
+    if (!payload_admission_shutdown_fallback()) {
+        ++renderer_shutdown_refusals;
+        return 0;
+    }
+    renderer_teardown_with_snapshot_alive = payload_admission_snapshot != nullptr;
+    ++renderer_teardown_calls;
+    renderer_ready = false;
+    return 1;
+}
+
+static int fail(const char *message) {
+    std::fprintf(stderr, "%s\n", message);
+    return 1;
+}
+
+int main(int argc, char **argv) {
+    const std::string scenario = argc > 1 ? argv[1] : "success";
+#if defined(__EMSCRIPTEN_PTHREADS__)
+    (void)scenario;
+    const uint32_t refused = melee_web_synctest_payload_admission_command(1);
+    if (refused != 0x202 || owner_reads || asyncify_setting_queries || runtime_thread_queries ||
+        browser_thread_queries || asyncify_idle_queries || capture_calls || admit_calls ||
+        source_step_calls || source_draw_calls || destroy_calls) return fail("pthread refusal touched an owner or runtime guard");
+    const uint32_t closed = melee_web_synctest_payload_admission_command(5);
+    if (closed != refused || owner_reads || destroy_calls) return fail("pthread cleanup changed the first refusal or touched an owner");
+    return 0;
+#else
+    if (scenario == "close-before-capture") {
+        if (melee_web_synctest_payload_admission_command(5) != 0 ||
+            melee_web_synctest_payload_admission_command(5) != 0 ||
+            melee_web_synctest_payload_admission_command(1) != 0x201 ||
+            owner_reads || capture_calls || source_step_calls || source_draw_calls || destroy_calls) {
+            return fail("cleanup before capture was not a harmless, idempotent close");
+        }
+        return 0;
+    }
+    if (scenario == "producer-layout") {
+        const uint32_t captured = melee_web_synctest_payload_admission_command(1);
+        std::printf("actual Aurora producer: header=%zu total=%u frames=%u submissions=%u CAPTURE=%u\n",
+            sizeof(descriptor), descriptor.byteSize, descriptor.frameDescriptorCount,
+            descriptor.submissionDescriptorCount, captured);
+        if (captured != 0 || capture_calls != 1 || admit_calls != 1 || source_step_calls || source_draw_calls || restore_calls)
+            return fail("actual producer layout was refused or snapshot work changed");
+        return melee_web_synctest_payload_admission_command(5) == 0x201 && destroy_calls == 1 ? 0 : fail("producer layout incomplete-close refusal or cleanup changed");
+    }
+    if (scenario == "success") {
+        if (melee_web_synctest_payload_admission_command(1) != 0 ||
+            melee_web_synctest_payload_admission_command(2) != 0 ||
+            melee_web_synctest_payload_admission_command(3) != 0 ||
+            melee_web_synctest_payload_admission_command(4) != 0) return fail("legal payload command sequence refused");
+        if (capture_calls != 1 || admit_calls != 3 || source_step_calls != 1 ||
+            source_draw_calls != 1 || restore_calls != 0) return fail("legal sequence call counts changed");
+        if (melee_web_synctest_payload_admission_command(5) != 0 ||
+            melee_web_synctest_payload_admission_command(5) != 0 || destroy_calls != 1) {
+            return fail("successful close did not destroy exactly once");
+        }
+        if (melee_web_synctest_payload_admission_command(2) != 0x201 ||
+            source_step_calls != 1 || source_draw_calls != 1) return fail("closed adapter accepted a command");
+        return 0;
+    }
+    if (scenario == "draw-pending-then-idle" || scenario == "postdraw-admit-early-latches") {
+        if (melee_web_synctest_payload_admission_command(1) != 0 ||
+            melee_web_synctest_payload_admission_command(2) != 0) {
+            return fail("pending-draw control could not capture and step once");
+        }
+        draw_leaves_aurora_busy = true;
+        if (melee_web_synctest_payload_admission_command(3) != 0 ||
+            payload_admission_state != PayloadAdmissionState::DrawSubmitted ||
+            source_draw_calls != 1 || admit_calls != 2 ||
+            descriptor.pendingFramePackets == 0 || descriptor.pendingStagingBuffers == 0 ||
+            descriptor.workerBusy == 0 || descriptor.lastBeginFrameId == descriptor.lastEndFrameId) {
+            return fail("DRAW_ONCE did not submit while Aurora remained busy");
+        }
+        if (scenario == "postdraw-admit-early-latches") {
+            const uint32_t first = melee_web_synctest_payload_admission_command(4);
+            const uint32_t before_idle_admit_calls = admit_calls;
+            const bool failed_before_idle = payload_admission_state == PayloadAdmissionState::Failed &&
+                first == 0x206 && payload_admission_first_failure == first;
+            descriptor.pendingFramePackets = 0;
+            descriptor.pendingStagingBuffers = 0;
+            descriptor.workerBusy = 0;
+            descriptor.lastEndFrameId = descriptor.lastBeginFrameId;
+            const uint32_t after_idle = melee_web_synctest_payload_admission_command(4);
+            const uint32_t closed = melee_web_synctest_payload_admission_command(5);
+            if (!failed_before_idle || before_idle_admit_calls != 2 || after_idle != first ||
+                closed != first || admit_calls != 2 || destroy_calls != 1 ||
+                std::strcmp(error, "Payload command requires an idle completed Aurora frame boundary") != 0) {
+                return fail("early post-draw refusal was not latched through later idle and one-shot cleanup");
+            }
+            return 0;
+        }
+        descriptor.pendingFramePackets = 0;
+        descriptor.pendingStagingBuffers = 0;
+        descriptor.workerBusy = 0;
+        descriptor.lastEndFrameId = descriptor.lastBeginFrameId;
+        if (melee_web_synctest_payload_admission_command(4) != 0 ||
+            payload_admission_state != PayloadAdmissionState::Complete || admit_calls != 3 ||
+            melee_web_synctest_payload_admission_command(5) != 0 || destroy_calls != 1) {
+            return fail("post-draw admission did not succeed only after the host made Aurora idle");
+        }
+        return 0;
+    }
+    if (scenario == "shutdown-fallback") {
+        if (melee_web_synctest_payload_admission_command(1) != 0 || capture_calls != 1 || destroy_calls) {
+            return fail("shutdown fallback control could not capture exactly once");
+        }
+        payload_admission_shutdown_fallback();
+        payload_admission_shutdown_fallback();
+        if (destroy_calls != 1 || source_step_calls || source_draw_calls) {
+            return fail("shutdown fallback did not destroy exactly once without source work");
+        }
+        if (melee_web_synctest_payload_admission_command(5) != 0x20c || destroy_calls != 1) {
+            return fail("interrupted sequence did not preserve its first cleanup failure");
+        }
+        return 0;
+    }
+    if (scenario == "reentrant-shutdown") {
+        if (melee_web_synctest_payload_admission_command(1) != 0 || capture_calls != 1 || destroy_calls) {
+            return fail("reentrant shutdown control could not capture exactly once");
+        }
+        reenter_step_shutdown = true;
+        const uint32_t refused = melee_web_synctest_payload_admission_command(2);
+        if (refused != 0x202 || reentrant_shutdown_result != 0 || reentrant_owner_reads ||
+            reentrant_shutdown_cleanup_early || renderer_shutdown_calls != 2 ||
+            renderer_shutdown_refusals != 1 || renderer_teardown_calls != 1 ||
+            renderer_teardown_with_snapshot_alive || source_step_calls != 1 ||
+            source_draw_calls || destroy_calls != 1) {
+            return fail("renderer shutdown was not refused in-flight and deferred until payload cleanup");
+        }
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls != 1 ||
+            renderer_teardown_calls != 1 || std::strcmp(error,
+                "Renderer shutdown reentered an active payload command") != 0) {
+            return fail("deferred shutdown changed first failure or repeated cleanup");
+        }
+        return 0;
+    }
+    if (scenario == "order") {
+        const uint32_t first = melee_web_synctest_payload_admission_command(2);
+        if (first != 0x201 || owner_reads || capture_calls || source_step_calls || source_draw_calls) {
+            return fail("out-of-order step read owner or did work");
+        }
+        if (melee_web_synctest_payload_admission_command(1) != first ||
+            melee_web_synctest_payload_admission_command(5) != first || destroy_calls) {
+            return fail("first order failure was not latched through close");
+        }
+        return 0;
+    }
+    if (scenario == "duplicate-capture") {
+        const uint32_t ok = melee_web_synctest_payload_admission_command(1);
+        const uint32_t failed = melee_web_synctest_payload_admission_command(1);
+        if (ok || failed != 0x201 || capture_calls != 1 || admit_calls != 1) return fail("duplicate capture was not refused once");
+        if (melee_web_synctest_payload_admission_command(5) != failed || destroy_calls != 1) return fail("duplicate capture cleanup failed");
+        return 0;
+    }
+    if (scenario == "capture-failure" || scenario == "capture-failure-pointer") {
+        capture_status = 7;
+        capture_returns_pointer_on_failure = scenario == "capture-failure-pointer";
+        const uint32_t failed = melee_web_synctest_payload_admission_command(1);
+        if (failed != 0x107 || capture_calls != 1 || source_step_calls || source_draw_calls) return fail("capture refusal status or work changed");
+        if (destroy_calls != (capture_returns_pointer_on_failure ? 1u : 0u)) return fail("capture failure pointer cleanup count changed");
+        if (melee_web_synctest_payload_admission_command(2) != failed ||
+            melee_web_synctest_payload_admission_command(5) != failed ||
+            destroy_calls != (capture_returns_pointer_on_failure ? 1u : 0u)) return fail("capture failure was not retained");
+        return 0;
+    }
+    if (scenario == "capture-admission-failure" || scenario == "step-admission-failure" ||
+        scenario == "postdraw-admission-failure") {
+        fail_admit_at = scenario == "capture-admission-failure" ? 1u :
+            scenario == "step-admission-failure" ? 2u : 3u;
+        const uint32_t captured = melee_web_synctest_payload_admission_command(1);
+        if (scenario == "capture-admission-failure") {
+            if (captured != 0x105 || source_step_calls || source_draw_calls || admit_calls != 1) return fail("capture admit refusal did not stop");
+            if (melee_web_synctest_payload_admission_command(5) != captured || destroy_calls != 1) return fail("capture admit cleanup failed");
+            return 0;
+        }
+        if (captured) return fail("capture failed before later admission control");
+        if (scenario == "step-admission-failure") {
+            if (melee_web_synctest_payload_admission_command(2) != 0x105 || source_step_calls != 1 || source_draw_calls) return fail("step admit refusal did not stop draw");
+        } else {
+            if (melee_web_synctest_payload_admission_command(2) || melee_web_synctest_payload_admission_command(3) ||
+                melee_web_synctest_payload_admission_command(4) != 0x105 || source_step_calls != 1 || source_draw_calls != 1) return fail("postdraw admit refusal changed sequence");
+        }
+        if (melee_web_synctest_payload_admission_command(5) != 0x105 || destroy_calls != 1) return fail("admission refusal cleanup/first failure changed");
+        return 0;
+    }
+    if (scenario == "step-failure" || scenario == "draw-failure") {
+        source_step_fails = scenario == "step-failure";
+        source_draw_fails = scenario == "draw-failure";
+        const uint32_t captured = melee_web_synctest_payload_admission_command(1);
+        if (captured) return fail("source failure control could not capture");
+        uint32_t failed = 0;
+        if (source_step_fails) {
+            failed = melee_web_synctest_payload_admission_command(2);
+            if (failed != 0x209 || source_step_calls != 1 || source_draw_calls) return fail("step failure did not stop draw");
+        } else {
+            if (melee_web_synctest_payload_admission_command(2)) return fail("step failed before draw control");
+            failed = melee_web_synctest_payload_admission_command(3);
+            if (failed != 0x20a || source_draw_calls != 1) return fail("draw failure status changed");
+        }
+        if (melee_web_synctest_payload_admission_command(4) != failed ||
+            melee_web_synctest_payload_admission_command(5) != failed || destroy_calls != 1) return fail("source failure was not latched through cleanup");
+        return 0;
+    }
+    if (scenario == "asyncify-disabled" || scenario == "asyncify-jspi" ||
+        scenario == "asyncify-busy" || scenario == "not-runtime-thread") {
+        asyncify_mode = scenario == "asyncify-disabled" ? 0 :
+            scenario == "asyncify-jspi" ? 2 : 1;
+        asyncify_state_idle = scenario != "asyncify-busy";
+        main_runtime_thread = scenario != "not-runtime-thread";
+        const uint32_t refused = melee_web_synctest_payload_admission_command(1);
+        if (refused != 0x202 || owner_reads || capture_calls || source_step_calls || source_draw_calls) {
+            return fail("unsafe Asyncify/runtime entry was not refused before owner access");
+        }
+        if ((scenario == "asyncify-disabled" || scenario == "asyncify-jspi") &&
+            (runtime_thread_queries || browser_thread_queries || asyncify_idle_queries)) {
+            return fail("unsupported Asyncify mode queried later entry guards");
+        }
+        if (scenario == "asyncify-busy" && asyncify_idle_queries != 1) {
+            return fail("non-idle Asyncify state was not checked");
+        }
+        if (scenario == "not-runtime-thread" && browser_thread_queries) {
+            return fail("non-runtime thread reached the browser-thread check");
+        }
+        asyncify_mode = 1;
+        asyncify_state_idle = true;
+        main_runtime_thread = true;
+        if (melee_web_synctest_payload_admission_command(5) != refused) {
+            return fail("Asyncify/runtime refusal was not retained through close");
+        }
+        return 0;
+    }
+    if (scenario == "asyncify-entry-not-idle") {
+        if (melee_web_synctest_payload_admission_command(1) != 0) return fail("capture failed before post-step Asyncify control");
+        asyncify_state_idle = false;
+        const uint32_t refused = melee_web_synctest_payload_admission_command(2);
+        if (refused != 0x202 || source_step_calls || source_draw_calls) {
+            return fail("non-idle Asyncify entry reached source work");
+        }
+        asyncify_state_idle = true;
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls != 1) {
+            return fail("post-step Asyncify refusal did not close safely exactly once");
+        }
+        return 0;
+    }
+    if (scenario == "asyncify-boundary-after-step") {
+        if (melee_web_synctest_payload_admission_command(1) != 0) return fail("capture failed before Asyncify completion-boundary control");
+        source_step_leaves_asyncify_busy = true;
+        const uint32_t refused = melee_web_synctest_payload_admission_command(2);
+        if (refused != 0x202 || source_step_calls != 1 || source_draw_calls || destroy_calls) {
+            return fail("post-step non-idle Asyncify state was not refused before admission/draw");
+        }
+        asyncify_state_idle = true;
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls != 1) {
+            return fail("post-step guard failure did not retain and clean up once");
+        }
+        return 0;
+    }
+    if (scenario == "reentrant-close") {
+        if (melee_web_synctest_payload_admission_command(1) != 0) return fail("capture failed before reentrant close control");
+        reenter_step_close = true;
+        const uint32_t refused = melee_web_synctest_payload_admission_command(2);
+        if (refused != 0x202 || reentrant_result != refused || reentrant_owner_reads ||
+            reentrant_cleanup_early || source_step_calls != 1 || source_draw_calls || destroy_calls != 1) {
+            return fail("reentrant CLOSE was not refused and deferred until the active command returned");
+        }
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls != 1) {
+            return fail("deferred reentrant CLOSE did not preserve failure and one-shot cleanup");
+        }
+        return 0;
+    }
+    if (scenario == "aurora-one-slot") {
+        fixture_frame_count = fixture_staging_count = 1;
+        descriptor = make_fixture_descriptor();
+        if (descriptor.byteSize != sizeof(descriptor) + sizeof(AuroraBrowserFrameStagingDescriptor) +
+            sizeof(AuroraBrowserSubmissionDescriptor)) return fail("one-slot producer extent differs");
+        if (melee_web_synctest_payload_admission_command(1) != 0 || capture_calls != 1) return fail("valid one-slot descriptor refused");
+        return melee_web_synctest_payload_admission_command(5) == 0x201 && destroy_calls == 1 ? 0 : fail("one-slot incomplete-close refusal or cleanup changed");
+    }
+    if (scenario.rfind("aurora-layout-", 0) == 0) {
+        if (scenario == "aurora-layout-schema") descriptor.schemaVersion--;
+        else if (scenario == "aurora-layout-header-only") descriptor.byteSize = sizeof(descriptor);
+        else if (scenario == "aurora-layout-truncated") descriptor.byteSize--;
+        else if (scenario == "aurora-layout-offset") descriptor.submissionDescriptorOffset++;
+        else if (scenario == "aurora-layout-stride") descriptor.frameDescriptorStride++;
+        else if (scenario == "aurora-layout-count") descriptor.frameDescriptorCount--;
+        else if (scenario == "aurora-layout-zero-count") descriptor.frameSlotCount = descriptor.frameDescriptorCount = 0;
+        else if (scenario == "aurora-layout-overflow") descriptor.frameSlotCount = descriptor.frameDescriptorCount = UINT32_MAX;
+        else if (scenario == "aurora-layout-size-unavailable") descriptor_size_unavailable = true;
+        else return fail("unknown layout scenario");
+        const uint32_t refused = melee_web_synctest_payload_admission_command(1);
+        if (refused != 0x205 || capture_calls || admit_calls || source_step_calls || source_draw_calls || destroy_calls)
+            return fail("malformed layout was not refused before snapshot work");
+        if (melee_web_synctest_payload_admission_command(5) != refused || destroy_calls)
+            return fail("layout refusal lost sticky status or invented a snapshot");
+        return 0;
+    }
+    if (scenario == "transfer-busy" || scenario == "aurora-missing" ||
+        scenario == "aurora-busy" || scenario == "owner-unhealthy" || scenario == "frame-mismatch" ||
+        scenario == "not-main-thread") {
+        transfer_busy = scenario == "transfer-busy";
+        descriptor_unavailable = scenario == "aurora-missing";
+        descriptor.pendingFramePackets = scenario == "aurora-busy" ? 1u : 0u;
+        owner_unhealthy = scenario == "owner-unhealthy";
+        if (scenario == "frame-mismatch") observation.frame++;
+        main_browser_thread = scenario != "not-main-thread";
+        const uint32_t expected = scenario == "transfer-busy" ? 0x204 :
+            scenario == "aurora-missing" ? 0x205 : scenario == "aurora-busy" ? 0x206 :
+            scenario == "frame-mismatch" ? 0x207 : scenario == "not-main-thread" ? 0x202 : 0x203;
+        const uint32_t refused = melee_web_synctest_payload_admission_command(1);
+        if (refused != expected || capture_calls || source_step_calls || source_draw_calls) return fail("unsafe boundary precondition was not refused before snapshot work");
+        if (melee_web_synctest_payload_admission_command(5) != refused) return fail("unsafe refusal was not latched");
+        return 0;
+    }
+    if (scenario == "unknown") {
+        if (melee_web_synctest_payload_admission_command(99) != 0x20d || capture_calls || owner_reads) return fail("unknown command was not refused before owner access");
+        return melee_web_synctest_payload_admission_command(5) == 0x20d ? 0 : fail("unknown command failure lost");
+    }
+    return fail("unknown test scenario");
+#endif
+}

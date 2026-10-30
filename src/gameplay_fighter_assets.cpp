@@ -219,6 +219,7 @@ struct GameplayFighterAssets::Storage {
     std::shared_ptr<const DatArchive> nana_popo_fighter;
     const FighterCostume* nana_popo_identity=nullptr;
     std::vector<uint8_t> nana_popo_animation;
+    const GameplayActionStorePolicy action_policy;
     GameplayActionStore prototype;
     NativeDatArena arena;
     /* Ness's authored x48 table has eleven Article slots; every other
@@ -250,14 +251,17 @@ struct GameplayFighterAssets::Storage {
     Storage(std::shared_ptr<const DatArchive> ft,std::shared_ptr<const DatArchive> costume,
             std::span<const uint8_t> aj,const FighterCostume& id,
             std::shared_ptr<const DatArchive> popo_fighter,const FighterCostume* popo_identity,
-            std::span<const uint8_t> popo_aj)
+            std::span<const uint8_t> popo_aj,GameplayActionStorePolicy policy)
       :fighter(std::move(ft)),identity(id),part(costume_part(costume,id)),animation(aj.begin(),aj.end()),
        nana_popo_fighter(std::move(popo_fighter)),nana_popo_identity(popo_identity),
-       nana_popo_animation(popo_aj.begin(),popo_aj.end()),
+       nana_popo_animation(popo_aj.begin(),popo_aj.end()),action_policy(policy),
        prototype(fighter,id,animation,{},nana_popo_fighter,nana_popo_identity,nana_popo_animation),arena(fighter),
        model(costume,root(*costume,id.model_symbol)),
        material(costume_material(costume,id,model.graph())),native(nullptr,destroy_joint),metal_native(nullptr,destroy_joint)
     {
+        if(action_policy!=GameplayActionStorePolicy::Legacy&&
+           action_policy!=GameplayActionStorePolicy::ResidentOrdinaryActions)
+            throw DatError("Unknown fighter action asset policy");
         char error[256];
         native.reset(melee_web_native_joint_hydrate(&model.graph(),error,sizeof(error)));
         if(!native)throw DatError(error);
@@ -619,7 +623,8 @@ struct GameplayFighterAssets::Storage {
             auto& s=*static_cast<Storage*>(context);
             for(size_t i=0;i<s.fighters.size();++i)if(!s.fighters[i]) {
                 auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation,
-                    s.result_demo_archive,s.nana_popo_fighter,s.nana_popo_identity,s.nana_popo_animation);
+                    s.result_demo_archive,s.nana_popo_fighter,s.nana_popo_identity,s.nana_popo_animation,
+                    s.action_policy);
                 actions->bind(fp);
                 *rows=actions->action_rows();*blends=actions->blend_rows();
                 s.bindings[i]=std::move(actions);s.fighters[i]=fp;return 1;
@@ -651,11 +656,11 @@ struct GameplayFighterAssets::Storage {
 GameplayFighterAssets::GameplayFighterAssets(std::shared_ptr<const DatArchive> fighter,
     std::shared_ptr<const DatArchive> costume,std::span<const uint8_t> animation,const FighterCostume& identity,
     std::shared_ptr<const DatArchive> nana_popo_fighter,const FighterCostume* nana_popo_identity,
-    std::span<const uint8_t> nana_popo_animation)
+    std::span<const uint8_t> nana_popo_animation,GameplayActionStorePolicy action_policy)
 {
     if(!fighter || !costume)throw DatError("Fighter asset archives are missing");
     storage_=std::make_unique<Storage>(std::move(fighter),std::move(costume),animation,identity,
-        std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation);
+        std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation,action_policy);
 }
 void GameplayFighterAssets::add_costume(std::shared_ptr<const DatArchive> archive,const FighterCostume& id)
 {
@@ -677,6 +682,8 @@ void GameplayFighterAssets::set_result_demo_archive(std::shared_ptr<const DatArc
 {
     if (!storage_ || live_fighters())
         throw DatError("Result demo archive requires an idle fighter asset owner");
+    if(storage_->action_policy!=GameplayActionStorePolicy::Legacy)
+        throw DatError("Resident ordinary actions do not admit a Results archive");
     storage_->result_demo_archive = std::move(archive);
 }
 GameplayFighterAssets::~GameplayFighterAssets()

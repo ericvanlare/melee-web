@@ -6,9 +6,63 @@
 #define SLIPPI_PROFILE_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5_ID \
     "slippi-render-dependencies-dbooc-shield-drop-v5"
 
+#define SLIPPI_PROFILE_LOGICAL_FRAME_V6_ID "slippi-render-dependencies-logical-frame-v6"
+
+#define SLIPPI_PROFILE_LOBJ_PRESENTATION_V7_ID "slippi-render-dependencies-logical-frame-lobj-v7"
+
+/* V8 named the retired persistent TObj presentation owner. Keep its identity
+ * value only so callers can explicitly refuse old manifests and snapshots. */
+#define SLIPPI_PROFILE_TOBJ_PRESENTATION_V8_ID "slippi-render-dependencies-logical-frame-lobj-tobj-v8"
+#define SLIPPI_PROFILE_TOBJ_PRESENTATION_V9_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9"
+#define SLIPPI_PROFILE_TOBJ_GROUND_MATRIX_V10_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-ground-matrix-v10"
+
+#define SLIPPI_PROFILE_FIGHTER_PROJECTION_V11_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-fighter-projection-v11"
+#define SLIPPI_PROFILE_SHADOW_CAMERA_V12_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-shadow-camera-v12"
+#define SLIPPI_PROFILE_LOCAL_TLUT_V13_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-shadow-camera-local-tlut-v13"
+
+#define SLIPPI_PROFILE_EFFECT_MATRIX_V14_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-effect-matrix-v14"
+#define SLIPPI_PROFILE_LOBJ_CURRENT_SET_V15_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15"
+#define SLIPPI_PROFILE_PARTICLE_PRESENTATION_V16_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16"
+#define SLIPPI_PROFILE_PARTICLE_MEASUREMENT_V17_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17"
+#define SLIPPI_PROFILE_STABLE_ACTION_ASSETS_V18_ID \
+    "slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18"
+
 typedef enum SlippiProfileIdentity {
     SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5 = 5,
+    SLIPPI_PROFILE_IDENTITY_LOGICAL_FRAME_V6 = 6,
+    SLIPPI_PROFILE_IDENTITY_LOBJ_PRESENTATION_V7 = 7,
+    SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_V8 = 8,
+    SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9 = 9,
+    SLIPPI_PROFILE_IDENTITY_TOBJ_GROUND_MATRIX_V10 = 10,
+    SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11 = 11,
+    SLIPPI_PROFILE_IDENTITY_SHADOW_CAMERA_V12 = 12,
+    SLIPPI_PROFILE_IDENTITY_LOCAL_TLUT_V13 = 13,
+    SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14 = 14,
+    SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15 = 15,
+    SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16 = 16,
+    SLIPPI_PROFILE_IDENTITY_PARTICLE_MEASUREMENT_V17 = 17,
+    SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18 = 18,
 } SlippiProfileIdentity;
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#define SLIPPI_PROFILE_ACTIVE_IDENTITY SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18
+#elif defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+#define SLIPPI_PROFILE_ACTIVE_IDENTITY SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15
+#elif defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+#define SLIPPI_PROFILE_ACTIVE_IDENTITY SLIPPI_PROFILE_IDENTITY_LOBJ_PRESENTATION_V7
+#elif defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
+#define SLIPPI_PROFILE_ACTIVE_IDENTITY SLIPPI_PROFILE_IDENTITY_LOGICAL_FRAME_V6
+#else
+#define SLIPPI_PROFILE_ACTIVE_IDENTITY SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5
+#endif
 
 typedef enum SlippiTickKind {
     SLIPPI_TICK_PRESENT = 0,

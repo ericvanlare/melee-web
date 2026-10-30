@@ -8,9 +8,15 @@
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include <array>
+#include <map>
 #include <memory>
+#include <tuple>
+
+struct MeleeWebActionInterval;
 
 namespace melee_web {
+
+class GameplayActionStore;
 
 struct DatRuntimeAction {
     std::uint32_t motion_id, descriptor_offset, motion_flags;
@@ -163,7 +169,26 @@ public:
     // Source fighter action hydration admits HSD_A_J_NODE visibility tracks;
     // generic inspection selection remains ordinary-SRT-only.
     [[nodiscard]] DatSelectedAction select_native_action(std::uint32_t motion_id);
+    // Builds the immutable native-action decode catalog without touching the
+    // two-entry logical cache or its interval hooks. Must finish before bind.
+    void prepare_resident_native_actions();
+    void set_interval_owner(const void* owner) noexcept { interval_owner_ = owner; }
 private:
+    friend struct ::MeleeWebActionInterval;
+    friend class GameplayActionStore;
+    struct CacheHooks {
+        void (*hit)(const DatFighterAnimationStore*,
+            const std::shared_ptr<const DatFighterRuntime>&, const DatRuntimeAction*,
+            DatAnimationPolicy, const std::shared_ptr<const DatAnimation>&) = nullptr;
+        std::shared_ptr<const DatAnimation> (*miss_replay)(const DatFighterAnimationStore*,
+            const std::shared_ptr<const DatFighterRuntime>&, const DatRuntimeAction*,
+            DatAnimationPolicy) = nullptr;
+        void (*miss_record)(const DatFighterAnimationStore*,
+            const std::shared_ptr<const DatFighterRuntime>&, const DatRuntimeAction*,
+            DatAnimationPolicy, const std::shared_ptr<const DatAnimation>&) = nullptr;
+    };
+    using ResidentKey = std::tuple<std::uint32_t, std::uint32_t, std::string, bool>;
+    void set_interval_cache_hooks(CacheHooks hooks) noexcept { cache_hooks_ = hooks; }
     struct Entry {
         std::uint32_t offset = 0, size = 0;
         std::string symbol;
@@ -171,10 +196,16 @@ private:
         std::shared_ptr<const DatAnimation> animation;
     };
     [[nodiscard]] DatSelectedAction select_impl(std::uint32_t motion_id, DatAnimationPolicy policy);
+    [[nodiscard]] DatSelectedAction resident_native_action(std::uint32_t motion_id) const;
     std::shared_ptr<const DatFighterRuntime> fighter_;
     std::vector<std::uint8_t> container_;
     std::array<Entry, 2> cache_;
     std::size_t next_ = 0;
+    std::map<ResidentKey, std::shared_ptr<const DatAnimation>> resident_native_actions_;
+    bool resident_native_actions_ready_ = false;
+    bool selection_started_ = false;
+    const void* interval_owner_ = nullptr;
+    CacheHooks cache_hooks_{};
 };
 
 } // namespace melee_web

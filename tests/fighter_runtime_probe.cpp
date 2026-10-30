@@ -1,3 +1,4 @@
+#include "gameplay_compat.h"
 #include "gameplay_world.hpp"
 #include "gameplay_match_context.h"
 #include "dat_archive.hpp"
@@ -5,6 +6,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+extern "C" {
+#include <melee/gm/gm_1601.h>
+#include <melee/gm/types.h>
+#include <melee/gr/forward.h>
+}
 using namespace melee_web;
 extern "C" void melee_web_fighter_link_gate(void);
 extern "C" int melee_web_match_context_trace(MeleeWebCollision*,const MeleeWebMatchSettings*,uint32_t,char*,size_t);
@@ -28,6 +34,23 @@ int main(int argc,char** argv){
         char error[256];
         for(unsigned pass=0;pass<2;pass++){
             GameplayWorld world(files);
+            // Current GameplayWorld defers original fighter-pool initialization
+            // and asset hydration until the source match initialization boundary.
+            // These narrow traces own their contexts below, so initialize the
+            // original rules/assets without requesting a session-owned context.
+            StartMeleeData start{};
+            gm_SetupRulesDefaults(&start.rules);
+            gm_SetupAllPlayerDefaults(start.players);
+            start.rules.match_kind=MatchKind_Stock;
+            start.rules.is_stock=true;start.rules.is_vs=true;
+            start.rules.xB=-1;start.rules.x0_3=2;
+            start.rules.stkind=St_Kind_Last;
+            for(unsigned slot=0;slot<2;++slot){
+                auto& player=start.players[slot];
+                player.ckind=CKIND_MARIO;player.slot_type=Gm_PKind_Human;
+                player.slot=slot+1;player.stocks=4;player.color=0;
+            }
+            world.initialize_match(start);
             MeleeWebMatchSettings settings{};settings.player={0,0,4,{0,world.floor_height(0)+1,0},1};
             settings.camera_subjects=70;settings.random_seed=0x13579bdf;
             check(melee_web_match_context_trace(world.collision(),&settings,120,error,sizeof(error)),error);

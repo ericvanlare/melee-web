@@ -38,7 +38,81 @@ def _source_statement(source, marker, label):
     return source[start:end]
 
 
+def _source_function(source, signature):
+    if source.count(signature) != 1:
+        raise AssertionError(f"expected one source function {signature!r}")
+    start = source.index(signature)
+    opening = source.index("{", start)
+    depth = 0
+    for index in range(opening, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1] + "\n"
+    raise AssertionError(f"unterminated source function {signature!r}")
+
+
 class ProfileControlsTests(unittest.TestCase):
+    def test_v15_v18_profile_identity_boundary_compiles_profile_c_only(self):
+        work_root = ROOT / "work"
+        work_root.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(prefix="slippi-profile-v15-v18-", dir=work_root))
+        source = output / "identity_control.c"
+        source.write_text(r'''#include <assert.h>
+#include <string.h>
+#include "slippi_profile/profile.h"
+
+int main(void)
+{
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
+    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18;
+    assert(strcmp(SLIPPI_PROFILE_STABLE_ACTION_ASSETS_V18_ID,
+                  "slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18") == 0);
+    assert(strcmp(SLIPPI_PROFILE_PARTICLE_MEASUREMENT_V17_ID,
+                  "slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17") == 0);
+    assert(strcmp(SLIPPI_PROFILE_PARTICLE_PRESENTATION_V16_ID,
+                  "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16") == 0);
+    assert(strcmp(slippi_profile_identity_name(active),
+                  SLIPPI_PROFILE_STABLE_ACTION_ASSETS_V18_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_MEASUREMENT_V17) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15) == 0);
+#else
+    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15;
+    assert(strcmp(slippi_profile_identity_name(active),
+                  SLIPPI_PROFILE_LOBJ_CURRENT_SET_V15_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16) == 0);
+#endif
+    assert(slippi_profile_source_draw_decision(active, SLIPPI_TICK_PRESENT) ==
+           SLIPPI_SOURCE_DRAW_ALLOW);
+    assert(slippi_profile_source_draw_decision(active, SLIPPI_TICK_CORRECTION) ==
+           SLIPPI_SOURCE_DRAW_SKIP);
+    return 0;
+}
+''', encoding="utf-8")
+        compiler = shlex.split(os.environ.get("CC", "cc"))
+        try:
+            for name, definitions in (
+                ("v15", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1"]),
+                ("v18", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1",
+                          "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1"]),
+            ):
+                executable = output / f"profile-{name}"
+                command = [*compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                           "-I", str(ROOT / "src"), *definitions,
+                           str(ROOT / "src/slippi_profile/profile.c"), str(source),
+                           "-o", str(executable)]
+                wrapped = [os.environ.get("PYTHON", "python3"),
+                           str(ROOT / "scripts/agent_workspace.py"), "run", "--", *command]
+                subprocess.run(wrapped, cwd=ROOT, check=True)
+                subprocess.run([str(executable)], cwd=ROOT, check=True)
+        except Exception as error:
+            self.fail(f"V15/V18 identity controls failed: {error}; retained reproducer directory: {output}")
+        else:
+            shutil.rmtree(output)
+
     def test_profile_policy_and_dependency_controls(self):
         work_root = ROOT / "work"
         work_root.mkdir(exist_ok=True)
@@ -75,11 +149,96 @@ class ProfileControlsTests(unittest.TestCase):
             str(ROOT / "scripts/agent_workspace.py"),
             "run", "--", *command,
         ]
+        v10_command = list(command)
+        v10_command.insert(v10_command.index("-o"),
+                           "-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1")
+        v10_command[v10_command.index("-o") + 1] = str(output / "profile-controls-v10")
+        wrapped_v10 = [
+            os.environ.get("PYTHON", "python3"),
+            str(ROOT / "scripts/agent_workspace.py"),
+            "run", "--", *v10_command,
+        ]
         try:
             subprocess.run(wrapped, cwd=ROOT, check=True)
             subprocess.run([str(executable)], cwd=ROOT, check=True)
+            subprocess.run(wrapped_v10, cwd=ROOT, check=True)
+            subprocess.run([str(output / "profile-controls-v10")], cwd=ROOT, check=True)
         except Exception as error:
             self.fail(f"Profile controls failed: {error}; retained reproducer directory: {output}")
+        else:
+            shutil.rmtree(output)
+
+    def test_actual_ground_proc_refreshes_after_authored_callback(self):
+        work_root = ROOT / "work"
+        work_root.mkdir(exist_ok=True)
+        output = Path(tempfile.mkdtemp(
+            prefix="ground-matrix-source-control-", dir=work_root))
+        source_tree = output / "source"
+        ground_path = source_tree / "src/melee/gr/ground.c"
+        ground_path.parent.mkdir(parents=True)
+        subprocess.run(["git", "init", "-q"], cwd=source_tree, check=True)
+        actual_pin = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=MELEE, text=True).strip()
+        self.assertEqual(actual_pin, MELEE_SOURCE_PIN)
+        ground_source = subprocess.check_output(
+            ["git", "show", f"{MELEE_SOURCE_PIN}:src/melee/gr/ground.c"],
+            cwd=MELEE, text=True,
+        )
+        ground_path.write_text(ground_source, encoding="utf-8")
+
+        try:
+            for patch_path in (
+                ROOT / "patches/melee-gameplay.patch",
+                ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch",
+            ):
+                subprocess.run([
+                    "git", "apply", "--check",
+                    "--include=src/melee/gr/ground.c", str(patch_path),
+                ], cwd=source_tree, check=True)
+                subprocess.run([
+                    "git", "apply",
+                    "--include=src/melee/gr/ground.c", str(patch_path),
+                ], cwd=source_tree, check=True)
+
+            composed_ground = ground_path.read_text(encoding="utf-8")
+            function = _source_function(
+                composed_ground, "static void Ground_801C1D38(HSD_GObj* gobj)")
+            template = (ROOT / "src/slippi_profile/tests/"
+                        "ground_matrix_refresh_control.c.in").read_text(
+                            encoding="utf-8")
+            self.assertEqual(template.count("GROUND_FUNCTION"), 1)
+            fixture = output / "ground-control.c"
+            fixture.write_text(template.replace("GROUND_FUNCTION", function),
+                               encoding="utf-8")
+            common = [
+                *shlex.split(os.environ.get("CC", "cc")),
+                "-std=c11", "-DTARGET_PC", "-Wall", "-Wextra", "-Werror",
+                "-DMELEE_WEB_SLIPPI_PROFILE=1",
+                "-I", str(ROOT / "src/slippi_profile/tests/stubs"),
+                "-I", str(ROOT / "src"),
+                "-I", str(MELEE / "src"),
+                "-I", str(ROOT / ".deps/aurora/include"),
+                "-I", str(MELEE / "extern/dolphin/include"),
+                "-include", str(ROOT / "src/gameplay_compat.h"),
+                str(ROOT / "src/slippi_profile/dynamics_fix.c"),
+                str(fixture),
+            ]
+            for lane, extra_defines in (
+                ("v10", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1"]),
+                ("legacy", []),
+            ):
+                executable = output / ("ground-control-" + lane)
+                command = [*common, *extra_defines, "-o", str(executable)]
+                wrapped = [
+                    os.environ.get("PYTHON", "python3"),
+                    str(ROOT / "scripts/agent_workspace.py"),
+                    "run", "--", *command,
+                ]
+                subprocess.run(wrapped, cwd=ROOT, check=True)
+                subprocess.run([str(executable)], cwd=ROOT, check=True)
+        except Exception as error:
+            self.fail(
+                f"Ground source control failed: {error}; retained reproducer: {output}")
         else:
             shutil.rmtree(output)
 

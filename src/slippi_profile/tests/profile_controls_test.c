@@ -47,10 +47,41 @@ void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
 
 static void test_draw_policy(void)
 {
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    const SlippiProfileIdentity profile =
+        SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15;
+    assert(strcmp(slippi_profile_identity_name(profile),
+                  SLIPPI_PROFILE_LOBJ_CURRENT_SET_V15_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_EFFECT_MATRIX_V14,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_LOCAL_TLUT_V13) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_LOCAL_TLUT_V13,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_SHADOW_CAMERA_V12) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_SHADOW_CAMERA_V12,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_FIGHTER_PROJECTION_V11,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_TOBJ_PRESENTATION_STATELESS_V9,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+#else
     const SlippiProfileIdentity profile =
         SLIPPI_PROFILE_IDENTITY_RENDER_DEPENDENCIES_DBOOC_SHIELD_DROP_V5;
     assert(strcmp(slippi_profile_identity_name(profile),
                   "slippi-render-dependencies-dbooc-shield-drop-v5") == 0);
+#endif
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_PRESENT) ==
            SLIPPI_SOURCE_DRAW_ALLOW);
     assert(slippi_profile_source_draw_decision(profile, SLIPPI_TICK_CORRECTION) ==

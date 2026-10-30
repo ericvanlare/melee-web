@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <cassert>
+#include <cstdint>
+#include <cstddef>
+#include "gameplay_source_memory_runtime.h"
+static bool active=true,healthy=true;
+static uint64_t world_generation=1,owner_epoch=2;
+struct Address { uint32_t n; uint32_t value() const {return n;} };
+struct Pool {uint32_t state;uintptr_t descriptor;uint32_t stride;uint64_t generation,epoch,world;};
+struct HostAllocation {uintptr_t host;uint32_t requested;Address source;uint64_t generation;Pool pool;};
+struct FighterLease {uint32_t source;uint64_t world_generation,allocation_generation;bool live;};
+static HostAllocation row={0x1000,0x200,{0x80001000},3,{1,0x3000,0x100,3,2,1}};
+static FighterLease lease={0x80001100,1,4,true};
+static bool allocation_present=true,lease_present=true;
+static HostAllocation* find_host_allocation(uintptr_t h)
+{return allocation_present&&h>=row.host&&h<row.host+row.requested?&row:nullptr;}
+static FighterLease* find_fighter(uintptr_t){return lease_present?&lease:nullptr;}
+ACTUAL_PROVENANCE_FUNCTIONS
+int main()
+{
+ auto* f=reinterpret_cast<void*>(0x1100);auto* d=reinterpret_cast<void*>(0x3000);
+ MeleeWebFighterProjectionIdentity receipt{};
+ assert(melee_web_source_memory_fighter_projection_identity(f,d,0x100,&receipt));
+ assert(melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ row.pool.state=0; // Existing checked source restore clears diagnostic metadata.
+ assert(!melee_web_source_memory_fighter_projection_identity(f,d,0x100,&receipt));
+ // identity() zeros output on refusal; only the retained original receipt works.
+ row.pool.state=1;
+ assert(melee_web_source_memory_fighter_projection_identity(f,d,0x100,&receipt));
+ row.pool.state=0;
+ assert(melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ lease.allocation_generation++;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ lease.allocation_generation--;row.generation++;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ row.generation--;row.pool.state=1;row.pool.descriptor++;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ row.pool.descriptor--;row.pool.state=2;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ row.pool.state=1;lease.source++;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ lease.source--;owner_epoch++;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ owner_epoch--;allocation_present=false;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ allocation_present=true;lease.live=false;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ lease.live=true;healthy=false;
+ assert(!melee_web_source_memory_fighter_projection_matches(f,d,0x100,&receipt));
+ return 0;
+}

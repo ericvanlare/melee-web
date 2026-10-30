@@ -1,0 +1,132 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+extern "C" {
+#include <sysdolphin/baselib/particle.h>
+#include <sysdolphin/baselib/psstructs.h>
+#include <sysdolphin/baselib/random.h>
+extern HSD_Particle* hsd_804D0908[16];
+extern u32* seed_ptr;
+void hsd_8039CEAC(u32 mask);
+void psDispParticles(u32 target_link, u32 sw);
+HSD_Particle* particleSort(s32 link, u8 key, HSD_Particle** sorted,
+                           HSD_Particle** nonedge);
+}
+
+static HSD_Particle draw_sorted[3];
+static HSD_Particle isolated_source[3];
+static HSD_Particle isolated_draw_copy[3];
+static u8 commands[3][6] = {
+    // Real source opcode A6: life = base + range * HSD_Randf(). The first
+    // frame starts every particle at life=200; 0x01 waits one tick so the
+    // actual bytecode interpreter reaches A6 once during the successor pass.
+    // With seed 0x12345678, the three RNG draws are assigned by visitation
+    // order. Both lanes consume three draws (same final seed), but per-ID
+    // results differ when the predecessor draw sorter changes source links.
+    {0xA6, 0x00, 0x64, 0x00, 0xC8, 0x01}, // id 1: base 100, range 200
+    {0xA6, 0x01, 0x2C, 0x00, 0xC8, 0x01}, // id 2: base 300, range 200
+    {0xA6, 0x01, 0xF4, 0x00, 0xC8, 0x01}, // id 3: base 500, range 200
+};
+static const u32 kinds[3] = {
+    (5u << 25) | 8u, // low bucket 5
+    (1u << 25),      // high bucket 9
+    (2u << 25) | 8u, // low bucket 2
+};
+
+static void init_particles(HSD_Particle* particles)
+{
+    std::memset(particles, 0, sizeof(HSD_Particle) * 3);
+    for (unsigned i = 0; i < 3; ++i) {
+        HSD_Particle& p = particles[i];
+        p.kind = kinds[i];
+        p.idnum = static_cast<u16>(i + 1);
+        p.cmdList = commands[i];
+        p.cmdWait = 1;
+        p.life = 200;
+        p.next = i < 2 ? &particles[i + 1] : nullptr;
+    }
+}
+
+static void print_states(const char* label, HSD_Particle* head)
+{
+    std::printf("%s order=", label);
+    for (HSD_Particle* p = head; p; p = p->next)
+        std::printf("%u,", p->idnum);
+    std::printf(" lives=");
+    for (u16 id = 1; id <= 3; ++id) {
+        for (HSD_Particle* p = head; p; p = p->next) {
+            if (p->idnum == id)
+                std::printf("%u:%u;", id, p->life);
+        }
+    }
+    std::putchar('\n');
+}
+
+int main()
+{
+    u32 rng = 0x12345678;
+    seed_ptr = &rng;
+    init_particles(draw_sorted);
+    std::memset(hsd_804D0908, 0, sizeof(HSD_Particle*) * 16);
+    hsd_804D0908[0] = draw_sorted;
+
+    // Both lanes use link 0, matching the same source list. Actual sw=0
+    // advances the source psFrameNum, which is the authored sort-cache key.
+    // Start at 0x7B and execute the two real increments independently.
+    psDispParticles(0, 0);
+    HSD_Particle* sorted = nullptr;
+    HSD_Particle* nonedge = nullptr;
+    particleSort(0, 0x7C, &sorted, &nonedge);
+    if (sorted != &draw_sorted[2] || sorted->next != &draw_sorted[0] ||
+        sorted->next->next != &draw_sorted[1]) {
+        std::fputs("CONTROL_FAILURE original particle sort order\n", stderr);
+        return 1;
+    }
+    print_states("draw-sorted-before-update", hsd_804D0908[0]);
+    hsd_8039CEAC(0); // Actual scheduler and actual hsd_8039930C callback.
+    print_states("draw-sorted-after-update", hsd_804D0908[0]);
+    const u32 draw_rng = rng;
+
+    rng = 0x12345678;
+    init_particles(isolated_source);
+    init_particles(isolated_draw_copy);
+    std::memset(hsd_804D0908, 0, sizeof(HSD_Particle*) * 16);
+    hsd_804D0908[0] = isolated_draw_copy;
+    psDispParticles(0, 0);
+    sorted = nonedge = nullptr;
+    particleSort(0, 0x7D, &sorted, &nonedge);
+    if (sorted != &isolated_draw_copy[2] ||
+        sorted->next != &isolated_draw_copy[0] ||
+        sorted->next->next != &isolated_draw_copy[1]) {
+        std::fputs("CONTROL_FAILURE isolated-copy particle sort order\n",
+                   stderr);
+        return 1;
+    }
+    // The isolated renderer consumes its sorted copy; the actual source
+    // successor still receives the canonical list and original visitation
+    // order.
+    hsd_804D0908[0] = &isolated_source[0];
+    print_states("isolated-source-before-update", hsd_804D0908[0]);
+    hsd_8039CEAC(0);
+    print_states("isolated-source-after-update", hsd_804D0908[0]);
+    std::printf("rng_after_sorted=%08x rng_after_isolated=%08x\n",
+                draw_rng, rng);
+
+    const u16 sorted_lives[3] = {
+        draw_sorted[0].life, draw_sorted[1].life, draw_sorted[2].life};
+    const u16 isolated_lives[3] = {
+        isolated_source[0].life, isolated_source[1].life,
+        isolated_source[2].life};
+    if (draw_rng != 0xCC0DDCAD || rng != draw_rng ||
+        sorted_lives[0] != 170 || sorted_lives[1] != 458 ||
+        sorted_lives[2] != 639 || isolated_lives[0] != 239 ||
+        isolated_lives[1] != 370 || isolated_lives[2] != 658) {
+        std::fputs("CONTROL_FAILURE actual particle RNG/state assignment\n",
+                   stderr);
+        return 1;
+    }
+    std::puts("actual successor particle-state dependency reproduced");
+    return 0;
+}

@@ -42,6 +42,15 @@ void owned_lifetime()
         check(!melee_web_gameplay_heap_release(arena, error, sizeof(error)), "live unselected heap blocks release");
         check(OSCheckHeap(heap) == initial_free, "rejected release preserves the heap");
         OSSetCurrentHeap(heap);
+        auto* root_guard=melee_web_gameplay_heap_guard_capture(arena,error,sizeof(error));
+        check(root_guard && melee_web_gameplay_heap_guard_admit(root_guard,error,sizeof(error)),
+              "exact SDK singleton roots admit");
+        OSSetCurrentHeap(-1);
+        check(!melee_web_gameplay_heap_guard_admit(root_guard,error,sizeof(error)) && __OSCurrHeap==-1,
+              "selected heap mutation refuses without repairing roots");
+        OSSetCurrentHeap(heap);
+        check(melee_web_gameplay_heap_guard_admit(root_guard,error,sizeof(error)),
+              "restored selected heap admits the unchanged root guard");
         MeleeWebSourceMemoryContext context_before{};
         check(melee_web_source_memory_context_read(nullptr) ==
                   MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,
@@ -132,6 +141,9 @@ void owned_lifetime()
         OSDestroyHeap(heap);
         check(__OSCurrHeap == -1 && !melee_web_gameplay_heap_available(), "destroyed heap retains owned metadata until release");
         check(melee_web_gameplay_heap_release(arena, error, sizeof(error)), "destroyed owned arena releases");
+        check(!melee_web_gameplay_heap_guard_admit(root_guard,error,sizeof(error)),
+              "retired arena refuses retained singleton-root guard");
+        melee_web_gameplay_heap_guard_destroy(root_guard);
         std::free(arena);
         check(melee_web_gameplay_heap_available(), "release clears SDK roots before arena free");
         check(!melee_web_gameplay_heap_owns(reinterpret_cast<void*>(arena_address)), "released arena has no owner");

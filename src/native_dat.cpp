@@ -1,15 +1,22 @@
 #include "native_dat.hpp"
 #include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <utility>
 #include <vector>
 namespace melee_web {
 struct NativeDatArena::Storage {
+    struct Allocation { void* pointer; std::size_t bytes; };
     std::shared_ptr<const DatArchive> archive;
     std::vector<NativeDatSourceRegion> source_regions;
-    std::vector<void*> allocations;
+    std::vector<Allocation> allocations;
+    // The token's lifetime extends through checkpoints, preventing stale
+    // checkpoints from matching a new owner at a recycled Storage address.
+    std::shared_ptr<const unsigned char> identity =
+        std::make_shared<const unsigned char>(0);
     size_t bytes = 0;
     MeleeWebNativeDat api{};
-    ~Storage() { for (auto* p : allocations) std::free(p); }
+    ~Storage() { for (const auto& a : allocations) std::free(a.pointer); }
 };
 NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive)
     : NativeDatArena(std::move(archive), {})
@@ -88,17 +95,122 @@ NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive,
     };
     s.api.allocate = [](void* c,size_t n,size_t width)->void* {
         auto& a = *static_cast<Storage*>(c);
-        constexpr size_t limit = 32U*1024U*1024U;
-        if (!width || n > (limit-a.bytes)/width || a.allocations.size() >= 65536)
+        constexpr size_t limit = native_dat_allocation_bytes_max;
+        if (!width || n > (limit-a.bytes)/width || a.allocations.size() >= native_dat_allocation_count_max)
             throw DatError("Native descriptor allocation budget exceeded");
         if (!n) return nullptr;
         void* p = std::calloc(n,width);
         if (!p) throw DatError("Native descriptor allocation failed");
-        try { a.allocations.push_back(p); } catch (...) { std::free(p); throw; }
+        try { a.allocations.push_back({p,n*width}); } catch (...) { std::free(p); throw; }
         a.bytes += n*width; return p;
     };
     s.api.reject = [](void*,const char* why) { throw DatError(why); };
 }
 NativeDatArena::~NativeDatArena() = default;
 const MeleeWebNativeDat* NativeDatArena::reader() const noexcept { return &storage_->api; }
+
+NativeDatAllocationInventory NativeDatArena::visit_owned_allocations(
+    std::size_t first, std::size_t count,
+    bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+    void* context) const noexcept {
+    NativeDatAllocationInventory result{};
+    const Storage* const storage = storage_.get();
+    if (!storage || !storage->identity) return result;
+
+    const auto identity = storage->identity.get();
+    const auto allocation_count = storage->allocations.size();
+    const auto total_bytes = storage->bytes;
+    result.arena_storage = storage;
+    result.identity_token = identity;
+    result.allocation_count = allocation_count;
+    result.total_bytes = total_bytes;
+
+    if (allocation_count > native_dat_allocation_count_max ||
+        total_bytes > native_dat_allocation_bytes_max ||
+        first > allocation_count || count > allocation_count - first ||
+        (count == 0 && visitor != nullptr) || (count != 0 && visitor == nullptr)) {
+        result.status = NativeDatAllocationVisitStatus::InvalidArgument;
+        return result;
+    }
+
+    std::size_t sum = 0;
+    const bool full_traversal = first == 0 && count == allocation_count;
+    const auto maximum = std::numeric_limits<std::uintptr_t>::max();
+    for (std::size_t offset = 0; offset < count; ++offset) {
+        const std::size_t ordinal = first + offset;
+        const auto& allocation = storage->allocations[ordinal];
+        const auto address = reinterpret_cast<std::uintptr_t>(allocation.pointer);
+        if (!allocation.pointer || allocation.bytes == 0 ||
+            allocation.bytes > maximum - address ||
+            (full_traversal && (allocation.bytes > native_dat_allocation_bytes_max - sum))) {
+            result.status = NativeDatAllocationVisitStatus::InvalidOwner;
+            return result;
+        }
+        if (full_traversal) sum += allocation.bytes;
+        const NativeDatAllocationRange row{ordinal, allocation.pointer, allocation.bytes};
+        if (!visitor(row, context)) {
+            result.visited_count = offset;
+            result.status = NativeDatAllocationVisitStatus::Aborted;
+            return result;
+        }
+        result.visited_count = offset + 1;
+    }
+
+    if (storage_.get() != storage || storage->identity.get() != identity ||
+        storage->allocations.size() != allocation_count || storage->bytes != total_bytes ||
+        (full_traversal && sum != total_bytes)) {
+        result.status = NativeDatAllocationVisitStatus::InvalidOwner;
+        return result;
+    }
+    result.status = NativeDatAllocationVisitStatus::Complete;
+    return result;
+}
+
+struct NativeDatArena::Checkpoint::Data {
+    struct Region {
+        void* pointer;
+        std::vector<unsigned char> contents;
+    };
+    std::shared_ptr<const unsigned char> identity;
+    std::vector<Region> regions;
+    std::size_t bytes = 0;
+};
+NativeDatArena::Checkpoint::Checkpoint(std::unique_ptr<Data> data)
+    : data_(std::move(data)) {}
+NativeDatArena::Checkpoint::~Checkpoint() = default;
+NativeDatArena::Checkpoint::Checkpoint(Checkpoint&&) noexcept = default;
+NativeDatArena::Checkpoint& NativeDatArena::Checkpoint::operator=(Checkpoint&&) noexcept = default;
+std::size_t NativeDatArena::Checkpoint::bytes() const noexcept {
+    return data_ ? data_->bytes : 0;
+}
+NativeDatArena::Checkpoint NativeDatArena::checkpoint() const {
+    auto data = std::make_unique<Checkpoint::Data>();
+    data->identity = storage_->identity;
+    data->bytes = storage_->bytes;
+    data->regions.reserve(storage_->allocations.size());
+    for (const auto& allocation : storage_->allocations) {
+        const auto* first = static_cast<const unsigned char*>(allocation.pointer);
+        data->regions.push_back({allocation.pointer,
+            std::vector<unsigned char>(first, first + allocation.bytes)});
+    }
+    return Checkpoint(std::move(data));
+}
+bool NativeDatArena::can_restore(const Checkpoint& checkpoint) const noexcept {
+    const auto* saved = checkpoint.data_.get();
+    if (!saved || saved->identity != storage_->identity ||
+        saved->bytes != storage_->bytes ||
+        saved->regions.size() != storage_->allocations.size()) return false;
+    for (std::size_t i = 0; i < saved->regions.size(); ++i) {
+        if (saved->regions[i].pointer != storage_->allocations[i].pointer ||
+            saved->regions[i].contents.size() != storage_->allocations[i].bytes)
+            return false;
+    }
+    return true;
+}
+bool NativeDatArena::restore(const Checkpoint& checkpoint) noexcept {
+    if (!can_restore(checkpoint)) return false;
+    for (const auto& region : checkpoint.data_->regions)
+        std::memcpy(region.pointer, region.contents.data(), region.contents.size());
+    return true;
+}
 }

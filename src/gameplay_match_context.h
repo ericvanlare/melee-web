@@ -3,6 +3,8 @@
 #include "gameplay_player_context.h"
 #include "gameplay_collision.h"
 #include "gameplay_pad_state.h"
+#include <stddef.h>
+#include <stdint.h>
 #include <dolphin/pad.h>
 #include <stdint.h>
 #ifdef __cplusplus
@@ -31,6 +33,35 @@ int melee_web_match_scene_rng_snapshot(MeleeWebMatchContext*,
     MeleeWebMatchSceneRngSnapshot*,char*,size_t);
 #endif
 int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
+/* Current live-context allocation provenance only. This descriptor contains
+ * the allocation identity/extent and its world/lifetime tags; it is not a
+ * snapshot and does not authorize memory restoration. */
+typedef struct MeleeWebMatchContextRange {
+    const void* address;
+    size_t byte_extent;
+    uint64_t world_generation;
+    uint64_t owner_epoch;
+} MeleeWebMatchContextRange;
+typedef enum MeleeWebMatchContextRangeResult {
+    MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE=1,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_OWNER=-1,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_INVALID_ARGUMENT=-2,
+    MELEE_WEB_MATCH_CONTEXT_RANGE_UNSAFE_BOUNDARY=-3
+} MeleeWebMatchContextRangeResult;
+MeleeWebMatchContextRangeResult melee_web_match_context_range_read(
+    MeleeWebMatchContext*,MeleeWebMatchContextRange*,char*,size_t);
+/* Exact C owner value snapshot; it excludes every pointed-to source/player,
+ * camera, collision and SDK allocation. These require companion snapshots.
+ * Pointer fields are retained as typed identities and never serialized. */
+typedef struct MeleeWebMatchContextSnapshot MeleeWebMatchContextSnapshot;
+MeleeWebMatchContextSnapshot* melee_web_match_context_snapshot_capture(
+    MeleeWebMatchContext*, char*, size_t);
+int melee_web_match_context_snapshot_admit(
+    MeleeWebMatchContext*, const MeleeWebMatchContextSnapshot*, char*, size_t);
+int melee_web_match_context_snapshot_restore(
+    MeleeWebMatchContext*, const MeleeWebMatchContextSnapshot*, char*, size_t);
+void melee_web_match_context_snapshot_destroy(MeleeWebMatchContextSnapshot*);
+
 /* Source scene phases run after PAD renewal and around the original scheduler. */
 typedef int (*MeleeWebMatchTickPhase)(void*, char*, size_t);
 int melee_web_match_step_raw_phased(MeleeWebMatchContext*, const PADStatus[4],

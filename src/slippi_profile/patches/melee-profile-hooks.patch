@@ -316,3 +316,2804 @@ index 0000000..0000000 100644
          ftCo_80099894(gobj);
          return true;
      }
+diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
+--- a/src/melee/gm/gm_1A45.c
++++ b/src/melee/gm/gm_1A45.c
+@@ -1,4 +1,7 @@
+ #include "gm_1A45.h"
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++#include "slippi_profile/logical_frame_clock.h"
++#endif
+ 
+ #include "gm_1A36.h"
+ #include "gm_1A45.static.h"
+@@ -398,6 +401,20 @@
+ #include <stdlib.h>
+ extern int melee_web_controller_map_begin(void);
+ extern int melee_web_controller_map_end(void);
++/* Own-C v6 profile state; not an original clock field or renderer owner. */
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++static u32 melee_source_clock_logical_phase;
++static int melee_source_clock_logical_valid(void)
++{return melee_source_clock_logical_phase<=SLIPPI_CLOCK_COMPLETED;}
++static int melee_source_clock_logical_event(unsigned event)
++{
++    SlippiLogicalClockTransition next;
++    if(!slippi_logical_clock_transition(melee_source_clock_logical_phase,event,&next))return 0;
++    if(next.advance && gm_80479D58.unk_4!=(u32)-2)gm_80479D58.unk_4++;
++    melee_source_clock_logical_phase=next.phase;
++    return 1;
++}
++#endif
+ static struct gm_80479D58_t melee_source_clock_saved;
+ static int melee_source_clock_owner;
+ static int melee_source_clock_prepared;
+@@ -416,6 +433,9 @@
+     int owner;
+     struct gm_80479D58_t value;
+     struct gm_80479D58_t saved_value;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    u32 logical_phase, logical_identity;
++#endif
+     u64 process_mask;
+     u64* active_mask_owner;
+     u64* saved_mask_ptr;
+@@ -467,6 +487,11 @@
+ {
+     MeleeWebClockCpuStorage result = {0};
+     if (!melee_source_clock_snapshot_boundary()) return result;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(!melee_source_clock_logical_valid())return result;
++    result.profile_phase=&melee_source_clock_logical_phase;
++    result.profile_phase_bytes=sizeof(melee_source_clock_logical_phase);
++#endif
+     result.record = &gm_80479D58;
+     result.record_bytes = sizeof(gm_80479D58);
+     result.process_mask = &melee_source_clock_process_mask;
+@@ -481,6 +506,9 @@
+     if (!flow_identity || !flow_epoch || !world_generation ||
+         !melee_source_clock_lifetime || !melee_source_clock_snapshot_boundary())
+         return NULL;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(!melee_source_clock_logical_valid())return NULL;
++#endif
+     snapshot = malloc(sizeof(*snapshot));
+     if (!snapshot) return NULL;
+     snapshot->flow_identity = flow_identity;
+@@ -488,6 +516,9 @@
+     snapshot->world_generation = world_generation;
+     snapshot->clock_lifetime = melee_source_clock_lifetime;
+     snapshot->owner = melee_source_clock_owner;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    snapshot->logical_phase=melee_source_clock_logical_phase;snapshot->logical_identity=6;
++#endif
+     snapshot->value = gm_80479D58;
+     snapshot->saved_value = melee_source_clock_saved;
+     snapshot->process_mask = melee_source_clock_process_mask;
+@@ -510,6 +541,10 @@
+         snapshot->active_mask_owner != HSD_GObjLibInitData.unk_2 ||
+         !melee_source_clock_snapshot_boundary())
+         return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(snapshot->logical_identity!=6 || snapshot->logical_phase>SLIPPI_CLOCK_COMPLETED ||
++       !melee_source_clock_logical_valid())return 0;
++#endif
+     /* The typed record is copied as a read-only candidate. Admission checks
+      * stable callback/port topology and the saved baseline owner, while the
+      * live counters and process mask may advance through source pre/post and
+@@ -538,6 +573,9 @@
+         return 0;
+     gm_80479D58 = snapshot->value;
+     melee_source_clock_process_mask = snapshot->process_mask;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=snapshot->logical_phase;
++#endif
+     return 1;
+ }
+ 
+@@ -548,7 +586,11 @@
+     return melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
+              flow_epoch, world_generation) &&
+         melee_source_clock_record_equal(&snapshot->value, &gm_80479D58) &&
+-        snapshot->process_mask == melee_source_clock_process_mask;
++        snapshot->process_mask == melee_source_clock_process_mask
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++        && snapshot->logical_phase==melee_source_clock_logical_phase
++#endif
++        ;
+ }
+ 
+ int melee_web_source_clock_snapshot_bootstrap_mask_admit(
+@@ -630,7 +672,10 @@
+     melee_source_clock_in_callback = 0;
+     melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
+     melee_menu_clock_constructor_pending = 0;
+     melee_source_clock_owner = owner;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
++#endif
+     HSD_GObjLibInitData.unk_2 = &melee_source_clock_process_mask;
+     return 1;
+ }
+@@ -642,6 +687,11 @@
+         (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH &&
+          on_frame == NULL))
+         return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH &&
++       (melee_source_clock_in_callback || gm_80479D58.unk_C!=0 ||
++        !melee_source_clock_logical_valid()))return 0;
++#endif
+     if (!melee_source_clock_state_supported()) return 0;
+ 
+     /* lb_80019A30(0) is the source frame/PAD cadence edge set by
+@@ -653,9 +703,21 @@
+         !lb_80019A30(0))
+         return 0;
+ 
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH){
++        const int runnable=gm_801A46B8(0) || !gm_801A45E8(0);
++        if(!runnable)return 0;
++        /* All source gates precede completion; callbacks see the same value
++         * as the prior real draw would have published. */
++        if(!melee_source_clock_logical_event(SLIPPI_CLOCK_NEXT_PRE))return 0;
++        gm_80479D58.unk_10.unk_38_0=runnable;
++    }else
++#endif
++    {
+     gm_80479D58.unk_10.unk_38_0 =
+         gm_801A46B8(0) || !gm_801A45E8(0);
+     if (!gm_80479D58.unk_10.unk_38_0) return 0;
++    }
+     if (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH)
+         gm_EvaluateAllControllerInputs();
+     if (on_frame != NULL) {
+@@ -702,12 +764,20 @@
+     } else if (!melee_source_clock_prepared) {
+         return 0;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH &&
++       (melee_source_clock_in_callback || !melee_source_clock_logical_valid()))return 0;
++#endif
+     if (gm_80479D58.unk_0 != (u32) -2) gm_80479D58.unk_0++;
+     if (gm_80479D58.unk_8 != (u32) -2 &&
+         gm_80479D58.unk_10.unk_38_0 &&
+         (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MENU ||
+          lb_80019A30(0)))
+         gm_80479D58.unk_8++;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH)
++        melee_source_clock_logical_phase=SLIPPI_CLOCK_PENDING; /* valid phase proven before source writes */
++#endif
+     melee_source_clock_prepared = 0;
+     return 1;
+ }
+@@ -715,7 +785,14 @@
+ int melee_web_source_clock_present(void)
+ {
+     if (!melee_source_clock_owned() || melee_menu_clock_constructor_pending)
+         return 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    if(melee_source_clock_owner==MELEE_WEB_SOURCE_CLOCK_MATCH){
++        if(melee_source_clock_prepared || melee_source_clock_in_callback ||
++           gm_80479D58.unk_C!=0 || !melee_source_clock_state_supported())return 0;
++        return melee_source_clock_logical_event(SLIPPI_CLOCK_PRESENT);
++    }
++#endif
+     if (gm_80479D58.unk_4 != (u32) -2) gm_80479D58.unk_4++;
+     return 1;
+ }
+@@ -767,7 +844,10 @@
+     melee_source_clock_prepared = 0;
+     melee_source_clock_in_callback = 0;
+     melee_menu_clock_constructor_pending = 0;
+     melee_source_clock_owner = 0;
++#if defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) && MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
++    melee_source_clock_logical_phase=SLIPPI_CLOCK_COLD;
++#endif
+     return 1;
+ }
+ 
+diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
+--- a/src/sysdolphin/baselib/lobj.c
++++ b/src/sysdolphin/baselib/lobj.c
+@@ -1,4 +1,16 @@
+ #include "lobj.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++#endif
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#include <slippi_profile/lobj_presentation_cache.h>
++#define LOBJ_CACHE(p, field) (slippi_lobj_cache_require(p)->field)
++#define LOBJ_DIRTY(p) (slippi_lobj_cache_require(p)->dirty)
++#else
++#define LOBJ_CACHE(p, field) ((p)->field)
++#define LOBJ_DIRTY(p) ((p)->flags)
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ #include "gameplay_lobj_writer_diagnostic.h"
+ #include <stddef.h>
+@@ -33,9 +45,60 @@
+ static s32 lightmask_attnfunc;
+ static s32 lightmask_alpha;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++/* Preserve these canonical source symbols for the linked source policy. The
++ * self-reference in each macro expansion resolves to the original lvalue. */
++#define current_lights (*slippi_lobj_current_set_head_slot(&current_lights))
++#define active_lights (slippi_lobj_current_set_active_slots(active_lights))
++#define nb_active_lights (*slippi_lobj_current_set_count_slot(&nb_active_lights))
++#define lightmask_diffuse (*slippi_lobj_current_set_mask_slot(0, &lightmask_diffuse))
++#define lightmask_specular (*slippi_lobj_current_set_mask_slot(1, &lightmask_specular))
++#define lightmask_attnfunc (*slippi_lobj_current_set_mask_slot(2, &lightmask_attnfunc))
++#define lightmask_alpha (*slippi_lobj_current_set_mask_slot(3, &lightmask_alpha))
++
++static void current_set_state(SlippiLObjCurrentSetState* state)
++{
++    int i;
++    state->head = current_lights;
++    for (i = 0; i < MAX_GXLIGHT; i++) state->active[i] = active_lights[i];
++    state->active_count = nb_active_lights;
++    state->masks[0] = lightmask_diffuse;
++    state->masks[1] = lightmask_specular;
++    state->masks[2] = lightmask_attnfunc;
++    state->masks[3] = lightmask_alpha;
++}
++
++int melee_web_lobj_current_set_anchor_capture(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_capture(&state);
++}
++
++int melee_web_lobj_current_set_view_import(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_import(&state);
++}
++
++int melee_web_lobj_current_set_refresh_source_members(void)
++{
++    SlippiLObjCurrentSetState state;
++    current_set_state(&state);
++    return slippi_lobj_current_set_refresh_source_members(&state);
++}
++#endif
++
+ u32 HSD_LObjGetFlags(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    if (lobj == NULL) return 0;
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    return (lobj->flags & ~0x180u) | cache->dirty;
++#else
+     return lobj ? lobj->flags : 0;
++#endif
+ }
+ 
+ void HSD_LObjSetFlags(HSD_LObj* lobj, u32 flags)
+@@ -43,7 +106,14 @@
+     if (lobj == NULL) {
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    lobj->flags |= (u16) (flags & ~0x180u);
++    cache->dirty |= (u16) (flags & 0x180u);
++    slippi_lobj_dirty_setter(flags);
++#else
+     lobj->flags |= flags;
++#endif
+ }
+ 
+ void HSD_LObjClearFlags(HSD_LObj* lobj, u32 flags)
+@@ -51,7 +121,14 @@
+     if (lobj == NULL) {
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    SlippiLObjCache* cache = slippi_lobj_cache_require(lobj);
++    lobj->flags &= (u16) ~(flags & ~0x180u);
++    cache->dirty &= (u16) ~(flags & 0x180u);
++    slippi_lobj_dirty_setter(flags);
++#else
+     lobj->flags &= ~flags;
++#endif
+ }
+ 
+ GXLightID HSD_LObjGetLightMaskDiffuse(void)
+@@ -81,6 +158,9 @@
+ 
+ void HSD_LObjSetActive(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_cache_require(lobj);
++#endif
+     int idx;
+ 
+     if (HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
+@@ -91,8 +171,12 @@
+     } else {
+         idx = nb_active_lights++;
+     }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
+     active_lights[idx] = lobj;
+-    lobj->id = HSD_Index2LightID(idx);
++    LOBJ_CACHE(lobj, id) = HSD_Index2LightID(idx);
+ }
+ 
+ s32 HSD_LObjGetNbActive(void)
+@@ -122,6 +206,10 @@
+ void HSD_LObjClearActive(void)
+ {
+     int i;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
+ 
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+@@ -270,6 +358,9 @@
+ 
+ void HSD_LObjSetup(HSD_LObj* lobj, GXColor color, f32 shininess)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_cache_require(lobj);
++#endif
+     f32 k0 = shininess;
+ 
+     if (lobj->flags & LOBJ_HIDDEN || HSD_LObjGetType(lobj) == LOBJ_AMBIENT) {
+@@ -277,32 +368,32 @@
+     }
+ 
+     if ((lobj->flags & LOBJ_DIFFUSE) != 0) {
+-        if (lobj->hw_color.r != color.r || lobj->hw_color.g != color.g ||
+-            lobj->hw_color.b != color.b || lobj->hw_color.a != color.a)
++        if (LOBJ_CACHE(lobj, hw_color).r != color.r || LOBJ_CACHE(lobj, hw_color).g != color.g ||
++            LOBJ_CACHE(lobj, hw_color).b != color.b || LOBJ_CACHE(lobj, hw_color).a != color.a)
+         {
+-            GXInitLightColor(&lobj->lightobj, color);
+-            lobj->hw_color = color;
+-            lobj->flags |= LOBJ_DIFF_DIRTY;
+-        }
+-
+-        if (lobj->flags & LOBJ_DIFF_DIRTY) {
+-            GXLoadLightObjImm(&lobj->lightobj, lobj->id);
+-            lobj->flags &= ~LOBJ_DIFF_DIRTY;
+-        }
+-    }
+-
+-    if (lobj->spec_id != GX_LIGHT_NULL) {
+-        if (lobj->shininess != shininess) {
+-            lobj->shininess = shininess;
++            GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), color);
++            LOBJ_CACHE(lobj, hw_color) = color;
++            LOBJ_DIRTY(lobj) |= LOBJ_DIFF_DIRTY;
++        }
++
++        if (LOBJ_DIRTY(lobj) & LOBJ_DIFF_DIRTY) {
++            GXLoadLightObjImm(&LOBJ_CACHE(lobj, lightobj), LOBJ_CACHE(lobj, id));
++            LOBJ_DIRTY(lobj) &= ~LOBJ_DIFF_DIRTY;
++        }
++    }
++
++    if (LOBJ_CACHE(lobj, spec_id) != GX_LIGHT_NULL) {
++        if (LOBJ_CACHE(lobj, shininess) != shininess) {
++            LOBJ_CACHE(lobj, shininess) = shininess;
+             k0 *= 0.5F;
+-            GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, k0, 0.0F,
++            GXInitLightAttn(&LOBJ_CACHE(lobj, spec_lightobj), 0.0F, 0.0F, 1.0F, k0, 0.0F,
+                             1.0F - k0);
+-            lobj->flags |= LOBJ_SPEC_DIRTY;
+-        }
+-
+-        if (lobj->flags & LOBJ_SPEC_DIRTY) {
+-            GXLoadLightObjImm(&lobj->spec_lightobj, lobj->spec_id);
+-            lobj->flags &= ~LOBJ_SPEC_DIRTY;
++            LOBJ_DIRTY(lobj) |= LOBJ_SPEC_DIRTY;
++        }
++
++        if (LOBJ_DIRTY(lobj) & LOBJ_SPEC_DIRTY) {
++            GXLoadLightObjImm(&LOBJ_CACHE(lobj, spec_lightobj), LOBJ_CACHE(lobj, spec_id));
++            LOBJ_DIRTY(lobj) &= ~LOBJ_SPEC_DIRTY;
+         }
+     }
+ }
+@@ -324,28 +415,28 @@
+         Vec3 half, ldir;
+         HSD_LObj* lobj = HSD_LObjGetActiveByIndex(i);
+ 
+-        if (lobj->spec_id == GX_LIGHT_NULL) {
++        if (LOBJ_CACHE(lobj, spec_id) == GX_LIGHT_NULL) {
+             continue;
+         }
+ 
+         switch (HSD_LObjGetType(lobj)) {
+         case LOBJ_POINT:
+         case LOBJ_SPOT:
+-            PSVECSubtract(&jpos, &lobj->lvec, &ldir);
++            PSVECSubtract(&jpos, &LOBJ_CACHE(lobj, lvec), &ldir);
+             PSVECNormalize(&ldir, &ldir);
+             PSVECAdd(&ldir, &cdir, &half);
+             break;
+ 
+         case LOBJ_INFINITE:
+-            PSVECAdd(&lobj->lvec, &cdir, &half);
++            PSVECAdd(&LOBJ_CACHE(lobj, lvec), &cdir, &half);
+             break;
+ 
+         default:
+             HSD_ASSERT(617, 0);
+         }
+         PSVECNormalize(&half, &half);
+-        GXInitLightDir(&lobj->spec_lightobj, half.x, half.y, half.z);
+-        lobj->flags |= LOBJ_SPEC_DIRTY;
++        GXInitLightDir(&LOBJ_CACHE(lobj, spec_lightobj), half.x, half.y, half.z);
++        LOBJ_DIRTY(lobj) |= LOBJ_SPEC_DIRTY;
+     }
+ }
+ 
+@@ -353,15 +444,15 @@
+ {
+     u32 _ = lobj->flags;
+ 
+-    GXInitLightColor(&lobj->lightobj, lobj->color);
+-    lobj->hw_color = lobj->color;
+-    lobj->flags |= LOBJ_DIFF_DIRTY;
+-    lightmask_diffuse |= lobj->id;
++    GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), lobj->color);
++    LOBJ_CACHE(lobj, hw_color) = lobj->color;
++    LOBJ_DIRTY(lobj) |= LOBJ_DIFF_DIRTY;
++    lightmask_diffuse |= LOBJ_CACHE(lobj, id);
+ 
+     switch (HSD_LObjGetType(lobj)) {
+     case LOBJ_SPOT:
+     case LOBJ_POINT:
+-        lightmask_attnfunc |= lobj->id;
++        lightmask_attnfunc |= LOBJ_CACHE(lobj, id);
+         break;
+     case LOBJ_INFINITE:
+         break;
+@@ -370,7 +461,7 @@
+     }
+ 
+     if (lobj->flags & LOBJ_ALPHA) {
+-        lightmask_alpha |= lobj->id;
++        lightmask_alpha |= LOBJ_CACHE(lobj, id);
+     }
+ }
+ 
+@@ -378,41 +469,41 @@
+ {
+     f32 x;
+ 
+-    lobj->spec_id = spec_id;
++    LOBJ_CACHE(lobj, spec_id) = spec_id;
+     if (spec_id != 0) {
+-        GXInitLightColor(&lobj->spec_lightobj, lobj->color);
+-        lobj->shininess = 50.0F;
++        GXInitLightColor(&LOBJ_CACHE(lobj, spec_lightobj), lobj->color);
++        LOBJ_CACHE(lobj, shininess) = 50.0F;
+ 
+         x =
+ #ifdef MUST_MATCH
+             x =
+ #endif
+-                lobj->shininess;
++                LOBJ_CACHE(lobj, shininess);
+ 
+         x *= 0.5F;
+-        GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, x, 0.0F,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, spec_lightobj), 0.0F, 0.0F, 1.0F, x, 0.0F,
+                         1.0F - x);
+-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+-        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&lobj->lvec,sizeof(*lobj),__FILE__,__LINE__);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
++        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&LOBJ_CACHE(lobj, lvec),sizeof(*lobj),__FILE__,__LINE__);
+ #endif
+         switch (HSD_LObjGetType(lobj)) {
+         case 2:
+         case 3:
+-            HSD_LObjGetPosition(lobj, &lobj->lvec);
+-            MTXMultVec(mtx, &lobj->lvec, &lobj->lvec);
++            HSD_LObjGetPosition(lobj, &LOBJ_CACHE(lobj, lvec));
++            MTXMultVec(mtx, &LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
+             break;
+         case 1:
+-            HSD_LObjGetLightVector(lobj, &lobj->lvec);
+-            PSMTXMultVecSR(mtx, &lobj->lvec, &lobj->lvec);
+-            VECNormalize(&lobj->lvec, &lobj->lvec);
++            HSD_LObjGetLightVector(lobj, &LOBJ_CACHE(lobj, lvec));
++            PSMTXMultVecSR(mtx, &LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
++            VECNormalize(&LOBJ_CACHE(lobj, lvec), &LOBJ_CACHE(lobj, lvec));
+             break;
+         default:
+             HSD_ASSERT(680, 0);
+         }
+-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
+         melee_web_lobj_writer_after(lvec_writer_ticket);
+ #endif
+-        lobj->flags |= 0x100;
++        LOBJ_DIRTY(lobj) |= 0x100;
+         lightmask_specular |= spec_id;
+     }
+ }
+@@ -427,11 +518,11 @@
+     lpos.z *= 1048576.0F;
+     MTXMultVec(vmtx, &lpos, &lpos);
+     if (lobj->flags & LOBJ_DIFFUSE) {
+-        GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-        GXInitLightAttn(&lobj->lightobj, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
++        GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), 1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+     }
+     if (lobj->flags & LOBJ_SPECULAR) {
+-        GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
++        GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
+     }
+ }
+ 
+@@ -439,22 +530,22 @@
+ {
+     Vec3 lpos;
+ 
+-    GXInitLightColor(&lobj->lightobj, lobj->color);
+-    lobj->hw_color = lobj->color;
++    GXInitLightColor(&LOBJ_CACHE(lobj, lightobj), lobj->color);
++    LOBJ_CACHE(lobj, hw_color) = lobj->color;
+     HSD_LObjGetPosition(lobj, &lpos);
+     MTXMultVec(mtx, &lpos, &lpos);
+-    GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
+     if (lobj->flags & 0x40) {
+-        GXInitLightAttn(&lobj->lightobj, 1.0F, 0.0F, 0.0F, lobj->u.attn.k0,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), 1.0F, 0.0F, 0.0F, lobj->u.attn.k0,
+                         lobj->u.attn.k1, lobj->u.attn.k2);
+     } else {
+         f32 ref_br = lobj->u.spot.ref_br;
+         f32 ref_dist = lobj->u.spot.ref_dist;
+         s32 dist_func = lobj->u.spot.dist_func;
+-        GXInitLightDistAttn(&lobj->lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightSpot(&lobj->lightobj, 0.0F, 0);
+-        GXInitLightDistAttn(&lobj->spec_lightobj, ref_dist, ref_br, dist_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightSpot(&LOBJ_CACHE(lobj, lightobj), 0.0F, 0);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, spec_lightobj), ref_dist, ref_br, dist_func);
+     }
+ }
+ 
+@@ -468,11 +559,11 @@
+     HSD_LObjGetLightVector(lobj, &ldir);
+     PSMTXMultVecSR(mtx, &ldir, &ldir);
+     PSVECNormalize(&ldir, &ldir);
+-    GXInitLightPos(&lobj->lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightPos(&lobj->spec_lightobj, lpos.x, lpos.y, lpos.z);
+-    GXInitLightDir(&lobj->lightobj, ldir.x, ldir.y, ldir.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightPos(&LOBJ_CACHE(lobj, spec_lightobj), lpos.x, lpos.y, lpos.z);
++    GXInitLightDir(&LOBJ_CACHE(lobj, lightobj), ldir.x, ldir.y, ldir.z);
+     if (lobj->flags & 0x40) {
+-        GXInitLightAttn(&lobj->lightobj, lobj->u.attn.a0, lobj->u.attn.a1,
++        GXInitLightAttn(&LOBJ_CACHE(lobj, lightobj), lobj->u.attn.a0, lobj->u.attn.a1,
+                         lobj->u.attn.a2, lobj->u.attn.k0, lobj->u.attn.k1,
+                         lobj->u.attn.k2);
+     } else {
+@@ -482,14 +573,22 @@
+         s32 spot_func = lobj->u.spot.spot_func;
+         s32 dist_func = lobj->u.spot.dist_func;
+ 
+-        GXInitLightDistAttn(&lobj->lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightDistAttn(&lobj->spec_lightobj, ref_dist, ref_br, dist_func);
+-        GXInitLightSpot(&lobj->lightobj, cutoff, spot_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightDistAttn(&LOBJ_CACHE(lobj, spec_lightobj), ref_dist, ref_br, dist_func);
++        GXInitLightSpot(&LOBJ_CACHE(lobj, lightobj), cutoff, spot_func);
+     }
+ }
+ 
+ void HSD_LObjSetupInit(HSD_CObj* cobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_lobj_current_set_view_active())
++        slippi_lobj_current_set_source_mutated();
++#endif
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    for (HSD_SList* n = current_lights; n != NULL; n = n->next)
++        slippi_lobj_cache_require(n->data);
++#endif
+     MtxPtr vmtx;
+     int i, num, idx;
+     HSD_SList* list;
+@@ -541,7 +640,7 @@
+         HSD_LObjSetActive(lobj);
+         idx = HSD_LObjGetNbActive();
+ 
+-        lobj->spec_id = GX_LIGHT_NULL;
++        LOBJ_CACHE(lobj, spec_id) = GX_LIGHT_NULL;
+ 
+         switch (type) {
+         case LOBJ_INFINITE:
+@@ -563,7 +662,7 @@
+             setup_diffuse_lightobj(lobj);
+             break;
+         case LOBJ_SPECULAR:
+-            setup_spec_lightobj(lobj, vmtx, lobj->id);
++            setup_spec_lightobj(lobj, vmtx, LOBJ_CACHE(lobj, id));
+             num++;
+             break;
+         }
+@@ -603,7 +702,7 @@
+         if (!(lobj = HSD_LObjGetActiveByIndex(i))) {
+             return;
+         }
+-        HSD_LObjSetup(lobj, lobj->color, lobj->shininess);
++        HSD_LObjSetup(lobj, lobj->color, LOBJ_CACHE(lobj, shininess));
+     }
+ }
+ 
+@@ -612,6 +711,15 @@
+     HSD_SList* node;
+     HSD_SList** p;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL) {
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_preflight_add(lobj)) return;
++        } else {
++            slippi_lobj_current_set_source_mutated();
++        }
++    }
++#endif
+     if (lobj != NULL) {
+         node = current_lights;
+         while (node != NULL) {
+@@ -621,13 +729,25 @@
+             }
+             node = node->next;
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (!slippi_lobj_current_set_view_active()) ref_INC(lobj);
++#else
+         ref_INC(lobj);
++#endif
+         for (p = &current_lights; *p != NULL; p = &(*p)->next) {
+             if (HSD_LObjGetPriority((*p)->data) > HSD_LObjGetPriority(lobj)) {
+                 break;
+             }
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_insert_at(p, lobj)) return;
++        } else {
++            *p = HSD_SListAllocAndPrepend(*p, lobj);
++        }
++#else
+         *p = HSD_SListAllocAndPrepend(*p, lobj);
++#endif
+     }
+ }
+ 
+@@ -643,6 +763,10 @@
+ 
+ void HSD_LObjDeleteCurrent(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL && slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_delete(lobj)) return;
++#endif
+     if (lobj != NULL) {
+         HSD_SList** p;
+         for (p = &current_lights; *p != NULL; p = &(*p)->next) {
+@@ -653,8 +777,18 @@
+                         active_lights[i] = NULL;
+                     }
+                 }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++                if (slippi_lobj_current_set_view_active()) {
++                    if (!slippi_lobj_current_set_remove_at(p, lobj)) return;
++                } else {
++                    slippi_lobj_current_set_source_mutated();
++                    *p = HSD_SListRemove(*p);
++                    HSD_LObjUnrefThis(lobj);
++                }
++#else
+                 *p = HSD_SListRemove(*p);
+                 HSD_LObjUnrefThis(lobj);
++#endif
+                 return;
+             }
+         }
+@@ -664,18 +798,39 @@
+ static inline void LObjRemoveAll(void)
+ {
+     int i;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        if (!slippi_lobj_current_set_preflight_remove_all()) return;
++    } else {
++        slippi_lobj_current_set_source_mutated();
++    }
++#endif
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+     }
+     nb_active_lights = 0;
+     while (current_lights != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_remove_at(&current_lights,
++                                                    current_lights->data)) return;
++        } else {
++            HSD_LObjUnrefThis(current_lights->data);
++            current_lights = HSD_SListRemove(current_lights);
++        }
++#else
+         HSD_LObjUnrefThis(current_lights->data);
+         current_lights = HSD_SListRemove(current_lights);
++#endif
+     }
+ }
+ 
+ void HSD_LObjDeleteCurrentAll(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (lobj != NULL && slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_delete_chain(lobj)) return;
++#endif
+     if (lobj != NULL) {
+         while (lobj != NULL) {
+             HSD_LObjDeleteCurrent(lobj);
+@@ -689,6 +844,10 @@
+ void HSD_LObjSetCurrentAll(HSD_LObj* lobj)
+ {
+     u32 _;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active() &&
++        !slippi_lobj_current_set_preflight_add(lobj)) return;
++#endif
+ 
+     LObjRemoveAll();
+     HSD_LObjAddCurrent(lobj);
+@@ -698,13 +857,30 @@
+ {
+     int i;
+     HSD_LObj* cur;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        if (!slippi_lobj_current_set_preflight_replace_all(lobj)) return;
++    } else {
++        slippi_lobj_current_set_source_mutated();
++    }
++#endif
+     for (i = 0; i < MAX_GXLIGHT; i++) {
+         active_lights[i] = NULL;
+     }
+     nb_active_lights = 0;
+     while (current_lights != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (slippi_lobj_current_set_view_active()) {
++            if (!slippi_lobj_current_set_remove_at(&current_lights,
++                                                    current_lights->data)) return;
++        } else {
++            HSD_LObjUnrefThis(current_lights->data);
++            current_lights = HSD_SListRemove(current_lights);
++        }
++#else
+         HSD_LObjUnrefThis(current_lights->data);
+         current_lights = HSD_SListRemove(current_lights);
++#endif
+     }
+     for (cur = lobj; cur != NULL; cur = cur->next) {
+         HSD_LObjAddCurrent(cur);
+@@ -798,6 +974,12 @@
+ 
+ void HSD_LObjRemoveAll(HSD_LObj* lobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_lobj_current_set_view_active()) {
++        slippi_lobj_current_set_retire_blocked();
++        return;
++    }
++#endif
+     HSD_LObj* next;
+     HSD_LObj* cur;
+ 
+@@ -909,6 +1091,9 @@
+ 
+ void HSD_LObjSetDefaultClass(HSD_LObjInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    if (info != NULL) slippi_lobj_require_descriptor(info);
++#endif
+     if (info != NULL) {
+         HSD_ASSERT(1420, hsdIsDescendantOf(info, &hsdLObj));
+     }
+@@ -1021,6 +1206,9 @@
+         {
+             *p = HSD_LObjAlloc();
+         } else {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++            slippi_lobj_require_descriptor(info);
++#endif
+             *p = hsdNew(info);
+             HSD_ASSERT(1644, *p);
+         }
+@@ -1077,6 +1265,13 @@
+ 
+ static void LObjAmnesia(HSD_ClassInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_amnesia(info);
++#endif
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (info == HSD_CLASS_INFO(&hsdLObj))
++        slippi_lobj_current_set_source_mutated();
++#endif
+     if (info == HSD_CLASS_INFO(default_class)) {
+         default_class = NULL;
+     }
+@@ -1094,4 +1289,17 @@
+     HSD_CLASS_INFO(&hsdLObj)->release = LObjRelease;
+     HSD_CLASS_INFO(&hsdLObj)->amnesia = LObjAmnesia;
+     HSD_LOBJ_INFO(&hsdLObj)->load = LObjLoad;
+-}
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_descriptor_attest(&hsdLObj);
++#endif
++}
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++void melee_web_lobj_slist_trace_sample(u32 boundary)
++{
++    HSD_ObjAllocData* descriptor = HSD_SListGetAllocData();
++    melee_web_source_memory_slist_trace_membership(boundary, current_lights,
++        descriptor, descriptor->freehead, descriptor->used, descriptor->free);
++}
++#endif
+diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
+--- a/src/sysdolphin/baselib/class.c
++++ b/src/sysdolphin/baselib/class.c
+@@ -1,4 +1,10 @@
+ #include "class.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++#include <slippi_profile/lobj_presentation_cache.h>
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+ #include "gameplay_class_piece_diagnostic.h"
+ #endif
+@@ -337,6 +343,9 @@
+ {
+     HSD_ClassInfo* info = cls->class_info;
+     info->head.nb_exist -= 1;
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_retiring(cls);
++#endif
+     hsdFreeMemPiece(cls, info->head.obj_size);
+ }
+ 
+@@ -389,6 +398,9 @@
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     melee_web_class_piece_label(cls, info, info->head.obj_size, 2, NULL);
+ #endif
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    slippi_lobj_constructed(cls, info);
++#endif
+     return cls;
+ }
+ 
+@@ -408,6 +420,9 @@
+ {
+     HSD_ClassInfo* var_r29;
+     HSD_ClassInfo* var_r28;
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    HSD_ClassInfo* presentation_previous;
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     HSD_ClassInfo* diagnostic_previous;
+ #endif
+@@ -415,6 +430,9 @@
+     HSD_ASSERT(0x249, object);
+     HSD_ASSERT(0x24A, class_info);
+     var_r29 = HSD_GetClassInfo(object);
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++    presentation_previous = var_r29;
++#endif
+ #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+     diagnostic_previous = var_r29;
+ #endif
+@@ -448,6 +466,12 @@
+     melee_web_class_piece_label(object, class_info, class_info->head.obj_size, 3, diagnostic_previous);
+ #endif
+ 
++#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
++        slippi_lobj_rebound(object, presentation_previous, class_info);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_rebound(object, presentation_previous, class_info);
++#endif
++#endif
+         return true;
+     }
+     return false;
+
+diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
+--- a/src/sysdolphin/baselib/tobj.c
++++ b/src/sysdolphin/baselib/tobj.c
+@@ -1,5 +1,15 @@
+ #include "hsd_texture_bounds.h"
+ #include "tobj.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++#include "gameplay_tobj_writer_diagnostic.h"
++#include <stddef.h>
++_Static_assert(sizeof(HSD_TObj)==172,"TObj diagnostic extent");
++_Static_assert(offsetof(HSD_TObj,mtx)==116,"TObj matrix field");
++_Static_assert(offsetof(HSD_TObj,flags)==76,"TObj flags field");
++#endif
+ 
+ #include <placeholder.h>
+ #include <string.h>
+@@ -195,6 +205,7 @@
+         goto mtxdirty;
+     mtxdirty:
+         tobj->flags |= TEX_MTX_DIRTY;
++
+         break;
+     case HSD_A_T_LOD_BIAS:
+         tobj->lod->LODBias = val->fv;
+@@ -289,6 +300,9 @@
+     tobj->tlut_no = (u8) -1;
+     tobj->tev = HSD_TObjTevLoadDesc(td->tev);
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_loaded(tobj);
++#endif
+     return 0;
+ }
+ 
+@@ -300,10 +314,18 @@
+ 
+         if (!td->class_name || !(info = hsdSearchClassInfo(td->class_name))) {
+             tobj = HSD_TObjAlloc();
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            /* Preserve the original lookup fallback; unresolved names fail closed. */
++            if (td->class_name) slippi_tobj_selected(tobj, NULL);
++#endif
++
+         } else {
+             tobj = hsdNew(info);
+             HSD_ASSERT(468, tobj);
+         }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_selected(tobj, HSD_CLASS_METHOD(tobj));
++#endif
+         HSD_TOBJ_METHOD(tobj)->load(tobj, td);
+         return tobj;
+     } else {
+@@ -387,6 +410,10 @@
+     melee_source_bool no_assert = false;
+ 
+     PAD_STACK(8);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++    const uint64_t tobj_writer_ticket = melee_web_tobj_writer_before(
++        tobj, &tobj->mtx, sizeof(*tobj), &hsdTObj, __FILE__, __LINE__);
++#endif
+ 
+     if (tobj->repeat_s && tobj->repeat_t) {
+         no_assert = true;
+@@ -419,10 +446,20 @@
+     MTXConcat(m, tobj->mtx, tobj->mtx);
+     MTXScale(m, scale.x, scale.y, scale.z);
+     MTXConcat(m, tobj->mtx, tobj->mtx);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++    melee_web_tobj_writer_after(tobj_writer_ticket);
++#endif
+ }
+ 
+ static void TObjSetupMtx(HSD_TObj* tobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    HSD_TObj presentation_scratch;
++    if (slippi_tobj_managed_require(tobj)) {
++        memcpy(&presentation_scratch, tobj, sizeof(presentation_scratch));
++        tobj = &presentation_scratch;
++    }
++#endif
+     int i;
+ 
+     if (tobj_coord(tobj) == TEX_COORD_TOON) {
+@@ -1524,6 +1561,9 @@
+ {
+     HSD_TObj* new = hsdNew((HSD_ClassInfo*) HSD_TObjGetDefaultClass());
+     HSD_ASSERT(2040, new);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_selected(new, HSD_CLASS_METHOD(new));
++#endif
+     return new;
+ }
+ 
+@@ -1628,6 +1668,9 @@
+ 
+ static void TObjAmnesia(HSD_ClassInfo* info)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_amnesia(info);
++#endif
+     if (info == HSD_CLASS_INFO(default_class)) {
+         default_class = NULL;
+     }
+@@ -1649,4 +1692,8 @@
+     HSD_TOBJ_INFO(&hsdTObj)->make_texp = TObjMakeTExp;
+ 
+     hsdTObj.make_mtx = MakeTextureMtx;
+-}
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_descriptor_attest(&hsdTObj);
++#endif
++
++}
+@@ -1148,7 +1179,11 @@ void HSD_TObjSetup(HSD_TObj* tobj)
+     GXTlutObj tlutobj;
+     GXTexObj texobj;
+     int num;
+     HSD_Tlut* tluts[8];
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    u32 tlut_names[8];
++    u32 selected_tlut_name;
++#endif
+     int nb_tluts = 0;
+     u32 tlut_name = GX_TLUT0;
+     u32 big_tlut_name = GX_BIGTLUT0;
+@@ -1202,25 +1237,47 @@ void HSD_TObjSetup(HSD_TObj* tobj)
+                 }
+             }
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+             if (i < nb_tluts) {
+-                tlut->tlut_name = tluts[i]->tlut_name;
++                selected_tlut_name = tlut_names[i];
+             } else if (nb_tluts < 8) {
+                 if (tlut->n_entries >= 256) {
+-                    tlut->tlut_name = big_tlut_name++;
++                    selected_tlut_name = big_tlut_name++;
+                 } else {
+-                    tlut->tlut_name = tlut_name++;
++                    selected_tlut_name = tlut_name++;
+                 }
+                 GXInitTlutObj(&tlutobj, tlut->lut, tlut->fmt, tlut->n_entries);
+-                GXLoadTlut(&tlutobj, tlut->tlut_name);
+-                tluts[nb_tluts++] = tlut;
++                GXLoadTlut(&tlutobj, selected_tlut_name);
++                tluts[nb_tluts] = tlut;
++                tlut_names[nb_tluts++] = selected_tlut_name;
+             } else {
+-                tlut->tlut_name = GX_TLUT0;
++                selected_tlut_name = GX_TLUT0;
+             }
++#else
++            if (i < nb_tluts) {
++                tlut->tlut_name = tluts[i]->tlut_name;
++            } else if (nb_tluts < 8) {
++                if (tlut->n_entries >= 256) {
++                    tlut->tlut_name = big_tlut_name++;
++                } else {
++                    tlut->tlut_name = tlut_name++;
++                }
++                GXInitTlutObj(&tlutobj, tlut->lut, tlut->fmt, tlut->n_entries);
++                GXLoadTlut(&tlutobj, tlut->tlut_name);
++                tluts[nb_tluts++] = tlut;
++            } else {
++                tlut->tlut_name = GX_TLUT0;
++            }
++#endif
+ 
+             GXInitTexObjCI(&texobj, imagedesc->image_ptr, imagedesc->width,
+                            imagedesc->height, imagedesc->format, tobj->wrap_s,
+                            tobj->wrap_t,
+                            imagedesc->mipmap ? GX_TRUE : GX_FALSE,
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++                           selected_tlut_name);
++#else
+                            tlut->tlut_name);
++#endif
+             if (min_filter == GX_LIN_MIP_LIN) {
+                 min_filter = GX_LIN_MIP_NEAR;
+             }
+diff --git a/src/sysdolphin/baselib/shadow.c b/src/sysdolphin/baselib/shadow.c
+--- a/src/sysdolphin/baselib/shadow.c
++++ b/src/sysdolphin/baselib/shadow.c
+@@ -43,6 +43,7 @@
+     shadowTObj->wrap_s = 0;
+     shadowTObj->wrap_t = 0;
+     shadowTObj->flags = 0x540103;
++
+     shadowTObj->imagedesc = HSD_ImageDescAlloc();
+     return shadowTObj;
+ }
+
+diff --git a/src/melee/gr/grizumi.c b/src/melee/gr/grizumi.c
+--- a/src/melee/gr/grizumi.c
++++ b/src/melee/gr/grizumi.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/tobj_presentation_cache.h>
++#endif
+ #include "grizumi.h"
+ 
+ #include "granime.h"
+@@ -316,6 +319,9 @@
+         tobj->src = 0;
+         tobj->wrap_s = 0;
+         tobj->wrap_t = 0;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        slippi_tobj_unsupported_write(tobj);
++#endif
+         tobj->flags = (tobj->flags & ~0x1FF) | 0x103;
+     } else {
+         OSReport("%s:%d:Warning: not found tobj !\n", __FILE__, 387);
+@@ -854,6 +860,9 @@
+     Ground* gp = GET_GROUND(gobj);
+     IzumiReflection* refl = HSD_GObjGetUserData(gp->u.izumi.xC8);
+     HSD_TObj* tobj = gp->u.izumi.xC4;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_tobj_unsupported_write(tobj);
++#endif
+     PSMTXCopy(refl->texture_matrix, tobj->mtx);
+     grDisplay_801C5DB0(gobj, renderpass);
+ }
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -1,5 +1,9 @@
+ #include "ground.h"
+ 
++#ifdef MELEE_WEB_SLIPPI_PROFILE
++#include <slippi_profile/dynamics_fix.h>
++#endif
++
+ #ifdef TARGET_PC
+ #include "gameplay_effect_banks.h"
+ #include "gameplay_stage_map.h"
+@@ -1102,6 +1106,11 @@ static void Ground_801C1D38(HSD_GObj* gobj)
+ {
+     Ground* gp = gobj->user_data;
+     if (gp->xC_callback != NULL) {
+         gp->xC_callback(gobj);
+     }
++#if defined(MELEE_WEB_SLIPPI_PROFILE) && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
++    MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    slippi_profile_refresh_ground_matrices((HSD_JObj *) gobj->hsd_obj);
++#endif
+ }
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "fighter.h"
+ #if defined(MELEE_WEB_GAMEPLAY)
+ #include "gameplay_fighter_assets.h"
+@@ -952,6 +955,11 @@
+         }
+     }
+     ftLib_800867E8(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_created(fp, &fighter_alloc_data, sizeof(*fp))) {
++        __builtin_trap();
++    }
++#endif
+     return gobj;
+ }
+ 
+@@ -3189,6 +3197,11 @@
+     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
+     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
+     HSD_ObjFree(&fighter_dat_attrs_alloc_data, fp->dat_attrs_backup);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_retiring(fp)) {
++        __builtin_trap();
++    }
++#endif
+     if (!melee_web_source_memory_fighter_release(fp)) {
+         __builtin_trap();
+     }
+diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
+--- a/src/melee/ft/ftlib.c
++++ b/src/melee/ft/ftlib.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "ftlib.h"
+ 
+ #ifdef MELEE_WEB_SLIPPI_PROFILE
+@@ -520,6 +523,11 @@
+     HSD_GObj* camera_gobj;
+ 
+     Fighter* fp = GET_FIGHTER(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!slippi_fighter_projection_require(fp)) {
++        __builtin_trap();
++    }
++#endif
+     if (!fp->x2229_b3 && !fp->x2220_b7) {
+         camera_gobj = Camera_80030A50();
+         if (camera_gobj != NULL) {
+diff --git a/src/melee/ft/ftdemo.c b/src/melee/ft/ftdemo.c
+--- a/src/melee/ft/ftdemo.c
++++ b/src/melee/ft/ftdemo.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "ftdemo.h"
+ 
+ #if defined(MELEE_WEB_GAMEPLAY)
+@@ -153,6 +156,14 @@
+         on_create_fighter[alloc_info->unk8](gobj);
+     }
+     ftLib_800867E8(gobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        Fighter* fp = gobj->user_data;
++        if (!slippi_fighter_projection_created(fp, &fighter_alloc_data, sizeof(*fp))) {
++            __builtin_trap();
++        }
++    }
++#endif
+     return gobj;
+ }
+ 
+diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
+--- a/src/melee/lb/lbshadow.c
++++ b/src/melee/lb/lbshadow.c
+@@ -1,4 +1,7 @@
+ #include "lbshadow.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include "lbvector.h"
+ #include "types.h"
+@@ -147,6 +150,11 @@
+ {
+     HSD_ASSERT(0x62U, lbshadow);
+     if (lbshadow->shadow != NULL) {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++        if (!slippi_fighter_projection_shadow_retiring(lbshadow, lbshadow->shadow)) {
++            __builtin_trap();
++        }
++#endif
+         HSD_ShadowRemove(lbshadow->shadow);
+     }
+ }
+
+diff --git a/src/sysdolphin/baselib/jobj.c b/src/sysdolphin/baselib/jobj.c
+--- a/src/sysdolphin/baselib/jobj.c
++++ b/src/sysdolphin/baselib/jobj.c
+@@ -1,4 +1,16 @@
+ #include "jobj.h"
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "gameplay_source_memory_runtime.h"
++#define PIECE_JOBJ_BEGIN(obj, leaf) \
++    MeleeWebPieceJObjTicket trace_ticket = {0}; \
++    melee_web_piece_jobj_begin((obj), (leaf), &trace_ticket)
++#define PIECE_JOBJ_END(obj) melee_web_piece_jobj_end((obj), &trace_ticket)
++#else
++#define PIECE_JOBJ_BEGIN(obj, leaf)
++#define PIECE_JOBJ_END(obj)
++#endif
+ 
+ #include <math.h>
+ #include <string.h>
+@@ -139,6 +151,8 @@
+ {
+     Vec3* scl;
+ 
++    PIECE_JOBJ_BEGIN(jobj, 1);
++
+     HSD_JObjSetupMatrix(jobj->parent);
+     if (jobj->flags & 8) {
+         if (jobj->parent != NULL && jobj->parent->scl != NULL) {
+@@ -193,6 +207,7 @@
+         jobj->mtx[1][3] = vec.y;
+         jobj->mtx[2][3] = vec.z;
+     }
++    PIECE_JOBJ_END(jobj);
+ }
+ 
+ void HSD_JObjRemoveAnimByFlags(HSD_JObj* jobj, u32 flags)
+@@ -1390,6 +1405,8 @@
+     HSD_JObj* parent;
+     HSD_RObj* robj;
+     f32 x_scale;
++
++    PIECE_JOBJ_BEGIN(jobj, 2);
+ 
+     HSD_JOBJ_METHOD(jobj)->make_mtx(jobj);
+     jobj->flags &= ~JOBJ_MTX_DIRTY;
+@@ -1440,6 +1457,7 @@
+         }
+         jobj->flags &= ~JOBJ_MTX_DIRTY;
+     }
++    PIECE_JOBJ_END(jobj);
+ }
+ 
+ void HSD_JObjSetMtxDirtySub(HSD_JObj* jobj)
+
+diff --git a/src/sysdolphin/baselib/list.c b/src/sysdolphin/baselib/list.c
+--- a/src/sysdolphin/baselib/list.c
++++ b/src/sysdolphin/baselib/list.c
+@@ -5,6 +5,18 @@
+ #include <string.h>
+ 
+ #include "debug.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++#define SLIST_TRACE_BEGIN(t, op, a, b, value) \
++    MeleeWebSListTraceTicket t = {0}; \
++    melee_web_source_memory_slist_trace_before((op), &slist_alloc_data, (a), (b), (value), &(t))
++#define SLIST_TRACE_END(t) \
++    melee_web_source_memory_slist_trace_after(&(t), slist_alloc_data.used, slist_alloc_data.free)
++#else
++#define SLIST_TRACE_BEGIN(t, op, a, b, value)
++#define SLIST_TRACE_END(t)
++#endif
+ 
+ HSD_ObjAllocData slist_alloc_data;
+ HSD_ObjAllocData dlist_alloc_data;
+@@ -32,7 +44,9 @@
+     list = HSD_ObjAlloc(HSD_SListGetAllocData());
+     HSD_ASSERT(76, list);
+ 
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_ZERO, list, NULL, NULL);
+     memset(list, 0, sizeof(HSD_SList));
++    SLIST_TRACE_END(trace);
+     return list;
+ }
+ 
+@@ -41,7 +55,9 @@
+     HSD_SList* list;
+ 
+     list = HSD_SListAlloc();
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_APPEND_DATA, list, NULL, data);
+     list->data = data;
++    SLIST_TRACE_END(trace);
+ 
+     return HSD_SListAppendList(next, list);
+ }
+@@ -51,7 +67,9 @@
+     HSD_SList* list;
+ 
+     list = HSD_SListAlloc();
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_ALLOC_PREPEND_DATA, list, NULL, data);
+     list->data = data;
++    SLIST_TRACE_END(trace);
+ 
+     return HSD_SListPrependList(next, list);
+ }
+@@ -61,11 +79,17 @@
+     HSD_ASSERT(179, next);
+ 
+     if (list != NULL) {
++        SLIST_TRACE_BEGIN(trace0, MELEE_WEB_SLIST_TRACE_APPEND_LIST, next, list, list->next);
+         next->next = list->next;
++        SLIST_TRACE_END(trace0);
++        SLIST_TRACE_BEGIN(trace1, MELEE_WEB_SLIST_TRACE_APPEND_LIST, list, next, next);
+         list->next = next;
++        SLIST_TRACE_END(trace1);
+         return list;
+     } else {
++        SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_APPEND_LIST, next, NULL, NULL);
+         next->next = NULL;
++        SLIST_TRACE_END(trace);
+         return next;
+     }
+ }
+@@ -73,7 +97,9 @@
+ HSD_SList* HSD_SListPrependList(HSD_SList* list, HSD_SList* prev)
+ {
+     HSD_ASSERT(202, prev);
++    SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_PREPEND_LIST, prev, list, list);
+     prev->next = list;
++    SLIST_TRACE_END(trace);
+     return prev;
+ }
+ 
+@@ -82,8 +108,10 @@
+     HSD_SList* next;
+ 
+     if (list != NULL) {
++        SLIST_TRACE_BEGIN(trace, MELEE_WEB_SLIST_TRACE_REMOVE, list, NULL, NULL);
+         next = list->next;
+         HSD_ObjFree(HSD_SListGetAllocData(), list);
++        SLIST_TRACE_END(trace);
+         return next;
+     }
+ 
+
+diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc.c
+--- a/src/sysdolphin/baselib/objalloc.c
++++ b/src/sysdolphin/baselib/objalloc.c
+@@ -13,6 +13,11 @@
+ #include "gameplay_source_memory_runtime.h"
+ #endif
+ #include <dolphin/os/OSAlloc.h>
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include "slippi_profile/slist_target_diagnostic.h"
++extern HSD_ObjAllocData slist_alloc_data;
++#endif
+ 
+ static objheap obj_heap = { 0, 0, -1, -1 };
+ 
+@@ -137,6 +142,13 @@
+         }
+     }
+     cur = data->freehead;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    MeleeWebSListTraceTicket trace = {0};
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_before(MELEE_WEB_SLIST_TRACE_OBJALLOC,
++            data, cur, data->freehead, data->used, data->free, &trace);
++#endif
+     data->freehead = cur->next;
+     data->used += 1;
+     data->free -= 1;
+@@ -146,6 +158,12 @@
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_alloc(data, cur, data->size);
+ #endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_after(&trace,
++            data, cur, data->freehead, data->used, data->free);
++#endif
+     return cur;
+ }
+ 
+@@ -154,6 +172,13 @@
+     HSD_ObjAllocLink* link = obj;
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_free(0, data, obj, data->size);
++#endif
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    MeleeWebSListTraceTicket trace = {0};
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_before(MELEE_WEB_SLIST_TRACE_OBJFREE,
++            data, obj, data->freehead, data->used, data->free, &trace);
+ #endif
+     link->next = data->freehead;
+     data->freehead = link;
+@@ -161,6 +186,13 @@
+     data->used -= 1;
+ #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+     melee_web_stadium_registration_free(1, data, obj, data->size);
++#endif
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
++    defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (data == &slist_alloc_data)
++        melee_web_source_memory_slist_trace_allocator_after(&trace,
++            data, obj, data->freehead, data->used, data->free);
+ #endif
+ }
+ 
+diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
+--- a/src/melee/cm/camera.c
++++ b/src/melee/cm/camera.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "camera.h"
+ 
+ #include <Runtime/platform.h>
+@@ -4128,6 +4133,17 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_main_camera_identity(HSD_GObj** gobj, GObj_RenderFunc* render,
++                                                HSD_GObjEvent* process, unsigned* x398_b3)
++{
++    *gobj = cm_80452C68.gobj;
++    *render = fn_800301D0;
++    *process = fn_8002F360;
++    *x398_b3 = (unsigned) cm_80452C68.x398_b3;
++}
++#endif
++
+ void Camera_800304E0(HSD_GObj* gobj)
+ {
+     s64 prio8;
+diff --git a/src/melee/ef/eflib.c b/src/melee/ef/eflib.c
+--- a/src/melee/ef/eflib.c
++++ b/src/melee/ef/eflib.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ /*
+  * TODO: I looked at the strings in the ASM, I think there was only
+  *       ever eflib.c and efasync.c (?) The files in this folder
+@@ -658,13 +663,26 @@
+     default:
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    SlippiParticleDispatchResult routed = slippi_particle_presentation_dispatch_begin(
++        gobj, particles_code, gobj->gx_link,
++        gobj->gx_link == 7 ? (PTCL_RENDER_LINKNO_0 | PTCL_RENDER_LINKNO_2) : PTCL_RENDER_LINKNO_1,
++        NULL, 0);
++    if (routed == SLIPPI_PARTICLE_DISPATCH_REFUSED) return;
++#endif
+     HSD_StateSetColorUpdate(1);
+     if (gobj->gx_link == 7) {
+         psDispParticles(PTCL_RENDER_LINKNO_0 | PTCL_RENDER_LINKNO_2,
+                         particles_code);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_dispatch_end(NULL, 0)) return;
++#endif
+         return;
+     }
+     psDispParticles(PTCL_RENDER_LINKNO_1, particles_code);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_dispatch_end(NULL, 0)) return;
++#endif
+ }
+ 
+ void efLib_particles_proc_main(HSD_GObj* gobj)
+diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
+--- a/src/sysdolphin/baselib/gobj.c
++++ b/src/sysdolphin/baselib/gobj.c
+@@ -1,3 +1,11 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_source_schedule.h>
++#endif
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ #include "pipeline_provenance_runtime.h"
+ #endif
+@@ -206,11 +214,22 @@
+             MeleeWebPipelineScope provenance_scope = {0};
+             melee_web_provenance_owner_begin(cur->classifier, cur->gx_link, 0, &provenance_scope);
+ #endif
++            #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++int particle_camera_ok = slippi_particle_source_camera_begin(cur, NULL, 0);
++            if (particle_camera_ok) {
++#endif
+             cur->render_cb(cur, 0);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++                particle_camera_ok = slippi_particle_source_camera_end(cur, NULL, 0);
++            }
++#endif
+ #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+             melee_web_provenance_scope_end(&provenance_scope);
+ #endif
+             HSD_GObj_804D7818 = saved;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!particle_camera_ok) return;
++#endif
+         }
+         cur = cur->next_gx;
+     }
+diff --git a/src/sysdolphin/baselib/particle.c b/src/sysdolphin/baselib/particle.c
+--- a/src/sysdolphin/baselib/particle.c
++++ b/src/sysdolphin/baselib/particle.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "particle.h"
+ 
+ #include "generator.h"
+@@ -335,6 +340,15 @@
+ 
+ void hsd_80398A08(u32 unused)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_reinitialization_allowed()) __builtin_trap();
++#endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int i;
+ 
+     (void) hsd_804D0908;
+@@ -346,6 +360,9 @@
+     (void) ptclref_804D0E5C;
+ 
+     HSD_ObjAllocInit(&hsd_804D0F60.alloc_data, sizeof(HSD_Particle), 4);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_initialized(&hsd_804D0F60.alloc_data, sizeof(HSD_Particle), 4)) __builtin_trap();
++#endif
+     PAD_STACK(16);
+ 
+     for (i = 0; i < 16; i++) {
+@@ -378,6 +395,11 @@
+                                   f32 vy, f32 vz, f32 size, f32 grav, f32 fric,
+                                   HSD_Generator* gp, int flgInterpret)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_Particle* pp;
+     HSD_Particle** slot;
+     s16 cmd_wait;
+@@ -390,6 +412,9 @@
+         return NULL;
+     }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_particle_created(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+     hsd_804D78E2 += 1;
+     if (hsd_804D78E2 > numPeakParticles) {
+         numPeakParticles = hsd_804D78E2;
+@@ -709,6 +734,9 @@
+ 
+             /* Free particle */
+             hsd_8039D048(pp);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, pp);
+             hsd_804D78E2--;
+             return next_pp;
+@@ -716,6 +744,11 @@
+ }
+ void melee_web_particle_clear_all(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int link;
+     for (link = 0; link < 16; ++link) {
+         while (hsd_804D0908[link] != NULL)
+@@ -726,6 +759,11 @@
+ 
+ void* hsd_8039930C(HSD_Particle* pp, HSD_Particle* prev)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     int bank;
+     f32 val;
+     u8* pc;
+@@ -2918,6 +2956,9 @@
+ 
+             /* Free particle */
+             hsd_8039D048(pp);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(pp, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, pp);
+             hsd_804D78E2--;
+             return next_pp;
+@@ -3021,6 +3062,11 @@
+ 
+ void hsd_8039CEAC(u32 mask)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     void* cur;
+     void* prev;
+     s32 i;
+@@ -3081,6 +3127,11 @@
+ 
+ void hsd_8039D048(void* particle)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     u32 flags = ((HSD_Particle*) particle)->kind;
+     if (flags & 0x8000) {
+         HSD_JObj** p = &hsd_804D08E8[(flags >> 12) & 7];
+@@ -3093,6 +3144,11 @@
+ 
+ void hsd_8039D0A0(HSD_Generator* gen)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     typedef struct {
+         HSD_JObj* jobj[8];
+         HSD_Particle* particle[146];
+@@ -3142,6 +3198,9 @@
+                 }
+             }
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_presentation_particle_retiring(prt, &hsd_804D0F60.alloc_data)) __builtin_trap();
++#endif
+             HSD_ObjFree(&hsd_804D0F60.alloc_data, prt);
+             hsd_804D78E2--;
+         } else {
+diff --git a/src/sysdolphin/baselib/psappsrt.c b/src/sysdolphin/baselib/psappsrt.c
+--- a/src/sysdolphin/baselib/psappsrt.c
++++ b/src/sysdolphin/baselib/psappsrt.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psappsrt.h"
+ 
+ #include <string.h>
+@@ -11,15 +16,32 @@
+ 
+ melee_source_bool psInitAppSRT(int num, int size)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_pool_reinitialization_allowed()) __builtin_trap();
++#endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     hsd_804D78DE = 0;
+     hsd_804D78D8 = 0;
+     HSD_PSAppSrt_804D7958[0] = (u16) size;
+     HSD_ObjAllocInit(&HSD_PSAppSrt_804D10B0, size, 4U);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_pool_initialized(&HSD_PSAppSrt_804D10B0, size, 4)) __builtin_trap();
++#endif
+     return 0;
+ }
+ 
+ HSD_psAppSRT* psAddGeneratorAppSRT(s32 status, u16 idnum)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+ 
+     srt = HSD_ObjAlloc(&HSD_PSAppSrt_804D10B0);
+@@ -49,39 +71,73 @@
+             hsd_804D78D8 = hsd_804D78DE;
+         }
+     }
++    #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (srt && !slippi_particle_presentation_appsrt_created(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+     return srt;
+ }
+ 
+ HSD_psAppSRT* psAddParticleAppSRT_begin(HSD_Particle* pp, s32 status)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     return (pp->appsrt = psAddGeneratorAppSRT(status, pp->idnum));
+ }
+ 
+ HSD_psAppSRT* psAddGeneratorAppSRT_begin(HSD_Generator* gp, s32 status)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     return gp->appsrt = psAddGeneratorAppSRT(status, gp->idnum);
+ }
+ 
+ int psAttachParticleAppSRT(HSD_Particle* pp, HSD_psAppSRT* srt)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     if (srt == NULL || pp == NULL || pp->appsrt != NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_attached(pp, srt, 0)) __builtin_trap();
++#endif
+     pp->appsrt = srt;
+     return (++srt->usedCount);
+ }
+ 
+ int psAttachGeneratorAppSRT(HSD_Generator* gp, HSD_psAppSRT* srt)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     if (srt == NULL || gp == NULL || gp->appsrt != NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_attached(gp, srt, 1)) __builtin_trap();
++#endif
+     gp->appsrt = srt;
+     return (++srt->usedCount);
+ }
+ 
+ int psRemoveParticleAppSRT(HSD_Particle* pp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+     int count;
+ 
+@@ -89,12 +145,18 @@
+     if (srt == NULL) {
+         return -1;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_detaching(pp, srt, 0)) __builtin_trap();
++#endif
+     count = --srt->usedCount;
+     if (count == 0) {
+         srt = pp->appsrt;
+         if (srt->freefunc != NULL) {
+             srt->freefunc(srt);
+         }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_appsrt_retiring(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+         HSD_ObjFree(&HSD_PSAppSrt_804D10B0, srt);
+         hsd_804D78DE--;
+     }
+@@ -104,6 +166,11 @@
+ 
+ int psRemoveGeneratorSRT(HSD_Generator* gp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_source_mutation_allowed())
++        __builtin_trap();
++#endif
++
+     HSD_psAppSRT* srt;
+     int count;
+ 
+@@ -118,12 +185,18 @@
+         }
+     }
+     srt = gp->appsrt;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_presentation_appsrt_detaching(gp, srt, 1)) __builtin_trap();
++#endif
+     count = --srt->usedCount;
+     if (count == 0) {
+         srt = gp->appsrt;
+         if (srt->freefunc != NULL) {
+             srt->freefunc(srt);
+         }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        if (!slippi_particle_presentation_appsrt_retiring(srt, &HSD_PSAppSrt_804D10B0)) __builtin_trap();
++#endif
+         HSD_ObjFree(&HSD_PSAppSrt_804D10B0, srt);
+         hsd_804D78DE--;
+     }
+diff --git a/src/sysdolphin/baselib/psdisp.c b/src/sysdolphin/baselib/psdisp.c
+--- a/src/sysdolphin/baselib/psdisp.c
++++ b/src/sysdolphin/baselib/psdisp.c
+@@ -1,3 +1,8 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psdisp.h"
+ 
+ #include <string.h>
+@@ -81,6 +86,32 @@
+ 
+ ASSERT_SIZE(HSD_PSDisp_8040C340, 0x20);
+ ASSERT_SIZE(HSD_PSDisp_8040C360, 0x10);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++uint8_t slippi_particle_source_frame_key(void) { return psFrameNum; }
++#define psFrameNum (*slippi_particle_presentation_frame_slot(&psFrameNum))
++#define prevPointSize (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_PREV_POINT_SIZE, &prevPointSize))
++#define prevLineWidth (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_PREV_LINE_WIDTH, &prevLineWidth))
++#define HSD_PSDisp_804D792C (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_BLEND_MODE, &HSD_PSDisp_804D792C))
++#define prevChanCtrl (*slippi_particle_presentation_s32_slot(SLIPPI_PARTICLE_CACHE_CHAN_CTRL, &prevChanCtrl))
++#define HSD_PSDisp_804D7914 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7914, &HSD_PSDisp_804D7914))
++#define HSD_PSDisp_804D7918 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7918, &HSD_PSDisp_804D7918))
++#define HSD_PSDisp_804D791C (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D791C, &HSD_PSDisp_804D791C))
++#define HSD_PSDisp_804D7920 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7920, &HSD_PSDisp_804D7920))
++#define HSD_PSDisp_804D7924 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7924, &HSD_PSDisp_804D7924))
++#define HSD_PSDisp_804D7928 (*slippi_particle_presentation_f32_slot(SLIPPI_PARTICLE_CACHE_HSD_804D7928, &HSD_PSDisp_804D7928))
++#define prevChanMat (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_CHAN_MAT, &prevChanMat))
++#define prevChanAmb (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_CHAN_AMB, &prevChanAmb))
++#define prevColorPrim (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_PRIM, &prevColorPrim))
++#define prevColorEnv (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_ENV, &prevColorEnv))
++#define prevColorMat (*slippi_particle_presentation_color_slot(SLIPPI_PARTICLE_CACHE_PREV_COLOR_MAT, &prevColorMat))
++#define vmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_VMTX, &vmtx))
++#define rvmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_RVMTX, &rvmtx))
++#define pvmtx (*slippi_particle_presentation_mtx_slot(SLIPPI_PARTICLE_CACHE_PVMTX, &pvmtx))
++#define prj (slippi_particle_presentation_projection_slot(prj))
++#define HSD_PSDisp_804D7948 (*slippi_particle_presentation_slot_array2(&HSD_PSDisp_804D7948))
++#define HSD_PSDisp_804D7908 (*slippi_particle_presentation_fog_slot(&HSD_PSDisp_804D7908))
++#endif
++
+ 
+ void setVtxDesc(s32 fmt)
+ {
+@@ -1258,6 +1289,15 @@
+ 
+ static inline void psDispSubAPPSRTPoint(HSD_Particle* pp)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_psAppSRT app_scratch;
++    HSD_psAppSRT* app_view = slippi_particle_presentation_app_srt_view(pp->appsrt, &app_scratch);
++    if (!app_view) __builtin_trap();
++#define SLIPPI_APP app_view
++#else
++#define SLIPPI_APP (pp->appsrt)
++#endif
++
+     Mtx scratch_mtx;
+     Vec3 scratch_scale;
+     f32 cur_x;
+@@ -1269,58 +1309,58 @@
+     u8 w;
+ 
+     psSetCurrentMtx(GX_PNMTX1);
+-    if (pp->appsrt != NULL) {
+-        if (pp->appsrt->frameNum != psFrameNum) {
++    if (SLIPPI_APP != NULL) {
++        if (SLIPPI_APP->frameNum != psFrameNum) {
+             f32 scale_x;
+             f32 scale_y;
+ 
+-            if (pp->appsrt->status != PS_APPSTATUS_STILL) {
+-                Vec3* translate = &pp->appsrt->translate;
+-                Vec3* rotate = (Vec3*) &pp->appsrt->rot;
+-                Vec3* scale = &pp->appsrt->scale;
+-                MtxPtr mmtx = pp->appsrt->mmtx;
++            if (SLIPPI_APP->status != PS_APPSTATUS_STILL) {
++                Vec3* translate = &SLIPPI_APP->translate;
++                Vec3* rotate = (Vec3*) &SLIPPI_APP->rot;
++                Vec3* scale = &SLIPPI_APP->scale;
++                MtxPtr mmtx = SLIPPI_APP->mmtx;
+ 
+                 HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
+             }
+-            if (pp->appsrt->status == PS_APPSTATUS_ONCE) {
+-                pp->appsrt->status = PS_APPSTATUS_STILL;
+-            }
+-            PSMTXConcat(vmtx, pp->appsrt->mmtx, (MtxPtr) &pp->appsrt->ssx);
+-            scale_x = pp->appsrt->ssx * pp->appsrt->ssx +
+-                      pp->appsrt->x74 * pp->appsrt->x74 +
+-                      pp->appsrt->x84 * pp->appsrt->x84;
++            if (SLIPPI_APP->status == PS_APPSTATUS_ONCE) {
++                SLIPPI_APP->status = PS_APPSTATUS_STILL;
++            }
++            PSMTXConcat(vmtx, SLIPPI_APP->mmtx, (MtxPtr) &SLIPPI_APP->ssx);
++            scale_x = SLIPPI_APP->ssx * SLIPPI_APP->ssx +
++                      SLIPPI_APP->x74 * SLIPPI_APP->x74 +
++                      SLIPPI_APP->x84 * SLIPPI_APP->x84;
+             scale_x = sqrtf(scale_x);
+-            pp->appsrt->x94 = scale_x;
+-            scale_y = pp->appsrt->ssy * pp->appsrt->ssy +
+-                      pp->appsrt->x78 * pp->appsrt->x78 +
+-                      pp->appsrt->x88 * pp->appsrt->x88;
++            SLIPPI_APP->x94 = scale_x;
++            scale_y = SLIPPI_APP->ssy * SLIPPI_APP->ssy +
++                      SLIPPI_APP->x78 * SLIPPI_APP->x78 +
++                      SLIPPI_APP->x88 * SLIPPI_APP->x88;
+             scale_y = sqrtf(scale_y);
+-            pp->appsrt->x98 = scale_y;
+-            if (pp->appsrt->xA2 != 0) {
++            SLIPPI_APP->x98 = scale_y;
++            if (SLIPPI_APP->xA2 != 0) {
+                 PSMTXIdentity(scratch_mtx);
+-                scratch_mtx[0][3] = pp->appsrt->translate.x;
+-                scratch_mtx[1][3] = pp->appsrt->translate.y;
+-                scratch_mtx[2][3] = pp->appsrt->translate.z;
++                scratch_mtx[0][3] = SLIPPI_APP->translate.x;
++                scratch_mtx[1][3] = SLIPPI_APP->translate.y;
++                scratch_mtx[2][3] = SLIPPI_APP->translate.z;
+                 PSMTXConcat(vmtx, scratch_mtx, scratch_mtx);
+                 HSD_MtxGetScale(scratch_mtx, &scratch_scale);
+-                PSMTXScale((MtxPtr) &pp->appsrt->ssx, scratch_scale.x,
++                PSMTXScale((MtxPtr) &SLIPPI_APP->ssx, scratch_scale.x,
+                            scratch_scale.y, scratch_scale.z);
+-                pp->appsrt->x70 = scratch_mtx[0][3];
+-                pp->appsrt->x80 = scratch_mtx[1][3];
+-                pp->appsrt->x90 = scratch_mtx[2][3];
+-            }
+-        }
+-        pp->appsrt->frameNum = psFrameNum;
+-    }
+-    cur_x = pp->appsrt->x70 +
+-            (pp->appsrt->x6C * pp->pos.z +
+-             (pp->appsrt->ssx * pp->pos.x + pp->appsrt->ssy * pp->pos.y));
+-    cur_y = pp->appsrt->x80 +
+-            (pp->appsrt->x7C * pp->pos.z +
+-             (pp->appsrt->x74 * pp->pos.x + pp->appsrt->x78 * pp->pos.y));
+-    cur_z = pp->appsrt->x90 +
+-            (pp->appsrt->x8C * pp->pos.z +
+-             (pp->appsrt->x84 * pp->pos.x + pp->appsrt->x88 * pp->pos.y));
++                SLIPPI_APP->x70 = scratch_mtx[0][3];
++                SLIPPI_APP->x80 = scratch_mtx[1][3];
++                SLIPPI_APP->x90 = scratch_mtx[2][3];
++            }
++        }
++        SLIPPI_APP->frameNum = psFrameNum;
++    }
++    cur_x = SLIPPI_APP->x70 +
++            (SLIPPI_APP->x6C * pp->pos.z +
++             (SLIPPI_APP->ssx * pp->pos.x + SLIPPI_APP->ssy * pp->pos.y));
++    cur_y = SLIPPI_APP->x80 +
++            (SLIPPI_APP->x7C * pp->pos.z +
++             (SLIPPI_APP->x74 * pp->pos.x + SLIPPI_APP->x78 * pp->pos.y));
++    cur_z = SLIPPI_APP->x90 +
++            (SLIPPI_APP->x8C * pp->pos.z +
++             (SLIPPI_APP->x84 * pp->pos.x + SLIPPI_APP->x88 * pp->pos.y));
+     (void) (pp->pos.x, pp->pos.y);
+     (void) (pp->pos.z, pp->size);
+     if (pp->kind & Tornado) {
+@@ -1330,27 +1370,27 @@
+ 
+         calcTornadoLastPos(pp, &x, &y, &z);
+         prev_x =
+-            pp->appsrt->x70 + (pp->appsrt->x6C * z +
+-                               (pp->appsrt->ssx * x + pp->appsrt->ssy * y));
++            SLIPPI_APP->x70 + (SLIPPI_APP->x6C * z +
++                               (SLIPPI_APP->ssx * x + SLIPPI_APP->ssy * y));
+         prev_y =
+-            pp->appsrt->x80 + (pp->appsrt->x7C * z +
+-                               (pp->appsrt->x74 * x + pp->appsrt->x78 * y));
++            SLIPPI_APP->x80 + (SLIPPI_APP->x7C * z +
++                               (SLIPPI_APP->x74 * x + SLIPPI_APP->x78 * y));
+         prev_z =
+-            pp->appsrt->x90 + (pp->appsrt->x8C * z +
+-                               (pp->appsrt->x84 * x + pp->appsrt->x88 * y));
++            SLIPPI_APP->x90 + (SLIPPI_APP->x8C * z +
++                               (SLIPPI_APP->x84 * x + SLIPPI_APP->x88 * y));
+     } else {
+         prev_x =
+-            pp->appsrt->x70 + (pp->appsrt->x6C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->ssx * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->ssy * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x70 + (SLIPPI_APP->x6C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->ssx * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->ssy * (pp->pos.y - pp->vel.y)));
+         prev_y =
+-            pp->appsrt->x80 + (pp->appsrt->x7C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->x74 * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->x78 * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x80 + (SLIPPI_APP->x7C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->x74 * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->x78 * (pp->pos.y - pp->vel.y)));
+         prev_z =
+-            pp->appsrt->x90 + (pp->appsrt->x8C * (pp->pos.z - pp->vel.z) +
+-                               (pp->appsrt->x84 * (pp->pos.x - pp->vel.x) +
+-                                pp->appsrt->x88 * (pp->pos.y - pp->vel.y)));
++            SLIPPI_APP->x90 + (SLIPPI_APP->x8C * (pp->pos.z - pp->vel.z) +
++                               (SLIPPI_APP->x84 * (pp->pos.x - pp->vel.x) +
++                                SLIPPI_APP->x88 * (pp->pos.y - pp->vel.y)));
+     }
+ 
+     w = (pp->size > 42.5) ? 255.0f : 6.0f * pp->size;
+@@ -1397,10 +1437,21 @@
+             GXTexCoord1x8(1);
+         }
+     }
++
++#undef SLIPPI_APP
+ }
+ 
+ static inline void psDispSubAppSRT(HSD_Particle* pp, u8* texform)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_psAppSRT app_scratch;
++    HSD_psAppSRT* app_view = slippi_particle_presentation_app_srt_view(pp->appsrt, &app_scratch);
++    if (!app_view) __builtin_trap();
++#define SLIPPI_APP app_view
++#else
++#define SLIPPI_APP (pp->appsrt)
++#endif
++
+     Mtx draw_mtx;
+     /* Retail keeps a dead 12-byte aggregate at this position. */
+     Vec3 pad;
+@@ -1441,52 +1492,52 @@
+     f32 cur_y;
+     f32 cur_z;
+ 
+-    if (pp->appsrt->frameNum != psFrameNum) {
++    if (SLIPPI_APP->frameNum != psFrameNum) {
+         f32 scale_x;
+         f32 scale_y;
+ 
+-        if (pp->appsrt->status != PS_APPSTATUS_STILL) {
+-            Vec3* translate = &pp->appsrt->translate;
+-            Vec3* rotate = (Vec3*) &pp->appsrt->rot;
+-            Vec3* scale = &pp->appsrt->scale;
+-            MtxPtr mmtx = pp->appsrt->mmtx;
++        if (SLIPPI_APP->status != PS_APPSTATUS_STILL) {
++            Vec3* translate = &SLIPPI_APP->translate;
++            Vec3* rotate = (Vec3*) &SLIPPI_APP->rot;
++            Vec3* scale = &SLIPPI_APP->scale;
++            MtxPtr mmtx = SLIPPI_APP->mmtx;
+ 
+             HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
+         }
+-        if (pp->appsrt->status == PS_APPSTATUS_ONCE) {
+-            pp->appsrt->status = PS_APPSTATUS_STILL;
+-        }
+-        PSMTXConcat(vmtx, pp->appsrt->mmtx, (MtxPtr) &pp->appsrt->ssx);
+-        scale_x = pp->appsrt->ssx * pp->appsrt->ssx +
+-                  pp->appsrt->x74 * pp->appsrt->x74 +
+-                  pp->appsrt->x84 * pp->appsrt->x84;
++        if (SLIPPI_APP->status == PS_APPSTATUS_ONCE) {
++            SLIPPI_APP->status = PS_APPSTATUS_STILL;
++        }
++        PSMTXConcat(vmtx, SLIPPI_APP->mmtx, (MtxPtr) &SLIPPI_APP->ssx);
++        scale_x = SLIPPI_APP->ssx * SLIPPI_APP->ssx +
++                  SLIPPI_APP->x74 * SLIPPI_APP->x74 +
++                  SLIPPI_APP->x84 * SLIPPI_APP->x84;
+         scale_x = sqrtf(scale_x);
+-        pp->appsrt->x94 = scale_x;
+-        scale_y = pp->appsrt->ssy * pp->appsrt->ssy +
+-                  pp->appsrt->x78 * pp->appsrt->x78 +
+-                  pp->appsrt->x88 * pp->appsrt->x88;
++        SLIPPI_APP->x94 = scale_x;
++        scale_y = SLIPPI_APP->ssy * SLIPPI_APP->ssy +
++                  SLIPPI_APP->x78 * SLIPPI_APP->x78 +
++                  SLIPPI_APP->x88 * SLIPPI_APP->x88;
+         scale_y = sqrtf(scale_y);
+-        pp->appsrt->x98 = scale_y;
+-        if (pp->appsrt->xA2 != 0) {
++        SLIPPI_APP->x98 = scale_y;
++        if (SLIPPI_APP->xA2 != 0) {
+             PSMTXIdentity(draw_mtx);
+-            draw_mtx[0][3] = pp->appsrt->translate.x;
+-            draw_mtx[1][3] = pp->appsrt->translate.y;
+-            draw_mtx[2][3] = pp->appsrt->translate.z;
++            draw_mtx[0][3] = SLIPPI_APP->translate.x;
++            draw_mtx[1][3] = SLIPPI_APP->translate.y;
++            draw_mtx[2][3] = SLIPPI_APP->translate.z;
+             PSMTXConcat(vmtx, draw_mtx, draw_mtx);
+             HSD_MtxGetScale(draw_mtx, &scratch_scale);
+-            PSMTXScale((MtxPtr) &pp->appsrt->ssx, scratch_scale.x,
++            PSMTXScale((MtxPtr) &SLIPPI_APP->ssx, scratch_scale.x,
+                        scratch_scale.y, scratch_scale.z);
+-            pp->appsrt->x70 = draw_mtx[0][3];
+-            pp->appsrt->x80 = draw_mtx[1][3];
+-            pp->appsrt->x90 = draw_mtx[2][3];
+-        }
+-        pp->appsrt->frameNum = psFrameNum;
++            SLIPPI_APP->x70 = draw_mtx[0][3];
++            SLIPPI_APP->x80 = draw_mtx[1][3];
++            SLIPPI_APP->x90 = draw_mtx[2][3];
++        }
++        SLIPPI_APP->frameNum = psFrameNum;
+     }
+     {
+         f32 pos_x;
+         f32 pos_y;
+ 
+-        PSMTXCopy((MtxPtr) &pp->appsrt->ssx, draw_mtx);
++        PSMTXCopy((MtxPtr) &SLIPPI_APP->ssx, draw_mtx);
+         cur_x = draw_mtx[0][3] + (draw_mtx[0][2] * pp->pos.z +
+                                   (draw_mtx[0][0] * (pos_x = pp->pos.x) +
+                                    draw_mtx[0][1] * (pos_y = pp->pos.y)));
+@@ -1529,8 +1580,8 @@
+         psScaleAppSRTAxes(pp, draw_mtx);
+         (void) &pad;
+     }
+-    x_extent = pp->appsrt->x94 * pp->size;
+-    y_extent = pp->appsrt->x98 * pp->size;
++    x_extent = SLIPPI_APP->x94 * pp->size;
++    y_extent = SLIPPI_APP->x98 * pp->size;
+     if (it == NULL) {
+         ay = y_extent;
+         by = -ay;
+@@ -1546,18 +1597,18 @@
+         f32 vf2;
+         /* The retail frame reserves twelve float slots here, matching one
+          * unused copy of each AppSRT matrix element. */
+-        UNUSED f32 m00 = pp->appsrt->ssx;
+-        UNUSED f32 m01 = pp->appsrt->ssy;
+-        UNUSED f32 m02 = pp->appsrt->x6C;
+-        UNUSED f32 m03 = pp->appsrt->x70;
+-        UNUSED f32 m10 = pp->appsrt->x74;
+-        UNUSED f32 m11 = pp->appsrt->x78;
+-        UNUSED f32 m12 = pp->appsrt->x7C;
+-        UNUSED f32 m13 = pp->appsrt->x80;
+-        UNUSED f32 m20 = pp->appsrt->x84;
+-        UNUSED f32 m21 = pp->appsrt->x88;
+-        UNUSED f32 m22 = pp->appsrt->x8C;
+-        UNUSED f32 m23 = pp->appsrt->x90;
++        UNUSED f32 m00 = SLIPPI_APP->ssx;
++        UNUSED f32 m01 = SLIPPI_APP->ssy;
++        UNUSED f32 m02 = SLIPPI_APP->x6C;
++        UNUSED f32 m03 = SLIPPI_APP->x70;
++        UNUSED f32 m10 = SLIPPI_APP->x74;
++        UNUSED f32 m11 = SLIPPI_APP->x78;
++        UNUSED f32 m12 = SLIPPI_APP->x7C;
++        UNUSED f32 m13 = SLIPPI_APP->x80;
++        UNUSED f32 m20 = SLIPPI_APP->x84;
++        UNUSED f32 m21 = SLIPPI_APP->x88;
++        UNUSED f32 m22 = SLIPPI_APP->x8C;
++        UNUSED f32 m23 = SLIPPI_APP->x90;
+         if (0.0f == prj[0]) {
+             f32 prev_x;
+             f32 prev_y;
+@@ -1570,24 +1621,24 @@
+                 prev_y = pp->pos.y - pp->vel.y;
+                 prev_z = pp->pos.z - pp->vel.z;
+             }
+-            w0 = pp->appsrt->x90 +
+-                 (pp->appsrt->x8C * pp->pos.z +
+-                  (pp->appsrt->x84 * pp->pos.x + pp->appsrt->x88 * pp->pos.y));
+-            s808 = prj[1] * pp->appsrt->ssx + prj[2] * pp->appsrt->x84;
+-            s804 = prj[1] * pp->appsrt->ssy + prj[2] * pp->appsrt->x88;
+-            f16 = prj[1] * pp->appsrt->x6C + prj[2] * pp->appsrt->x8C;
+-            f20 = prj[1] * pp->appsrt->x70 + prj[2] * pp->appsrt->x90;
+-            f12 = prj[3] * pp->appsrt->x74 + prj[4] * pp->appsrt->x84;
+-            f8 = prj[3] * pp->appsrt->x78 + prj[4] * pp->appsrt->x88;
+-            f11 = prj[3] * pp->appsrt->x7C + prj[4] * pp->appsrt->x8C;
+-            f13 = prj[3] * pp->appsrt->x80 + prj[4] * pp->appsrt->x90;
++            w0 = SLIPPI_APP->x90 +
++                 (SLIPPI_APP->x8C * pp->pos.z +
++                  (SLIPPI_APP->x84 * pp->pos.x + SLIPPI_APP->x88 * pp->pos.y));
++            s808 = prj[1] * SLIPPI_APP->ssx + prj[2] * SLIPPI_APP->x84;
++            s804 = prj[1] * SLIPPI_APP->ssy + prj[2] * SLIPPI_APP->x88;
++            f16 = prj[1] * SLIPPI_APP->x6C + prj[2] * SLIPPI_APP->x8C;
++            f20 = prj[1] * SLIPPI_APP->x70 + prj[2] * SLIPPI_APP->x90;
++            f12 = prj[3] * SLIPPI_APP->x74 + prj[4] * SLIPPI_APP->x84;
++            f8 = prj[3] * SLIPPI_APP->x78 + prj[4] * SLIPPI_APP->x88;
++            f11 = prj[3] * SLIPPI_APP->x7C + prj[4] * SLIPPI_APP->x8C;
++            f13 = prj[3] * SLIPPI_APP->x80 + prj[4] * SLIPPI_APP->x90;
+             if (0.0f == w0) {
+                 return;
+             }
+             w0inv = -1.0f / w0;
+-            w1 = pp->appsrt->x90 +
+-                 (pp->appsrt->x8C * prev_z +
+-                  (pp->appsrt->x84 * prev_x + pp->appsrt->x88 * prev_y));
++            w1 = SLIPPI_APP->x90 +
++                 (SLIPPI_APP->x8C * prev_z +
++                  (SLIPPI_APP->x84 * prev_x + SLIPPI_APP->x88 * prev_y));
+             if (0.0f == w1) {
+                 return;
+             }
+@@ -1601,12 +1652,12 @@
+                                 (f12 * pp->pos.x + f8 * pp->pos.y))) -
+                 w1inv * (f13 + (f11 * prev_z + (f12 * prev_x + f8 * prev_y)));
+         } else {
+-            s800 = prj[1] * pp->appsrt->ssx + prj[2];
+-            s7FC = prj[1] * pp->appsrt->ssy + prj[2];
+-            s7F8 = prj[1] * pp->appsrt->x6C + prj[2];
+-            f17 = prj[3] * pp->appsrt->x74 + prj[4];
+-            f18 = prj[3] * pp->appsrt->x78 + prj[4];
+-            f20b = prj[3] * pp->appsrt->x7C + prj[4];
++            s800 = prj[1] * SLIPPI_APP->ssx + prj[2];
++            s7FC = prj[1] * SLIPPI_APP->ssy + prj[2];
++            s7F8 = prj[1] * SLIPPI_APP->x6C + prj[2];
++            f17 = prj[3] * SLIPPI_APP->x74 + prj[4];
++            f18 = prj[3] * SLIPPI_APP->x78 + prj[4];
++            f20b = prj[3] * SLIPPI_APP->x7C + prj[4];
+             if (pp->kind & Tornado) {
+                 f32 tx;
+                 f32 ty;
+@@ -1880,6 +1931,8 @@
+             }
+         }
+     }
++
++#undef SLIPPI_APP
+ }
+ 
+ static inline void psUpdateBillboardAxes(const Mtx inv_view)
+@@ -1932,6 +1985,12 @@
+     u32 prev_kind;
+     HSD_Particle* pp;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (melee_web_cpu_interval_active() &&
++        !slippi_particle_presentation_preparing() &&
++        !slippi_particle_presentation_dispatch_active()) __builtin_trap();
++    if (slippi_particle_presentation_dispatch_active() && sw == 0) return;
++#endif
+     alpha_compare_mode = 0;
+     prev_tex_interp_near = 0;
+     sp7A5 = 0;
+@@ -1948,6 +2007,13 @@
+     sp7B4 = 0;
+     do {
+         if (target_link & (1 << sp7B4)) {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            u8 prepared_key;
++            SlippiParticleDispatchResult routed = slippi_particle_presentation_render_data(
++                sp7B4, sw, &prepared_key, &sorted_particles, &non_edge_particles);
++            if (routed == SLIPPI_PARTICLE_DISPATCH_REFUSED) return;
++            if (routed == SLIPPI_PARTICLE_DISPATCH_SOURCE)
++#endif
+             particleSort(sp7B4, psFrameNum, &sorted_particles,
+                          &non_edge_particles);
+             if (sw == 1) {
+@@ -2299,3 +2365,67 @@
+ #ifdef MUST_MATCH
+ #pragma pop
+ #endif
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++int slippi_particle_source_preflight_visit(const SlippiParticlePassVisit* v, uint8_t key)
++{
++    unsigned link;
++    if (!v || v->code > 2 || !v->camera || !v->manager ||
++        (v->gx_link != 7 && v->gx_link != 8) ||
++        v->target_mask != (v->gx_link == 7 ? 5u : 2u)) return 0;
++    if (v->code == 0) return 1;
++    for (link = 0; link < 16; ++link) if (v->target_mask & (1u << link)) {
++        HSD_Particle* p = hsd_804D0908[link];
++        size_t visited = 0, bound = slippi_particle_presentation_particle_bound();
++        for (; p; p = p->next) {
++            unsigned kind;
++            if (visited++ >= bound || !slippi_particle_presentation_particle_require(p)) return 0;
++            if (p->linkNo != link) return 0;
++            if ((v->code == 1) != !!(p->kind & TexEdge) || (p->size < FLT_EPSILON)) continue;
++            /* psSetupTev clears this canonical kind bit in these four cases.
++             * Until that dependency has a source-phase proof, refuse BEFORE
++             * any key/sort/world writes rather than localize it into a cache. */
++            kind = p->kind & 0x80100480u;
++            if (kind == 0x80u || kind == 0x80000080u ||
++                kind == 0x00100080u || kind == 0x80100080u) return 0;
++            if (p->appsrt && !slippi_particle_presentation_app_future(p->appsrt, key, v->camera)) return 0;
++        }
++    }
++    return 1;
++}
++int slippi_particle_source_prepare_visit(const SlippiParticlePassVisit* v)
++{
++    SlippiParticlePreparedDispatch data;
++    unsigned link;
++    memset(&data, 0, sizeof(data));
++    if (v->code == 0) {
++        psDispParticles(v->target_mask, 0);
++    } else for (link = 0; link < 16; ++link) if (v->target_mask & (1u << link)) {
++        HSD_Particle* p;
++        particleSort(link, psFrameNum, &data.sorted[link], &data.nonedge[link]);
++        p = v->code == 1 ? data.sorted[link] : data.nonedge[link];
++        for (; p; p = p->next) {
++            HSD_psAppSRT* app;
++            int refreshed;
++            if (v->code == 1 && !(p->kind & TexEdge)) break;
++            if (p->size < FLT_EPSILON || !(app = p->appsrt)) continue;
++            refreshed = app->frameNum != psFrameNum;
++            if (refreshed) {
++                if (app->status != PS_APPSTATUS_STILL) {
++                    Vec3* translate = &app->translate;
++                    Vec3* rotate = (Vec3*) &app->rot;
++                    Vec3* scale = &app->scale;
++                    MtxPtr mmtx = app->mmtx;
++                    HSD_MtxSRT(mmtx, scale, rotate, translate, NULL);
++                }
++                if (app->status == PS_APPSTATUS_ONCE) app->status = PS_APPSTATUS_STILL;
++                app->frameNum = psFrameNum;
++            }
++            slippi_particle_presentation_app_prepared(app, psFrameNum, refreshed);
++            if (slippi_particle_presentation_failure()) return 0;
++        }
++    }
++    data.key = psFrameNum;
++    return slippi_particle_presentation_record_prepared(v, &data);
++}
++#endif
+diff --git a/src/sysdolphin/baselib/psdisptev.c b/src/sysdolphin/baselib/psdisptev.c
+--- a/src/sysdolphin/baselib/psdisptev.c
++++ b/src/sysdolphin/baselib/psdisptev.c
+@@ -1,8 +1,16 @@
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/particle_presentation_source.h>
++#include <slippi_profile/particle_pass_plan.h>
++#include <gameplay_cpu_interval.h>
++#endif
+ #include "psdisptev.h"
+ 
+ #include <dolphin/gx.h>
+ 
+ static u32 prevTev[2];
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#define prevTev (*slippi_particle_presentation_tev_slots(&prevTev))
++#endif
+ 
+ void psSetupTevCommon(void)
+ {
+diff --git a/src/melee/if/ifall.c b/src/melee/if/ifall.c
+--- a/src/melee/if/ifall.c
++++ b/src/melee/if/ifall.c
+@@ -155,6 +155,17 @@ static void fn_802F36B8(HSD_GObj* gobj, int unused)
+         }
+     }
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_hud_identity(HSD_GObj** camera,
++                                        GObj_RenderFunc* callback,
++                                        unsigned* hidden_state)
++{
++    *camera = ifAll_804A0FD8.gobj;
++    *callback = fn_802F36B8;
++    *hidden_state = ifAll_IsHUDHidden() ? 1u : 0u;
++}
++#endif
+ 
+ static void ifAll_802F370C(SceneDesc* arg0)
+ {
+diff --git a/src/melee/if/ifnametag.c b/src/melee/if/ifnametag.c
+--- a/src/melee/if/ifnametag.c
++++ b/src/melee/if/ifnametag.c
+@@ -181,5 +181,14 @@ void fn_802FCAC4(HSD_GObj* gobj, int pass)
+     }
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_particle_source_nametag_identity(HSD_GObj** camera,
++                                            GObj_RenderFunc* callback)
++{
++    *camera = un_804D6D68;
++    *callback = fn_802FCAC4;
++}
++#endif
+ 
+ /// un_802FD4C8 will try to inline this otherwise
+ #ifdef MUST_MATCH
+diff --git a/src/melee/if/ifmagnify.c b/src/melee/if/ifmagnify.c
+--- a/src/melee/if/ifmagnify.c
++++ b/src/melee/if/ifmagnify.c
+@@ -463,5 +463,12 @@ static void melee_web_magnify_camera(HSD_GObj* gobj, int pass)
+     ifMagnify_802FBBDC(gobj);
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++GObj_RenderFunc slippi_particle_source_magnify_callback(void)
++{
++    return melee_web_magnify_camera;
++}
++#endif
+ #endif
+ 
+ void ifMagnify_802FC3C0(s32 slot)
+diff --git a/src/melee/if/ifcoget.c b/src/melee/if/ifcoget.c
+--- a/src/melee/if/ifcoget.c
++++ b/src/melee/if/ifcoget.c
+@@ -1,4 +1,8 @@
+ #include "ifcoget.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include <melee/gm/gm_unsplit.h>
+ #include <melee/lb/lbarchive.h>
+@@ -80,12 +84,18 @@
+     HSD_GObj* gobj_light;
+     HSD_GObj* gobj_ui;
+     HSD_JObj* jobj_ui;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_ifcoget_constructing()) __builtin_trap();
++#endif
+     gobj_camera = GObj_Create(HSD_GOBJ_CLASS_CAMERA, 21, 0);
+     HSD_GObjObject_80390A70(
+         gobj_camera, HSD_GObj_CameraKind,
+         (0, HSD_CObjLoadDesc(un_804D6DA4->cameras[0].desc)));
+     GObj_SetupGXLinkMax(gobj_camera, HSD_GObj_803910D8, 9);
+     gobj_camera->gxlink_prios = 0x8400;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_ifcoget_created(gobj_camera)) __builtin_trap();
++#endif
+     gobj_light = GObj_Create(HSD_GOBJ_CLASS_LIGHT, 3, 0);
+     HSD_GObjObject_80390A70(gobj_light, HSD_GObj_LightKind,
+                             (0, lb_80011AC4(un_804D6DA4->lights)));
+diff --git a/src/sysdolphin/baselib/gobjplink.c b/src/sysdolphin/baselib/gobjplink.c
+--- a/src/sysdolphin/baselib/gobjplink.c
++++ b/src/sysdolphin/baselib/gobjplink.c
+@@ -1,4 +1,8 @@
+ #include "gobjplink.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include "debug.h"
+ #include "gobj.h"
+@@ -107,6 +111,9 @@
+         HSD_GObj_804CE3E4.b1 = 1;
+         return;
+     }
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_gobj_retiring(gobj)) __builtin_trap();
++#endif
+     GObj_RemoveUserData(gobj);
+     HSD_GObjObject_80390B0C(gobj);
+     HSD_GObjProc_8038FED4(gobj);
+diff --git a/src/melee/if/textdraw.c b/src/melee/if/textdraw.c
+--- a/src/melee/if/textdraw.c
++++ b/src/melee/if/textdraw.c
+@@ -1,4 +1,8 @@
+ #include "textdraw.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "slippi_profile/particle_source_schedule.h"
++#endif
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -282,6 +286,11 @@
+ void DevText_CreateCObj(int classifier, int p_link, int gobj_priority,
+                         int gx_link, u8 gx_priority)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    if (!slippi_particle_source_devtext_constructing(
++            classifier, p_link, gobj_priority, gx_link, gx_priority))
++        __builtin_trap();
++#endif
+     HSD_GObj* gobj = GObj_Create(classifier, p_link, gobj_priority);
+     if (gobj) {
+         HSD_CObj* cobj = HSD_CObjLoadDesc((HSD_CObjDesc*) &devtext_CObjDesc);
+@@ -289,6 +298,9 @@
+             HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
+             GObj_SetupGXLinkMax(gobj, HSD_GObj_803910D8, gx_priority);
+             gobj->gxlink_prios = 1LL << gx_link;
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++            if (!slippi_particle_source_devtext_created(gobj)) __builtin_trap();
++#endif
+         } else {
+             HSD_GObjPLink_80390228(gobj);
+         }
+
+
+diff --git a/src/sysdolphin/baselib/perf.c b/src/sysdolphin/baselib/perf.c
+--- a/src/sysdolphin/baselib/perf.c
++++ b/src/sysdolphin/baselib/perf.c
+@@ -1,4 +1,8 @@
+ #include "perf.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/perf_measurement.h>
++#endif
+ 
+ #include <string.h>
+ 
+@@ -12,35 +16,85 @@
+ 
+ void HSD_PerfInitStat(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_PerfStat* last = slippi_hsd_perf_measurement_last_for_init();
++    HSD_ASSERT(0xA1, current != 0 && last != 0);
++    if (current == 0 || last == 0) __builtin_trap();
++    *last = *current;
++    memset(current, 0, sizeof(HSD_PerfStat));
++#else
+     HSD_PerfLastStat = HSD_PerfCurrentStat;
+     memset(&HSD_PerfCurrentStat, 0, sizeof(HSD_PerfStat));
++#endif
+ }
+ 
+ void HSD_PerfSetStartTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA2, start != 0);
++    if (start == 0) __builtin_trap();
++    *start = OSGetTime();
++#else
+     start_time = OSGetTime();
++#endif
+ }
+ 
+ void HSD_PerfSetCPUTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA3, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->cpu_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.cpu_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfSetDrawTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA4, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->draw_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.draw_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfSetTotalTime(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    s64* start = slippi_hsd_perf_measurement_start_time();
++    HSD_ASSERT(0xA5, current != 0 && start != 0);
++    if (current == 0 || start == 0) __builtin_trap();
++    current->total_time =
++        (OSGetTime() - *start) / (f32) (OSSecondsToTicks(1) / 60);
++#else
+     HSD_PerfCurrentStat.total_time =
+         (OSGetTime() - start_time) / (f32) (OSSecondsToTicks(1) / 60);
++#endif
+ }
+ 
+ void HSD_PerfCountEnvelopeBlending(s32 n)
+ {
+     HSD_ASSERT(0xA4, n < 32);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA6, current != 0);
++    if (current == 0) __builtin_trap();
++    current->env_blend[n]++;
++#else
+     HSD_PerfCurrentStat.env_blend[n]++;
++#endif
+ }
+
+diff --git a/src/sysdolphin/baselib/perf.h b/src/sysdolphin/baselib/perf.h
+--- a/src/sysdolphin/baselib/perf.h
++++ b/src/sysdolphin/baselib/perf.h
+@@ -14,6 +14,17 @@
+ extern HSD_PerfStat HSD_PerfCurrentStat;
+ extern HSD_PerfStat HSD_PerfLastStat;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include "debug.h"
++#ifdef __cplusplus
++extern "C" {
++#endif
++HSD_PerfStat* slippi_hsd_perf_measurement_current(void);
++#ifdef __cplusplus
++}
++#endif
++#endif
++
+ void HSD_PerfInitStat(void);
+ void HSD_PerfSetStartTime(void);
+ void HSD_PerfSetCPUTime(void);
+@@ -23,7 +34,14 @@
+ 
+ static inline void HSD_PerfCountMtxLoad(void)
+ {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA7, current != 0);
++    if (current == 0) __builtin_trap();
++    current->nb_mtx_load += 1;
++#else
+     HSD_PerfCurrentStat.nb_mtx_load += 1;
++#endif
+ }
+ 
+ #endif
+
+diff --git a/src/sysdolphin/baselib/hsd_392A.c b/src/sysdolphin/baselib/hsd_392A.c
+--- a/src/sysdolphin/baselib/hsd_392A.c
++++ b/src/sysdolphin/baselib/hsd_392A.c
+@@ -3,6 +3,9 @@
+ #include <stdio.h>
+ 
+ #include "perf.h"
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/perf_measurement.h>
++#endif
+ #include "psstructs.h" // IWYU pragma: keep
+ 
+ // types
+@@ -48,12 +51,24 @@
+     f32 draw;
+     f32 total;
+ 
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    const HSD_PerfStat* last = slippi_hsd_perf_measurement_last();
++    HSD_ASSERT(0xA8, last != 0);
++    if (last == 0) __builtin_trap();
++    cpu = last->cpu_time;
++    hsd_804D7858 = cpu;
++    draw = last->draw_time;
++    hsd_804D785C = draw;
++    total = last->total_time;
++    hsd_804D7860 = total;
++#else
+     cpu = HSD_PerfLastStat.cpu_time;
+     hsd_804D7858 = cpu;
+     draw = HSD_PerfLastStat.draw_time;
+     hsd_804D785C = draw;
+     total = HSD_PerfLastStat.total_time;
+     hsd_804D7860 = total;
++#endif
+ 
+     if (hsd_804D7864 < cpu || hsd_804D7870-- < 0) {
+         hsd_804D7864 = cpu;
+
+diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
+--- a/src/melee/lb/lbshadow.c
++++ b/src/melee/lb/lbshadow.c
+@@ -250,7 +250,14 @@
+     imagedesc = shadow->texture->imagedesc;
+     GXSetScissor(0, 0, imagedesc->width, imagedesc->height);
+     GXLoadPosMtxImm(HSD_identityMtx, GX_PNMTX0);
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++    HSD_PerfStat* current = slippi_hsd_perf_measurement_current();
++    HSD_ASSERT(0xA9, current != 0);
++    if (current == 0) __builtin_trap();
++    current->nb_mtx_load++;
++#else
+     HSD_PerfCurrentStat.nb_mtx_load++;
++#endif
+     GXSetCurrentMtx(GX_PNMTX0);
+     HSD_ClearVtxDesc();
+     GXSetVtxDesc(GX_VA_POS, GX_DIRECT);

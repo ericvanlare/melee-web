@@ -4548,7 +4548,7 @@ index 9fc7d6b09a3f0881a23881b758adc65103d025b4..c2f7519ad4be10e92f22d53876f3cf9a
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
-index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c587ea00e 100644
+index b7e470cfb7ffb2addf957104eb65b2e931996edb..b7563fcab4e2f7bca574038cf3c31de80b352d48 100644
 --- a/src/melee/gm/gm_1A45.c
 +++ b/src/melee/gm/gm_1A45.c
 @@ -15,6 +15,7 @@
@@ -4575,7 +4575,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c
  /// @brief returns a pointer to the current scenes enter data
  void* gm_GetCurrentSceneEnterData(void)
  {
-@@ -376,3 +386,295 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
+@@ -376,3 +386,495 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
      }
      HSD_VIWaitXFBFlush();
  }
@@ -4587,6 +4587,8 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c
 + * is an ownership capability: a changed pointer is an explicit failure, not
 + * a value to overwrite during rollback. */
 +#include "gameplay_match_clock.h"
++#include "gameplay_bootstrap.h"
++#include <stdlib.h>
 +extern int melee_web_controller_map_begin(void);
 +extern int melee_web_controller_map_end(void);
 +static struct gm_80479D58_t melee_source_clock_saved;
@@ -4598,6 +4600,203 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c
 +static u64 melee_source_clock_saved_mask;
 +static int melee_source_clock_in_callback;
 +static int melee_source_clock_end_failure;
++static u64 melee_source_clock_lifetime;
++
++struct MeleeWebSourceClockSnapshot {
++    const void* flow_identity;
++    u64 flow_epoch;
++    u64 world_generation;
++    u64 clock_lifetime;
++    int owner;
++    struct gm_80479D58_t value;
++    struct gm_80479D58_t saved_value;
++    u64 process_mask;
++    u64* active_mask_owner;
++    u64* saved_mask_ptr;
++    u64 saved_mask_value;
++};
++
++STATIC_ASSERT(sizeof(struct gm_80479D58_t) == 64);
++static int melee_source_clock_owned(void);
++static int melee_source_clock_state_supported(void);
++
++static int melee_source_clock_record_equal(
++    const struct gm_80479D58_t* a, const struct gm_80479D58_t* b)
++{
++    return a->unk_0 == b->unk_0 && a->unk_4 == b->unk_4 &&
++        a->unk_8 == b->unk_8 && a->unk_C == b->unk_C &&
++        a->unk_10.x0 == b->unk_10.x0 && a->unk_10.x1 == b->unk_10.x1 &&
++        a->unk_10.x2 == b->unk_10.x2 && a->unk_10.x3 == b->unk_10.x3 &&
++        a->unk_10.x4[0] == b->unk_10.x4[0] &&
++        a->unk_10.x4[1] == b->unk_10.x4[1] &&
++        a->unk_10.xC == b->unk_10.xC &&
++        a->unk_10.unk_20 == b->unk_10.unk_20 &&
++        a->unk_10.unk_28 == b->unk_10.unk_28 &&
++        a->unk_10.unk_30 == b->unk_10.unk_30 &&
++        a->unk_10.unk_34 == b->unk_10.unk_34 &&
++        a->unk_10.unk_38_0 == b->unk_10.unk_38_0 &&
++        a->unk_10.unk_38_1 == b->unk_10.unk_38_1;
++}
++
++static int melee_source_clock_snapshot_boundary(void)
++{
++    return melee_source_clock_owned() &&
++        melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH &&
++        !melee_source_clock_prepared && !melee_source_clock_in_callback &&
++        !HSD_GObj_804D781C && !HSD_GObj_804D7818 && !HSD_GObj_804D7814 &&
++        melee_source_clock_state_supported() && gm_80479D58.unk_C == 0 &&
++        /* Begin preserves the legitimate initial NULL pair. Match ending can
++         * install the exact source pair; all other callback profiles refuse. */
++        ((gm_80479D58.unk_10.x4[0] == NULL &&
++          gm_80479D58.unk_10.x4[1] == NULL) ||
++         (gm_80479D58.unk_10.x4[0] == fn_801A46F4 &&
++          gm_80479D58.unk_10.x4[1] == fn_801A47E4)) &&
++        gm_80479D58.unk_10.xC == NULL &&
++        gm_80479D58.unk_10.unk_30 == NULL &&
++        gm_80479D58.unk_10.unk_38_1 == 0 &&
++        melee_source_clock_process_mask == gm_80479D58.unk_10.unk_28;
++}
++
++MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void)
++{
++    MeleeWebClockCpuStorage result = {0};
++    if (!melee_source_clock_snapshot_boundary()) return result;
++    result.record = &gm_80479D58;
++    result.record_bytes = sizeof(gm_80479D58);
++    result.process_mask = &melee_source_clock_process_mask;
++    result.process_mask_bytes = sizeof(melee_source_clock_process_mask);
++    return result;
++}
++MeleeWebClockCpuEndpoint melee_web_source_clock_cpu_endpoint(void)
++{
++    MeleeWebClockCpuEndpoint result = {0};
++    if (!melee_source_clock_snapshot_boundary()) return result;
++    result.valid = 1;
++    result.unk_0 = gm_80479D58.unk_0;
++    result.unk_4 = gm_80479D58.unk_4;
++    result.unk_8 = gm_80479D58.unk_8;
++    result.unk_C = gm_80479D58.unk_C;
++    result.callback_x0 = gm_80479D58.unk_10.x0;
++    result.callback_x1 = gm_80479D58.unk_10.x1;
++    result.callback_x2 = gm_80479D58.unk_10.x2;
++    result.callback_x3 = gm_80479D58.unk_10.x3;
++    result.callback_x4_0 = (uintptr_t) gm_80479D58.unk_10.x4[0];
++    result.callback_x4_1 = (uintptr_t) gm_80479D58.unk_10.x4[1];
++    result.unk_10_xC = (uintptr_t) gm_80479D58.unk_10.xC;
++    result.unk_10_x20 = gm_80479D58.unk_10.unk_20;
++    result.unk_10_x28 = gm_80479D58.unk_10.unk_28;
++    result.unk_10_x30 = (uintptr_t) gm_80479D58.unk_10.unk_30;
++    result.unk_10_x34 = gm_80479D58.unk_10.unk_34;
++    result.unk_10_x38_0 = gm_80479D58.unk_10.unk_38_0;
++    result.unk_10_x38_1 = gm_80479D58.unk_10.unk_38_1;
++    return result;
++}
++
++MeleeWebSourceClockSnapshot* melee_web_source_clock_snapshot_capture(
++    const void* flow_identity, u64 flow_epoch, u64 world_generation)
++{
++    MeleeWebSourceClockSnapshot* snapshot;
++    if (!flow_identity || !flow_epoch || !world_generation ||
++        !melee_source_clock_lifetime || !melee_source_clock_snapshot_boundary())
++        return NULL;
++    snapshot = malloc(sizeof(*snapshot));
++    if (!snapshot) return NULL;
++    snapshot->flow_identity = flow_identity;
++    snapshot->flow_epoch = flow_epoch;
++    snapshot->world_generation = world_generation;
++    snapshot->clock_lifetime = melee_source_clock_lifetime;
++    snapshot->owner = melee_source_clock_owner;
++    snapshot->value = gm_80479D58;
++    snapshot->saved_value = melee_source_clock_saved;
++    snapshot->process_mask = melee_source_clock_process_mask;
++    snapshot->active_mask_owner = HSD_GObjLibInitData.unk_2;
++    snapshot->saved_mask_ptr = melee_source_clock_saved_mask_ptr;
++    snapshot->saved_mask_value = melee_source_clock_saved_mask;
++    return snapshot;
++}
++
++int melee_web_source_clock_snapshot_admit(
++    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
++    u64 flow_epoch, u64 world_generation)
++{
++    if (!snapshot || !flow_identity || !flow_epoch || !world_generation ||
++        snapshot->flow_identity != flow_identity ||
++        snapshot->flow_epoch != flow_epoch ||
++        snapshot->world_generation != world_generation ||
++        snapshot->clock_lifetime != melee_source_clock_lifetime ||
++        snapshot->owner != MELEE_WEB_SOURCE_CLOCK_MATCH ||
++        snapshot->active_mask_owner != HSD_GObjLibInitData.unk_2 ||
++        !melee_source_clock_snapshot_boundary())
++        return 0;
++    /* The typed record is copied as a read-only candidate. Admission checks
++     * stable callback/port topology and the saved baseline owner, while the
++     * live counters and process mask may advance through source pre/post and
++     * presentation. Never dereference the saved external mask pointer here;
++     * source_clock_end() retains its existing guarded teardown check. */
++    if (snapshot->value.unk_10.x4[0] != gm_80479D58.unk_10.x4[0] ||
++        snapshot->value.unk_10.x4[1] != gm_80479D58.unk_10.x4[1] ||
++        snapshot->value.unk_10.unk_34 != gm_80479D58.unk_10.unk_34 ||
++        snapshot->value.unk_10.xC != gm_80479D58.unk_10.xC ||
++        snapshot->value.unk_10.unk_30 != gm_80479D58.unk_10.unk_30 ||
++        !melee_source_clock_record_equal(&snapshot->saved_value,
++                                         &melee_source_clock_saved) ||
++        snapshot->saved_mask_ptr != melee_source_clock_saved_mask_ptr ||
++        snapshot->saved_mask_value != melee_source_clock_saved_mask)
++        return 0;
++    return 1;
++}
++
++/* Explicit CPU writer; legacy flow-only restore does not call this. */
++int melee_web_source_clock_snapshot_restore(
++    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
++    u64 flow_epoch, u64 world_generation)
++{
++    if (!melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
++                                               flow_epoch, world_generation))
++        return 0;
++    gm_80479D58 = snapshot->value;
++    melee_source_clock_process_mask = snapshot->process_mask;
++    return 1;
++}
++
++int melee_web_source_clock_snapshot_matches(
++    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
++    u64 flow_epoch, u64 world_generation)
++{
++    return melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
++             flow_epoch, world_generation) &&
++        melee_source_clock_record_equal(&snapshot->value, &gm_80479D58) &&
++        snapshot->process_mask == melee_source_clock_process_mask;
++}
++
++int melee_web_source_clock_snapshot_bootstrap_mask_admit(
++    const MeleeWebSourceClockSnapshot* snapshot)
++{
++    return snapshot && melee_web_gameplay_clock_mask_admit(
++        snapshot->saved_mask_ptr, snapshot->saved_mask_value);
++}
++
++/* The original VS constructor publishes this exact field; the full
++ * typed record writer owns it, as source_clock_end already recognizes.
++ * All lifetime/callback/saved-baseline checks precede pointer classification.
++ * Foreign pointers never get dereferenced as proof of ownership. */
++int melee_web_source_clock_snapshot_cpu_mask_admit(
++    const MeleeWebSourceClockSnapshot* snapshot, const void* flow_identity,
++    u64 flow_epoch, u64 world_generation)
++{
++    if (!melee_web_source_clock_snapshot_admit(snapshot, flow_identity,
++                                               flow_epoch, world_generation))
++        return 0;
++    if (snapshot->saved_mask_ptr == &gm_80479D58.unk_10.unk_28)
++        return 1;
++    return melee_web_source_clock_snapshot_bootstrap_mask_admit(snapshot);
++}
++
++void melee_web_source_clock_snapshot_destroy(
++    MeleeWebSourceClockSnapshot* snapshot)
++{
++    free(snapshot);
++}
 +
 +static int melee_source_clock_owned(void)
 +{
@@ -4633,6 +4832,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..6f63ffa1d9c3fefdde01dcd2626cdf3c
 +        return 0;
 +
 +    if (!melee_web_controller_map_begin()) return 0;
++    if (++melee_source_clock_lifetime == 0) ++melee_source_clock_lifetime;
 +    melee_source_clock_saved = gm_80479D58;
 +    melee_source_clock_saved_mask_ptr = HSD_GObjLibInitData.unk_2;
 +    melee_source_clock_saved_mask =
@@ -14239,19 +14439,23 @@ index 75dfb9cefa5a12a51976e194098594662c810689..79a2d57dba4b25115ea971ef456f51ad
  {
      HSD_PadRumbleRemove(slot);
 diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
-index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..3111f783bf40b9f22b1648eed1ba46d8f01beb97 100644
+index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..a513fa4e90f147b9ac0062f524b1d7404d39d565 100644
 --- a/src/melee/lb/lb_0195.c
 +++ b/src/melee/lb/lb_0195.c
-@@ -1,3 +1,8 @@
+@@ -1,3 +1,12 @@
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_audio_bank_transport.h"
 +#include "gameplay_source_files.h"
 +#include "gameplay_platform.h"
++#include "gameplay_match_clock.h"
++#include <sysdolphin/baselib/gobj.h>
++#include <stdlib.h>
++#include <string.h>
 +#endif
  #include "lb_0195.h"
  
  #include "lb_0192.h"
-@@ -46,6 +51,12 @@ void lb_8001955C(void)
+@@ -46,6 +55,12 @@ void lb_8001955C(void)
  
  void lb_800195D0(void)
  {
@@ -14264,7 +14468,7 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..3111f783bf40b9f22b1648eed1ba46d8
      lb_800192A8(lb_8001955C);
      lb_8001CC84();
  }
-@@ -190,3 +201,60 @@ void lb_80019AAC(Event arg0)
+@@ -190,3 +205,165 @@ void lb_80019AAC(Event arg0)
  
      lb_80019628();
  }
@@ -14276,6 +14480,7 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..3111f783bf40b9f22b1648eed1ba46d8
 +static struct lb_804329F0_t melee_source_cadence_saved;
 +static OSTime melee_source_cadence_frame;
 +static int melee_source_cadence_active;
++static u64 melee_source_cadence_lifetime;
 +
 +static int melee_source_cadence_owned(void)
 +{
@@ -14290,7 +14495,9 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..3111f783bf40b9f22b1648eed1ba46d8
 +{
 +    int i;
 +
-+    if (melee_source_cadence_active || lb_804329F0.x48 != 0) return 0;
++    if (melee_source_cadence_active || lb_804329F0.x48 != 0 ||
++        melee_source_cadence_lifetime == ~(u64) 0) return 0;
++    ++melee_source_cadence_lifetime;
 +    melee_source_cadence_saved = lb_804329F0;
 +    melee_source_cadence_frame = OSSecondsToTicks(1.0F / 60);
 +    for (i = 0; i < 2; i++) {
@@ -14323,6 +14530,108 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..3111f783bf40b9f22b1648eed1ba46d8
 +    melee_source_cadence_frame = 0;
 +    melee_source_cadence_active = 0;
 +    return 1;
++}
++
++/* Typed cadence companion: simulation values rewind, ownership never does. */
++struct MeleeWebSourceCadenceSnapshot {
++    const void* flow_identity;
++    u64 flow_epoch, world_generation, lifetime;
++    struct lb_804329F0_t value, saved;
++    OSTime frame;
++};
++static int melee_source_cadence_snapshot_boundary(void)
++{
++    return melee_source_cadence_owned() && melee_source_cadence_lifetime &&
++        !HSD_GObj_804D781C && !HSD_GObj_804D7818 && !HSD_GObj_804D7814;
++}
++static int melee_source_cadence_record_equal(
++    const struct lb_804329F0_t* a, const struct lb_804329F0_t* b)
++{
++    int i;
++    for (i = 0; i < 2; ++i)
++        if (a->x0[i].x0 != b->x0[i].x0 || a->x0[i].x8 != b->x0[i].x8 ||
++            a->x0[i].x10 != b->x0[i].x10) return 0;
++    return a->x4 == b->x4 && a->x38 == b->x38 && a->x40 == b->x40 &&
++        a->x48 == b->x48 && !memcmp(&a->alarm, &b->alarm, sizeof(a->alarm));
++}
++MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void)
++{
++    MeleeWebCadenceCpuStorage result = {0};
++    if (!melee_source_cadence_snapshot_boundary()) return result;
++    result.record = &lb_804329F0;
++    result.record_bytes = sizeof(lb_804329F0);
++    return result;
++}
++MeleeWebCadenceCpuEndpoint melee_web_source_cadence_cpu_endpoint(void)
++{
++    MeleeWebCadenceCpuEndpoint result = {0};
++    if (!melee_source_cadence_snapshot_boundary()) return result;
++    result.valid = 1;
++    result.x0_0_x0 = lb_804329F0.x0[0].x0;
++    result.x0_0_x8 = lb_804329F0.x0[0].x8;
++    result.x0_0_x10 = lb_804329F0.x0[0].x10;
++    result.x0_1_x0 = lb_804329F0.x0[1].x0;
++    result.x0_1_x8 = lb_804329F0.x0[1].x8;
++    result.x0_1_x10 = lb_804329F0.x0[1].x10;
++    result.x4 = lb_804329F0.x4;
++    result.x38 = lb_804329F0.x38;
++    result.x40 = lb_804329F0.x40;
++    result.x48 = lb_804329F0.x48;
++    result.alarm = &lb_804329F0.alarm;
++    result.alarm_bytes = sizeof(lb_804329F0.alarm);
++    return result;
++}
++MeleeWebSourceCadenceSnapshot* melee_web_source_cadence_snapshot_capture(
++    const void* identity, u64 epoch, u64 world)
++{
++    MeleeWebSourceCadenceSnapshot* snapshot;
++    if (!identity || !epoch || !world ||
++        !melee_source_cadence_snapshot_boundary()) return NULL;
++    snapshot = malloc(sizeof(*snapshot));
++    if (!snapshot) return NULL;
++    snapshot->flow_identity = identity;
++    snapshot->flow_epoch = epoch;
++    snapshot->world_generation = world;
++    snapshot->lifetime = melee_source_cadence_lifetime;
++    snapshot->value = lb_804329F0;
++    snapshot->saved = melee_source_cadence_saved;
++    snapshot->frame = melee_source_cadence_frame;
++    return snapshot;
++}
++int melee_web_source_cadence_snapshot_admit(
++    const MeleeWebSourceCadenceSnapshot* snapshot, const void* identity,
++    u64 epoch, u64 world)
++{
++    return snapshot && identity && epoch && world &&
++        snapshot->flow_identity == identity && snapshot->flow_epoch == epoch &&
++        snapshot->world_generation == world &&
++        snapshot->lifetime == melee_source_cadence_lifetime &&
++        snapshot->frame == melee_source_cadence_frame &&
++        melee_source_cadence_snapshot_boundary() &&
++        melee_source_cadence_record_equal(&snapshot->saved,
++                                          &melee_source_cadence_saved) &&
++        !memcmp(&snapshot->value.alarm, &lb_804329F0.alarm,
++                 sizeof(lb_804329F0.alarm));
++}
++int melee_web_source_cadence_snapshot_restore(
++    const MeleeWebSourceCadenceSnapshot* snapshot, const void* identity,
++    u64 epoch, u64 world)
++{
++    if (!melee_web_source_cadence_snapshot_admit(snapshot, identity, epoch, world))
++        return 0;
++    lb_804329F0 = snapshot->value;
++    return 1;
++}
++int melee_web_source_cadence_snapshot_matches(
++    const MeleeWebSourceCadenceSnapshot* snapshot, const void* identity,
++    u64 epoch, u64 world)
++{
++    return melee_web_source_cadence_snapshot_admit(snapshot, identity, epoch, world) &&
++        melee_source_cadence_record_equal(&snapshot->value, &lb_804329F0);
++}
++void melee_web_source_cadence_snapshot_destroy(MeleeWebSourceCadenceSnapshot* snapshot)
++{
++    free(snapshot);
 +}
 +#endif
 diff --git a/src/melee/lb/lb_0219.c b/src/melee/lb/lb_0219.c
@@ -18263,20 +18572,33 @@ index 72776f83322214c6cee06d235e9af762c71b1d3a..2aa1009954979ea4566538cb1bc711a2
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/class.c b/src/sysdolphin/baselib/class.c
-index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76f806e122 100644
+index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..febb4973ed315e7f0db2baeea48ca2b4e9b3f3e1 100644
 --- a/src/sysdolphin/baselib/class.c
 +++ b/src/sysdolphin/baselib/class.c
-@@ -1,5 +1,9 @@
+@@ -1,4 +1,11 @@
  #include "class.h"
- 
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_class_piece_diagnostic.h"
++#endif
++
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +#include "stadium_c1_heap_owner_observer.h"
 +#endif
-+
+ 
  #include <string.h>
  
- #include "debug.h"
-@@ -94,10 +98,19 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -55,6 +62,10 @@ void hsdInitClassInfo(HSD_ClassInfo* class_info, HSD_ClassInfo* parent_info,
+         class_info->head.next = parent_info->head.child;
+         parent_info->head.child = class_info;
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_descriptor(class_info);
++#endif
+ }
+ 
+ void OSReport_PrintSpaces(s32 count)
+@@ -94,10 +105,19 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
              }
              memset(memory_list, 0, new_nb * sizeof(*memory_list));
              nb_memory_list = new_nb;
@@ -18296,7 +18618,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76
  
              new_nb = nb_memory_list * 2;
              while (idx >= new_nb) {
-@@ -108,6 +121,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -108,6 +128,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
              if (new_list == NULL) {
                  return NULL;
              }
@@ -18309,8 +18631,14 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76
  
              memcpy(new_list, memory_list,
                     sizeof(*memory_list) * nb_memory_list);
-@@ -123,6 +142,9 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -121,8 +147,15 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+             memory_list = new_list;
+             nb_memory_list = new_nb;
  
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_promote(old_list, old_nb);
++#endif
              hsdFreeMemPiece(old_list, old_nb);
              memory_list[OSRoundUp32B(old_nb) / 32 - 1]->nb_alloc += 1;
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -18319,7 +18647,7 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76
          }
      }
  
-@@ -157,6 +179,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
+@@ -157,6 +190,12 @@ HSD_MemoryEntry* GetMemoryEntry(s32 idx)
                      }
                  }
              }
@@ -18332,10 +18660,47 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76
          }
          return memory_list[idx];
      }
-@@ -228,6 +256,13 @@ void* hsdAllocMemPiece(s32 size)
+@@ -176,6 +215,10 @@ void* hsdAllocMemPiece(s32 size)
+     s32 temp_r29;
+     void* temp_r3;
+ 
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_cold(memory_list, nb_memory_list);
++#endif
+     temp_r29 = (size + 0x1F) / 32 - 1;
+     temp_r3_3 = GetMemoryEntry((size + 0x1F) / 32 - 1);
+     if (temp_r3_3 == NULL) {
+@@ -184,6 +227,10 @@ void* hsdAllocMemPiece(s32 size)
+     if ((temp_r3_2 = temp_r3_3->free_list)) {
+         temp_r3_3->free_list = temp_r3_2->next;
+         temp_r3_3->nb_free -= 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r3_2, size, temp_r3_3->size);
++#endif
+         return temp_r3_2;
+     }
+     var_r28 = temp_r3_3->next;
+@@ -204,6 +251,10 @@ void* hsdAllocMemPiece(s32 size)
+             temp_r3_4->nb_alloc += 1;
+             temp_r3_4->nb_free += 1;
+             temp_r3_3->nb_alloc += 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r5, size, temp_r3_3->size);
++#endif
+             return temp_r5;
+         }
+         var_r28 = var_r28->next;
+@@ -228,9 +279,29 @@ void* hsdAllocMemPiece(s32 size)
          var_r30->nb_free += 1;
      }
      temp_r3_3->nb_alloc += 1;
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_alloc(temp_r3, size, temp_r3_3->size);
++#endif
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +    melee_web_stadium_c1_heap_owner_record(
 +        MELEE_WEB_STADIUM_C1_HEAP_OWNER_CLASS_SLAB, temp_r3_3,
@@ -18346,6 +18711,127 @@ index b9ed7e05d3e00a2e9c1652e702388ee5f09bd0d6..6fd8b370aac507675f16d9a23afc9d76
      return temp_r3;
  }
  
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_hsdAllocMemPieceAt(s32 size, u32 site)
++{
++    void* piece = hsdAllocMemPiece(size);
++    if (piece) melee_web_class_piece_origin(piece, size, site);
++    return piece;
++}
++#endif
++
+ void hsdFreeMemPiece(void* mem, s32 size)
+ {
+     HSD_MemoryEntry* entry;
+@@ -241,19 +312,27 @@ void hsdFreeMemPiece(void* mem, s32 size)
+         piece->next = entry->free_list;
+         entry->free_list = piece;
+         entry->nb_free += 1;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_free(mem, size);
++#endif
+     }
+ }
+ 
+ /// _hsdClassAlloc
+ HSD_Class* _hsdClassAlloc(HSD_ClassInfo* info)
+ {
+-    HSD_Class* mem_piece = hsdAllocMemPiece(info->head.obj_size);
++    HSD_Class* mem_piece = hsdAllocMemPieceAt(
++        info->head.obj_size, MELEE_WEB_CLASS_PIECE_SITE_HSD_CLASS_ALLOC);
+     if (mem_piece != NULL) {
+         info->head.nb_exist += 1;
+         if (info->head.nb_exist > info->head.nb_peak) {
+             info->head.nb_peak = info->head.nb_exist;
+         }
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    if (mem_piece) melee_web_class_piece_label(mem_piece, info, info->head.obj_size, 1, NULL);
++#endif
+     return mem_piece;
+ }
+ 
+@@ -276,6 +355,10 @@ void _hsdClassAmnesia(HSD_ClassInfo* info)
+     info->head.nb_exist = 0;
+     info->head.nb_peak = 0;
+     if (info == &hsdClass) {
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_amnesia();
++#endif
+         nb_memory_list = 0;
+         memory_list = NULL;
+         current_hash = NULL;
+@@ -312,6 +395,10 @@ void* hsdNew(HSD_ClassInfo* i)
+         info->destroy(cls);
+         return NULL;
+     }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_label(cls, info, info->head.obj_size, 2, NULL);
++#endif
+     return cls;
+ }
+ 
+@@ -331,10 +418,17 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+ {
+     HSD_ClassInfo* var_r29;
+     HSD_ClassInfo* var_r28;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    HSD_ClassInfo* diagnostic_previous;
++#endif
+ 
+     HSD_ASSERT(0x249, object);
+     HSD_ASSERT(0x24A, class_info);
+     var_r29 = HSD_GetClassInfo(object);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    diagnostic_previous = var_r29;
++#endif
++
+     !var_r29;
+     var_r28 = HSD_PushClassInfo(class_info);
+     if (!(var_r28->head.flags & 1)) {
+@@ -360,6 +454,10 @@ static inline bool hsdChangeClass_inline(HSD_Obj* object,
+             class_info->head.nb_peak = class_info->head.nb_exist;
+         }
+         object->parent.class_info = class_info;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_class_piece_label(object, class_info, class_info->head.obj_size, 3, diagnostic_previous);
++#endif
++
+         return true;
+     }
+     return false;
+diff --git a/src/sysdolphin/baselib/class.h b/src/sysdolphin/baselib/class.h
+index 90de5e6fc77454f4a47357371e326aa28ee4c7eb..7b7178d2f7fcaf03e1e518e512e69721c604e7e9 100644
+--- a/src/sysdolphin/baselib/class.h
++++ b/src/sysdolphin/baselib/class.h
+@@ -3,6 +3,10 @@
+ 
+ #include <Runtime/platform.h>
+ 
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_class_piece_diagnostic.h"
++#endif
++
+ #include <sysdolphin/baselib/forward.h>
+ 
+ #define HSD_CLASS_INFO(o) ((HSD_ClassInfo*) o)
+@@ -60,6 +64,13 @@ void hsdInitClassInfo(HSD_ClassInfo* class_info, HSD_ClassInfo* parent_info,
+ void OSReport_PrintSpaces(s32 count);
+ 
+ void* hsdAllocMemPiece(s32 size);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_hsdAllocMemPieceAt(s32 size, u32 site);
++#define hsdAllocMemPieceAt(size, site) \
++    melee_web_hsdAllocMemPieceAt((size), (site))
++#else
++#define hsdAllocMemPieceAt(size, site) hsdAllocMemPiece((size))
++#endif
+ void hsdFreeMemPiece(void* mem, s32 size);
+ void* hsdNew(HSD_ClassInfo*);
+ bool hsdChangeClass(void* object, void* class_info);
 diff --git a/src/sysdolphin/baselib/cobj.c b/src/sysdolphin/baselib/cobj.c
 index ff44dcde84072dcea551c30cdb6582ac3d23a6bd..535e6449e151d8360a596cd47933f3b13c61d103 100644
 --- a/src/sysdolphin/baselib/cobj.c
@@ -18806,10 +19292,37 @@ index 869fe23793d36d2ba6e2e78c67b8e763ffa60808..884813655e20f81fe8f89be5fbb90948
                                      tex_offset = glyph_idx - 0x2000;
                                  } else {
 diff --git a/src/sysdolphin/baselib/initialize.c b/src/sysdolphin/baselib/initialize.c
-index 45a276811723073968eca0c3d049990eeb63e753..2c5fd44b6571c1a12433cf6e46918f6e8606f199 100644
+index 45a276811723073968eca0c3d049990eeb63e753..749dcb406116ffa54f8dbd2ba38ba09da8dfe1e5 100644
 --- a/src/sysdolphin/baselib/initialize.c
 +++ b/src/sysdolphin/baselib/initialize.c
-@@ -252,6 +252,19 @@ void HSD_StartRender(HSD_RenderPass pass)
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_source_memory_runtime.h"
++#endif
+ #include "initialize.h"
+ 
+ #include <stdarg.h>
+@@ -101,6 +104,9 @@ void** HSD_AllocateXFB(s32 nbuffer, GXRenderModeObj* rm)
+     if (arena_lo == arena_hi) {
+         for (i = 0; i < nbuffer; i++) {
+             FrameBuffer[i] = OSAllocFromHeap(__OSCurrHeap, fb_size);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        melee_web_source_memory_origin_event(FrameBuffer[i], fb_size, __FILE__, __LINE__, 2);
++#endif
+         }
+     } else {
+         for (i = 0; i < nbuffer; i++) {
+@@ -128,6 +134,9 @@ GXFifoObj* HSD_AllocateFifo(u32 size)
+     arena_hi = OSRoundDown32B(OSGetArenaHi());
+     if (arena_lo == 0 && arena_hi == 0) {
+         fifo = OSAllocFromHeap(__OSCurrHeap, size);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        melee_web_source_memory_origin_event(fifo, size, __FILE__, __LINE__, 2);
++#endif
+         if (fifo == NULL) {
+             HSD_Panic(__FILE__, 295, "cannot allocate memory for gx fifo.\n");
+         }
+@@ -252,6 +261,19 @@ void HSD_StartRender(HSD_RenderPass pass)
      GXSetFieldMode(rmode->field_rendering, rmode->xfbHeight < rmode->viHeight);
  }
  
@@ -18843,8 +19356,82 @@ index 692625a18cc2e6f0619cc0695282da803c2474ad..a4973b7e20aafff5ce0168e9b08e2103
  void HSD_GXSetFifoObj(GXFifoObj* fifo);
  void** HSD_AllocateXFB(s32 nbuffer, GXRenderModeObj* rm);
  GXFifoObj* HSD_AllocateFifo(u32 size);
+diff --git a/src/sysdolphin/baselib/lobj.c b/src/sysdolphin/baselib/lobj.c
+index 6fe7b8128b314b61bb10f57cc5a06a2c6134281e..ece95e028447fe13f0eb9faedce78a6809592c4b 100644
+--- a/src/sysdolphin/baselib/lobj.c
++++ b/src/sysdolphin/baselib/lobj.c
+@@ -1,4 +1,9 @@
+ #include "lobj.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_lobj_writer_diagnostic.h"
++#include <stddef.h>
++_Static_assert(offsetof(HSD_LObj,lvec)==60 && sizeof(((HSD_LObj*)0)->lvec)==12 && sizeof(HSD_LObj)==212,"Private lvec witness ABI");
++#endif
+ 
+ #include <placeholder.h>
+ 
+@@ -387,6 +392,9 @@ static void setup_spec_lightobj(HSD_LObj* lobj, Mtx mtx, s32 spec_id)
+         x *= 0.5F;
+         GXInitLightAttn(&lobj->spec_lightobj, 0.0F, 0.0F, 1.0F, x, 0.0F,
+                         1.0F - x);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        const uint64_t lvec_writer_ticket=melee_web_lobj_writer_before(lobj,&lobj->lvec,sizeof(*lobj),__FILE__,__LINE__);
++#endif
+         switch (HSD_LObjGetType(lobj)) {
+         case 2:
+         case 3:
+@@ -401,6 +409,9 @@ static void setup_spec_lightobj(HSD_LObj* lobj, Mtx mtx, s32 spec_id)
+         default:
+             HSD_ASSERT(680, 0);
+         }
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++        melee_web_lobj_writer_after(lvec_writer_ticket);
++#endif
+         lobj->flags |= 0x100;
+         lightmask_specular |= spec_id;
+     }
+diff --git a/src/sysdolphin/baselib/memory.c b/src/sysdolphin/baselib/memory.c
+index c544a9184c65c51381140625c660a7d128b74053..d19a9ad201447c6827f81bf415ec99dff61e46f1 100644
+--- a/src/sysdolphin/baselib/memory.c
++++ b/src/sysdolphin/baselib/memory.c
+@@ -1,4 +1,8 @@
+ #include "memory.h"
++#undef HSD_MemAlloc
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_source_memory_runtime.h"
++#endif
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -24,3 +28,12 @@ void* HSD_MemAlloc(ssize_t size)
+ 
+     return adr;
+ }
++
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_HSD_MemAllocAt(ssize_t size, const char* file, unsigned line)
++{
++    void* result = HSD_MemAlloc(size);
++    if (result) melee_web_source_memory_origin_event(result, (uint32_t) size, file, line, 1);
++    return result;
++}
++#endif
+diff --git a/src/sysdolphin/baselib/memory.h b/src/sysdolphin/baselib/memory.h
+index c788005215cd2982c61d3b201ef1e20ee8d195c8..cfe3ca11b3fee9c281b21b935470a08806dfcc07 100644
+--- a/src/sysdolphin/baselib/memory.h
++++ b/src/sysdolphin/baselib/memory.h
+@@ -6,4 +6,9 @@
+ void HSD_Free(void* ptr);
+ void* HSD_MemAlloc(ssize_t size);
+ 
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++void* melee_web_HSD_MemAllocAt(ssize_t size, const char* file, unsigned line);
++#define HSD_MemAlloc(size) melee_web_HSD_MemAllocAt((size), __FILE__, __LINE__)
++#endif
++
+ #endif
 diff --git a/src/sysdolphin/baselib/mobj.c b/src/sysdolphin/baselib/mobj.c
-index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bb73f48fd3f7706f45654993b6dc08c6eab5492e 100644
+index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bc7fc63d9b6f84589a27aaca8e34f82c2857f96c 100644
 --- a/src/sysdolphin/baselib/mobj.c
 +++ b/src/sysdolphin/baselib/mobj.c
 @@ -91,6 +91,14 @@ static void MObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
@@ -18862,6 +19449,26 @@ index 3ecfd29f5b7dcef6faab05a44b00838e7afa50e5..bb73f48fd3f7706f45654993b6dc08c6
      switch (type) {
      case HSD_A_M_AMBIENT_R:
          mobj->mat->ambient.r = (u8) (255.0 * val->fv);
+@@ -157,7 +165,8 @@ static int MObjLoad(HSD_MObj* mobj, HSD_MObjDesc* desc)
+     memcpy(mobj->mat, desc->mat, sizeof(HSD_Material));
+     mobj->rendermode |= RENDER_TOON;
+     if (desc->pedesc != NULL) {
+-        mobj->pe = hsdAllocMemPiece(sizeof(HSD_PEDesc));
++        mobj->pe = hsdAllocMemPieceAt(
++            sizeof(HSD_PEDesc), MELEE_WEB_CLASS_PIECE_SITE_MOBJ_PEDESC);
+         memcpy(mobj->pe, desc->pedesc, sizeof(HSD_PEDesc));
+     }
+     mobj->aobj = NULL;
+@@ -495,7 +504,8 @@ HSD_MObj* HSD_MObjAlloc(void)
+ 
+ HSD_Material* HSD_MaterialAlloc(void)
+ {
+-    HSD_Material* mat = hsdAllocMemPiece(sizeof(HSD_Material));
++    HSD_Material* mat = hsdAllocMemPieceAt(
++        sizeof(HSD_Material), MELEE_WEB_CLASS_PIECE_SITE_MATERIAL);
+     HSD_ASSERT(943, mat);
+     memset(mat, 0, sizeof(HSD_Material));
+     mat->alpha = 1.0F;
 diff --git a/src/sysdolphin/baselib/mtx.c b/src/sysdolphin/baselib/mtx.c
 index 15fa8a880a290516780c5febbc76db6c0cf04105..d6acdf2e32548b6c119cda499038ee387195301c 100644
 --- a/src/sysdolphin/baselib/mtx.c
@@ -18885,10 +19492,10 @@ index 15fa8a880a290516780c5febbc76db6c0cf04105..d6acdf2e32548b6c119cda499038ee38
      m[0][3] = vec3->x;
      m[1][3] = vec3->y;
 diff --git a/src/sysdolphin/baselib/objalloc.c b/src/sysdolphin/baselib/objalloc.c
-index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e4216ed9f63 100644
+index 499fe7804bee57eee4e5bad306235086489dde19..c41c84cbe4f8d29c7c490bed59b832f522b85320 100644
 --- a/src/sysdolphin/baselib/objalloc.c
 +++ b/src/sysdolphin/baselib/objalloc.c
-@@ -1,5 +1,10 @@
+@@ -1,9 +1,17 @@
  #include "objalloc.h"
  
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -18899,10 +19506,23 @@ index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e42
  #include <string.h>
  
  #include "initialize.h"
-@@ -65,6 +70,13 @@ s32 HSD_ObjAllocAddFree(HSD_ObjAllocData* data, u32 num)
+ #include "memory.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_source_memory_runtime.h"
++#endif
+ #include <dolphin/os/OSAlloc.h>
+ 
+ static objheap obj_heap = { 0, 0, -1, -1 };
+@@ -65,6 +73,19 @@ s32 HSD_ObjAllocAddFree(HSD_ObjAllocData* data, u32 num)
  
      data->freehead = (HSD_ObjAllocLink*) pool_start;
      data->free += num;
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    /* Diagnostic observation only, after original linking/accounting. */
++    melee_web_source_memory_objalloc_event(pool_start, data, data->size, num,
++                                          data->align, pool_size,
++                                          obj_heap.top != 0);
++#endif
 +#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 +    if (obj_heap.top == 0) {
 +        melee_web_stadium_c1_heap_owner_record(
@@ -18913,7 +19533,7 @@ index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e42
      return num;
  }
  
-@@ -74,7 +86,10 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+@@ -74,7 +95,10 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
      u32 size;
  
      if (data->num_limit_flag && data->used >= data->num_limit) {
@@ -18925,7 +19545,7 @@ index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e42
      }
      if (data->heap_limit_flag) {
          if (data->heap_limit_num == (unsigned) -1) {
-@@ -97,12 +112,18 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+@@ -97,12 +121,18 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
              }
          }
          if (data->used >= data->heap_limit_num) {
@@ -18944,7 +19564,7 @@ index 499fe7804bee57eee4e5bad306235086489dde19..379c708650474520f4f30d43b98b6e42
              return NULL;
          }
      }
-@@ -113,16 +134,25 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+@@ -113,16 +143,25 @@ void* HSD_ObjAlloc(HSD_ObjAllocData* data)
      if (data->used > data->peak) {
          data->peak = data->used;
      }
@@ -19079,6 +19699,30 @@ index 2b9052578d839648c308ee7317e19c5a15d5a224..061d98799d249a0ca49c24a90e5d0771
              hsd_804D78E2--;
          } else {
              prev = prt;
+diff --git a/src/sysdolphin/baselib/pobj.c b/src/sysdolphin/baselib/pobj.c
+index 8b16a28c877984e309bd91a5bb57a5f09a9f8d2c..945b2abc416f9e34fb9dd3e24dff447ec66f4ea7 100644
+--- a/src/sysdolphin/baselib/pobj.c
++++ b/src/sysdolphin/baselib/pobj.c
+@@ -172,7 +172,8 @@ void HSD_PObjAnimAll(HSD_PObj* pobj)
+ 
+ static HSD_Envelope* HSD_EnvelopeAlloc(void)
+ {
+-    HSD_Envelope* envelope = hsdAllocMemPiece(sizeof(HSD_Envelope));
++    HSD_Envelope* envelope = hsdAllocMemPieceAt(
++        sizeof(HSD_Envelope), MELEE_WEB_CLASS_PIECE_SITE_ENVELOPE);
+     HSD_ASSERT(441, envelope);
+     memset(envelope, 0, sizeof(HSD_Envelope));
+     return envelope;
+@@ -254,7 +255,8 @@ static HSD_ShapeSet* loadShapeSetDesc(HSD_ShapeSetDesc* sdesc)
+ {
+     int i;
+ 
+-    HSD_ShapeSet* shape_set = hsdAllocMemPiece(sizeof(HSD_ShapeSet));
++    HSD_ShapeSet* shape_set = hsdAllocMemPieceAt(
++        sizeof(HSD_ShapeSet), MELEE_WEB_CLASS_PIECE_SITE_SHAPE_SET);
+     HSD_ASSERT(498, shape_set);
+     memset(shape_set, 0, sizeof(HSD_ShapeSet));
+     shape_set->flags = sdesc->flags;
 diff --git a/src/sysdolphin/baselib/psdisp.c b/src/sysdolphin/baselib/psdisp.c
 index 8eaaeadfb713481a6c788539c79ff7528fb61cf6..7468f68b791437b8d6c38386084801f1a869c610 100644
 --- a/src/sysdolphin/baselib/psdisp.c
@@ -19410,10 +20054,24 @@ index 44358de009c736a95cca2342897b24ea1de2d8ad..37edc6f1f9d34a1490ebcae12b14fbea
  }
  
 diff --git a/src/sysdolphin/baselib/rumble.c b/src/sysdolphin/baselib/rumble.c
-index 9536d2a353ac39e156c8fc17f9a780871229c060..41143790a92d43d934e32627112598ea63122035 100644
+index 9536d2a353ac39e156c8fc17f9a780871229c060..453c893efe5f29f0d9b3dc12cdebea8bcdb09ec6 100644
 --- a/src/sysdolphin/baselib/rumble.c
 +++ b/src/sysdolphin/baselib/rumble.c
-@@ -168,7 +168,7 @@ int HSD_PadRumbleInterpret1(HSD_PadRumbleListData* a, u8* b)
+@@ -7,6 +7,13 @@
+ #include <dolphin/os.h>
+ #include <dolphin/pad.h>
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_cpu_interval.h"
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED)
++#define PADControlMotor melee_web_cpu_interval_pad_motor
++#endif
++#endif
++
+ HSD_RumbleData HSD_Rumble_804C22E0[4];
+ 
+ void HSD_PadRumbleOn(u8 no)
+@@ -168,7 +175,7 @@ int HSD_PadRumbleInterpret1(HSD_PadRumbleListData* a, u8* b)
          return 0;
      }
      while (a->wait == 0) {
@@ -19652,10 +20310,13 @@ index 6a4569f13b77a49d95725b755b1fa3f6bda30a8f..95b3490730089b472006870f3f946ffb
          case 1:
              cp = &spline->cv[idx * 3];
 diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
-index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59edf8a7d1 100644
+index 4af6a8122cee5e53fc0507622d029e9f42603341..dec05f9cdb95867ffd3c3adbee2c598ba2dcd98f 100644
 --- a/src/sysdolphin/baselib/synth.c
 +++ b/src/sysdolphin/baselib/synth.c
-@@ -1,3 +1,7 @@
+@@ -1,3 +1,10 @@
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++#include "gameplay_source_memory_runtime.h"
++#endif
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_audio_bank_transport.h"
 +#include <sysdolphin/baselib/initialize.h>
@@ -19663,7 +20324,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
  #include "synth.h"
  
  #include <math.h> // IWYU pragma: keep
-@@ -17,16 +21,29 @@
+@@ -17,16 +24,32 @@
                                             float mix_main, float mix_auxA,
                                             float mix_auxB);
  
@@ -19678,6 +20339,9 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
 +    return melee_web_audio_heap_alloc(size);
 +#else
      void* p = OSAllocFromHeap(HSD_Synth_804D6018, size);
++#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
++    melee_web_source_memory_origin_event(p, size, __FILE__, __LINE__, 2);
++#endif
      HSD_ASSERTREPORT(0x29U, p, "audio heap overflow.\n");
      return p;
 +#endif
@@ -19693,7 +20357,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
  }
  
  static int HSD_Synth_804D6028[2] = { 0 };
-@@ -107,6 +124,18 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
+@@ -107,6 +130,18 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
              memcpy((u8*) HSD_Synth_804D7730 + 8, HSD_Synth_804D7734, nbytes);
              for (k = 0; k < n; k++) {
                  u8* e = (u8*) HSD_Synth_804D7730 + k * 0x40;
@@ -19712,7 +20376,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
                  if (e + 0x10 != NULL) {
                      *(u32*) (e + 0x14) += hsd_SynthSFXBank[bankID] * 2;
                  } else {
-@@ -116,6 +145,7 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
+@@ -116,6 +151,7 @@ static void HSD_SynthSFXSampleLoadCallback(int result, int length, void* addr,
                      hsd_SynthSFXBank[bankID] * 2;
                  *(u32*) ((u8*) HSD_Synth_804D7730 + k * 0x40 + 0x1C) +=
                      hsd_SynthSFXBank[bankID] * 2;
@@ -19720,7 +20384,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
              }
              id = base + i;
              HSD_Synth_804D7730->x4 = id;
-@@ -206,6 +236,9 @@ int HSD_SynthSFXLoad(const char* filename, int bankID, void (*cb)(int, int),
+@@ -206,6 +242,9 @@ int HSD_SynthSFXLoad(const char* filename, int bankID, void (*cb)(int, int),
      entrynum = DVDConvertPathToEntrynum(filename);
  
      while (HSD_Synth_804D772C >= 6) {
@@ -19730,7 +20394,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
      }
  
      enabled = OSDisableInterrupts();
-@@ -309,6 +342,10 @@ void HSD_SynthSFXUnloadBank(int bank_id)
+@@ -309,6 +348,10 @@ void HSD_SynthSFXUnloadBank(int bank_id)
          AXVPB* cur;
          HSD_SynthSFXUnloadBank_inline(*head);
          cur = *head;
@@ -19741,7 +20405,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
          *head = (*head)->next;
          HSD_AudioFree(cur);
      }
-@@ -343,6 +380,10 @@ void HSD_Synth_80388E08(int sfx_id)
+@@ -343,6 +386,10 @@ void HSD_Synth_80388E08(int sfx_id)
              if ((int) cur->prev == sfx_id) {
                  HSD_SynthSFXUnloadBank_inline(cur);
                  *pcur = cur->next;
@@ -19752,7 +20416,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
                  HSD_AudioFree(cur);
                  return;
              }
-@@ -351,8 +392,8 @@ void HSD_Synth_80388E08(int sfx_id)
+@@ -351,8 +398,8 @@ void HSD_Synth_80388E08(int sfx_id)
      }
  }
  
@@ -19763,7 +20427,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
  {
      HSD_ASSERT(0x182, sfxGroupDataReaddressCounter > 0);
      sfxGroupDataReaddressCounter--;
-@@ -381,19 +422,31 @@ void HSD_SynthSFXGroupDataReaddress(AXVPB* arg0, void* callback)
+@@ -381,19 +428,31 @@ void HSD_SynthSFXGroupDataReaddress(AXVPB* arg0, void* callback)
      HSD_DevComRequest(
          0, (uintptr_t) arg0->callback, (uintptr_t) callback, arg0->userContext,
          0x1B, 0,
@@ -19797,7 +20461,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
              q += 0x40;
          }
          p = (u8*) ((count << 6) + (uintptr_t) p);
-@@ -418,12 +471,21 @@ void HSD_SynthSFXBankDeflag(int bank_id)
+@@ -418,12 +477,21 @@ void HSD_SynthSFXBankDeflag(int bank_id)
          offset += vpb->userContext;
          vpb = vpb->next;
      }
@@ -19819,7 +20483,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
          continue;
      }
  }
-@@ -614,9 +676,12 @@ int HSD_Synth_80389334(int sfx_id, u8 vol, u8 vol2, u8 pan, int priority,
+@@ -614,9 +682,12 @@ int HSD_Synth_80389334(int sfx_id, u8 vol, u8 vol2, u8 pan, int priority,
              while (voice_idx < sfx_entry->unk8) {
                  AXSetVoicePriority(voices[voice_idx], priority);
                  AXSetVoiceVe(voices[voice_idx], &ve);
@@ -19835,7 +20499,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
                  AXSetVoiceSrc(voices[voice_idx], &HSD_Synth_80407FD8);
                  AXSetVoiceAddr(voices[voice_idx], &SFX_VOICE(voice_idx)->x10);
                  AXSetVoiceAdpcm(voices[voice_idx], &SFX_VOICE(voice_idx)->x20);
-@@ -1184,6 +1249,24 @@ void HSD_SynthCallback(void)
+@@ -1184,6 +1255,24 @@ void HSD_SynthCallback(void)
      OSRestoreInterrupts(enabled);
  }
  
@@ -19860,7 +20524,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
  void HSD_SynthResetStreamCounters(int result, int length, void* buf, bool b)
  {
      HSD_Synth_804D776C = HSD_Synth_804D7768;
-@@ -1221,7 +1304,7 @@ static inline void HSD_Synth_8038ADD0_inline(u32 pos)
+@@ -1221,7 +1310,7 @@ static inline void HSD_Synth_8038ADD0_inline(u32 pos)
                  HSD_DevComRequest(
                      HSD_Synth_804D7764, src,
                      (uintptr_t) &lbl_804C4540[HSD_Synth_804D7768], 0x20, 0x21,
@@ -19869,7 +20533,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
                      (struct HSD_SynthStreamHeader*) (src + 0x20));
              }
          }
-@@ -1241,8 +1324,8 @@ void HSD_Synth_8038ADD0(void)
+@@ -1241,8 +1330,8 @@ void HSD_Synth_8038ADD0(void)
      if (node->flags & 8) {
          return;
      }
@@ -19880,7 +20544,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
      if (pos != HSD_Synth_804D7774) {
          HSD_Synth_804D7774 = pos;
          for (i = 0; i < node->voice_count; i++) {
-@@ -1303,11 +1386,11 @@ void HSD_Synth_8038B120(void)
+@@ -1303,11 +1392,11 @@ void HSD_Synth_8038B120(void)
          for (i = 0; i < node->voice_count; i++) {
              AXSetVoiceVe(node->voice[i], &ve);
              if (node->flags & 4) {
@@ -19896,7 +20560,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
              }
              AXSetVoiceSrc(node->voice[i], &HSD_Synth_80407FD8);
              AXSetVoiceCurrentAddr(
-@@ -1345,7 +1428,7 @@ void HSD_SynthPStreamFirstHakoHeaderCallback(void)
+@@ -1345,7 +1434,7 @@ void HSD_SynthPStreamFirstHakoHeaderCallback(void)
      HSD_DevComRequest(HSD_Synth_804D7764, 0xA0,
                        HSD_Synth_804D7780 + (HSD_Synth_804D7768 << 16),
                        lbl_804C4540[HSD_Synth_804D7768].x0, 0x23, 0,
@@ -19905,7 +20569,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
  }
  
  void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
-@@ -1364,7 +1447,9 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
+@@ -1364,7 +1453,9 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
          }
          node->x14 = 0.00003125f * (f32) entry[2];
          for (i = 0; i < node->voice_count; i++) {
@@ -19916,7 +20580,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
              AXSetVoiceAddr(node->voice[i], (AXPBADDR*) &entry[i * 14 + 4]);
              AXSetVoiceAdpcm(node->voice[i], (AXPBADPCM*) &entry[i * 14 + 8]);
          }
-@@ -1374,7 +1459,7 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
+@@ -1374,7 +1465,7 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
          HSD_DevComRequest(
              HSD_Synth_804D7764, 0x80,
              (uintptr_t) &lbl_804C4540[HSD_Synth_804D7768], 0x20, 0x21, 0,
@@ -19925,7 +20589,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
              NULL);
      } else {
          HSD_Synth_804D7778 = 0;
-@@ -1468,20 +1553,8 @@ void HSD_SynthStreamSetVolume(f32 volume)
+@@ -1468,20 +1559,8 @@ void HSD_SynthStreamSetVolume(f32 volume)
      updateAllVolume(0xFFFF);
  }
  
@@ -19947,7 +20611,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
      HSD_Synth_804C28E0_1784[0].x1784 = 1.0F;
      HSD_Synth_804C28E0_1784[0].x1788 = 1.0F;
      HSD_Synth_804C28E0_1784[0].x178C = 0;
-@@ -1530,6 +1603,23 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
+@@ -1530,6 +1609,23 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
      HSD_Synth_804C28E0_1784[15].x1784 = 1.0F;
      HSD_Synth_804C28E0_1784[15].x1788 = 1.0F;
      HSD_Synth_804C28E0_1784[15].x178C = 0;
@@ -19971,7 +20635,7 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
      hsd_SynthSFXBankAREnd = hsd_SynthSFXBankHead[0] + bank_size;
      HSD_Synth_804D7780 = ARAlloc(0x30000);
      HSD_Synth_804D7754 = OSGetSoundMode();
-@@ -1538,3 +1628,239 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
+@@ -1538,3 +1634,239 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
  /// @remarks Nothing in the DOL references this; it is recovered from the tail
  /// of this TU's `.data`.
  static u8 HSD_Synth_804080FC[0x44] = { 0 };
@@ -20211,8 +20875,41 @@ index 4af6a8122cee5e53fc0507622d029e9f42603341..bbaba9acacf3bf19858a168c5bd23c59
 +    melee_audio_banks_active = 0;
 +}
 +#endif
+diff --git a/src/sysdolphin/baselib/texp.c b/src/sysdolphin/baselib/texp.c
+index 30394f74d46a744dabbd34feee96dd97998a80b5..77db36b90f911b626ad1ce00ef0dda60bea077eb 100644
+--- a/src/sysdolphin/baselib/texp.c
++++ b/src/sysdolphin/baselib/texp.c
+@@ -24,14 +24,16 @@ HSD_TExpType HSD_TExpGetType(HSD_TExp* texp)
+ 
+ static HSD_TExp* TevAlloc(void)
+ {
+-    HSD_TExp* texp = hsdAllocMemPiece(sizeof(HSD_TETev));
++    HSD_TExp* texp = hsdAllocMemPieceAt(
++        sizeof(HSD_TETev), MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV);
+     HSD_ASSERT(62, texp);
+     return texp;
+ }
+ 
+ static HSD_TExp* CnstAlloc(void)
+ {
+-    HSD_TExp* texp = hsdAllocMemPiece(sizeof(HSD_TECnst));
++    HSD_TExp* texp = hsdAllocMemPieceAt(
++        sizeof(HSD_TECnst), MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST);
+     HSD_ASSERT(70, texp);
+     return texp;
+ }
+@@ -1212,7 +1214,8 @@ int HSD_TExpCompile(HSD_TExp* texp, HSD_TExpTevDesc** tevdesc,
+     HSD_TExpSchedule(num, list, order, &res);
+     *tevdesc = NULL;
+     for (i = 0; i < num; ++i) {
+-        HSD_TExpTevDesc* tdesc = hsdAllocMemPiece(sizeof(HSD_TExpTevDesc));
++        HSD_TExpTevDesc* tdesc = hsdAllocMemPieceAt(
++            sizeof(HSD_TExpTevDesc), MELEE_WEB_CLASS_PIECE_SITE_TEXP_TEV_DESC);
+         tdesc->desc.stage = HSD_Index2TevStage(i);
+         TExp2TevDesc(order[(num - i) - 1], tdesc, &init_cprev, &init_aprev);
+         tdesc->desc.next = &(*tevdesc)->desc;
 diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
-index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0aa3a0bfe2 100644
+index a9f2c8b5759c64a71edf098e7e9a2210433c570d..6eb9caafc81956e106bd9d739934dec6962ad6b6 100644
 --- a/src/sysdolphin/baselib/tobj.c
 +++ b/src/sysdolphin/baselib/tobj.c
 @@ -1,3 +1,4 @@
@@ -20248,7 +20945,37 @@ index a9f2c8b5759c64a71edf098e7e9a2210433c570d..ae6f02b360c13a373fb007c95e351f0a
      switch (type) {
      case HSD_A_T_TIMG: {
          int n;
-@@ -1595,6 +1610,7 @@ void HSD_ImageDescCopyFromEFB(HSD_ImageDesc* idesc, u16 origx, u16 origy,
+@@ -1521,7 +1536,8 @@ void HSD_TObjFree(HSD_TObj* tobj)
+ 
+ HSD_Tlut* HSD_TlutAlloc(void)
+ {
+-    HSD_Tlut* tlut = hsdAllocMemPiece(sizeof(HSD_Tlut));
++    HSD_Tlut* tlut = hsdAllocMemPieceAt(
++        sizeof(HSD_Tlut), MELEE_WEB_CLASS_PIECE_SITE_TLUT);
+     HSD_ASSERT(2069, tlut);
+     memset(tlut, 0, sizeof(HSD_Tlut));
+     return tlut;
+@@ -1541,7 +1557,8 @@ void HSD_TlutRemove(HSD_Tlut* tlut)
+ 
+ HSD_TObjTev* HSD_TObjTevAlloc(void)
+ {
+-    HSD_TObjTev* tev = hsdAllocMemPiece(sizeof(HSD_TObjTev));
++    HSD_TObjTev* tev = hsdAllocMemPieceAt(
++        sizeof(HSD_TObjTev), MELEE_WEB_CLASS_PIECE_SITE_TOBJ_TEV);
+     HSD_ASSERT(2112, tev);
+     memset(tev, 0, sizeof(HSD_TObjTev));
+     return tev;
+@@ -1561,7 +1578,8 @@ void HSD_TObjTevRemove(HSD_TObjTev* tev)
+ 
+ HSD_ImageDesc* HSD_ImageDescAlloc(void)
+ {
+-    HSD_ImageDesc* idesc = hsdAllocMemPiece(sizeof(HSD_ImageDesc));
++    HSD_ImageDesc* idesc = hsdAllocMemPieceAt(
++        sizeof(HSD_ImageDesc), MELEE_WEB_CLASS_PIECE_SITE_IMAGE_DESC);
+     HSD_ASSERT(2155, idesc);
+     memset(idesc, 0, sizeof(HSD_ImageDesc));
+     return idesc;
+@@ -1595,6 +1613,7 @@ void HSD_ImageDescCopyFromEFB(HSD_ImageDesc* idesc, u16 origx, u16 origy,
  static void TObjRelease(HSD_Class* o)
  {
      HSD_TObj* tobj = HSD_TOBJ(o);

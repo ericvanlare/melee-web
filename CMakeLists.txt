@@ -23,6 +23,35 @@ option(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC
   "Build the private one-shot terminal match draw/discard diagnostic" OFF)
 option(MELEE_WEB_SLIPPI_SYNCTEST
   "Build the private drawn-reference versus no-draw Slippi dependency synctest" OFF)
+option(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
+  "Enable the private Release v6 logical-frame profile clock" OFF)
+if(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK AND
+   (NOT MELEE_WEB_SLIPPI_SYNCTEST OR NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR
+    MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
+  message(FATAL_ERROR "Logical-frame clock requires the private Release Slippi synctest")
+endif()
+option(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+  "Enable the private Release v7 canonical light presentation owner" OFF)
+if(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE AND
+   (NOT MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK OR NOT MELEE_WEB_SLIPPI_SYNCTEST OR
+    NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR MELEE_WEB_PUBLIC_RUNTIME OR
+    MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
+  message(FATAL_ERROR "LObj presentation cache requires the private Release logical-frame Slippi synctest")
+endif()
+option(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+  "Enable the private incomplete v9 stateless canonical texture matrix presentation" OFF)
+if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
+  message(FATAL_ERROR "TObj presentation cache requires the private v7 logical-frame light owner profile")
+endif()
+if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+  message(FATAL_ERROR "The private presentation profile requires the Aurora staging-shadow inventory and CPU owner provenance")
+endif()
+option(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+  "Enable the private v18 stable-action-assets and particle-preparation profile" OFF)
+if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND
+   NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
+  message(FATAL_ERROR "Particle presentation requires the private v15 TObj profile")
+endif()
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
   "Enable the private PC-mapped scalar collision FMA diagnostic" OFF)
 option(MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC
@@ -110,7 +139,7 @@ if(EMSCRIPTEN)
     message(FATAL_ERROR "Generated gameplay source missing; use scripts/build.py")
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
-    src/gameplay_source_context.c src/gameplay_source_files.c
+    src/gameplay_source_context.c src/gameplay_source_files.c src/gameplay_cpu_interval.c
     src/gameplay_source_memory_runtime.cpp
     src/source_address_context.cpp src/source_game_heap_context.cpp
     src/gameplay_ps_math.c
@@ -138,6 +167,30 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(gameplay_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_SLIPPI_SYNCTEST AND MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
+    target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_CPU_INTERVAL_ENABLED=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
+    target_sources(gameplay_runtime PRIVATE
+      src/slippi_profile/fighter_projection.c
+      src/slippi_profile/effect_matrix.c)
+    target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
+    target_sources(gameplay_runtime PRIVATE
+      src/slippi_profile/particle_presentation.c
+      src/slippi_profile/particle_source_schedule.c
+      src/slippi_profile/particle_pass_plan.c)
+    target_compile_definitions(gameplay_runtime PUBLIC
+      MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
+    target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK)
+    target_sources(gameplay_runtime PRIVATE src/slippi_profile/logical_frame_clock.c)
+    target_compile_definitions(gameplay_runtime PUBLIC MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK=1)
+  endif()
   if(MELEE_WEB_SLIPPI_SYNCTEST)
     target_sources(gameplay_runtime PRIVATE
       src/slippi_profile/profile.c src/slippi_profile/offscreen_damage.c)
@@ -192,6 +245,19 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(hsd_native_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(hsd_native_runtime PUBLIC TARGET_PC)
+  if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
+    target_sources(hsd_native_runtime PRIVATE src/slippi_profile/tobj_presentation_cache.c)
+    target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
+    target_sources(hsd_native_runtime PRIVATE src/slippi_profile/perf_measurement.c)
+    target_compile_definitions(hsd_native_runtime PRIVATE
+      MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1)
+  endif()
+  if(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
+    target_sources(hsd_native_runtime PRIVATE src/slippi_profile/lobj_presentation_cache.c)
+    target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1)
+  endif()
   if(MELEE_WEB_SLIPPI_SYNCTEST)
     target_sources(hsd_native_runtime PRIVATE src/slippi_profile/dynamics_fix.c)
     target_compile_definitions(hsd_native_runtime PRIVATE

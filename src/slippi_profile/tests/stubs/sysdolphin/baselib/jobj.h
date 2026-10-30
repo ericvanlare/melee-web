@@ -8,6 +8,7 @@
 /* Minimal test shape for the helper's traversal contract. This deliberately
  * does not model the HSD object ABI or replace an HSD/JObj runtime service. */
 typedef struct HSD_JObj {
+    struct HSD_JObj *parent;
     struct HSD_JObj *next;
     struct HSD_JObj *child;
     uint32_t flags;

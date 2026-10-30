@@ -1,0 +1,888 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include <sysdolphin/baselib/tobj.h>
+#include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/object.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/texp.h>
+#include <sysdolphin/baselib/hash.h>
+#include <sysdolphin/baselib/memory.h>
+#include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/lobj.h>
+#include <sysdolphin/baselib/debug.h>
+#include "gameplay_class_piece_diagnostic.h"
+#include "hsd_texture_bounds.h"
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+#include <stdalign.h>
+#include "slippi_profile/tobj_presentation_cache.h"
+#if PROPOSED_LANE
+#include "../tobj_presentation_cache.c"
+#endif
+
+extern HSD_TObjInfo hsdTObj;
+void fixture_tobj_update(HSD_TObj*, float);
+void fixture_tobj_update_type(HSD_TObj*, u32, float);
+void fixture_tobj_setup(HSD_TObj*);
+void fixture_tobj_setup_full(HSD_TObj*);
+void fixture_tobj_setup_unbounded(HSD_TObj*);
+s32 fixture_tobj_assign_resources_all(HSD_TObj*);
+void fixture_tobj_amnesia(void);
+HSD_TObj* fixture_actual_shadow(void);
+void fixture_actual_make(HSD_TObj*);
+int fixture_tobj_default_callbacks(void);
+int fixture_reload(HSD_TObj*, HSD_TObjDesc*);
+
+static _Noreturn void stop(const char* s) {
+    fprintf(stderr, "UNSUPPORTED:%s\n", s);
+    exit(91);
+}
+static void require(int yes, const char* s) {
+    if (!yes) {
+        fprintf(stderr, "CONTROL_FAIL:%s\n", s);
+        exit(92);
+    }
+}
+void __assert(char* f, u32 l, char* s) {
+    fprintf(stderr, "SOURCE_ASSERT:%s:%u:%s\n", f, l, s);
+    exit(93);
+}
+void HSD_Panic(char* f, u32 l, char* s) {
+    fprintf(stderr, "SOURCE_PANIC:%s:%u:%s\n", f, l, s);
+    exit(94);
+}
+void OSReport(const char* format, ...) {
+    char message[512];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+    if (!strncmp(message, "FIRST_FAILURE_CONTEXT=", 22)) {
+        fputs(message, stderr);
+        return;
+    }
+    fprintf(stderr, "UNSUPPORTED_OSREPORT:%s\n", message);
+    exit(91);
+}
+
+alignas(32) static unsigned char arena[1 << 20];
+static size_t used;
+static unsigned constructed, released, freed, descriptors;
+static unsigned host_allocs;
+static int fail_host_alloc;
+void* __real_malloc(size_t);
+void* __real_calloc(size_t, size_t);
+void* __wrap_malloc(size_t n) {
+    ++host_allocs;
+    if (fail_host_alloc) return NULL;
+    return __real_malloc(n);
+}
+void* __wrap_calloc(size_t n, size_t size) {
+    ++host_allocs;
+    if (fail_host_alloc) return NULL;
+    return __real_calloc(n, size);
+}
+
+/* Explicit source allocation model; original class-piece split/free-list code
+ * remains under test. These are not rollback snapshots or GPU storage. */
+void* (HSD_MemAlloc)(ssize_t n) {
+    require(n > 0, "positive source alloc");
+    size_t p = (used + 31) & ~(size_t) 31;
+    require((size_t) n <= sizeof(arena) - p, "arena bound");
+    used = p + (size_t) n;
+    return arena + p;
+}
+void* melee_web_HSD_MemAllocAt(ssize_t n, const char* f, unsigned l) {
+    (void) f;
+    (void) l;
+    return (HSD_MemAlloc)(n);
+}
+void HSD_Free(void* p) {
+    (void) p;
+    stop("source allocation table growth/free outside fixture");
+}
+void HSD_AObjRemove(HSD_AObj* p) {
+    require(p == NULL, "null-only AObj provider");
+    ++released;
+}
+void melee_web_class_piece_cold(const void* p, int32_t n) {
+    (void) p;
+    (void) n;
+}
+void melee_web_class_piece_descriptor(const void* p) {
+    require(p != NULL, "descriptor callback");
+    ++descriptors;
+}
+void melee_web_class_piece_alloc(void* p, int32_t n, uint32_t z) {
+    require(p && n > 0 && z >= (uint32_t) n, "piece event");
+}
+/* Modeled diagnostic sink only; allocation caller provenance is not under test. */
+void melee_web_class_piece_origin(void* p, int32_t n, uint32_t site) {
+    require(p && n > 0 && site >= MELEE_WEB_CLASS_PIECE_SITE_HSD_CLASS_ALLOC &&
+                site <= MELEE_WEB_CLASS_PIECE_SITE_SHAPE_SET,
+            "finite allocation origin diagnostic leaf");
+}
+void melee_web_class_piece_promote(void* p, int32_t n) {
+    (void) p;
+    (void) n;
+    stop("unexpected old table promotion");
+}
+void melee_web_class_piece_free(void* p, int32_t n) {
+    require(p && n > 0, "free event");
+    ++freed;
+}
+void melee_web_class_piece_label(void* p, const void* i, int32_t n,
+                                 uint32_t s, const void* old) {
+    (void) old;
+    require(p && i && n > 0, "label event");
+    if (s == 2) ++constructed;
+}
+void melee_web_class_piece_amnesia(void) {}
+void slippi_lobj_constructed(void* p, void* i) {
+    require(p != NULL, "foreign-class constructor leaf");
+    (void) i;
+}
+void slippi_lobj_retiring(void* p) { require(p != NULL, "retire leaf"); }
+void slippi_lobj_rebound(void* p, void* a, void* b) {
+    require(p && a && b, "actual successful rebind leaf");
+}
+
+_Noreturn HSD_HashClassInfo* HSD_HashSearch(HSD_Hash* p, void* q, int* r) {
+    (void) p;
+    (void) q;
+    (void) r;
+    stop("custom class lookup");
+}
+_Noreturn HSD_LObj* HSD_LObjGetCurrentByType(u16 t) {
+    (void) t;
+    stop("highlight provider");
+}
+_Noreturn void HSD_LObjGetLightVector(HSD_LObj* p, Vec3* q) {
+    (void) p;
+    (void) q;
+    stop("light vector provider");
+}
+_Noreturn void C_MTXMultVecSR(const Mtx m, const Vec* src, Vec* dst) {
+    (void) m;
+    (void) src;
+    (void) dst;
+    stop("unsupported highlight C_MTXMultVecSR");
+}
+_Noreturn void PSVECNormalize(const Vec* src, Vec* dst) {
+    (void) src;
+    (void) dst;
+    stop("unsupported highlight PSVECNormalize");
+}
+_Noreturn HSD_TExp* HSD_TExpTev(HSD_TExp** p) { (void) p; stop("TExpTev"); }
+_Noreturn HSD_TExp* HSD_TExpCnst(void* p, HSD_TEInput a, HSD_TEType b,
+                                 HSD_TExp** q) {
+    (void) p;
+    (void) a;
+    (void) b;
+    (void) q;
+    stop("TExpCnst");
+}
+_Noreturn void HSD_TExpOrder(HSD_TExp* p, HSD_TObj* q, GXChannelID c) {
+    (void) p;
+    (void) q;
+    (void) c;
+    stop("TExpOrder");
+}
+_Noreturn void HSD_TExpColorOp(HSD_TExp* p, GXTevOp a, GXTevBias b,
+                               GXTevScale c, u8 d) {
+    (void) p; (void) a; (void) b; (void) c; (void) d; stop("TExpColorOp");
+}
+_Noreturn void HSD_TExpAlphaOp(HSD_TExp* p, GXTevOp a, GXTevBias b,
+                               GXTevScale c, u8 d) {
+    (void) p; (void) a; (void) b; (void) c; (void) d; stop("TExpAlphaOp");
+}
+_Noreturn void HSD_TExpColorIn(HSD_TExp* p, HSD_TEInput a, HSD_TExp* b,
+                               HSD_TEInput c, HSD_TExp* d, HSD_TEInput e,
+                               HSD_TExp* f, HSD_TEInput g, HSD_TExp* h) {
+    (void) p; (void) a; (void) b; (void) c; (void) d; (void) e; (void) f;
+    (void) g; (void) h; stop("TExpColorIn");
+}
+_Noreturn void HSD_TExpAlphaIn(HSD_TExp* p, HSD_TEInput a, HSD_TExp* b,
+                               HSD_TEInput c, HSD_TExp* d, HSD_TEInput e,
+                               HSD_TExp* f, HSD_TEInput g, HSD_TExp* h) {
+    (void) p; (void) a; (void) b; (void) c; (void) d; (void) e; (void) f;
+    (void) g; (void) h; stop("TExpAlphaIn");
+}
+
+/* Shadow matrix tests use an identity viewing matrix as a leaf provider only;
+ * this does not claim a real camera or whole Shadow Setup implementation. */
+static int use_fixture_camera;
+static unsigned char camera_cookie;
+static Mtx fixture_inverse = {
+    {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}};
+HSD_CObj* HSD_CObjGetCurrent(void) {
+    if (!use_fixture_camera) stop("camera provider not enabled");
+    return (HSD_CObj*) &camera_cookie;
+}
+MtxPtr HSD_CObjGetInvViewingMtxPtrDirect(HSD_CObj* cobj) {
+    require(use_fixture_camera && cobj == (HSD_CObj*) &camera_cookie,
+            "fixture Shadow camera identity");
+    return fixture_inverse;
+}
+
+struct Submission { u32 id, type; unsigned char matrix[48]; };
+static struct Submission gx[32];
+static unsigned count;
+static unsigned gx_setup_calls, state_setup_calls;
+void GXLoadTexMtxImm(const void* m, u32 id, GXTexMtxType type) {
+    ++gx_setup_calls;
+    require(count < 32 && type == GX_MTX3x4, "GX 3x4 sink");
+    gx[count].id = id;
+    gx[count].type = type;
+    memcpy(gx[count++].matrix, m, 48);
+}
+
+#define TLUT_TEST_MAX 12
+static const void* tlut_test_luts[TLUT_TEST_MAX];
+static const void* tlut_test_images[TLUT_TEST_MAX];
+static unsigned tlut_test_lut_count, tlut_test_image_count;
+static int pointer_tag(const void* p, const void* const* table, unsigned count_)
+{
+    for (unsigned i = 0; i < count_; ++i) {
+        if (table[i] == p) return (int) i;
+    }
+    return -1;
+}
+void HSD_StateRegisterTexGen(int coord) {
+    ++state_setup_calls;
+    printf("STATE_TEXGEN:%d\n", coord);
+}
+void GXInitTlutObj(GXTlutObj* obj, const void* lut, GXTlutFmt fmt, u16 n_entries)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TLUT_INIT:%d:%u:%u\n",
+           pointer_tag(lut, tlut_test_luts, tlut_test_lut_count),
+           (unsigned) fmt, (unsigned) n_entries);
+}
+void GXLoadTlut(const GXTlutObj* obj, u32 name)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TLUT_LOAD:%u\n", name);
+}
+void GXInitTexObjCI(GXTexObj* obj, const void* image_ptr, u16 width, u16 height,
+                    GXCITexFmt format, GXTexWrapMode wrap_s,
+                    GXTexWrapMode wrap_t, GXBool mipmap, u32 tlut_name)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX_CI:%d:%u:%u:%u:%u:%u:%u:%u\n",
+           pointer_tag(image_ptr, tlut_test_images, tlut_test_image_count),
+           (unsigned) width, (unsigned) height, (unsigned) format,
+           (unsigned) wrap_s, (unsigned) wrap_t, (unsigned) mipmap,
+           (unsigned) tlut_name);
+}
+void GXInitTexObj(GXTexObj* obj, const void* image_ptr, u16 width, u16 height,
+                  GXTexFmt format, GXTexWrapMode wrap_s,
+                  GXTexWrapMode wrap_t, GXBool mipmap)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX:%d:%u:%u:%u:%u:%u:%u\n",
+           pointer_tag(image_ptr, tlut_test_images, tlut_test_image_count),
+           (unsigned) width, (unsigned) height, (unsigned) format,
+           (unsigned) wrap_s, (unsigned) wrap_t, (unsigned) mipmap);
+}
+void GXInitTexObjLOD(GXTexObj* obj, GXTexFilter min_filt, GXTexFilter mag_filt,
+                     f32 min_lod, f32 max_lod, f32 lod_bias,
+                     GXBool bias_clamp, GXBool do_edge_lod,
+                     GXAnisotropy max_aniso)
+{
+    ++gx_setup_calls;
+    u32 min_bits, max_bits, bias_bits;
+    (void) obj;
+    memcpy(&min_bits, &min_lod, sizeof(min_bits));
+    memcpy(&max_bits, &max_lod, sizeof(max_bits));
+    memcpy(&bias_bits, &lod_bias, sizeof(bias_bits));
+    printf("TEX_LOD:%u:%u:%08x:%08x:%08x:%u:%u:%u\n",
+           (unsigned) min_filt, (unsigned) mag_filt, min_bits, max_bits,
+           bias_bits, (unsigned) bias_clamp, (unsigned) do_edge_lod,
+           (unsigned) max_aniso);
+}
+void GXLoadTexObj(GXTexObj* obj, GXTexMapID id)
+{
+    ++gx_setup_calls;
+    (void) obj;
+    printf("TEX_LOAD:%u\n", (unsigned) id);
+}
+
+static HSD_TObj* make_flags(u32 flags) {
+    HSD_TObjDesc d;
+    memset(&d, 0, sizeof(d));
+    d.id = GX_TEXMAP0;
+    d.src = GX_TG_TEX0;
+    d.scale.x = d.scale.y = d.scale.z = 1;
+    d.repeat_s = d.repeat_t = 1;
+    d.wrap_s = d.wrap_t = GX_CLAMP;
+    d.blend_flags = flags;
+    d.translate.y = 0.125f;
+    if ((flags & TEX_COORD_MASK) == TEX_COORD_REFLECTION) {
+        d.rotate.x = 0.125f; d.rotate.y = -0.25f; d.rotate.z = 0.375f;
+        d.scale.x = 0.75f; d.scale.y = 1.25f; d.scale.z = 0.5f;
+        d.translate.x = -0.25f; d.translate.y = 0.375f; d.translate.z = 0.625f;
+        d.wrap_s = GX_REPEAT; d.wrap_t = GX_MIRROR;
+        d.repeat_s = 3; d.repeat_t = 5;
+    }
+    HSD_TObj* p = HSD_TObjLoadDesc(&d);
+    require(p && p->parent.parent.class_info == (HSD_ClassInfo*) &hsdTObj,
+            "actual canonical HSD_TObj construction and descriptor Load");
+    require(fixture_tobj_default_callbacks() &&
+                hsdTObj.parent.head.obj_size == sizeof(HSD_TObj) &&
+                hsdTObj.parent.head.parent == &hsdObj,
+            "actual canonical methods, ancestry and extent");
+    p->mtxid = GX_TEXMTX0;
+    return p;
+}
+static HSD_TObj* make(void) { return make_flags(TEX_COORD_UV); }
+static HSD_TObj* make_coord(u32 coord) { return make_flags(coord); }
+
+static void observe_class_identity(const char* label, HSD_TObj* p) {
+    HSD_ClassInfo* actual = p->parent.parent.class_info;
+    require(actual == (HSD_ClassInfo*) &hsdTObj,
+            "actual canonical HSD_TObj class identity");
+    fprintf(stderr, "SOURCE_CLASS_IDENTITY:%s:%p:HSD_TObj\n", label,
+            (void*) actual);
+}
+static void observe(const char* label, HSD_TObj* p) {
+    observe_class_identity(label, p);
+    fprintf(stderr, "SOURCE:%s:%08x:%08x:", label, (u32) p->flags, (u32) p->mtxid);
+    for (size_t i = 0; i < sizeof(p->mtx); ++i)
+        fprintf(stderr, "%02x", ((const unsigned char*) p->mtx)[i]);
+    fprintf(stderr, ":");
+    for (size_t i = 0; i < sizeof(p->rotate) + sizeof(p->scale) +
+                           sizeof(p->translate); ++i) {
+        const unsigned char* fields = (const unsigned char*) &p->rotate;
+        fprintf(stderr, "%02x", fields[i]);
+    }
+    fprintf(stderr, "\n");
+}
+static int scratch_role(HSD_TObj* p) {
+    u32 coord = tobj_coord(p);
+    return coord == TEX_COORD_UV || coord == TEX_COORD_REFLECTION;
+}
+static void draw(const char* label, HSD_TObj* p) {
+    unsigned char before[sizeof(HSD_TObj)];
+    memcpy(before, p, sizeof(before));
+    size_t source_used = used;
+    unsigned allocations = host_allocs;
+    unsigned start = count;
+    u32 before_flags = p->flags;
+    fixture_tobj_setup(p);
+    require(source_used == used && allocations == host_allocs,
+            "matrix setup makes no source or host allocation");
+#if PROPOSED_LANE
+    if (scratch_role(p) || !(before_flags & TEX_MTX_DIRTY)) {
+        require(!memcmp(before, p, sizeof(before)),
+                "clean draw preserves all 172 source bytes");
+        if (scratch_role(p)) fputs("SOURCE172_ACTIVE_DRAW:UNCHANGED\n", stderr);
+        if (scratch_role(p) && (before_flags & TEX_MTX_DIRTY))
+            require((p->flags & TEX_MTX_DIRTY) != 0,
+                    "scratch Setup does not consume source dirty flag");
+    }
+#else
+    if (scratch_role(p) && (before_flags & TEX_MTX_DIRTY))
+        require((p->flags & TEX_MTX_DIRTY) == 0,
+                "original Setup consumes source dirty flag");
+#endif
+    observe(label, p);
+    for (unsigned i = start; i < count; ++i) {
+        printf("GX:%s:", label);
+        for (size_t j = 0; j < sizeof(gx[i]); ++j)
+            printf("%02x", ((const unsigned char*) &gx[i])[j]);
+        printf("\n");
+    }
+}
+
+static void reload_coord(HSD_TObj* p, u32 coord) {
+    HSD_TObjDesc d;
+    memset(&d, 0, sizeof(d));
+    d.id = GX_TEXMAP0; d.src = GX_TG_TEX0;
+    d.scale.x = d.scale.y = d.scale.z = 1;
+    d.repeat_s = d.repeat_t = 1;
+    d.wrap_s = d.wrap_t = GX_CLAMP;
+    d.translate.y = 0.125f; d.blend_flags = coord;
+    require(fixture_reload(p, &d) == 0, "actual canonical descriptor Load");
+    p->mtxid = GX_TEXMTX0;
+}
+static void reload_reflection(HSD_TObj* p) {
+    HSD_TObjDesc d;
+    memset(&d, 0, sizeof(d));
+    d.id = GX_TEXMAP0; d.src = GX_TG_TEX0;
+    d.rotate.x = 0.125f; d.rotate.y = -0.25f; d.rotate.z = 0.375f;
+    d.scale.x = 0.75f; d.scale.y = 1.25f; d.scale.z = 0.5f;
+    d.translate.x = -0.25f; d.translate.y = 0.375f; d.translate.z = 0.625f;
+    d.wrap_s = GX_REPEAT; d.wrap_t = GX_MIRROR;
+    d.repeat_s = 3; d.repeat_t = 5;
+    d.blend_flags = TEX_COORD_REFLECTION;
+    require(fixture_reload(p, &d) == 0, "actual canonical Reflection reload");
+    p->mtxid = GX_TEXMTX0;
+}
+static int finish_world(void) {
+#if PROPOSED_LANE
+    slippi_tobj_world_end(1);
+#endif
+    return 0;
+}
+
+static int run_tlut_control(int force_unbounded_resources)
+{
+    enum { BASIC_COUNT = 8, OVERFLOW_COUNT = 9 };
+    const unsigned n = force_unbounded_resources ? OVERFLOW_COUNT : BASIC_COUNT;
+    HSD_TObjDesc desc[OVERFLOW_COUNT];
+    HSD_ImageDesc images[OVERFLOW_COUNT];
+    HSD_TlutDesc palette_descs[OVERFLOW_COUNT];
+    HSD_TexLODDesc lod = {GX_LIN_MIP_LIN, 0.375f, GX_TRUE, GX_FALSE,
+                          GX_ANISO_2};
+    static unsigned char image_bytes[OVERFLOW_COUNT][32];
+    static unsigned char lut_bytes[OVERFLOW_COUNT][512];
+    HSD_TObj* objects[OVERFLOW_COUNT];
+    HSD_TObj* head;
+    HSD_Tlut* fixture_palette_table[2];
+    u32 original_names[OVERFLOW_COUNT];
+    HSD_Tlut original_palettes[OVERFLOW_COUNT];
+
+    memset(desc, 0, sizeof(desc));
+    memset(images, 0, sizeof(images));
+    memset(palette_descs, 0, sizeof(palette_descs));
+    tlut_test_lut_count = 0;
+    tlut_test_image_count = n;
+    for (unsigned i = 0; i < n; ++i) {
+        images[i].image_ptr = image_bytes[i];
+        images[i].width = 16 + i;
+        images[i].height = 8 + i;
+        images[i].mipmap = i == 1;
+        images[i].format = force_unbounded_resources ? (GXTexFmt) GX_TF_C4 :
+            (i == 0 ? (GXTexFmt) GX_TF_C4 : i == 1 ? (GXTexFmt) GX_TF_C8 :
+             i == 2 ? (GXTexFmt) GX_TF_C14X2 : i == BASIC_COUNT - 1 ? GX_TF_I4 : (GXTexFmt) GX_TF_C4);
+        tlut_test_images[i] = image_bytes[i];
+        desc[i].next = i + 1 < n ? &desc[i + 1] : NULL;
+        desc[i].id = GX_TEXMAP0;
+        desc[i].src = GX_TG_TEX0;
+        desc[i].scale.x = desc[i].scale.y = desc[i].scale.z = 1.0f;
+        desc[i].repeat_s = desc[i].repeat_t = 1;
+        desc[i].wrap_s = GX_REPEAT;
+        desc[i].wrap_t = GX_MIRROR;
+        desc[i].blend_flags = TEX_COORD_UV;
+        desc[i].imagedesc = &images[i];
+        desc[i].lod = i == 1 ? &lod : NULL;
+        desc[i].tlutdesc = images[i].format == (GXTexFmt) GX_TF_C4 ||
+                           images[i].format == (GXTexFmt) GX_TF_C8 ||
+                           images[i].format == (GXTexFmt) GX_TF_C14X2
+            ? &palette_descs[i] : NULL;
+        palette_descs[i].lut = lut_bytes[i];
+        palette_descs[i].fmt = (GXTlutFmt) (GX_TL_IA8 + (i & 1));
+        palette_descs[i].tlut_name = 0xA500u + i;
+        palette_descs[i].n_entries = force_unbounded_resources
+            ? (u16) (100 + i)
+            : (u16) (i == 0 ? 255 : i <= 3 ? 256 : 238 + i);
+        if (desc[i].tlutdesc != NULL) {
+            tlut_test_luts[tlut_test_lut_count++] = lut_bytes[i];
+        }
+    }
+
+    head = HSD_TObjLoadDesc(desc);
+    require(head != NULL, "actual canonical TObj Load for TLUT control");
+    HSD_TObj* current = head;
+    for (unsigned i = 0; i < n; ++i) {
+        require(current != NULL, "loaded TObj chain extent");
+        objects[i] = current;
+        if (desc[i].tlutdesc != NULL) {
+            require(current->tlut != NULL &&
+                        current->tlut != (HSD_Tlut*) desc[i].tlutdesc,
+                    "actual HSD_TlutLoadDesc creates copied runtime storage");
+            require(current->tlut->lut == desc[i].tlutdesc->lut &&
+                        current->tlut->tlut_name == desc[i].tlutdesc->tlut_name,
+                    "HSD_TlutLoadDesc preserves copied descriptor fields");
+            original_names[i] = current->tlut->tlut_name;
+        } else {
+            original_names[i] = 0;
+        }
+        current = current->next;
+    }
+    require(current == NULL, "loaded TObj chain terminates");
+
+    if (!force_unbounded_resources) {
+        /* Exercise table selection and both distinct-equal-entry and exact
+         * pointer duplicates without changing source descriptor behavior. */
+        objects[1]->tlut_no = 0;
+        /* Explicit modeled animation table; canonical LoadDesc leaves it NULL. */
+        fixture_palette_table[0] = objects[1]->tlut;
+        fixture_palette_table[1] = NULL;
+        objects[1]->tluttbl = fixture_palette_table;
+        objects[3]->tlut = objects[1]->tlut;
+    }
+    for (unsigned i = 0; i < n; ++i) {
+        if (objects[i]->tlut != NULL) {
+            original_names[i] = objects[i]->tlut->tlut_name;
+            memcpy(&original_palettes[i], objects[i]->tlut,
+                   sizeof(original_palettes[i]));
+        }
+    }
+
+    memset(gx, 0, sizeof(gx));
+    count = 0;
+    size_t source_allocations_before_setup = used;
+    unsigned host_allocations_before_setup = host_allocs;
+    if (force_unbounded_resources) {
+        fixture_tobj_setup_unbounded(head);
+    } else {
+        fixture_tobj_setup_full(head);
+        unsigned gx_calls_after_setup = gx_setup_calls;
+        unsigned state_calls_after_setup = state_setup_calls;
+        fixture_tobj_setup_full(NULL);
+        require(gx_setup_calls == gx_calls_after_setup &&
+                    state_setup_calls == state_calls_after_setup,
+                "NULL full setup returns without issuing state or GX calls");
+    }
+    require(used == source_allocations_before_setup &&
+                host_allocs == host_allocations_before_setup,
+            "full TObj setup adds no source or host allocations");
+
+    for (unsigned i = 0; i < n; ++i) {
+        if (objects[i]->tlut != NULL) {
+            fprintf(stderr, "SOURCE_TLUT:%u:%08x:%08x:%u\n", i,
+                    original_names[i], objects[i]->tlut->tlut_name,
+                    (unsigned) objects[i]->tlut->n_entries);
+#if PROPOSED_LANE
+            require(objects[i]->tlut->tlut_name == original_names[i],
+                    "profile HSD_TObjSetup preserves every runtime TLUT name");
+            require(memcmp(objects[i]->tlut, &original_palettes[i],
+                           sizeof(original_palettes[i])) == 0,
+                    "profile HSD_TObjSetup preserves all runtime TLUT bytes");
+#else
+            HSD_Tlut after = *objects[i]->tlut;
+            after.tlut_name = original_palettes[i].tlut_name;
+            require(memcmp(&after, &original_palettes[i], sizeof(after)) == 0,
+                    "original HSD_TObjSetup only changes the palette-name field");
+#endif
+        }
+        require(desc[i].tlutdesc == NULL ||
+                    desc[i].tlutdesc->tlut_name == 0xA500u + i,
+                "source TLUT descriptors remain unchanged");
+    }
+    if (!force_unbounded_resources) {
+        require(objects[2]->tlut != objects[1]->tlut &&
+                    objects[2]->tlut->n_entries == objects[1]->tlut->n_entries &&
+                    objects[2]->tlut->fmt != objects[1]->tlut->fmt,
+                "distinct same-entry palettes retain original duplicate selection");
+        require(objects[3]->tlut == objects[1]->tlut,
+                "same-pointer palette repeat uses the selected local slot");
+    }
+    printf("TLUT_RESULT:%u:%u:%u\n", n, (unsigned) force_unbounded_resources,
+           (unsigned) count);
+    printf("TLUT_CONSTANTS:%u:%u:%u:%u:%u:%u:%u:%u:%u\n",
+           (unsigned) GX_TLUT0, (unsigned) GX_TLUT1,
+           (unsigned) GX_TLUT2, (unsigned) GX_TLUT3,
+           (unsigned) GX_TLUT4, (unsigned) GX_TLUT5,
+           (unsigned) GX_TLUT6, (unsigned) GX_TLUT7,
+           (unsigned) GX_BIGTLUT0);
+    puts(force_unbounded_resources
+             ? "ACTUAL:source HSD_TObjSetup CI block with explicit all-resource test seam"
+             : "ACTUAL:canonical HSD_TObjSetup CI and non-CI source paths");
+    return finish_world();
+}
+
+int main(int argc, char** argv) {
+    const char* mode = argc > 1 ? argv[1] : "changed";
+#if PROPOSED_LANE
+    require(slippi_tobj_world_begin(1), "profile TObj world begins before source startup");
+    if (!strcmp(mode, "missing-world-load")) slippi_tobj_world_end(1);
+#endif
+    _Static_assert(sizeof(HSD_TObj) == 172, "exact canonical extent");
+    _Static_assert(offsetof(HSD_TObj, mtx) == 116, "matrix field offset");
+    if (!strcmp(mode, "tlut-basic")) return run_tlut_control(0);
+    if (!strcmp(mode, "tlut-overflow")) return run_tlut_control(1);
+    HSD_TObj* p = make();
+
+#if PROPOSED_LANE
+    if (!strcmp(mode, "missing-world-load")) {
+        require(slippi_tobj_failure() == 10,
+                "canonical selection/load hooks reject a missing profile world");
+        fixture_tobj_setup(p);
+        require(0, "missing profile world must fail closed at matrix setup");
+    }
+#endif
+    if (!strcmp(mode, "timg-null-table")) {
+        melee_web_texture_bounds_bind(p, 1, 0);
+        fixture_tobj_update_type(p, HSD_A_T_TIMG, 0.0f);
+        require(0, "null TIMG table must take original source assertion");
+    }
+    if (!strcmp(mode, "repeat-null")) {
+        HSD_TObjDesc d;
+        memset(&d, 0, sizeof(d));
+        d.id = GX_TEXMAP0; d.src = GX_TG_TEX0;
+        d.scale.x = d.scale.y = d.scale.z = 1;
+        d.repeat_t = 1; d.wrap_s = d.wrap_t = GX_CLAMP;
+        d.blend_flags = TEX_COORD_UV;
+        require(fixture_reload(p, &d) == 0, "real UV descriptor Load with zero repeat_s");
+        fixture_tobj_setup(p);
+        require(0, "original MakeTextureMtx must assert on zero repeat_s");
+    }
+    if (!strcmp(mode, "uv-clean-matrix")) {
+        p->flags &= ~TEX_MTX_DIRTY;
+        for (unsigned i = 0; i < 3; ++i)
+            for (unsigned j = 0; j < 4; ++j)
+                p->mtx[i][j] = (float) (i * 7 + j + 2) * 0.125f;
+        draw("uv-authored-clean-non-srt", p);
+        require(!(p->flags & TEX_MTX_DIRTY), "clean source flag stays clean");
+        HSD_TObjRemove(p);
+        puts("ACTUAL:clean non-SRT UV matrix copied and submitted unchanged");
+        return finish_world();
+    }
+    if (!strncmp(mode, "reflection-", 11)) {
+        HSD_TObjRemove(p);
+        p = make_coord(TEX_COORD_REFLECTION);
+        draw("reflection-warm", p);
+        if (!strcmp(mode, "reflection-changed")) {
+            fixture_tobj_update_type(p, HSD_A_T_ROTX, .25f); draw("reflection-ROTX", p);
+            fixture_tobj_update_type(p, HSD_A_T_ROTY, -.125f); draw("reflection-ROTY", p);
+            fixture_tobj_update_type(p, HSD_A_T_ROTZ, .5f); draw("reflection-ROTZ", p);
+            fixture_tobj_update_type(p, HSD_A_T_TRAU, .5f); draw("reflection-TRAU", p);
+            fixture_tobj_update_type(p, HSD_A_T_TRAV, .625f); draw("reflection-TRAV", p);
+            fixture_tobj_update_type(p, HSD_A_T_SCAU, 1.5f); draw("reflection-SCAU", p);
+            fixture_tobj_update_type(p, HSD_A_T_SCAV, .875f); draw("reflection-SCAV", p);
+            fixture_tobj_update_type(p, HSD_A_T_ROTX, .375f);
+            fixture_tobj_update_type(p, HSD_A_T_SCAV, .75f);
+            fixture_tobj_update_type(p, HSD_A_T_TRAV, .5f);
+            draw("reflection-after-noDraw-corrections", p);
+        } else if (!strcmp(mode, "reflection-same-value")) {
+            fixture_tobj_update_type(p, HSD_A_T_TRAV, .375f);
+            draw("reflection-same-value-TRAV", p);
+        } else if (!strcmp(mode, "reflection-reload")) {
+            reload_reflection(p); draw("reflection-after-canonical-reload", p);
+        } else if (!strcmp(mode, "reflection-bump")) {
+            HSD_TObjRemove(p); p = make_flags(TEX_COORD_REFLECTION | TEX_BUMP);
+            require((p->flags & TEX_BUMP) != 0, "authored Reflection+BUMP flags");
+            draw("reflection-bump-dedicated-3x4", p);
+        } else {
+            require(!strcmp(mode, "reflection-unchanged"), "known Reflection history");
+            draw("reflection-unchanged-second-presentation", p);
+        }
+        HSD_TObjRemove(p);
+        puts("ACTUAL:canonical Reflection dirty/SRT histories and exact GX arguments");
+        return finish_world();
+    }
+    if (!strcmp(mode, "shadow-original")) {
+        HSD_TObjRemove(p); p = fixture_actual_shadow();
+        require(p && tobj_coord(p) == TEX_COORD_SHADOW,
+                "actual makeShadowTObj source path");
+        use_fixture_camera = 1;
+        p->mtxid = GX_TEXMTX0;
+        for (unsigned i = 0; i < 3; ++i)
+            for (unsigned j = 0; j < 4; ++j)
+                p->mtx[i][j] = (float) (i * 5 + j + 1) * 0.25f;
+        draw("shadow-original-source-setup", p);
+        HSD_TObjRemove(p);
+        puts("FIXTURE:Shadow original-path matrix leaf with identity camera provider only");
+        return finish_world();
+    }
+    if (!strcmp(mode, "active-interval-load")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token && slippi_tobj_anchor_admit(a), "arm source interval before birth");
+        HSD_TObj* q = make_coord(TEX_COORD_UV);
+        draw("active-interval-loaded-UV", q);
+        require(slippi_tobj_anchor_admit(a),
+                "canonical source construction/Load/draw preserves world descriptor anchor");
+        slippi_tobj_anchor_disarm(a);
+        HSD_TObjRemove(q); HSD_TObjRemove(p);
+        puts("ACTUAL:canonical TObj construction, Load and scratch Setup during one-use interval");
+        return finish_world();
+#else
+        require(0, "active interval case is only meaningful in profile lane");
+#endif
+    }
+    if (!strcmp(mode, "reuse")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token, "capture before actual class-piece release/recreate");
+        HSD_TObj* old = p;
+        HSD_TObjRemove(p);
+        p = make();
+        require(p == old, "actual canonical source class-piece same-address reuse");
+        draw("same-address-recreated-object", p);
+        require(slippi_tobj_anchor_admit(a),
+                "source allocator reuse does not create stale presentation state");
+        slippi_tobj_anchor_disarm(a);
+        HSD_TObjRemove(p);
+        puts("ACTUAL:source class-piece release/recreate at same address");
+        return finish_world();
+#else
+        HSD_TObj* old = p;
+        HSD_TObjRemove(p); p = make();
+        require(p == old, "actual canonical source class-piece same-address reuse");
+        draw("same-address-recreated-object", p); HSD_TObjRemove(p);
+        puts("ACTUAL:source class-piece release/recreate at same address");
+        return 0;
+#endif
+    }
+    if (!strcmp(mode, "active-authored-write")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token && slippi_tobj_anchor_admit(a), "capture before unsupported writer");
+        slippi_tobj_unsupported_write(p);
+        require(slippi_tobj_failure() == 9 && !slippi_tobj_anchor_admit(a),
+                "existing GrIzumi writer hook remains sticky during interval");
+        slippi_tobj_anchor_disarm(a); HSD_TObjRemove(p);
+        puts("ACTUAL:unsupported authored TObj writer invalidates the active interval");
+        return finish_world();
+#endif
+    }
+    if (!strcmp(mode, "active-amnesia")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token && slippi_tobj_anchor_admit(a), "capture before active class amnesia");
+        fixture_tobj_amnesia();
+        require(slippi_tobj_failure() == 7 && !slippi_tobj_anchor_admit(a),
+                "active canonical class amnesia is sticky");
+        slippi_tobj_anchor_disarm(a); HSD_TObjRemove(p);
+        puts("ACTUAL:active class amnesia invalidates descriptor interval");
+        return finish_world();
+#endif
+    }
+    if (!strcmp(mode, "normal-amnesia")) {
+#if PROPOSED_LANE
+        HSD_TObjRemove(p);
+        hsdForgetClassLibrary("sysdolphin_base_library");
+        require(slippi_tobj_failure() == 0,
+                "ordinary teardown amnesia without an active interval is not a failure");
+        slippi_tobj_world_end(1);
+        require(slippi_tobj_world_begin(2), "world restarts after source class amnesia");
+        HSD_TObj* q = make();
+        draw("canonical-reinit-after-class-amnesia", q);
+        HSD_TObjRemove(q);
+        slippi_tobj_world_end(2);
+        puts("ACTUAL:ordinary class amnesia, world end and canonical reinitialization");
+        return 0;
+#endif
+    }
+    if (!strcmp(mode, "unsupported-highlight")) {
+        reload_coord(p, TEX_COORD_HILIGHT);
+#if PROPOSED_LANE
+        require(slippi_tobj_failure() == 9, "Highlight Load remains unsupported");
+#endif
+        fixture_tobj_setup(p);
+        require(0, "unsupported Highlight must not fall back to original draw");
+    }
+    if (!strcmp(mode, "toon-custom")) {
+#if PROPOSED_LANE
+        p->flags = (p->flags & ~TEX_COORD_MASK) | TEX_COORD_TOON;
+        p->parent.parent.class_info = &hsdObj;
+        fixture_tobj_setup(p);
+        require(0, "custom Toon must fail before the original Toon return");
+#endif
+    }
+    if (!strcmp(mode, "toon-descriptor")) {
+#if PROPOSED_LANE
+        p->flags = (p->flags & ~TEX_COORD_MASK) | TEX_COORD_TOON;
+        void (*saved)(HSD_TObj*) = hsdTObj.make_mtx;
+        hsdTObj.make_mtx = NULL;
+        fixture_tobj_setup(p);
+        hsdTObj.make_mtx = saved;
+        require(0, "changed descriptor must fail before the original Toon return");
+#endif
+    }
+    if (!strcmp(mode, "toon-sticky")) {
+#if PROPOSED_LANE
+        slippi_tobj_unsupported_write(p);
+        p->flags = (p->flags & ~TEX_COORD_MASK) | TEX_COORD_TOON;
+        fixture_tobj_setup(p);
+        require(0, "sticky authored-write refusal must precede the Toon return");
+#endif
+    }
+    if (!strcmp(mode, "toon-missing-world")) {
+#if PROPOSED_LANE
+        p->flags = (p->flags & ~TEX_COORD_MASK) | TEX_COORD_TOON;
+        slippi_tobj_world_end(1);
+        fixture_tobj_setup(p);
+        require(0, "missing world must fail before the original Toon return");
+#endif
+    }
+    if (!strcmp(mode, "custom-selection")) {
+#if PROPOSED_LANE
+        HSD_TObjInfo child = {0};
+        hsdInitClassInfo((HSD_ClassInfo*) &child, (HSD_ClassInfo*) &hsdTObj,
+                         "fixture", "custom default", sizeof(child), sizeof(HSD_TObj));
+        HSD_TObjSetDefaultClass(&child);
+        HSD_TObj* q = HSD_TObjAlloc();
+        require(q && slippi_tobj_failure() == 12 &&
+                    !slippi_tobj_anchor_capture().token,
+                "actual custom default class selection remains sticky");
+        HSD_TObjSetDefaultClass(&hsdTObj);
+        HSD_TObjRemove(q);
+        HSD_TObjRemove(p);
+        puts("ACTUAL:custom class selection remains explicitly refused");
+        return finish_world();
+#endif
+    }
+    if (!strcmp(mode, "rebind")) {
+#if PROPOSED_LANE
+        HSD_TObjInfo child = {0};
+        hsdInitClassInfo((HSD_ClassInfo*) &child, (HSD_ClassInfo*) &hsdTObj,
+                         "fixture", "same-size child", sizeof(child), sizeof(HSD_TObj));
+        require(hsdChangeClass((HSD_Obj*) p, (HSD_ClassInfo*) &child),
+                "actual canonical class rebind");
+        require(slippi_tobj_failure() == 6 && !slippi_tobj_anchor_capture().token,
+                "canonical class rebind stays sticky");
+        HSD_TObjRemove(p);
+        puts("ACTUAL:custom/rebound TObj descriptor remains refused");
+        return finish_world();
+#endif
+    }
+    if (!strcmp(mode, "descriptor-change")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token, "capture before descriptor change");
+        void (*saved)(HSD_TObj*) = hsdTObj.make_mtx;
+        hsdTObj.make_mtx = NULL;
+        require(!slippi_tobj_anchor_admit(a) && slippi_tobj_failure() == 2,
+                "descriptor method mutation sticks and invalidates anchor");
+        hsdTObj.make_mtx = saved;
+        require(!slippi_tobj_anchor_admit(a), "restoring bytes cannot revive failed interval");
+        slippi_tobj_anchor_disarm(a); HSD_TObjRemove(p);
+        puts("ACTUAL:descriptor mutation permanently invalidates active interval");
+        return finish_world();
+#endif
+    }
+    if (!strcmp(mode, "world-recreation")) {
+#if PROPOSED_LANE
+        SlippiTObjAnchor a = slippi_tobj_anchor_capture();
+        require(a.token, "capture old world interval");
+        slippi_tobj_anchor_disarm(a); HSD_TObjRemove(p);
+        slippi_tobj_world_end(1);
+        require(slippi_tobj_world_begin(2), "new world begins");
+        require(!slippi_tobj_anchor_admit(a), "old world anchor rejected");
+        slippi_tobj_world_end(2);
+        puts("ACTUAL:world recreation rejects old one-use anchor");
+        return 0;
+#endif
+    }
+    if (!strcmp(mode, "timg-null-table")) return finish_world();
+    if (!strcmp(mode, "changed")) {
+        fixture_tobj_update_type(p, HSD_A_T_TRAV, .25f);
+        fixture_tobj_update_type(p, HSD_A_T_ROTZ, .5f);
+        draw("uv-changed-animated", p);
+    } else if (!strcmp(mode, "same-value")) {
+        fixture_tobj_update_type(p, HSD_A_T_TRAV, .125f);
+        draw("uv-same-value", p);
+    } else if (!strcmp(mode, "unchanged")) {
+        draw("uv-repeated-dirty-source", p);
+        draw("uv-repeated-dirty-source", p);
+    } else if (!strcmp(mode, "toon")) {
+        HSD_TObjRemove(p); p = make_coord(TEX_COORD_TOON);
+        draw("toon-exact-early-return", p);
+    } else {
+        require(0, "unknown fixture mode");
+    }
+    HSD_TObjRemove(p);
+    puts("ACTUAL:canonical source TObj matrix setup; GX arguments captured exactly");
+    return finish_world();
+}

@@ -100,9 +100,31 @@ int melee_web_gameplay_session_end(char* error, size_t error_size);
 int melee_web_gameplay_session_arena(const void** base, size_t* bytes);
 int melee_web_gameplay_session_active(void);
 MeleeWebGameplayAllocation melee_web_gameplay_allocation(void);
+/* Read-only extent of the live game arena. This succeeds only at a quiescent
+ * boundary with balanced HSD callback markers, a live owned SDK heap, and the
+ * matching healthy source-memory owner. It does not grant restore permission. */
+int melee_web_gameplay_active_arena_view(const void** base, size_t* bytes);
 /* Public prototype for the typed read-only owner producer. */
 int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
                                        uint32_t out_size);
+
+/* Owner-only checkpoint. Captures private bootstrap values; restoring it does
+ * not restore SDK/source globals or arena contents. All lifecycle fields must
+ * remain invariant; only ticks and the process-link mask may rewind. Caller
+ * must serialize at a quiescent boundary and admit companion owners first. */
+typedef struct MeleeWebGameplayBootstrapSnapshot MeleeWebGameplayBootstrapSnapshot;
+MeleeWebGameplayBootstrapSnapshot* melee_web_gameplay_bootstrap_snapshot_capture(
+    char* error, size_t error_size);
+int melee_web_gameplay_bootstrap_snapshot_admit(
+    const MeleeWebGameplayBootstrapSnapshot*, char* error, size_t error_size);
+int melee_web_gameplay_bootstrap_snapshot_restore(
+    const MeleeWebGameplayBootstrapSnapshot*, char* error, size_t error_size);
+/* Actual arena extent, never an inferred span from allocations. Valid only
+ * while this snapshot admits; exposing it does not authorize an arena restore. */
+int melee_web_gameplay_bootstrap_snapshot_arena(
+    const MeleeWebGameplayBootstrapSnapshot*, const void** base, size_t* bytes,
+    char* error, size_t error_size);
+void melee_web_gameplay_bootstrap_snapshot_destroy(MeleeWebGameplayBootstrapSnapshot*);
 
 /* Owns a single isolated SDK heap and the HSD process tables. This nonrendering
  * bootstrap executes original allocation, object lifecycle and scheduling;
@@ -147,6 +169,14 @@ int melee_web_gameplay_vs_startup_active(void);
 int melee_web_gameplay_vs_manager_preparing(void);
 int melee_web_gameplay_initialize_vs_dynamics(char* error, size_t error_size);
 int melee_web_gameplay_step(char* error, size_t error_size);
+/* Internal per-invocation hook for a private match source post-step. The
+ * callback is never retained and runs inside the source callback context. */
+typedef int (*MeleeWebGameplayPostSourceCallback)(void* context,
+                                                  char* error,
+                                                  size_t error_size);
+int melee_web_gameplay_step_post_source(
+    MeleeWebGameplayPostSourceCallback callback, void* context,
+    char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);
 /* Returns the live world's generation without walking SDK heap statistics.
@@ -166,6 +196,17 @@ int melee_web_gameplay_world_exists(void);
  * Re-registering the same callback is idempotent within the current world. */
 int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
                                          char* error, size_t error_size);
+
+/* Private CPU aggregate: this exact source mask is bootstrap-owned. Compare
+ * pointer identity before reading only the known local scalar, never a foreign
+ * pointee. The ordinary clock companion deliberately does not own this value. */
+int melee_web_gameplay_clock_mask_admit(const void* saved_pointer,uint64_t saved_value);
+typedef struct MeleeWebBootstrapCpuStorage {
+    const void* ticks; size_t ticks_bytes;
+    const void* disabled_links; size_t disabled_links_bytes;
+} MeleeWebBootstrapCpuStorage;
+MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void);
+
 
 #ifdef __cplusplus
 }

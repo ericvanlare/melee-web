@@ -10,6 +10,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {browserLaunchOptions, loadBrowserTools} from '../../../scripts/browser_tools.mjs';
+import {waitForAuroraSubmission} from './cpu_restore_runner.mjs';
 import {QuiescentWasmSnapshot} from '../../../tests/quiescent_wasm_snapshot.mjs';
 import {
   applyCleanupVerdict, assertDrawDiagnosticsClear, checkedAsyncCcall,
@@ -21,12 +22,13 @@ import {
 } from './runner_contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const OBSERVATION_BYTES = 1280;
-const PCM_BYTES = 1068 * 4;
-const PAD_BYTES = 44;
-const DRAW_DIAGNOSTIC_BYTES = 132;
-const SOURCE_SEED = 0x13579bdf;
-const PREFIX_SAMPLES = 300;
+export const OBSERVATION_BYTES = 1280;
+export const PCM_BYTES = 1068 * 4;
+export const PAD_BYTES = 44;
+export const DRAW_DIAGNOSTIC_BYTES = 132;
+export const SOURCE_SEED = 0x13579bdf;
+export const PREFIX_SAMPLES = 300;
+export const SYNCTEST_PROFILE = 'slippi-render-dependencies-dbooc-shield-drop-v5';
 const INTERVAL_SAMPLES = Object.freeze([300, 301]);
 const SUBMISSION_TIMEOUT_MS = 5000;
 const POLL_MS = 10;
@@ -175,6 +177,1188 @@ export function compareLane(sample, domain, expected, actual) {
   }
 }
 
+// Byte-level census helpers classify observed writes by static provenance,
+// arena extent, and validated live audio ranges. These labels never admit a
+// range for restore.
+export function diffHeapRanges(before, after) {
+  if (!(before instanceof Uint8Array) || !(after instanceof Uint8Array)) {
+    throw new TypeError('Heap census snapshots must be Uint8Array values');
+  }
+  const shared = Math.min(before.length, after.length);
+  const ranges = [];
+  let start = -1;
+  let changedBytes = 0;
+  for (let offset = 0; offset < shared; offset++) {
+    if (before[offset] !== after[offset]) {
+      changedBytes++;
+      if (start < 0) start = offset;
+    } else if (start >= 0) {
+      ranges.push({start, end: offset, bytes: offset - start});
+      start = -1;
+    }
+  }
+  if (start >= 0) ranges.push({start, end: shared, bytes: shared - start});
+  if (after.length > shared) {
+    ranges.push({start: shared, end: after.length, bytes: after.length - shared,
+      kind: 'memory-growth'});
+    changedBytes += after.length - shared;
+  } else if (before.length > shared) {
+    ranges.push({start: shared, end: before.length, bytes: before.length - shared,
+      kind: 'memory-shrink'});
+    changedBytes += before.length - shared;
+  }
+  return {ranges, changedBytes};
+}
+
+export function classifyHeapRanges(rawRanges, manifestRows, arenaRange,
+  audioInventoryTransition = null, nativeOutputRange = null,
+  matchContextInventoryTransition = null, auroraInventoryTransition = null,
+  stageArenaInventoryTransition = null) {
+  if (!Array.isArray(rawRanges) || !Array.isArray(manifestRows) ||
+      !arenaRange || !Number.isSafeInteger(arenaRange.base) ||
+      !Number.isSafeInteger(arenaRange.bytes)) {
+    throw new TypeError('Heap census classification inputs are malformed');
+  }
+  let audioRows = [];
+  if (audioInventoryTransition !== null) {
+    const {before, after} = audioInventoryTransition || {};
+    if (!before || !after || !Array.isArray(before.rows) || !Array.isArray(after.rows) ||
+        before.audioOwner !== after.audioOwner ||
+        before.generationLow !== after.generationLow ||
+        before.generationHigh !== after.generationHigh || before.count !== after.count ||
+        before.effectsEnabled !== after.effectsEnabled || before.rows.length !== after.rows.length ||
+        before.rows.some((row, index) => {
+          const other = after.rows[index];
+          return row.kind !== other.kind || row.address !== other.address ||
+            row.extent !== other.extent || row.owner !== other.owner ||
+            row.generationLow !== other.generationLow || row.generationHigh !== other.generationHigh;
+        })) {
+      throw new Error('Audio owner attribution requires same-range, same-owner rows at both boundaries');
+    }
+    audioRows = before.rows;
+  }
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const rows = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size, row,
+  })).sort((a, b) => a.start - b.start || a.end - b.end);
+  const prefixMaxEnd = [];
+  for (let index = 0, maximum = 0; index < rows.length; index++) {
+    maximum = Math.max(maximum, rows[index].end);
+    prefixMaxEnd.push(maximum);
+  }
+  const ownedRanges = audioRows.map(row => ({
+    start: row.address, end: row.address + row.extent, row, ownerType: 'audio',
+  })).sort((a, b) => a.start - b.start || a.end - b.end);
+  let matchContextRows = [];
+  if (matchContextInventoryTransition !== null) {
+    const {before, after} = matchContextInventoryTransition || {};
+    if (!before || !after || !Array.isArray(before.rows) || !Array.isArray(after.rows) ||
+        before.count !== 1 || after.count !== 1 || before.rows.length !== 1 ||
+        after.rows.length !== 1 ||
+        before.owner !== after.owner ||
+        before.worldGenerationLow !== after.worldGenerationLow ||
+        before.worldGenerationHigh !== after.worldGenerationHigh ||
+        before.ownerEpochLow !== after.ownerEpochLow ||
+        before.ownerEpochHigh !== after.ownerEpochHigh ||
+        before.rows.some((row, index) => {
+          const other = after.rows[index];
+          return row.kind !== other.kind || row.address !== other.address ||
+            row.extent !== other.extent || row.owner !== other.owner ||
+            row.worldGenerationLow !== other.worldGenerationLow ||
+            row.worldGenerationHigh !== other.worldGenerationHigh ||
+            row.ownerEpochLow !== other.ownerEpochLow ||
+            row.ownerEpochHigh !== other.ownerEpochHigh;
+        })) {
+      throw new Error('Match-context owner attribution requires same-range, same-owner, same-lifetime rows at both boundaries');
+    }
+    matchContextRows = before.rows;
+    ownedRanges.push(...matchContextRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row, ownerType: 'match-context',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  let auroraShadowRows = [];
+  let auroraDiagnosticOutput = null;
+  if (auroraInventoryTransition !== null) {
+    const {before, after} = auroraInventoryTransition || {};
+    const sameIdentity = before && after &&
+      before.version === after.version && before.size === after.size &&
+      before.frameSlotCount === after.frameSlotCount && before.stagingSlotCount === after.stagingSlotCount &&
+      before.stagingGenerationLow === after.stagingGenerationLow &&
+      before.stagingGenerationHigh === after.stagingGenerationHigh &&
+      before.diagnosticOutputRange?.base === after.diagnosticOutputRange?.base &&
+      before.diagnosticOutputRange?.bytes === after.diagnosticOutputRange?.bytes &&
+      before.rows?.length === after.rows?.length && before.ranges?.length === after.ranges?.length &&
+      before.rows.every((row, index) => {
+        const other = after.rows[index];
+        return row.kind === other.kind && row.frameSlot === other.frameSlot &&
+          row.streamIndex === other.streamIndex && row.address === other.address &&
+          row.extent === other.extent && row.maxCapacity === other.maxCapacity &&
+          row.owned === other.owned && row.ownerAddress === other.ownerAddress &&
+          row.generationLow === other.generationLow && row.generationHigh === other.generationHigh;
+      });
+    if (!sameIdentity) {
+      throw new Error('Aurora staging-shadow attribution requires same owner address, capacity, topology, and lifetime');
+    }
+    auroraShadowRows = before.ranges;
+    auroraDiagnosticOutput = {start: before.diagnosticOutputRange.base,
+      end: before.diagnosticOutputRange.base + before.diagnosticOutputRange.bytes};
+    ownedRanges.push(...auroraShadowRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row,
+      ownerType: 'aurora-staging-shadow',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  let stageArenaRows = [];
+  let stageArenaDiagnosticOutput = null;
+  if (stageArenaInventoryTransition !== null) {
+    const {before, after} = stageArenaInventoryTransition || {};
+    const sameInventory = before && after &&
+      sameStageArenaMetadata(before.metadata, after.metadata) &&
+      before.rows?.length === before.metadata.allocationCount &&
+      after.rows?.length === after.metadata.allocationCount &&
+      before.diagnosticOutputStorage?.base === after.diagnosticOutputStorage?.base &&
+      before.diagnosticOutputStorage?.bytes === after.diagnosticOutputStorage?.bytes &&
+      before.rows.length === after.rows.length &&
+      before.rows.every((row, index) => {
+        const other = after.rows[index];
+        return row.ordinal === other.ordinal && row.address === other.address &&
+          row.extent === other.extent &&
+          row.worldGenerationLow === before.metadata.worldGenerationLow &&
+          row.worldGenerationHigh === before.metadata.worldGenerationHigh &&
+          row.worldStorage === before.metadata.worldStorage &&
+          row.arenaStorage === before.metadata.arenaStorage &&
+          row.identityToken === before.metadata.identityToken &&
+          row.allocationCount === before.metadata.allocationCount &&
+          row.totalBytes === before.metadata.totalBytes &&
+          row.worldGenerationLow === other.worldGenerationLow &&
+          row.worldGenerationHigh === other.worldGenerationHigh &&
+          row.worldStorage === other.worldStorage && row.arenaStorage === other.arenaStorage &&
+          row.identityToken === other.identityToken &&
+          row.allocationCount === other.allocationCount && row.totalBytes === other.totalBytes;
+      });
+    if (!sameInventory) {
+      throw new Error('Stage-arena attribution requires the same complete owner and ordered ranges at both boundaries');
+    }
+    stageArenaRows = before.rows;
+    stageArenaDiagnosticOutput = {start: before.diagnosticOutputStorage.base,
+      end: before.diagnosticOutputStorage.base + before.diagnosticOutputStorage.bytes};
+    ownedRanges.push(...stageArenaRows.map(row => ({
+      start: row.address, end: row.address + row.extent, row, ownerType: 'stage-arena',
+    })));
+    ownedRanges.sort((a, b) => a.start - b.start || a.end - b.end);
+  }
+  let nativeOutput = null;
+  if (nativeOutputRange !== null) {
+    if (!nativeOutputRange || !Number.isSafeInteger(nativeOutputRange.base) ||
+        !Number.isSafeInteger(nativeOutputRange.bytes) || nativeOutputRange.base < 0 ||
+        nativeOutputRange.bytes <= 0 || nativeOutputRange.base > 0x100000000 ||
+        nativeOutputRange.bytes > 0x100000000 - nativeOutputRange.base) {
+      throw new TypeError('Native PCM diagnostic range is malformed');
+    }
+    nativeOutput = {start: nativeOutputRange.base,
+      end: nativeOutputRange.base + nativeOutputRange.bytes};
+  }
+  const classified = [];
+  for (const range of rawRanges) {
+    if (!range || !Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.end) ||
+        range.start < 0 || range.end <= range.start) {
+      throw new TypeError('Heap census contains an invalid changed range');
+    }
+    let low = 0, high = prefixMaxEnd.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (prefixMaxEnd[middle] <= range.start) low = middle + 1;
+      else high = middle;
+    }
+    const overlapping = [];
+    for (let index = low; index < rows.length && rows[index].start < range.end; index++) {
+      if (range.start < rows[index].end) overlapping.push(rows[index]);
+    }
+    const boundaries = new Set([range.start, range.end]);
+    for (const item of overlapping) {
+      boundaries.add(Math.max(range.start, item.start));
+      boundaries.add(Math.min(range.end, item.end));
+    }
+    const overlappingOwners = ownedRanges.filter(item =>
+      range.start < item.end && item.start < range.end);
+    for (const item of overlappingOwners) {
+      boundaries.add(Math.max(range.start, item.start));
+      boundaries.add(Math.min(range.end, item.end));
+    }
+    if (nativeOutput && nativeOutput.start < range.end && range.start < nativeOutput.end) {
+      boundaries.add(Math.max(range.start, nativeOutput.start));
+      boundaries.add(Math.min(range.end, nativeOutput.end));
+    }
+    if (auroraDiagnosticOutput && auroraDiagnosticOutput.start < range.end &&
+        range.start < auroraDiagnosticOutput.end) {
+      boundaries.add(Math.max(range.start, auroraDiagnosticOutput.start));
+      boundaries.add(Math.min(range.end, auroraDiagnosticOutput.end));
+    }
+    if (stageArenaDiagnosticOutput && stageArenaDiagnosticOutput.start < range.end &&
+        range.start < stageArenaDiagnosticOutput.end) {
+      boundaries.add(Math.max(range.start, stageArenaDiagnosticOutput.start));
+      boundaries.add(Math.min(range.end, stageArenaDiagnosticOutput.end));
+    }
+    if (arenaRange.base < range.end && range.start < arenaEnd) {
+      boundaries.add(Math.max(range.start, arenaRange.base));
+      boundaries.add(Math.min(range.end, arenaEnd));
+    }
+    const ordered = [...boundaries].sort((a, b) => a - b);
+    for (let index = 0; index + 1 < ordered.length; index++) {
+      const start = ordered[index], end = ordered[index + 1];
+      if (start === end) continue;
+      const matches = overlapping.filter(item => item.start <= start && end <= item.end);
+      const ownerMatches = overlappingOwners.filter(item => item.start <= start && end <= item.end);
+      const inArena = arenaRange.base <= start && end <= arenaEnd;
+      const inNativeOutput = nativeOutput && nativeOutput.start <= start && end <= nativeOutput.end;
+      const inAuroraDiagnosticOutput = auroraDiagnosticOutput &&
+        auroraDiagnosticOutput.start <= start && end <= auroraDiagnosticOutput.end;
+      const inStageArenaDiagnosticOutput = stageArenaDiagnosticOutput &&
+        stageArenaDiagnosticOutput.start <= start && end <= stageArenaDiagnosticOutput.end;
+      let provenance, details = {};
+      if (inNativeOutput) {
+        provenance = 'native-output-storage-diagnostic-excluded';
+      } else if (inAuroraDiagnosticOutput) {
+        provenance = 'aurora-staging-shadow-descriptor-diagnostic-excluded';
+      } else if (inStageArenaDiagnosticOutput) {
+        provenance = 'stage-arena-descriptor-diagnostic-excluded';
+      } else if (matches.length > 1 || ownerMatches.length > 1 ||
+          (matches.length && ownerMatches.length) ||
+          (matches.length && inArena) || (ownerMatches.length && inArena)) {
+        provenance = 'ambiguous-overlap';
+      } else if (ownerMatches.length === 1) {
+        const {row, ownerType} = ownerMatches[0];
+        if (ownerType === 'stage-arena') {
+          provenance = 'stage-arena-owner-range';
+          details = {stageArenaOrdinal: row.ordinal,
+            stageArenaWorldGenerationTag: `${row.worldGenerationHigh.toString(16).padStart(8, '0')}${row.worldGenerationLow.toString(16).padStart(8, '0')}`,
+            stageArenaWorldStorage: row.worldStorage,
+            stageArenaStorage: row.arenaStorage,
+            stageArenaIdentityToken: row.identityToken};
+        } else if (ownerType === 'match-context') {
+          provenance = 'match-context-owner-range';
+          details = {
+            matchContextOwnerAddress: row.owner,
+            matchContextWorldGenerationTag: `${row.worldGenerationHigh.toString(16).padStart(8, '0')}${row.worldGenerationLow.toString(16).padStart(8, '0')}`,
+            matchContextOwnerEpoch: `${row.ownerEpochHigh.toString(16).padStart(8, '0')}${row.ownerEpochLow.toString(16).padStart(8, '0')}`,
+          };
+        } else if (ownerType === 'aurora-staging-shadow') {
+          provenance = 'aurora-staging-shadow-owner-range';
+          details = {
+            auroraStagingShadowKind: row.kindName,
+            auroraFrameSlot: row.frameSlot,
+            auroraStreamIndex: row.streamIndex,
+            ownerAddress: row.ownerAddress,
+            ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
+            ownerCapacity: row.capacity,
+            ownerMaxCapacity: row.maxCapacity,
+          };
+        } else {
+          provenance = 'audio-owner-range';
+          details = {
+            audioRangeKind: row.kindName,
+            audioRangeKindValue: row.kind,
+            ownerAddress: row.owner,
+            ownerLifetimeTag: `${row.generationHigh.toString(16).padStart(8, '0')}${row.generationLow.toString(16).padStart(8, '0')}`,
+          };
+        }
+      } else if (matches.length === 1) {
+        const {row} = matches[0];
+        provenance = row.decision === 'source-c-static-candidate' ?
+          'source-c-static-candidate' : 'excluded-mutable-input-section';
+        details = {
+          source: row.source,
+          inputObject: row.input_object,
+          inputSection: row.input_section,
+          exclusionReason: row.exclusion_reason,
+        };
+      } else if (inArena) {
+        provenance = 'gameplay-arena';
+      } else {
+        provenance = 'unmapped';
+      }
+      classified.push({start, end, bytes: end - start,
+        ...(range.kind ? {kind: range.kind} : {}), provenance,
+        ownerRestoreAdmission: false, ...details});
+    }
+  }
+  return classified;
+}
+
+export function validateSourceStateManifest(manifest) {
+  const limit = 0x100000000;
+  if (!manifest || manifest.schema !== 'melee-web-source-state-manifest-v1' ||
+      manifest.target !== 'gameplay_slippi_synctest_browser' ||
+      manifest.complete_game_state !== false ||
+      !/^[0-9a-f]{64}$/.test(manifest.configuration_identity_sha256 || '') ||
+      !manifest.configuration_identity ||
+      manifest.configuration_identity.target !== 'gameplay_slippi_synctest_browser' ||
+      !/^[0-9a-f]{64}$/.test(manifest.configuration_identity.wasm_sha256 || '') ||
+      !Array.isArray(manifest.mutable_input_sections)) {
+    throw new Error('Source-state manifest is malformed');
+  }
+  const rows = manifest.mutable_input_sections;
+  if (!manifest.counts || !Number.isSafeInteger(manifest.counts.mutable_input_sections) ||
+      !Number.isSafeInteger(manifest.counts.source_c_candidates) ||
+      !Number.isSafeInteger(manifest.counts.excluded_mutable_input_sections) ||
+      manifest.counts.mutable_input_sections !== rows.length || rows.length === 0) {
+    throw new Error('Source-state manifest row count is inconsistent');
+  }
+  const intervals = [];
+  for (const row of rows) {
+    if (!row || !Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.size) ||
+        row.address < 0 || row.size < 0 || row.address > limit || row.size > limit - row.address ||
+        !['source-c-static-candidate', 'excluded'].includes(row.decision) ||
+        typeof row.input_object !== 'string' || row.input_object.length === 0 ||
+        typeof row.input_section !== 'string' || row.input_section.length === 0 ||
+        !('source' in row) || !(row.source === null || typeof row.source === 'string') ||
+        !('exclusion_reason' in row) ||
+        (row.decision === 'source-c-static-candidate' ? row.exclusion_reason !== null :
+          typeof row.exclusion_reason !== 'string' || row.exclusion_reason.length === 0)) {
+      throw new Error('Source-state manifest contains an invalid mutable input section');
+    }
+    if (row.size) intervals.push({start: row.address, end: row.address + row.size});
+  }
+  const sourceCStaticCandidates = rows.filter(row => row.decision === 'source-c-static-candidate').length;
+  const excludedMutableInputSections = rows.filter(row => row.decision === 'excluded').length;
+  if (sourceCStaticCandidates !== manifest.counts?.source_c_candidates ||
+      excludedMutableInputSections !== manifest.counts?.excluded_mutable_input_sections) {
+    throw new Error('Source-state manifest decision counts are inconsistent');
+  }
+  intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let i = 1; i < intervals.length; i++) {
+    if (intervals[i].start < intervals[i - 1].end) {
+      throw new Error('Source-state manifest mutable sections overlap');
+    }
+  }
+  return {
+    target: manifest.target,
+    completeGameState: manifest.complete_game_state,
+    configurationIdentitySha256: manifest.configuration_identity_sha256,
+    wasmSha256: manifest.configuration_identity.wasm_sha256,
+    mutableInputSections: rows.length,
+    sourceCStaticCandidates,
+    excludedMutableInputSections,
+  };
+}
+
+export function validateCensusArenaDisjointness(manifestRows, arenaRange) {
+  const limit = 0x100000000;
+  if (!Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 ||
+      arenaRange.base > limit || arenaRange.bytes > limit - arenaRange.base) {
+    throw new Error('Live gameplay arena range is malformed');
+  }
+  const intervals = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size,
+  }));
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  if (intervals.some(row => row.start < arenaEnd && arenaRange.base < row.end)) {
+    throw new Error('Live gameplay arena overlaps a manifest input section');
+  }
+}
+
+export function validateCensusInventory(manifest, arenaRange) {
+  const validated = validateSourceStateManifest(manifest);
+  validateCensusArenaDisjointness(manifest.mutable_input_sections, arenaRange);
+  return {
+    mutableInputSections: validated.mutableInputSections,
+    sourceCStaticCandidates: validated.sourceCStaticCandidates,
+    excludedMutableInputSections: validated.excludedMutableInputSections,
+    completeGameState: validated.completeGameState,
+  };
+}
+
+// The browser adapter exposes a fixed wasm32 record. Decode each integer as a
+// word; generation stays as two words so the full uint64 lifetime tag is never
+// rounded through JavaScript Number.
+export function decodeAudioOwnerInventory(heap, pointer) {
+  const wireVersion = 1, wireHeaderBytes = 36, wireRowBytes = 24, wireCapacity = 9;
+  const wireBytes = wireHeaderBytes + wireRowBytes * wireCapacity;
+  const kindNames = {
+    1: 'audio-owner', 2: 'audio-entries', 3: 'audio-bindings',
+    4: 'audio-programs', 5: 'audio-words', 6: 'audio-starts',
+    7: 'effects-owner', 8: 'effects-reverb-heap', 9: 'effects-delay-heap',
+  };
+  const limit = 0x100000000;
+  if (!(heap instanceof Uint8Array) || heap.byteLength > limit ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+      pointer > heap.byteLength || wireBytes > heap.byteLength - pointer) {
+    throw new Error('Audio owner inventory wire pointer or wasm bounds are invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, wireBytes);
+  const version = view.getUint32(0, true);
+  const size = view.getUint32(4, true);
+  const count = view.getUint32(8, true);
+  const rowSize = view.getUint32(12, true);
+  const capacity = view.getUint32(16, true);
+  const status = view.getInt32(20, true);
+  const audioOwner = view.getUint32(24, true);
+  const generationLow = view.getUint32(28, true);
+  const generationHigh = view.getUint32(32, true);
+  if (version !== wireVersion || size !== wireBytes ||
+      rowSize !== wireRowBytes || capacity !== wireCapacity ||
+      (count !== 6 && count !== 9) || status !== 1) {
+    throw new Error(`Audio owner inventory wire layout/status is invalid: version=${version}, size=${size}, rowSize=${rowSize}, count=${count}, capacity=${capacity}, status=${status}`);
+  }
+  if (!audioOwner || (generationLow === 0 && generationHigh === 0)) {
+    throw new Error('Audio owner inventory has an invalid owner or zero lifetime tag');
+  }
+  const rows = [];
+  const intervals = [];
+  for (let index = 0; index < count; index++) {
+    const offset = wireHeaderBytes + index * wireRowBytes;
+    const row = {
+      kind: view.getUint32(offset, true),
+      address: view.getUint32(offset + 4, true),
+      extent: view.getUint32(offset + 8, true),
+      owner: view.getUint32(offset + 12, true),
+      generationLow: view.getUint32(offset + 16, true),
+      generationHigh: view.getUint32(offset + 20, true),
+    };
+    const expectedKind = index + 1;
+    const audioLifetimeMismatch = index < 6 &&
+      (row.generationLow !== generationLow || row.generationHigh !== generationHigh);
+    if (row.kind !== expectedKind || !kindNames[row.kind] ||
+        !row.address || !row.extent || !row.owner ||
+        row.address > limit || row.extent > limit - row.address ||
+        row.address + row.extent > heap.byteLength ||
+        audioLifetimeMismatch) {
+      throw new Error(`Audio owner inventory row ${index} has an invalid kind, extent, owner, lifetime, or wasm bound`);
+    }
+    if (index >= 6 && row.generationLow === 0 && row.generationHigh === 0) {
+      throw new Error(`FX owner inventory row ${index} has a zero lifetime tag`);
+    }
+    if (index < 6 && row.owner !== audioOwner) {
+      throw new Error(`Audio owner inventory row ${index} has the wrong owner identity`);
+    }
+    if (index === 0 && row.address !== audioOwner) {
+      throw new Error('Audio owner inventory does not identify its owner allocation');
+    }
+    if (index === 6 && (row.address !== row.owner || row.owner === audioOwner)) {
+      throw new Error('FX owner inventory does not identify a delegated effects allocation');
+    }
+    if (index > 6 && (row.owner !== rows[6].owner ||
+        row.generationLow !== rows[6].generationLow ||
+        row.generationHigh !== rows[6].generationHigh)) {
+      throw new Error('FX audio ranges disagree on their delegated owner identity or lifetime tag');
+    }
+    row.kindName = kindNames[row.kind];
+    intervals.push({start: row.address, end: row.address + row.extent});
+    rows.push(row);
+  }
+  intervals.sort((a, b) => a.start - b.start || a.end - b.end);
+  for (let index = 1; index < intervals.length; index++) {
+    if (intervals[index].start < intervals[index - 1].end) {
+      throw new Error('Audio owner inventory ranges overlap each other');
+    }
+  }
+  return {version, size, rowSize, capacity, count, status, audioOwner,
+    generationLow, generationHigh, effectsEnabled: count === 9,
+    rows, ownerRestoreAdmission: false};
+}
+
+export function validateAudioOwnerRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes) {
+  const limit = 0x100000000;
+  if (!inventory || !Array.isArray(inventory.rows) || !Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > limit ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > limit ||
+      arenaRange.bytes > limit - arenaRange.base ||
+      arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > limit || nativeOutputRange.bytes > limit - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes) {
+    throw new Error('Audio owner, arena, or native output inventory bounds are invalid');
+  }
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const outputEnd = nativeOutputRange.base + nativeOutputRange.bytes;
+  const staticIntervals = manifestRows.filter(row => row.size > 0).map(row => ({
+    start: row.address, end: row.address + row.size,
+  }));
+  for (const row of inventory.rows) {
+    const end = row.address + row.extent;
+    if (staticIntervals.some(item => row.address < item.end && item.start < end)) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps a static manifest range`);
+    }
+    if (row.address < arenaEnd && arenaRange.base < end) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps the gameplay arena`);
+    }
+    if (row.address < outputEnd && nativeOutputRange.base < end) {
+      throw new Error(`Audio owner range ${row.kindName} overlaps native PCM output storage`);
+    }
+  }
+  if (nativeOutputRange.base < arenaEnd && arenaRange.base < outputEnd) {
+    throw new Error('Native PCM output storage overlaps the gameplay arena');
+  }
+  return {base: nativeOutputRange.base, bytes: nativeOutputRange.bytes,
+    diagnosticOnly: true, ownerRestoreAdmission: false};
+}
+
+export function requireStableAudioOwnerInventory(inventories) {
+  if (!Array.isArray(inventories) || inventories.length !== 3 ||
+      inventories.some(item => !item || !Array.isArray(item.rows))) {
+    throw new Error('Audio owner inventory requires all three census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.audioOwner !== first.audioOwner) {
+      throw new Error('Audio owner address changed across census boundaries');
+    }
+    if (inventory.generationLow !== first.generationLow ||
+        inventory.generationHigh !== first.generationHigh) {
+      throw new Error('Audio owner lifetime generation changed across census boundaries');
+    }
+    if (first.count === 9 && inventory.count === 9 &&
+        (inventory.rows[6].generationLow !== first.rows[6].generationLow ||
+         inventory.rows[6].generationHigh !== first.rows[6].generationHigh)) {
+      throw new Error('FX owner lifetime generation changed across census boundaries');
+    }
+    if (inventory.count !== first.count || inventory.effectsEnabled !== first.effectsEnabled ||
+        inventory.rows.length !== first.rows.length ||
+        inventory.rows.some((row, index) => {
+          const prior = first.rows[index];
+          return row.kind !== prior.kind || row.address !== prior.address ||
+            row.extent !== prior.extent || row.owner !== prior.owner ||
+            row.generationLow !== prior.generationLow || row.generationHigh !== prior.generationHigh;
+        })) {
+      throw new Error('Audio owner inventory topology changed across census boundaries');
+    }
+  }
+  return first.rows.map(row => ({...row}));
+}
+
+// One fixed record describes only the live MeleeWebMatchContext allocation.
+// Both 64-bit identities remain split into words so JS never rounds them.
+export function decodeMatchContextRangeInventory(heap, pointer) {
+  const wireVersion = 1, wireHeaderBytes = 24, wireRowBytes = 32,
+    wireCapacity = 1, wireBytes = wireHeaderBytes + wireRowBytes;
+  const limit = 0x100000000;
+  if (!(heap instanceof Uint8Array) || heap.byteLength > limit ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+      pointer > heap.byteLength || wireBytes > heap.byteLength - pointer) {
+    throw new Error('Match-context range inventory wire pointer or wasm bounds are invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, wireBytes);
+  const version = view.getUint32(0, true), size = view.getUint32(4, true);
+  const count = view.getUint32(8, true), rowSize = view.getUint32(12, true);
+  const capacity = view.getUint32(16, true), status = view.getInt32(20, true);
+  if (version !== wireVersion || size !== wireBytes || count !== 1 ||
+      rowSize !== wireRowBytes || capacity !== wireCapacity || status !== 1) {
+    throw new Error(`Match-context range inventory wire layout/status is invalid: version=${version}, size=${size}, count=${count}, rowSize=${rowSize}, capacity=${capacity}, status=${status}`);
+  }
+  const offset = wireHeaderBytes;
+  const row = {
+    kind: view.getUint32(offset, true),
+    address: view.getUint32(offset + 4, true),
+    extent: view.getUint32(offset + 8, true),
+    owner: view.getUint32(offset + 12, true),
+    worldGenerationLow: view.getUint32(offset + 16, true),
+    worldGenerationHigh: view.getUint32(offset + 20, true),
+    ownerEpochLow: view.getUint32(offset + 24, true),
+    ownerEpochHigh: view.getUint32(offset + 28, true),
+  };
+  const worldGenerationIsZero = row.worldGenerationLow === 0 && row.worldGenerationHigh === 0;
+  const ownerEpochIsZero = row.ownerEpochLow === 0 && row.ownerEpochHigh === 0;
+  if (row.kind !== 1 || !row.address || !row.extent || row.owner !== row.address ||
+      row.address > limit || row.extent > limit - row.address ||
+      row.address + row.extent > heap.byteLength || worldGenerationIsZero || ownerEpochIsZero) {
+    throw new Error('Match-context range inventory row has invalid kind, owner, extent, lifetime, or wasm bounds');
+  }
+  row.kindName = 'match-context-owner';
+  return {version, size, count, rowSize, capacity, status,
+    owner: row.owner,
+    worldGenerationLow: row.worldGenerationLow,
+    worldGenerationHigh: row.worldGenerationHigh,
+    ownerEpochLow: row.ownerEpochLow,
+    ownerEpochHigh: row.ownerEpochHigh,
+    rows: [row], ownerRestoreAdmission: false};
+}
+
+export function validateMatchContextRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes, audioInventory) {
+  const limit = 0x100000000;
+  if (!inventory || !Array.isArray(inventory.rows) || inventory.rows.length !== 1 ||
+      inventory.count !== 1 || !Array.isArray(manifestRows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > limit ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > limit ||
+      arenaRange.bytes > limit - arenaRange.base || arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > limit || nativeOutputRange.bytes > limit - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes ||
+      !audioInventory || !Array.isArray(audioInventory.rows)) {
+    throw new Error('Match-context owner, arena, or native output inventory bounds are invalid');
+  }
+  const [row] = inventory.rows;
+  const end = row.address + row.extent;
+  const arenaEnd = arenaRange.base + arenaRange.bytes;
+  const outputEnd = nativeOutputRange.base + nativeOutputRange.bytes;
+  if (row.address < arenaEnd && arenaRange.base < end) {
+    throw new Error('Match-context owner range overlaps the gameplay arena');
+  }
+  if (row.address < outputEnd && nativeOutputRange.base < end) {
+    throw new Error('Match-context owner range overlaps native PCM output storage');
+  }
+  for (const section of manifestRows) {
+    if (section.size > 0 && row.address < section.address + section.size &&
+        section.address < end) {
+      throw new Error('Match-context owner range overlaps a static manifest range');
+    }
+  }
+  for (const audioRow of audioInventory.rows) {
+    const audioEnd = audioRow.address + audioRow.extent;
+    if (row.address < audioEnd && audioRow.address < end) {
+      throw new Error('Match-context owner range overlaps an audio owner range');
+    }
+  }
+  return {base: row.address, bytes: row.extent, owner: row.owner,
+    diagnosticOnly: true, ownerRestoreAdmission: false};
+}
+
+export function requireStableMatchContextRangeInventory(inventories) {
+  const boundaryOrder = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== boundaryOrder.length ||
+      inventories.some((item, index) => !item || !Array.isArray(item.rows) ||
+        item.rows.length !== 1 || item.count !== 1 || item.boundary !== boundaryOrder[index])) {
+    throw new Error('Match-context owner inventory requires all three ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.owner !== first.owner || inventory.rows[0].owner !== first.rows[0].owner) {
+      throw new Error('Match-context owner address changed across census boundaries');
+    }
+    if (inventory.worldGenerationLow !== first.worldGenerationLow ||
+        inventory.worldGenerationHigh !== first.worldGenerationHigh) {
+      throw new Error('Match-context world generation changed across census boundaries');
+    }
+    if (inventory.ownerEpochLow !== first.ownerEpochLow ||
+        inventory.ownerEpochHigh !== first.ownerEpochHigh) {
+      throw new Error('Match-context owner epoch changed across census boundaries');
+    }
+    if (inventory.version !== first.version || inventory.size !== first.size ||
+        inventory.rowSize !== first.rowSize || inventory.capacity !== first.capacity ||
+        inventory.status !== first.status ||
+        inventory.rows.some((row, index) => {
+          const prior = first.rows[index];
+          return row.kind !== prior.kind || row.address !== prior.address ||
+            row.extent !== prior.extent || row.owner !== prior.owner ||
+            row.worldGenerationLow !== prior.worldGenerationLow ||
+            row.worldGenerationHigh !== prior.worldGenerationHigh ||
+            row.ownerEpochLow !== prior.ownerEpochLow ||
+            row.ownerEpochHigh !== prior.ownerEpochHigh;
+        })) {
+      throw new Error('Match-context owner inventory topology changed across census boundaries');
+    }
+  }
+  return {...first.rows[0]};
+}
+
+const STAGE_ARENA_WIRE_VERSION = 1;
+const STAGE_ARENA_WIRE_BYTES = 64;
+const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+
+export function decodeStageArenaOwnerWire(bytes, pointer = 0) {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength !== STAGE_ARENA_WIRE_BYTES ||
+      !Number.isSafeInteger(pointer) || pointer < 0 || pointer % 4 !== 0) {
+    throw new Error('Stage-arena owner wire bytes or pointer are invalid');
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const values = Array.from({length: 16}, (_, index) => view.getUint32(index * 4, true));
+  const [version, size, status, ownerKind, worldGenerationLow, worldGenerationHigh,
+    worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+    ordinal, address, extent, flags, reserved] = values;
+  if (version !== STAGE_ARENA_WIRE_VERSION || size !== STAGE_ARENA_WIRE_BYTES ||
+      status !== 1 || ownerKind !== STAGE_ARENA_WIRE_OWNER_KIND ||
+      (worldGenerationLow === 0 && worldGenerationHigh === 0) ||
+      !worldStorage || !arenaStorage || !identityToken ||
+      allocationCount > STAGE_ARENA_MAX_ALLOCATIONS || totalBytes > STAGE_ARENA_MAX_BYTES ||
+      flags !== 0 || reserved !== 0) {
+    throw new Error('Stage-arena owner wire header or bounded owner metadata is invalid');
+  }
+  const metadata = ordinal === 0xffffffff;
+  if ((metadata && (address !== 0 || extent !== 0)) ||
+      (!metadata && (!address || !extent || extent > WASM32_LIMIT - address))) {
+    throw new Error('Stage-arena owner wire row ordinal or extent is invalid');
+  }
+  return {version, size, status, ownerKind, worldGenerationLow, worldGenerationHigh,
+    worldStorage, arenaStorage, identityToken, allocationCount, totalBytes,
+    ordinal, address, extent, flags, reserved, metadata};
+}
+
+function sameStageArenaMetadata(left, right) {
+  return left && right && left.version === right.version && left.size === right.size &&
+    left.status === right.status && left.ownerKind === right.ownerKind &&
+    left.worldGenerationLow === right.worldGenerationLow &&
+    left.worldGenerationHigh === right.worldGenerationHigh &&
+    left.worldStorage === right.worldStorage && left.arenaStorage === right.arenaStorage &&
+    left.identityToken === right.identityToken &&
+    left.allocationCount === right.allocationCount && left.totalBytes === right.totalBytes &&
+    left.flags === right.flags && left.reserved === right.reserved;
+}
+
+export function validateStageArenaOwnerCatalog(metadata, rows, finalMetadata, wirePointer,
+  manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory,
+  matchContextInventory, auroraInventory = null) {
+  if (!metadata?.metadata || !finalMetadata?.metadata ||
+      !sameStageArenaMetadata(metadata, finalMetadata) ||
+      !Array.isArray(rows) || rows.length !== metadata.allocationCount ||
+      !Array.isArray(manifestRows) || !Number.isSafeInteger(heapBytes) ||
+      heapBytes < 0 || heapBytes > WASM32_LIMIT || !Number.isSafeInteger(wirePointer) ||
+      wirePointer <= 0 || wirePointer % 4 !== 0 ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes)) {
+    throw new Error('Stage-arena catalog metadata, count, wire pointer, or bounds are invalid');
+  }
+  if (arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > WASM32_LIMIT ||
+      arenaRange.bytes > WASM32_LIMIT - arenaRange.base || arenaRange.base + arenaRange.bytes > heapBytes ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > WASM32_LIMIT || nativeOutputRange.bytes > WASM32_LIMIT - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes) {
+    throw new Error('Stage-arena cross-owner bounds are invalid');
+  }
+  const diagnosticMatches = manifestRows.filter(row =>
+    row?.input_object === 'CMakeFiles/gameplay_slippi_synctest_browser.dir/src/slippi_profile/tests/synctest_browser.cpp.o' &&
+    row?.input_section === '.bss.melee_web_synctest_stage_arena_diagnostic_storage');
+  if (diagnosticMatches.length !== 1) {
+    throw new Error('Stage-arena observer requires one exact diagnostic manifest identity');
+  }
+  const diagnostic = diagnosticMatches[0];
+  if (diagnostic.decision !== 'excluded' ||
+      diagnostic.exclusion_reason !== 'not-a-known-source-archive-member' ||
+      diagnostic.size !== 96 || diagnostic.address + 32 !== wirePointer ||
+      diagnostic.address < 0 || diagnostic.address > WASM32_LIMIT - 96 ||
+      diagnostic.address + 96 > heapBytes) {
+    throw new Error('Stage-arena observer diagnostic manifest identity or returned wire offset is invalid');
+  }
+  const intervals = [];
+  let total = 0;
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index];
+    if (!row || row.metadata || row.ordinal !== index || row.ordinal >= metadata.allocationCount ||
+        row.version !== metadata.version || row.worldGenerationLow !== metadata.worldGenerationLow ||
+        row.worldGenerationHigh !== metadata.worldGenerationHigh || row.worldStorage !== metadata.worldStorage ||
+        row.arenaStorage !== metadata.arenaStorage || row.identityToken !== metadata.identityToken ||
+        row.allocationCount !== metadata.allocationCount || row.totalBytes !== metadata.totalBytes ||
+        !row.address || !row.extent || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes ||
+        row.extent > STAGE_ARENA_MAX_BYTES - total) {
+      throw new Error(`Stage-arena catalog row ${index} has invalid identity, order, extent, or wasm bounds`);
+    }
+    total += row.extent;
+    intervals.push({start: row.address, end: row.address + row.extent, row, label: 'stage-arena owner range'});
+  }
+  if (total !== metadata.totalBytes || total > STAGE_ARENA_MAX_BYTES) {
+    throw new Error('Stage-arena catalog extents do not equal the full reported byte total');
+  }
+  const byAddress = values => values.slice().sort((left, right) => left.start - right.start || left.end - right.end);
+  const requireDisjoint = (leftValues, rightValues, description) => {
+    const left = byAddress(leftValues), right = byAddress(rightValues);
+    let leftIndex = 0, rightIndex = 0;
+    while (leftIndex < left.length && rightIndex < right.length) {
+      const a = left[leftIndex], b = right[rightIndex];
+      if (a.start < b.end && b.start < a.end) {
+        throw new Error(`${description}: ${a.label} overlaps ${b.label}`);
+      }
+      if (a.end <= b.end) leftIndex++;
+      else rightIndex++;
+    }
+  };
+  const diagnosticInterval = {start: diagnostic.address, end: diagnostic.address + diagnostic.size,
+    label: 'stage-arena diagnostic storage'};
+  const otherOwners = [
+    ...manifestRows.filter(row => row !== diagnostic && row.size > 0).map(row => ({
+      start: row.address, end: row.address + row.size, label: 'static manifest range'})),
+    {start: arenaRange.base, end: arenaRange.base + arenaRange.bytes, label: 'gameplay arena'},
+    {start: nativeOutputRange.base, end: nativeOutputRange.base + nativeOutputRange.bytes,
+      label: 'native PCM diagnostic storage'},
+  ];
+  for (const row of audioInventory?.rows || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'audio owner range'});
+  for (const row of matchContextInventory?.rows || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'match-context owner range'});
+  for (const row of auroraInventory?.ranges || []) otherOwners.push({
+    start: row.address, end: row.address + row.extent, label: 'Aurora staging-shadow range'});
+  // Existing owner descriptions may alias one another (for example, PCM's
+  // static section and its explicit diagnostic range). Check every new stage
+  // and observer interval against every description below without requiring
+  // unrelated existing descriptions to be mutually disjoint.
+  const sortedIntervals = byAddress(intervals);
+  for (let index = 1; index < sortedIntervals.length; index++) {
+    if (sortedIntervals[index].start < sortedIntervals[index - 1].end) {
+      throw new Error('Stage-arena allocation intervals overlap each other');
+    }
+  }
+  requireDisjoint(intervals, [diagnosticInterval], 'Stage-arena owner range overlaps the diagnostic storage');
+  requireDisjoint(intervals, otherOwners, 'Stage-arena owner range overlaps another owner');
+  requireDisjoint([diagnosticInterval], otherOwners, 'Stage-arena diagnostic storage overlaps another owner');
+  return {metadata, rows, diagnosticOutputStorage: {base: diagnostic.address, bytes: diagnostic.size,
+    wirePointer, diagnosticOnly: true, ownerRestoreAdmission: false},
+    ownerRestoreAdmission: false, completeGameState: false};
+}
+
+export function requireStableStageArenaOwnerInventory(inventories) {
+  const order = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== order.length ||
+      inventories.some((item, index) => !item || item.boundary !== order[index] ||
+        !Array.isArray(item.rows) || item.rows.length !== item.metadata?.allocationCount)) {
+    throw new Error('Stage-arena owner inventory requires three complete ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const current of inventories.slice(1)) {
+    if (!sameStageArenaMetadata(first.metadata, current.metadata) ||
+        first.diagnosticOutputStorage?.base !== current.diagnosticOutputStorage?.base ||
+        first.diagnosticOutputStorage?.bytes !== current.diagnosticOutputStorage?.bytes ||
+        first.rows.length !== current.rows.length ||
+        first.rows.some((row, index) => row.ordinal !== current.rows[index].ordinal ||
+          row.address !== current.rows[index].address || row.extent !== current.rows[index].extent ||
+          row.worldGenerationLow !== current.rows[index].worldGenerationLow ||
+          row.worldGenerationHigh !== current.rows[index].worldGenerationHigh ||
+          row.worldStorage !== current.rows[index].worldStorage ||
+          row.arenaStorage !== current.rows[index].arenaStorage ||
+          row.identityToken !== current.rows[index].identityToken ||
+          row.allocationCount !== current.rows[index].allocationCount ||
+          row.totalBytes !== current.rows[index].totalBytes ||
+          row.worldGenerationLow !== first.metadata.worldGenerationLow ||
+          row.worldGenerationHigh !== first.metadata.worldGenerationHigh ||
+          row.worldStorage !== first.metadata.worldStorage ||
+          row.arenaStorage !== first.metadata.arenaStorage ||
+          row.identityToken !== first.metadata.identityToken ||
+          row.allocationCount !== first.metadata.allocationCount ||
+          row.totalBytes !== first.metadata.totalBytes)) {
+      throw new Error('Stage-arena owner lifetime or complete ordered topology changed across census boundaries');
+    }
+  }
+  return first.rows.map(row => ({...row}));
+}
+
+const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+const AURORA_FRAME_DESCRIPTOR_BYTES = 464;
+const AURORA_SUBMISSION_DESCRIPTOR_BYTES = 56;
+const AURORA_HEADER_BYTES = 120;
+const AURORA_STREAM_NAMES = ['verts', 'uniforms', 'indices', 'storage', 'textureUpload'];
+const WASM32_LIMIT = 0x100000000;
+
+function u64Words(view, offset) {
+  return {low: view.getUint32(offset, true), high: view.getUint32(offset + 4, true)};
+}
+
+function isZeroU64(value) {
+  return value.low === 0 && value.high === 0;
+}
+
+export function decodeAuroraStagingShadowInventory(heap, pointer) {
+  if (!(heap instanceof Uint8Array) || heap.byteLength > WASM32_LIMIT ||
+      !Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 8 !== 0 ||
+      pointer > heap.byteLength || AURORA_HEADER_BYTES > heap.byteLength - pointer) {
+    throw new Error('Aurora staging-shadow inventory wire pointer or wasm bounds are invalid');
+  }
+  const header = new DataView(heap.buffer, heap.byteOffset + pointer, AURORA_HEADER_BYTES);
+  const version = header.getUint32(0, true), size = header.getUint32(4, true);
+  const frameSlotCount = header.getUint32(8, true), stagingSlotCount = header.getUint32(12, true);
+  const frameOffset = header.getUint32(16, true), frameStride = header.getUint32(20, true);
+  const frameCount = header.getUint32(24, true), submissionOffset = header.getUint32(28, true);
+  const submissionStride = header.getUint32(32, true), submissionCount = header.getUint32(36, true);
+  const pendingFramePackets = header.getUint32(40, true);
+  const pendingStagingBuffers = header.getUint32(44, true);
+  const workerBusy = header.getUint32(48, true);
+  const pipelineCacheStatus = header.getUint32(52, true);
+  const queuedPipelines = header.getUint32(56, true);
+  const createdPipelines = header.getUint32(60, true);
+  const drawCallCount = header.getUint32(64, true);
+  const currentFrameIndex = header.getUint32(68, true);
+  const stagingGeneration = u64Words(header, 72);
+  const lastBeginFrameId = u64Words(header, 80);
+  const lastEndFrameId = u64Words(header, 88);
+  const lastRegistrationSequence = u64Words(header, 96);
+  const lastCallbackSequence = u64Words(header, 104);
+  const staleCallbackCount = u64Words(header, 112);
+  if (version !== AURORA_QUIESCENCE_SCHEMA_VERSION || frameSlotCount === 0 ||
+      frameSlotCount > 4 || stagingSlotCount === 0 || stagingSlotCount > 4 ||
+      frameCount !== frameSlotCount || submissionCount !== stagingSlotCount ||
+      frameOffset !== AURORA_HEADER_BYTES || frameStride !== AURORA_FRAME_DESCRIPTOR_BYTES ||
+      submissionStride !== AURORA_SUBMISSION_DESCRIPTOR_BYTES ||
+      submissionOffset !== frameOffset + frameCount * frameStride ||
+      size !== submissionOffset + submissionCount * submissionStride ||
+      size > heap.byteLength - pointer || pendingFramePackets !== 0 ||
+      pendingStagingBuffers !== 0 || workerBusy !== 0 || pipelineCacheStatus !== 0 ||
+      queuedPipelines !== 0 || currentFrameIndex === 0xffffffff ||
+      isZeroU64(stagingGeneration)) {
+    throw new Error('Aurora staging-shadow inventory schema, count, offset, stride, or idle status is invalid');
+  }
+  const view = new DataView(heap.buffer, heap.byteOffset + pointer, size);
+  const rows = [], ranges = [];
+  const frameOwners = [];
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+    const base = frameOffset + frameIndex * frameStride;
+    const frameSlot = view.getUint32(base, true);
+    const packetActive = view.getUint32(base + 4, true);
+    const packetStagingBuffer = view.getUint32(base + 8, true);
+    const reserved = view.getUint32(base + 12, true);
+    const packetFrameId = u64Words(view, base + 16);
+    if (frameSlot !== frameIndex || packetActive !== 0 || packetStagingBuffer !== 0xffffffff ||
+        reserved !== 0 || !isZeroU64(packetFrameId)) {
+      throw new Error('Aurora staging-shadow frame row is active or has invalid identity');
+    }
+    const previousUsed = AURORA_STREAM_NAMES.map((_, streamIndex) => {
+      const value = u64Words(view, base + 24 + streamIndex * 8);
+      if (value.high !== 0) throw new Error('Aurora staging-shadow previousUsed exceeds wasm32');
+      return value.low;
+    });
+    const packetBuffers = [], shadowBuffers = [];
+    const packetStart = base + 64;
+    const shadowStart = packetStart + AURORA_STREAM_NAMES.length * 40;
+    for (let streamIndex = 0; streamIndex < AURORA_STREAM_NAMES.length; streamIndex++) {
+      const packetOffset = packetStart + streamIndex * 40;
+      const packet = {
+        dataAddress: u64Words(view, packetOffset), length: u64Words(view, packetOffset + 8),
+        capacity: u64Words(view, packetOffset + 16), maxCapacity: u64Words(view, packetOffset + 24),
+        owned: view.getUint32(packetOffset + 32, true), reserved: view.getUint32(packetOffset + 36, true),
+      };
+      if (!isZeroU64(packet.dataAddress) || !isZeroU64(packet.length) ||
+          !isZeroU64(packet.capacity) || packet.maxCapacity.high !== 0 ||
+          packet.maxCapacity.low >= WASM32_LIMIT || packet.owned !== 1 || packet.reserved !== 0) {
+        throw new Error('Aurora staging-shadow packet buffer is not empty at the idle boundary');
+      }
+      packetBuffers.push(packet);
+
+      const shadowOffset = shadowStart + streamIndex * 40;
+      const address = u64Words(view, shadowOffset);
+      const length = u64Words(view, shadowOffset + 8);
+      const capacity = u64Words(view, shadowOffset + 16);
+      const maxCapacity = u64Words(view, shadowOffset + 24);
+      const owned = view.getUint32(shadowOffset + 32, true);
+      const shadowReserved = view.getUint32(shadowOffset + 36, true);
+      if (address.high !== 0 || length.high !== 0 || capacity.high !== 0 || maxCapacity.high !== 0 ||
+          owned !== 1 || shadowReserved !== 0 || length.low > capacity.low ||
+          capacity.low > maxCapacity.low || maxCapacity.low >= WASM32_LIMIT ||
+          previousUsed[streamIndex] > capacity.low) {
+        throw new Error('Aurora staging-shadow owner row has invalid kind, lifetime extent, or wasm32 bounds');
+      }
+      if (capacity.low === 0) {
+        if (address.low !== 0 || length.low !== 0) {
+          throw new Error('Aurora empty staging-shadow row has a nonempty address or length');
+        }
+      } else if (address.low === 0 || address.low > WASM32_LIMIT ||
+                 capacity.low > WASM32_LIMIT - address.low ||
+                 address.low + capacity.low > heap.byteLength) {
+        throw new Error('Aurora staging-shadow capacity lies outside wasm32 memory');
+      }
+      const row = {
+        kind: streamIndex + 1,
+        kindName: `aurora-staging-shadow-${AURORA_STREAM_NAMES[streamIndex]}`,
+        frameSlot, streamIndex, streamName: AURORA_STREAM_NAMES[streamIndex],
+        address: address.low, owner: address.low, ownerAddress: address.low,
+        length: length.low, extent: capacity.low, capacity: capacity.low,
+        maxCapacity: maxCapacity.low, previousUsed: previousUsed[streamIndex],
+        owned, generationLow: stagingGeneration.low, generationHigh: stagingGeneration.high,
+      };
+      shadowBuffers.push(row);
+      if (row.extent > 0) {
+        const end = row.address + row.extent;
+        for (const prior of frameOwners) {
+          if (row.address < prior.end && prior.start < end) {
+            throw new Error('Aurora staging-shadow capacity ranges overlap each other');
+          }
+        }
+        frameOwners.push({start: row.address, end});
+        ranges.push(row);
+      }
+      rows.push(row);
+    }
+  }
+  const submissionRows = [];
+  for (let slot = 0; slot < submissionCount; slot++) {
+    const base = submissionOffset + slot * submissionStride;
+    const row = {
+      stagingSlot: view.getUint32(base, true), state: view.getUint32(base + 4, true),
+      futureId: u64Words(view, base + 8),
+      registrationSequence: u64Words(view, base + 16),
+      callbackSequence: u64Words(view, base + 24),
+      capturedGeneration: u64Words(view, base + 32),
+      queueHandle: u64Words(view, base + 40),
+      encoderHandle: u64Words(view, base + 48),
+    };
+    if (row.stagingSlot !== slot || row.state > 5 || row.state === 1) {
+      throw new Error('Aurora staging-shadow submission row has invalid slot or pending callback state');
+    }
+    submissionRows.push(row);
+  }
+  return {
+    version, size, frameSlotCount, stagingSlotCount, frameDescriptorCount: frameCount,
+    submissionDescriptorCount: submissionCount, frameStride, submissionStride,
+    pendingFramePackets, pendingStagingBuffers, workerBusy, pipelineCacheStatus,
+    queuedPipelines, createdPipelines, drawCallCount, currentFrameIndex,
+    stagingGenerationLow: stagingGeneration.low, stagingGenerationHigh: stagingGeneration.high,
+    lastBeginFrameId, lastEndFrameId, lastRegistrationSequence, lastCallbackSequence,
+    staleCallbackCount, rows, ranges, submissionRows,
+    diagnosticOutputRange: {base: pointer, bytes: size}, ownerRestoreAdmission: false,
+  };
+}
+
+export function validateAuroraStagingShadowRangeDisjointness(inventory, manifestRows,
+  arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory) {
+  if (!inventory || inventory.version !== AURORA_QUIESCENCE_SCHEMA_VERSION ||
+      !Array.isArray(inventory.rows) || !Array.isArray(inventory.ranges) ||
+      inventory.rows.length !== inventory.frameSlotCount * AURORA_STREAM_NAMES.length ||
+      !Array.isArray(manifestRows) || !audioInventory || !Array.isArray(audioInventory.rows) ||
+      !matchContextInventory || !Array.isArray(matchContextInventory.rows) ||
+      !Number.isSafeInteger(heapBytes) || heapBytes < 0 || heapBytes > WASM32_LIMIT ||
+      !Number.isSafeInteger(arenaRange?.base) || !Number.isSafeInteger(arenaRange?.bytes) ||
+      arenaRange.base < 0 || arenaRange.bytes <= 0 || arenaRange.base > WASM32_LIMIT ||
+      arenaRange.bytes > WASM32_LIMIT - arenaRange.base ||
+      arenaRange.base + arenaRange.bytes > heapBytes ||
+      !Number.isSafeInteger(nativeOutputRange?.base) || !Number.isSafeInteger(nativeOutputRange?.bytes) ||
+      nativeOutputRange.base <= 0 || nativeOutputRange.bytes <= 0 ||
+      nativeOutputRange.base > WASM32_LIMIT || nativeOutputRange.bytes > WASM32_LIMIT - nativeOutputRange.base ||
+      nativeOutputRange.base + nativeOutputRange.bytes > heapBytes ||
+      !Number.isSafeInteger(inventory.diagnosticOutputRange?.base) ||
+      !Number.isSafeInteger(inventory.diagnosticOutputRange?.bytes) ||
+      inventory.diagnosticOutputRange.base <= 0 || inventory.diagnosticOutputRange.bytes <= 0 ||
+      inventory.diagnosticOutputRange.base > WASM32_LIMIT ||
+      inventory.diagnosticOutputRange.bytes > WASM32_LIMIT - inventory.diagnosticOutputRange.base ||
+      inventory.diagnosticOutputRange.base + inventory.diagnosticOutputRange.bytes > heapBytes) {
+    throw new Error('Aurora staging-shadow, arena, or diagnostic output inventory bounds are invalid');
+  }
+  const overlaps = (leftBase, leftBytes, rightBase, rightBytes) =>
+    leftBytes > 0 && rightBytes > 0 && leftBase < rightBase + rightBytes && rightBase < leftBase + leftBytes;
+  // Bind precisely the one private producer-owned diagnostic allocation.
+  // These maxima are the authored wasm32 FrameSlotCount/StagingBufferCount (4/4).
+  const storageBytes = 120 + 4 * 464 + 4 * 56;
+  const storageRows = manifestRows.filter(section =>
+    section.input_object === '.deps/aurora/libaurora_gx.a(frame.cpp.o)' &&
+    section.input_section === '.bss.aurora_browser_quiescence_observer_storage');
+  if (storageRows.length !== 1 || storageRows[0].decision !== 'excluded' ||
+      storageRows[0].exclusion_reason !== 'archive-outside-generated-source-producers' ||
+      storageRows[0].address !== inventory.diagnosticOutputRange.base ||
+      storageRows[0].size !== storageBytes || inventory.diagnosticOutputRange.bytes > storageBytes ||
+      storageBytes > heapBytes - storageRows[0].address) {
+    throw new Error('Aurora diagnostic storage lacks its exact excluded manifest identity');
+  }
+  const storageRow = storageRows[0];
+  const diagnosticOutput = {base: storageRow.address, bytes: storageRow.size};
+  const knownRanges = [
+    {label: 'gameplay arena', base: arenaRange.base, bytes: arenaRange.bytes},
+    {label: 'native PCM output storage', base: nativeOutputRange.base, bytes: nativeOutputRange.bytes},
+  ];
+  for (const section of manifestRows) {
+    if (!Number.isSafeInteger(section.address) || !Number.isSafeInteger(section.size) ||
+        section.address < 0 || section.size < 0 || section.address > WASM32_LIMIT ||
+        section.size > WASM32_LIMIT - section.address || section.address + section.size > heapBytes) {
+      throw new Error('Aurora staging-shadow static manifest range is malformed');
+    }
+    if (section !== storageRow && section.size > 0) knownRanges.push({label: 'static manifest range',
+      base: section.address, bytes: section.size});
+  }
+  for (const row of audioInventory.rows) {
+    if (!Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address < 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes) {
+      throw new Error('Aurora staging-shadow audio owner range is malformed');
+    }
+    knownRanges.push({label: 'audio owner range', base: row.address, bytes: row.extent});
+  }
+  for (const row of matchContextInventory.rows) {
+    if (!Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address < 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes) {
+      throw new Error('Aurora staging-shadow match-context range is malformed');
+    }
+    knownRanges.push({label: 'match-context owner range', base: row.address, bytes: row.extent});
+  }
+  for (const known of knownRanges) {
+    if (overlaps(diagnosticOutput.base, diagnosticOutput.bytes, known.base, known.bytes)) {
+      throw new Error(`Aurora staging-shadow diagnostic output overlaps ${known.label}`);
+    }
+  }
+  for (const section of manifestRows) {
+    if (section !== storageRow && section.size > 0 && overlaps(diagnosticOutput.base, diagnosticOutput.bytes,
+        section.address, section.size)) {
+      throw new Error('Aurora staging-shadow diagnostic output overlaps static manifest range');
+    }
+  }
+  for (const row of [...audioInventory.rows, ...matchContextInventory.rows]) {
+    if (overlaps(diagnosticOutput.base, diagnosticOutput.bytes, row.address, row.extent)) {
+      throw new Error('Aurora staging-shadow diagnostic output overlaps an existing owner range');
+    }
+  }
+  for (let index = 0; index < inventory.ranges.length; index++) {
+    const row = inventory.ranges[index];
+    if (!row || !Number.isSafeInteger(row.address) || !Number.isSafeInteger(row.extent) ||
+        row.address <= 0 || row.extent <= 0 || row.address > WASM32_LIMIT ||
+        row.extent > WASM32_LIMIT - row.address || row.address + row.extent > heapBytes ||
+        row.ownerAddress !== row.address || row.owned !== 1 ||
+        row.generationLow !== inventory.stagingGenerationLow ||
+        row.generationHigh !== inventory.stagingGenerationHigh) {
+      throw new Error('Aurora staging-shadow owner range is malformed');
+    }
+    if (overlaps(row.address, row.extent, diagnosticOutput.base, diagnosticOutput.bytes)) {
+      throw new Error('Aurora staging-shadow owner range overlaps its diagnostic output');
+    }
+    for (let prior = 0; prior < index; prior++) {
+      if (overlaps(row.address, row.extent, inventory.ranges[prior].address,
+          inventory.ranges[prior].extent)) {
+        throw new Error('Aurora staging-shadow capacity ranges overlap each other');
+      }
+    }
+    for (const known of knownRanges) {
+      if (overlaps(row.address, row.extent, known.base, known.bytes)) {
+        throw new Error(`Aurora staging-shadow owner range overlaps ${known.label}`);
+      }
+    }
+  }
+  return {rangeCount: inventory.ranges.length, diagnosticOnly: true,
+    diagnosticOutputStorage: {...diagnosticOutput}, ownerRestoreAdmission: false};
+}
+
+export function requireStableAuroraStagingShadowInventory(inventories) {
+  const boundaryOrder = ['before-source-step', 'after-source-step',
+    'after-actual-draw-and-Aurora-quiescence'];
+  if (!Array.isArray(inventories) || inventories.length !== boundaryOrder.length ||
+      inventories.some((item, index) => !item || !Array.isArray(item.rows) ||
+        !Array.isArray(item.ranges) || item.boundary !== boundaryOrder[index])) {
+    throw new Error('Aurora staging-shadow inventory requires all three ordered census boundaries');
+  }
+  const first = inventories[0];
+  for (const inventory of inventories.slice(1)) {
+    if (inventory.stagingGenerationLow !== first.stagingGenerationLow ||
+        inventory.stagingGenerationHigh !== first.stagingGenerationHigh) {
+      throw new Error('Aurora staging-shadow lifetime generation changed across census boundaries');
+    }
+    const sameIdentity = first.version === inventory.version && first.size === inventory.size &&
+      first.frameSlotCount === inventory.frameSlotCount &&
+      first.stagingSlotCount === inventory.stagingSlotCount &&
+      first.frameDescriptorCount === inventory.frameDescriptorCount &&
+      first.submissionDescriptorCount === inventory.submissionDescriptorCount &&
+      first.stagingGenerationLow === inventory.stagingGenerationLow &&
+      first.stagingGenerationHigh === inventory.stagingGenerationHigh &&
+      first.diagnosticOutputRange?.base === inventory.diagnosticOutputRange?.base &&
+      first.diagnosticOutputRange?.bytes === inventory.diagnosticOutputRange?.bytes &&
+      first.rows.length === inventory.rows.length && first.ranges.length === inventory.ranges.length &&
+      first.rows.every((row, index) => {
+        const other = inventory.rows[index];
+        return row.kind === other.kind && row.frameSlot === other.frameSlot &&
+          row.streamIndex === other.streamIndex && row.address === other.address &&
+          row.extent === other.extent && row.maxCapacity === other.maxCapacity &&
+          row.owned === other.owned && row.ownerAddress === other.ownerAddress &&
+          row.generationLow === other.generationLow && row.generationHigh === other.generationHigh;
+      });
+    if (!sameIdentity) {
+      throw new Error('Aurora staging-shadow owner topology or capacity changed across census boundaries');
+    }
+  }
+  return first.ranges.map(row => ({...row}));
+}
+
 function initializerBytes(module) {
   const size = module._melee_web_snapshot_initializer_diagnostic_size();
   return copyBytes(module, module._melee_web_snapshot_initializer_diagnostic(), size);
@@ -191,19 +1375,21 @@ function machine() {
   };
 }
 
-function flatAssetHashes(root) {
+export function flatAssetHashes(root) {
   return Object.fromEntries(fs.readdirSync(root).sort().flatMap(name => {
     const full = path.join(root, name);
     return fs.statSync(full).isFile() ? [[name, fileSha(full)]] : [];
   }));
 }
 
-function reportSourceHashes() {
+export function reportSourceHashes() {
   const files = [
     'tests/gameplay_snapshot_probe.cpp',
     'tests/quiescent_wasm_snapshot.mjs',
     'src/slippi_profile/profile.h',
     'src/slippi_profile/profile.c',
+    'src/slippi_profile/lobj_presentation_cache.h',
+    'src/slippi_profile/lobj_presentation_cache.c',
     'src/slippi_profile/offscreen_damage.h',
     'src/slippi_profile/offscreen_damage.c',
     'src/slippi_profile/dynamics_fix.h',
@@ -226,6 +1412,12 @@ function reportSourceHashes() {
     'src/slippi_profile/patches/melee-profile-hooks.patch',
     'src/slippi_profile/tests/synctest_node.cpp',
     'src/slippi_profile/tests/synctest_browser.cpp',
+    'src/native_dat.hpp',
+    'src/native_dat.cpp',
+    'src/gameplay_world.hpp',
+    'src/gameplay_world.cpp',
+    'src/gameplay_match_session.hpp',
+    'src/gameplay_match_session.cpp',
     'src/slippi_profile/tests/run_synctest.mjs',
     'src/slippi_profile/tests/runner_contract.mjs',
     'cmake/FighterRuntime.cmake',
@@ -236,7 +1428,7 @@ function reportSourceHashes() {
   return Object.fromEntries(files.map(name => [name, fileSha(path.join(ROOT, name))]));
 }
 
-function serveBuild(buildRoot, fileNames) {
+export function serveBuild(buildRoot, fileNames) {
   const page = `<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><title>Slippi-compatible rules (unofficial) — dependency diagnostic</title></head><body><p>Slippi-compatible rules (unofficial) — private dependency diagnostic only; no player settings or service connection. Not affiliated with or endorsed by Project Slippi.</p><canvas id="canvas" width="640" height="480"></canvas></body></html>`;
   const allowed = new Map(fileNames.map(name => [`/${name}`, path.join(buildRoot, name)]));
   const server = http.createServer((request, response) => {
@@ -345,35 +1537,472 @@ export async function runBrowserInit(page, origin, runtimeName) {
     drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
 }
 
-export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks) {
-  return page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
-    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes}) => {
+export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks,
+  writeCensus = null, payloadAdmissionPlan = null) {
+  let evaluation;
+  try {
+    evaluation = await page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
+    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus, payloadAdmissionPlan,
+    diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
+    validateAudioOwnerRangesSource, requireStableAudioInventorySource,
+    decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
+    requireStableMatchContextRangeInventorySource, decodeAuroraStagingShadowInventorySource,
+    validateAuroraStagingShadowRangeDisjointnessSource,
+    requireStableAuroraStagingShadowInventorySource, decodeStageArenaOwnerWireSource,
+    validateStageArenaOwnerCatalogSource, requireStableStageArenaOwnerInventorySource,
+    sameStageArenaMetadataSource, maxHeapBytes, waitSubmissionSource}) => {
+    const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64 =
+      'AgAAAAAAAAAAAAABALAAAAAAAAAAAAAAAAAAAAAAAAD/AAAAAAAAAAAAAP8=';
+    const PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256 =
+      '46e14bb3286ecad56fd0c8c45e405b64f645f971bfbd35e9ddd8432db3c4e288';
     const {module} = window.__slippiSynctest;
+    const payloadAdmissionProgress = payloadAdmissionPlan === null ? null : {
+      status: 'running', checkpoint: null, payloadAdmission: null,
+      commandSequence: [], boundaries: null, sourceStep: null,
+      actualDraw: null, sample300: null, failure: null,
+    };
+    if (payloadAdmissionProgress) {
+      window.__slippiSynctest.payloadAdmissionProgress = payloadAdmissionProgress;
+    }
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const checked = (label, identifier, argumentTypes = [], args = []) =>
       checkedAsyncCcall(module, label, identifier, argumentTypes, args);
+    const payloadAdmissionCommands = payloadAdmissionProgress?.commandSequence || [];
+    let payloadAdmissionResult = null;
+    const payloadAdmissionCommand = async (command, label) => {
+      const commandRecord = {command, label, outcome: 'pending'};
+      payloadAdmissionCommands.push(commandRecord);
+      try {
+        const result = await module.ccall('melee_web_synctest_payload_admission_command',
+          'number', ['number'], [command], {async: true});
+        commandRecord.result = result;
+        commandRecord.outcome = result === 0 ? 'returned-zero' : 'returned-nonzero';
+        if (payloadAdmissionResult) {
+          payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+        }
+        if (result !== 0) {
+          const failure = {command, label, result};
+          if (payloadAdmissionResult) {
+            payloadAdmissionResult.status = 'refused';
+            payloadAdmissionResult.failure = failure;
+          }
+          if (payloadAdmissionProgress) {
+            payloadAdmissionProgress.status = 'refused';
+            payloadAdmissionProgress.failure = failure;
+          }
+          throw new Error(`${label}: source-payload command returned ${String(result)}`);
+        }
+        return result;
+      } catch (error) {
+        if (commandRecord.outcome === 'pending') {
+          commandRecord.outcome = 'threw';
+          commandRecord.error = String(error);
+          const failure = {command, label, error: String(error)};
+          if (payloadAdmissionResult) {
+            payloadAdmissionResult.status = 'command-error';
+            payloadAdmissionResult.failure = failure;
+            payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+          }
+          if (payloadAdmissionProgress) {
+            payloadAdmissionProgress.status = 'command-error';
+            payloadAdmissionProgress.failure = failure;
+          }
+        }
+        throw error;
+      }
+    };
+    if (payloadAdmissionPlan !== null) {
+      if (sample !== 300 || !writeCensus || payloadAdmissionPlan.checkpointSample !== 299 ||
+          !Number.isSafeInteger(payloadAdmissionPlan.checkpointSourceFrame) ||
+          payloadAdmissionPlan.expectedSample300Pad44Base64 !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64 ||
+          payloadAdmissionPlan.expectedSample300Pad44Sha256 !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256 ||
+          writeCensus.requireAuroraStagingShadowInventory !== true ||
+          writeCensus.requireStageArenaOwnerInventory !== true) {
+        throw new Error('Source-payload dry run requires the exact warmed sample-299 checkpoint and combined private owner diagnostics');
+      }
+      if (typeof SharedArrayBuffer !== 'undefined' &&
+          module.HEAPU8.buffer instanceof SharedArrayBuffer) {
+        throw new Error('Source-payload dry run refuses shared WebAssembly memory');
+      }
+      if (typeof module._melee_web_synctest_payload_admission_command !== 'function') {
+        throw new Error('Source-payload admission command export is unavailable');
+      }
+      const observationPointer = module._melee_web_snapshot_observation();
+      const observationSize = module._melee_web_snapshot_observation_size();
+      const inputPointer = module._melee_web_snapshot_input();
+      if (observationSize !== 1280 || observationPointer < 0 ||
+          observationPointer + observationSize > module.HEAPU8.byteLength || inputPointer < 0 ||
+          inputPointer + 44 > module.HEAPU8.byteLength) {
+        throw new Error('Source-payload dry-run checkpoint observation or PAD range is invalid');
+      }
+      const currentObservation = new DataView(module.HEAPU8.buffer,
+        observationPointer, observationSize);
+      if (currentObservation.getUint32(0, true) !== payloadAdmissionPlan.checkpointSourceFrame ||
+          currentObservation.getUint32(8, true) !== 1 || currentObservation.getUint32(16, true) !== 0 ||
+          currentObservation.getUint32(20, true) !== 0) {
+        throw new Error('Live sample-299 observation no longer matches its recorded ready source boundary');
+      }
+      const currentPad = module.HEAPU8.slice(inputPointer, inputPointer + 44);
+      const currentPadBase64 = btoa(String.fromCharCode(...currentPad));
+      if (currentPadBase64 !== payloadAdmissionPlan.checkpointRawPad44Base64) {
+        throw new Error('Live source PAD no longer matches the actual sample-299 warm checkpoint');
+      }
+      payloadAdmissionResult = {status: 'running', checkpointSample: 299,
+        checkpointSourceFrame: payloadAdmissionPlan.checkpointSourceFrame,
+        checkpointRawPad44Base64: currentPadBase64,
+        expectedSample300Pad44Base64: PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64,
+        expectedSample300Pad44Sha256: PAYLOAD_DRY_RUN_SAMPLE300_PAD44_SHA256,
+        sequence: [], restoreCalled: false, completeGameState: false,
+        perturbation: 'payload snapshot capture explicitly allocates diagnostic storage; heap deltas are not natural-census attribution'};
+      payloadAdmissionProgress.payloadAdmission = payloadAdmissionResult;
+      payloadAdmissionProgress.checkpoint = {
+        sample: 299,
+        sourceFrame: currentObservation.getUint32(0, true),
+        ready: currentObservation.getUint32(8, true) === 1,
+        complete: currentObservation.getUint32(16, true) !== 0,
+        paused: currentObservation.getUint32(20, true) !== 0,
+        rawPad44Base64: currentPadBase64,
+      };
+    }
     const decision = module._melee_web_synctest_draw_decision(0);
     if (decision !== 1) throw new Error(`present tick draw policy returned ${decision}`);
-    await checked(`draw-reference source tick ${sample}`,
-      'melee_web_snapshot_step', ['number'], [sample]);
-    await checked(`actual source draw ${sample}`,
-      'melee_web_synctest_draw_present');
+    let heapBefore = null, heapAfterStep = null, censusBeforeSha256 = null;
+    let censusAfterStepSha256 = null, censusAfterDrawSha256 = null;
+    let censusStepDiff = null, censusDrawDiff = null;
+    let censusStepRaw = null, censusDrawRaw = null;
+    const audioInventoryBoundaries = writeCensus ? [] : null;
+    const matchContextInventoryBoundaries = writeCensus ? [] : null;
+    const auroraStagingShadowInventoryBoundaries =
+      writeCensus?.requireAuroraStagingShadowInventory === true ? [] : null;
+    const stageArenaOwnerInventoryBoundaries =
+      writeCensus?.requireStageArenaOwnerInventory === true ? [] : null;
+    let nativeOutputRange = null;
+    let queryOwnerInventories = null, requireStableInventory = null,
+      requireStableMatchContextInventory = null, requireStableAuroraInventory = null,
+      decodeStageArenaWire = null, validateStageArenaCatalog = null,
+      requireStableStageArenaInventory = null;
+    const censusNativeTransferQuiescence = writeCensus ? {
+      beforeStep: null, afterStep: null, afterActualDraw: null,
+    } : null;
+    if (payloadAdmissionProgress) {
+      payloadAdmissionProgress.boundaries = {
+        nativeTransferQuiescence: censusNativeTransferQuiescence,
+        audioOwnerInventory: audioInventoryBoundaries,
+        matchContextOwnerInventory: matchContextInventoryBoundaries,
+        auroraStagingShadowOwnerInventory: auroraStagingShadowInventoryBoundaries,
+        stageArenaOwnerInventory: stageArenaOwnerInventoryBoundaries,
+      };
+    }
+    if (writeCensus) {
+      if (writeCensus.requireAudioInventory !== true) {
+        throw new Error('Write census runner must require the audio owner inventory');
+      }
+      if (writeCensus.requireMatchContextInventory !== true) {
+        throw new Error('Write census runner must require the match-context owner inventory');
+      }
+      for (const name of ['_melee_web_synctest_audio_range_inventory_query',
+        '_melee_web_synctest_audio_range_inventory',
+        '_melee_web_synctest_match_context_range_inventory_query',
+        '_melee_web_synctest_match_context_range_inventory',
+        '_melee_web_snapshot_pcm', '_melee_web_snapshot_pcm_size']) {
+        if (typeof module[name] !== 'function') {
+          const ownerLabel = name.includes('match_context') ? 'match-context owner' : 'audio owner';
+          throw new Error(`Required ${ownerLabel} inventory export is unavailable: ${name}`);
+        }
+      }
+      if (writeCensus.requireAuroraStagingShadowInventory &&
+          typeof module._melee_web_synctest_aurora_staging_shadow_inventory_query !== 'function') {
+        throw new Error('Required Aurora staging-shadow inventory export is unavailable: _melee_web_synctest_aurora_staging_shadow_inventory_query');
+      }
+      if (writeCensus.requireStageArenaOwnerInventory &&
+          typeof module._melee_web_synctest_stage_arena_inventory_query !== 'function') {
+        throw new Error('Required stage-arena owner inventory export is unavailable: _melee_web_synctest_stage_arena_inventory_query');
+      }
+      const arenaBase = module._melee_web_synctest_gameplay_arena_base();
+      const arenaBytes = module._melee_web_synctest_gameplay_arena_bytes();
+      if (arenaBase !== writeCensus.arenaRange.base || arenaBytes !== writeCensus.arenaRange.bytes) {
+        throw new Error(`Live gameplay arena changed before census: ${arenaBase}/${arenaBytes}`);
+      }
+      if (!globalThis.crypto?.subtle) throw new Error('Browser Web Crypto is unavailable for census hashes');
+      await checked('native transfer quiescence before census source step', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.beforeStep = 'passed';
+      const decodeInventory = new Function('heap', 'pointer',
+        `return (${decodeAudioInventorySource})(heap, pointer)`);
+      const validateOwnerRanges = new Function('inventory', 'manifestRows', 'arenaRange',
+        'nativeOutputRange', 'heapBytes',
+        `return (${validateAudioOwnerRangesSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes)`);
+      const decodeMatchContextInventory = new Function('heap', 'pointer',
+        `return (${decodeMatchContextRangeInventorySource})(heap, pointer)`);
+      const validateMatchContextDisjointness = new Function('inventory', 'manifestRows',
+        'arenaRange', 'nativeOutputRange', 'heapBytes', 'audioInventory',
+        `return (${validateMatchContextRangeDisjointnessSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory)`);
+      requireStableInventory = new Function('inventories',
+        `return (${requireStableAudioInventorySource})(inventories)`);
+      requireStableMatchContextInventory = new Function('inventories',
+        `return (${requireStableMatchContextRangeInventorySource})(inventories)`);
+      const decodeAuroraInventory = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('heap', 'pointer',
+          `const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+` +
+          `const AURORA_FRAME_DESCRIPTOR_BYTES = 464;
+` +
+          `const AURORA_SUBMISSION_DESCRIPTOR_BYTES = 56;
+` +
+          `const AURORA_HEADER_BYTES = 120;
+` +
+          `const AURORA_STREAM_NAMES = ['verts','uniforms','indices','storage','textureUpload'];
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `const u64Words = (view, offset) => ({low:view.getUint32(offset,true),high:view.getUint32(offset+4,true)});
+` +
+          `const isZeroU64 = value => value.low === 0 && value.high === 0;
+` +
+          `return (${decodeAuroraStagingShadowInventorySource})(heap, pointer);`) : null;
+      const validateAuroraOwnerRanges = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('inventory', 'manifestRows', 'arenaRange', 'nativeOutputRange',
+          'heapBytes', 'audioInventory', 'matchContextInventory',
+          `const AURORA_QUIESCENCE_SCHEMA_VERSION = 5;
+` +
+          `const AURORA_STREAM_NAMES = ['verts','uniforms','indices','storage','textureUpload'];
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `return (${validateAuroraStagingShadowRangeDisjointnessSource})(inventory, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory);`) : null;
+      requireStableAuroraInventory = writeCensus.requireAuroraStagingShadowInventory ?
+        new Function('inventories',
+          `return (${requireStableAuroraStagingShadowInventorySource})(inventories)`) : null;
+      if (writeCensus.requireStageArenaOwnerInventory) {
+        decodeStageArenaWire = new Function('bytes', 'pointer',
+          `const STAGE_ARENA_WIRE_VERSION = 1;
+` +
+          `const STAGE_ARENA_WIRE_BYTES = 64;
+` +
+          `const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+` +
+          `const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+` +
+          `const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` +
+          `return (${decodeStageArenaOwnerWireSource})(bytes, pointer);`);
+        const sameStageMetadataSource = `const sameStageArenaMetadata = ${sameStageArenaMetadataSource};\n`;
+        validateStageArenaCatalog = new Function('metadata','rows','finalMetadata','wirePointer',
+          'manifestRows','arenaRange','nativeOutputRange','heapBytes','audioInventory',
+          'matchContextInventory','auroraInventory',
+          `const STAGE_ARENA_WIRE_VERSION = 1;
+` +
+          `const STAGE_ARENA_WIRE_BYTES = 64;
+` +
+          `const STAGE_ARENA_WIRE_OWNER_KIND = 1;
+` +
+          `const STAGE_ARENA_MAX_ALLOCATIONS = 65536;
+` +
+          `const STAGE_ARENA_MAX_BYTES = 32 * 1024 * 1024;
+` +
+          `const WASM32_LIMIT = 0x100000000;
+` + sameStageMetadataSource +
+          `return (${validateStageArenaOwnerCatalogSource})(metadata, rows, finalMetadata, wirePointer, manifestRows, arenaRange, nativeOutputRange, heapBytes, audioInventory, matchContextInventory, auroraInventory);`);
+        requireStableStageArenaInventory = new Function('inventories',
+          sameStageMetadataSource +
+          `return (${requireStableStageArenaOwnerInventorySource})(inventories);`);
+      }
+      queryOwnerInventories = async boundary => {
+        await checked(`audio owner inventory ${boundary}`,
+          'melee_web_synctest_audio_range_inventory_query');
+        const pointer = module._melee_web_synctest_audio_range_inventory();
+        const inventory = decodeInventory(module.HEAPU8, pointer);
+        const currentNativeOutput = {
+          base: module._melee_web_snapshot_pcm(),
+          bytes: module._melee_web_snapshot_pcm_size(),
+        };
+        if (nativeOutputRange && (nativeOutputRange.base !== currentNativeOutput.base ||
+            nativeOutputRange.bytes !== currentNativeOutput.bytes)) {
+          throw new Error('Native PCM diagnostic storage changed across census boundaries');
+        }
+        nativeOutputRange ||= currentNativeOutput;
+        const nativeOutput = validateOwnerRanges(inventory, writeCensus.manifestRows,
+          writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength);
+        audioInventoryBoundaries.push({boundary, ...inventory});
+        await checked(`match-context owner inventory ${boundary}`,
+          'melee_web_synctest_match_context_range_inventory_query');
+        const matchContextPointer = module._melee_web_synctest_match_context_range_inventory();
+        const matchContextInventory = decodeMatchContextInventory(module.HEAPU8,
+          matchContextPointer);
+        validateMatchContextDisjointness(matchContextInventory, writeCensus.manifestRows,
+          writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength, inventory);
+        const matchContextBoundary = {boundary, ...matchContextInventory,
+          nativeOutputStorage: nativeOutput};
+        matchContextInventoryBoundaries.push(matchContextBoundary);
+        if (writeCensus.requireAuroraStagingShadowInventory) {
+          const pointer = await module.ccall(
+            'melee_web_synctest_aurora_staging_shadow_inventory_query',
+            'number', [], [], {async: true});
+          if (!Number.isSafeInteger(pointer) || pointer <= 0 || pointer >= 0x100000000) {
+            throw new Error(`Aurora staging-shadow inventory ${boundary} refused or returned an invalid wire pointer`);
+          }
+          const auroraInventory = decodeAuroraInventory(module.HEAPU8, pointer);
+          const diagnosticOutput = validateAuroraOwnerRanges(auroraInventory,
+            writeCensus.manifestRows, writeCensus.arenaRange, nativeOutputRange,
+            module.HEAPU8.byteLength, inventory, matchContextInventory);
+          auroraStagingShadowInventoryBoundaries.push({boundary, ...auroraInventory,
+            diagnosticOutputRange: diagnosticOutput.diagnosticOutputStorage,
+            diagnosticOutputStorage: diagnosticOutput});
+        }
+        if (writeCensus.requireStageArenaOwnerInventory) {
+          const stageArenaWireBytes = 64;
+          const queryStageWire = (ordinal, label) => {
+            const pointer = module._melee_web_synctest_stage_arena_inventory_query(ordinal);
+            if (!Number.isSafeInteger(pointer) || pointer <= 0 || pointer % 4 !== 0 ||
+                pointer > module.HEAPU8.byteLength || stageArenaWireBytes > module.HEAPU8.byteLength - pointer) {
+              throw new Error(`Stage-arena owner inventory ${boundary} ${label} refused or returned an invalid wire pointer`);
+            }
+            const copied = module.HEAPU8.slice(pointer, pointer + stageArenaWireBytes);
+            return {pointer, wire: decodeStageArenaWire(copied, pointer)};
+          };
+          const firstMetadata = queryStageWire(0xffffffff, 'metadata');
+          if (!firstMetadata.wire.metadata) throw new Error(`Stage-arena owner inventory ${boundary} metadata row is malformed`);
+          const rows = [];
+          for (let ordinal = 0; ordinal < firstMetadata.wire.allocationCount; ordinal++) {
+            const queried = queryStageWire(ordinal, `row ${ordinal}`);
+            if (queried.pointer !== firstMetadata.pointer) {
+              throw new Error(`Stage-arena owner inventory ${boundary} changed diagnostic wire address`);
+            }
+            rows.push(queried.wire);
+          }
+          const finalMetadata = queryStageWire(0xffffffff, 'final metadata');
+          if (finalMetadata.pointer !== firstMetadata.pointer || !finalMetadata.wire.metadata) {
+            throw new Error(`Stage-arena owner inventory ${boundary} final metadata identity changed`);
+          }
+          const validated = validateStageArenaCatalog(firstMetadata.wire, rows,
+            finalMetadata.wire, firstMetadata.pointer, writeCensus.manifestRows,
+            writeCensus.arenaRange, nativeOutputRange, module.HEAPU8.byteLength,
+            inventory, matchContextInventory, auroraStagingShadowInventoryBoundaries ?
+              auroraStagingShadowInventoryBoundaries.at(-1) : null);
+          stageArenaOwnerInventoryBoundaries.push({boundary,
+            metadata: firstMetadata.wire, ...validated});
+        }
+      };
+      if (payloadAdmissionPlan !== null) await payloadAdmissionCommand(1, 'CAPTURE');
+      await queryOwnerInventories('before-source-step');
+      const heap = module.HEAPU8;
+      if (!(heap instanceof Uint8Array) || heap.byteLength > maxHeapBytes) {
+        throw new Error(`Unsupported census heap size: ${heap?.byteLength}`);
+      }
+      heapBefore = heap.slice();
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapBefore);
+      censusBeforeSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    if (payloadAdmissionPlan !== null) {
+      await payloadAdmissionCommand(2, 'STEP_AND_ADMIT(sample 300)');
+    } else {
+      await checked(`draw-reference source tick ${sample}`,
+        'melee_web_snapshot_step', ['number'], [sample]);
+    }
+    if (writeCensus) {
+      await checked('native transfer quiescence after census source step', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.afterStep = 'passed';
+      await queryOwnerInventories('after-source-step');
+      heapAfterStep = module.HEAPU8.slice();
+      if (heapAfterStep.byteLength > maxHeapBytes) {
+        throw new Error(`Census heap grew beyond its bound: ${heapAfterStep.byteLength}`);
+      }
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterStep);
+      censusAfterStepSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
+      const raw = makeDiff(heapBefore, heapAfterStep);
+      censusStepRaw = {
+        beforeHeapBytes: heapBefore.byteLength,
+        afterHeapBytes: heapAfterStep.byteLength,
+        beforeHeapSha256: censusBeforeSha256,
+        afterHeapSha256: censusAfterStepSha256,
+        changedBytes: raw.changedBytes,
+        ranges: raw.ranges,
+      };
+      if (payloadAdmissionProgress) payloadAdmissionProgress.sourceStep = censusStepRaw;
+      heapBefore = null;
+    }
+    if (payloadAdmissionPlan !== null) {
+      await payloadAdmissionCommand(3, 'DRAW_ONCE');
+    } else {
+      await checked(`actual source draw ${sample}`,
+        'melee_web_synctest_draw_present');
+    }
     if (sample === 0) {
       await checked('draw-reference native quiescence', 'melee_web_snapshot_quiescent');
     }
-    const deadline = performance.now() + 5000;
-    let status;
-    for (;;) {
-      status = JSON.parse(module.UTF8ToString(module._melee_web_synctest_submission_json()));
-      if (status.rendererErrorCount !== 0) {
-        throw new Error(`Aurora renderer logged native errors at sample ${sample}: ${JSON.stringify(status)}`);
+    const waitForAuroraSubmission = new Function(`return (${waitSubmissionSource})`)();
+    const status = await waitForAuroraSubmission(module,sample);
+    if (writeCensus) {
+      await checked('native transfer quiescence after census actual draw', 'melee_web_snapshot_quiescent');
+      censusNativeTransferQuiescence.afterActualDraw = 'passed';
+      if (payloadAdmissionPlan !== null) {
+        await payloadAdmissionCommand(4, 'POSTDRAW_ADMIT');
+        payloadAdmissionResult.status = 'owner-local-payload-admission-complete';
+        payloadAdmissionResult.sequence = payloadAdmissionCommands.map(item => ({...item}));
+        payloadAdmissionProgress.status = 'owner-local-payload-admission-complete';
       }
-      if (status.pendingFramePackets === 0 && status.pendingStagingBuffers === 0 &&
-          status.workerBusy === 0) break;
-      if (performance.now() >= deadline) {
-        throw new Error(`Aurora submission did not quiesce for sample ${sample}: ${JSON.stringify(status)}`);
+      await queryOwnerInventories('after-actual-draw-and-Aurora-quiescence');
+      const heapAfterDraw = module.HEAPU8.slice();
+      if (heapAfterDraw.byteLength > maxHeapBytes) {
+        throw new Error(`Census heap grew beyond its bound: ${heapAfterDraw.byteLength}`);
       }
-      await new Promise(resolve => setTimeout(resolve, 10));
+      const digest = await globalThis.crypto.subtle.digest('SHA-256', heapAfterDraw);
+      censusAfterDrawSha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      const makeDiff = new Function(`return (${diffHeapRangesSource})`)();
+      requireStableInventory(audioInventoryBoundaries);
+      requireStableMatchContextInventory(matchContextInventoryBoundaries);
+      if (requireStableAuroraInventory) {
+        requireStableAuroraInventory(auroraStagingShadowInventoryBoundaries);
+      }
+      if (requireStableStageArenaInventory) {
+        requireStableStageArenaInventory(stageArenaOwnerInventoryBoundaries);
+      }
+      const raw = makeDiff(heapAfterStep, heapAfterDraw);
+      censusDrawRaw = {
+        beforeHeapBytes: heapAfterStep.byteLength,
+        afterHeapBytes: heapAfterDraw.byteLength,
+        beforeHeapSha256: censusAfterStepSha256,
+        afterHeapSha256: censusAfterDrawSha256,
+        changedBytes: raw.changedBytes,
+        ranges: raw.ranges,
+      };
+      if (payloadAdmissionProgress) payloadAdmissionProgress.actualDraw = censusDrawRaw;
+      const makeClassify = new Function('ranges', 'manifestRows', 'arenaRange',
+        'audioInventoryTransition', 'nativeOutputRange', 'matchContextInventoryTransition',
+        'auroraInventoryTransition', 'stageArenaInventoryTransition',
+        `const sameStageArenaMetadata = ${sameStageArenaMetadataSource};\n` +
+        `return (${classifyHeapRangesSource})(ranges, manifestRows, arenaRange, audioInventoryTransition, nativeOutputRange, matchContextInventoryTransition, auroraInventoryTransition, stageArenaInventoryTransition)`);
+      censusStepDiff = {...censusStepRaw,
+        changedRanges: makeClassify(censusStepRaw.ranges, writeCensus.manifestRows,
+          writeCensus.arenaRange, {before: audioInventoryBoundaries[0],
+            after: audioInventoryBoundaries[1]}, nativeOutputRange,
+          {before: matchContextInventoryBoundaries[0],
+            after: matchContextInventoryBoundaries[1]},
+          auroraStagingShadowInventoryBoundaries ? {
+            before: auroraStagingShadowInventoryBoundaries[0],
+            after: auroraStagingShadowInventoryBoundaries[1],
+          } : null,
+          stageArenaOwnerInventoryBoundaries ? {
+            before: stageArenaOwnerInventoryBoundaries[0],
+            after: stageArenaOwnerInventoryBoundaries[1],
+          } : null)};
+      censusDrawDiff = {...censusDrawRaw,
+        changedRanges: makeClassify(censusDrawRaw.ranges, writeCensus.manifestRows,
+          writeCensus.arenaRange, {before: audioInventoryBoundaries[1],
+            after: audioInventoryBoundaries[2]}, nativeOutputRange,
+          {before: matchContextInventoryBoundaries[1],
+            after: matchContextInventoryBoundaries[2]},
+          auroraStagingShadowInventoryBoundaries ? {
+            before: auroraStagingShadowInventoryBoundaries[1],
+            after: auroraStagingShadowInventoryBoundaries[2],
+          } : null,
+          stageArenaOwnerInventoryBoundaries ? {
+            before: stageArenaOwnerInventoryBoundaries[1],
+            after: stageArenaOwnerInventoryBoundaries[2],
+          } : null)};
+      heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
     const observationSize = module._melee_web_snapshot_observation_size();
@@ -408,23 +2037,138 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       }
       return btoa(binary);
     };
+    if (payloadAdmissionProgress) {
+      payloadAdmissionProgress.sample300 = {
+        observation: encode(observation), pcm: encode(pcm), pad44Base64: encode(pad),
+        drawDiagnostics: encode(diagnostics), boundary, submissionStatus: status,
+      };
+    }
+    const heapCensus = writeCensus ? {
+      sample,
+      arenaRange: writeCensus.arenaRange,
+      audioOwnerInventory: {
+        version: audioInventoryBoundaries[0].version,
+        wireSize: audioInventoryBoundaries[0].size,
+        rowSize: audioInventoryBoundaries[0].rowSize,
+        boundaryOrder: audioInventoryBoundaries.map(item => item.boundary),
+        boundaries: audioInventoryBoundaries,
+        stableTopologyValidated: true,
+        effectsEnabled: audioInventoryBoundaries[0].effectsEnabled,
+        ownerRestoreAdmission: false,
+      },
+      matchContextOwnerInventory: {
+        version: matchContextInventoryBoundaries[0].version,
+        wireSize: matchContextInventoryBoundaries[0].size,
+        rowSize: matchContextInventoryBoundaries[0].rowSize,
+        boundaryOrder: matchContextInventoryBoundaries.map(item => item.boundary),
+        boundaries: matchContextInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+      },
+      requireAuroraStagingShadowInventory: Boolean(auroraStagingShadowInventoryBoundaries),
+      requireStageArenaOwnerInventory: Boolean(stageArenaOwnerInventoryBoundaries),
+      stageArenaOwnerInventory: stageArenaOwnerInventoryBoundaries ? {
+        wireSize: stageArenaOwnerInventoryBoundaries[0].metadata.size,
+        boundaryOrder: stageArenaOwnerInventoryBoundaries.map(item => item.boundary),
+        boundaries: stageArenaOwnerInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+        completeGameState: false,
+      } : null,
+      auroraStagingShadowOwnerInventory: auroraStagingShadowInventoryBoundaries ? {
+        version: auroraStagingShadowInventoryBoundaries[0].version,
+        wireSize: auroraStagingShadowInventoryBoundaries[0].size,
+        frameSlotCount: auroraStagingShadowInventoryBoundaries[0].frameSlotCount,
+        stagingSlotCount: auroraStagingShadowInventoryBoundaries[0].stagingSlotCount,
+        frameDescriptorStride: auroraStagingShadowInventoryBoundaries[0].frameStride,
+        submissionDescriptorStride: auroraStagingShadowInventoryBoundaries[0].submissionStride,
+        boundaryOrder: auroraStagingShadowInventoryBoundaries.map(item => item.boundary),
+        boundaries: auroraStagingShadowInventoryBoundaries,
+        stableOwnerLifetimeValidated: true,
+        ownerRestoreAdmission: false,
+      } : null,
+      nativeOutputStorage: {
+        kind: 'fixture-native-pcm-output', ...nativeOutputRange,
+        diagnosticOnly: true, ownerRestoreAdmission: false,
+      },
+      beforeStepSha256: censusBeforeSha256,
+      afterStepSha256: censusAfterStepSha256,
+      afterDrawSha256: censusAfterDrawSha256,
+      nativeTransferQuiescence: censusNativeTransferQuiescence,
+      sourceStep: censusStepDiff,
+      actualDrawAndQuiescence: censusDrawDiff,
+    } : null;
+    if (payloadAdmissionProgress) payloadAdmissionProgress.heapCensus = heapCensus;
+    if (payloadAdmissionPlan !== null && encode(pad) !== PAYLOAD_DRY_RUN_SAMPLE300_PAD44_BASE64) {
+      throw new Error('Actual sample-300 raw PAD differs from the pinned deterministic input');
+    }
     return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
-      drawDiagnostics: encode(diagnostics), boundary, status};
-  }, {sample, expectedInputMapping, expectedStocks, checkedSource: checkedAsyncCcall.toString(),
+      drawDiagnostics: encode(diagnostics), boundary, status, heapCensus,
+      payloadAdmission: payloadAdmissionResult};
+  }, {sample, expectedInputMapping, expectedStocks, payloadAdmissionPlan,
+    checkedSource: checkedAsyncCcall.toString(),
     inputMappingSource: validateSourceInputMapping.toString(),
     diagnosticSizeSource: requireDrawDiagnosticSize.toString(),
     inspectSource: inspectInteractiveObservation.toString(),
-    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES});
+    drawDiagnosticBytes: DRAW_DIAGNOSTIC_BYTES, writeCensus,
+    diffHeapRangesSource: diffHeapRanges.toString(),
+    classifyHeapRangesSource: classifyHeapRanges.toString(),
+    decodeAudioInventorySource: decodeAudioOwnerInventory.toString(),
+    validateAudioOwnerRangesSource: validateAudioOwnerRangeDisjointness.toString(),
+    requireStableAudioInventorySource: requireStableAudioOwnerInventory.toString(),
+    decodeMatchContextRangeInventorySource: decodeMatchContextRangeInventory.toString(),
+    validateMatchContextRangeDisjointnessSource: validateMatchContextRangeDisjointness.toString(),
+    requireStableMatchContextRangeInventorySource: requireStableMatchContextRangeInventory.toString(),
+    decodeAuroraStagingShadowInventorySource: decodeAuroraStagingShadowInventory.toString(),
+    validateAuroraStagingShadowRangeDisjointnessSource: validateAuroraStagingShadowRangeDisjointness.toString(),
+    requireStableAuroraStagingShadowInventorySource: requireStableAuroraStagingShadowInventory.toString(),
+    decodeStageArenaOwnerWireSource: decodeStageArenaOwnerWire.toString(),
+    validateStageArenaOwnerCatalogSource: validateStageArenaOwnerCatalog.toString(),
+    requireStableStageArenaOwnerInventorySource: requireStableStageArenaOwnerInventory.toString(),
+    sameStageArenaMetadataSource: sameStageArenaMetadata.toString(),
+    maxHeapBytes: MAX_HEAP_BYTES, waitSubmissionSource: waitForAuroraSubmission.toString()});
+  } catch (error) {
+    const sampleError = error instanceof Error ? error : new Error(String(error));
+    if (payloadAdmissionPlan !== null) {
+      try {
+        const serialized = await page.evaluate(() => {
+          const progress = window.__slippiSynctest?.payloadAdmissionProgress;
+          return progress ? JSON.stringify(progress) : null;
+        });
+        if (typeof serialized === 'string') {
+          const partial = JSON.parse(serialized);
+          if (partial.status === 'running') {
+            const failure = {kind: 'runner-error', message: String(sampleError)};
+            partial.status = 'interrupted';
+            partial.failure ||= failure;
+            if (partial.payloadAdmission?.status === 'running') {
+              partial.payloadAdmission.status = 'interrupted';
+              partial.payloadAdmission.failure ||= failure;
+            }
+          }
+          sampleError.payloadAdmissionPartial = partial;
+        }
+      } catch (readError) {
+        sampleError.payloadAdmissionPartialReadError = String(readError);
+      }
+    }
+    throw sampleError;
+  }
+  return evaluation;
 }
 
-async function closeBrowser(page) {
+export async function closeBrowser(page, payloadAdmissionEnabled = false, cpuRestoreEnabled = false) {
   if (!page) return null;
-  return page.evaluate(async checkedSource => {
+  return page.evaluate(async ({checkedSource, payloadAdmissionEnabled, cpuRestoreEnabled}) => {
     const state = window.__slippiSynctest;
     if (!state) return {closed: true, renderer: false};
     const {module} = state;
     const checkedAsyncCcall = new Function(`return (${checkedSource})`)();
     const errors = [];
+    const payloadAdmissionClose = {status: 'not-attempted'};
+    const cpuRestoreClose = {status: 'not-attempted'};
+    const snapshotClose = {status: 'not-attempted'};
+    const rendererShutdown = {status: 'not-attempted'};
     try {
       const status = JSON.parse(module.UTF8ToString(module._melee_web_synctest_submission_json()));
       if (status.pendingFramePackets !== 0 || status.pendingStagingBuffers !== 0 || status.workerBusy !== 0) {
@@ -434,14 +2178,48 @@ async function closeBrowser(page) {
         errors.push(`renderer logged errors before shutdown: ${JSON.stringify(status)}`);
       }
     } catch (error) { errors.push(`renderer quiescence check failed: ${String(error)}`); }
+    if(cpuRestoreEnabled){
+      try{
+        const result=await module.ccall('melee_web_synctest_cpu_restore_command','number',['number'],[5],{async:true});
+        cpuRestoreClose.result=result;cpuRestoreClose.status=result===0?'returned-zero':'returned-nonzero';
+        if(result!==0)errors.push(`CPU restore CLOSE returned ${result}`);
+      }catch(error){cpuRestoreClose.status='threw';cpuRestoreClose.error=String(error);errors.push(`CPU restore CLOSE failed: ${error}`);}
+    }
+    if (payloadAdmissionEnabled) {
+      try {
+        const result = await module.ccall('melee_web_synctest_payload_admission_command',
+          'number', ['number'], [5], {async: true});
+        payloadAdmissionClose.result = result;
+        payloadAdmissionClose.status = result === 0 ? 'returned-zero' : 'returned-nonzero';
+        if (result !== 0) errors.push(`source-payload CLOSE returned ${String(result)}`);
+      } catch (error) {
+        payloadAdmissionClose.status = 'threw';
+        payloadAdmissionClose.error = String(error);
+        errors.push(`source-payload CLOSE failed: ${String(error)}`);
+      }
+    }
     try {
-      await checkedAsyncCcall(module, 'snapshot close', 'melee_web_snapshot_close');
-    } catch (error) { errors.push(String(error)); }
+      const result = await checkedAsyncCcall(module, 'snapshot close', 'melee_web_snapshot_close');
+      snapshotClose.status = 'checked-return-one';
+      snapshotClose.result = result;
+    } catch (error) {
+      snapshotClose.status = 'checked-call-failed';
+      snapshotClose.error = String(error);
+      errors.push(String(error));
+    }
     try {
-      await checkedAsyncCcall(module, 'renderer shutdown', 'melee_web_synctest_renderer_shutdown');
-    } catch (error) { errors.push(String(error)); }
-    return {closed: errors.length === 0, renderer: true, errors};
-  }, checkedAsyncCcall.toString());
+      const result = await checkedAsyncCcall(module, 'renderer shutdown', 'melee_web_synctest_renderer_shutdown');
+      rendererShutdown.status = 'checked-return-one';
+      rendererShutdown.result = result;
+    } catch (error) {
+      rendererShutdown.status = 'checked-call-failed';
+      rendererShutdown.error = String(error);
+      errors.push(String(error));
+    }
+    return {closed: errors.length === 0, renderer: true, errors,
+      ...(payloadAdmissionEnabled ? {payloadAdmissionClose, snapshotClose, rendererShutdown} : {}),
+      ...(cpuRestoreEnabled ? {cpuRestoreClose, snapshotClose, rendererShutdown} : {})};
+  }, {checkedSource: checkedAsyncCcall.toString(), payloadAdmissionEnabled, cpuRestoreEnabled});
 }
 
 async function main() {

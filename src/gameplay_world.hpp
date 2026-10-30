@@ -7,6 +7,7 @@
 #include "gameplay_source_files.h"
 #endif
 #include "dat_menu_support.hpp"
+#include "native_dat.hpp"
 #include <array>
 #include <functional>
 #include <map>
@@ -69,6 +70,12 @@ class RuntimeArchiveCache;
 class DatArchive;
 enum class GameplayWorldPurpose { Match, Results };
 enum class GameplayWorldConstruction { Immediate, Deferred, SourceOrdered };
+struct GameplayWorldStageArenaInventory {
+    NativeDatAllocationVisitStatus status = NativeDatAllocationVisitStatus::InvalidOwner;
+    const void* world_storage = nullptr;
+    std::uint64_t world_generation = 0;
+    NativeDatAllocationInventory arena{};
+};
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
 // existing Mario/FD probes scoped to their original fixture.
 struct GameplayWorldSelection {
@@ -164,6 +171,10 @@ public:
     std::array<float, 3> player_spawn(unsigned slot) const;
     uint32_t unresolved_fighter_fields() const;
     void verify_immutable_archives() const;
+    [[nodiscard]] GameplayWorldStageArenaInventory diagnostic_stage_arena_allocations(
+        std::size_t first, std::size_t count,
+        bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+        void* context) const noexcept;
     bool advance_construction();
     bool construction_complete() const;
 private:

@@ -2,15 +2,25 @@
 #include "gameplay_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_context.h"
-#include <memory>
-#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "gameplay_match_flow.h"
-#endif
+#include <memory>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance.h"
 #endif
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
+/* Private diagnostic named-owner bridge. No value snapshot or restore
+ * authority: callers must re-read this tuple from the live session before
+ * using opaque component handles, then use each owner's admission API. */
+struct GameplayMatchCpuOwners {
+    const void* storage = nullptr;
+    MeleeWebMatchContext* context = nullptr;
+    MeleeWebMatchFlow* flow = nullptr;
+    MeleeWebAudio* audio = nullptr;
+    uint64_t world = 0;
+    uint64_t context_epoch = 0;
+    uint32_t frame = 0;
+};
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 enum class GameplayMatchDiagnostic { StadiumReady, StadiumFirstFireReady, StadiumFirstWaterReady };
 // Pointer-free result of one opt-in Water collision-query component at an
@@ -95,6 +105,13 @@ public:
     const StartMeleeData* diagnostic_start_data() const noexcept;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
+    [[nodiscard]] GameplayMatchCpuOwners diagnostic_cpu_owners() const noexcept;
+    MeleeWebMatchContextRangeResult diagnostic_match_context_range(
+        MeleeWebMatchContextRange*,char*,size_t) const;
+    [[nodiscard]] GameplayWorldStageArenaInventory diagnostic_stage_arena_allocations(
+        std::size_t first, std::size_t count,
+        bool (*visitor)(const NativeDatAllocationRange&, void*) noexcept,
+        void* context) const noexcept;
     bool advance_construction();
     bool construction_complete() const;
     void close();
@@ -125,6 +142,10 @@ public:
     MeleeWebPipelineSourceContext provenance_context() const;
 #endif
 private:
+#if defined(MELEE_WEB_CPU_ENDPOINT_TEST)
+    friend struct GameplayCpuEndpointTestFixture;
+    GameplayMatchSession() noexcept;
+#endif
     struct Storage;
     std::unique_ptr<Storage> storage_;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)

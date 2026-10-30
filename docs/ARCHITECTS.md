@@ -72,6 +72,8 @@ browser restoration or working online rollback.
 [browser restore #341](https://github.com/ericvanlare/melee-web/issues/341),
 [priorities #158](https://github.com/ericvanlare/melee-web/issues/158).
 
+**October 28 initialization follow-up:** The owner requested a fresh bounded attempt at the renderer failure. Inspection found a historical subagent rejection; the later permanent no-retry wording was a lead-authored checkpoint, not a verified repository or account restriction. The new attempt changed no safeguards and completed without a new rejection. A reduced Node reproducer identified canonical Shadow and Reflection texture-role initialization defects. Their reviewed repair passes scoped source controls and initialization. After current-main integration, the browser passes initialization and its warm prefix, then exposes a fixed-owner texture-cache assumption when simulation constructs an object during the first baseline tick. The reviewed successor makes canonical texture-matrix presentation stateless. Its browser experiment now completes actual restore and both no-draw correction ticks, then exposes a different typed source-payload mismatch. Strict state comparison and final presentation remain incomplete; reduce that writer before another replay. The separate UCF reference gate is unchanged. The owner also requested triage of brief loading panels between scenes; source triage is recorded for the next short transition-presentation milestone without displacing rollback. Detailed results remain in the existing rollback status boundary.
+
 ### 2026-10-26 — Owner and Codex: fix the first failure before broad validation
 
 **Ask:** Proceed autonomously, but step back when stuck or when validation is consuming more effort than the fix.
@@ -103,6 +105,23 @@ changes.
 **Links:** [Stadium #251](https://github.com/ericvanlare/melee-web/issues/251),
 [draft PR #301](https://github.com/ericvanlare/melee-web/pull/301),
 [current boundary](status/2026-10-07-pokemon-stadium-profile-oninit.md).
+
+### 2026-10-22 — Owner: proceed with the browser rollback sprint
+
+**Ask:** Execute the next sprint toward working browser rollback and Stadium.
+
+**Status:** In progress. The primary milestone is safe restoration of the same
+rendered browser instance, followed by no-draw comparison and present-frame
+recovery, combat boundaries and the combined seven-correction budget. Keep the
+existing source-only comparison as scoped evidence. The relay match remains
+conditional on the state, host-effect and profile gates. Stadium's finite-CSS
+prerequisite is a bounded parallel lane; the rejected reference follow-up stays
+frozen. This changes execution order, not the October 17 architecture or mode
+and service restrictions.
+
+**Links:** [Milestone #341](https://github.com/ericvanlare/melee-web/issues/341),
+[replanned queue](https://github.com/ericvanlare/melee-web/issues/158#issuecomment-6348798545),
+[existing rollback evidence](status/2026-10-12-match-only-rollback-feasibility.md).
 
 ### 2026-10-17 — Owner and Claude: no-draw rollback and isolated profile
 
