@@ -55,6 +55,22 @@ typedef struct MeleeWebClockCpuStorage {
     const void* profile_phase; size_t profile_phase_bytes;
 } MeleeWebClockCpuStorage;
 MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
+/* Named values copied by value from the original 0x479D58 record. This is
+ * deliberately not a byte view: the source owner compares these exact fields
+ * and excludes struct padding. Pointer-valued fields remain identities. */
+typedef struct MeleeWebClockCpuEndpoint {
+    uint32_t valid;
+    uint32_t unk_0, unk_4, unk_8;
+    int32_t unk_C;
+    uint32_t callback_x0, callback_x1, callback_x2, callback_x3;
+    uintptr_t callback_x4_0, callback_x4_1;
+    uintptr_t unk_10_xC;
+    uint64_t unk_10_x20, unk_10_x28;
+    uintptr_t unk_10_x30;
+    int32_t unk_10_x34;
+    uint32_t unk_10_x38_0, unk_10_x38_1;
+} MeleeWebClockCpuEndpoint;
+MeleeWebClockCpuEndpoint melee_web_source_clock_cpu_endpoint(void);
 
 MeleeWebSourceClockSnapshot* melee_web_source_clock_snapshot_capture(
     const void* flow_identity, uint64_t flow_epoch, uint64_t world_generation);
@@ -114,6 +130,22 @@ typedef struct MeleeWebCadenceCpuStorage {
     const void* record; size_t record_bytes;
 } MeleeWebCadenceCpuStorage;
 MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void);
+/* Named values used by the original cadence comparator. Only alarm is a raw
+ * byte range because that comparator alone uses memcmp for its state. */
+typedef struct MeleeWebCadenceCpuEndpoint {
+    uint32_t valid;
+    int64_t x0_0_x0, x0_0_x8;
+    int32_t x0_0_x10;
+    int64_t x0_1_x0, x0_1_x8;
+    int32_t x0_1_x10;
+    uint32_t x4;
+    uint64_t x38;
+    int64_t x40;
+    int32_t x48;
+    const void* alarm;
+    size_t alarm_bytes;
+} MeleeWebCadenceCpuEndpoint;
+MeleeWebCadenceCpuEndpoint melee_web_source_cadence_cpu_endpoint(void);
 
 MeleeWebSourceCadenceSnapshot* melee_web_source_cadence_snapshot_capture(
     const void*, uint64_t, uint64_t);

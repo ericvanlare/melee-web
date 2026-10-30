@@ -49,18 +49,21 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
         output=self.compile_run('coordinator',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'src/gameplay_cpu_commit.cpp',
             SOURCE/'tests/cpu_commit_control.cpp'],['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0'])
         self.assertIn('eight admission refusals write zero',output)
+        self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
     def test_actual_fixed_coordinator_light_anchor_refuses_before_writes(self):
         output=self.compile_run('coordinator-light',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'src/gameplay_cpu_commit.cpp',
             SOURCE/'tests/cpu_commit_control.cpp'],['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
                 '-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1'])
         self.assertIn('nine admission refusals write zero; light leaf modeled',output)
+        self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
     def test_actual_fixed_coordinator_texture_anchor_refuses_before_writes(self):
         output=self.compile_run('coordinator-texture',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'src/gameplay_cpu_commit.cpp',
             SOURCE/'tests/cpu_commit_control.cpp'],['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
                 '-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1','-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1'])
         self.assertIn('ten admission refusals write zero; light/texture leaves modeled',output)
+        self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
     def test_actual_fixed_coordinator_particle_anchor_refuses_before_writes(self):
         output=self.compile_run('coordinator-particle',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'src/gameplay_cpu_commit.cpp',
@@ -68,6 +71,7 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
                 '-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1','-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1',
                 '-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1'])
         self.assertIn('eleven admission refusals write zero; light/texture/particle leaves modeled',output)
+        self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
     def test_actual_effect_barrier_and_inactive_transport_link(self):
         def function(text,needle):
@@ -156,7 +160,8 @@ int main(void){
         files=['src/slippi_profile/tests/'+name for name in [
             'cpu_restore_runner.mjs','test_cpu_restore_runner.mjs','cpu_two_tick_runner.mjs',
             'test_cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
-            'test_cpu_seven_tick_runner.mjs','run_synctest.mjs',
+            'test_cpu_seven_tick_runner.mjs','cpu_corrected_runner.mjs','test_cpu_corrected_runner.mjs',
+            'cpu_endpoint.mjs','test_cpu_endpoint.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
         files+=['scripts/browser_tools.mjs','scripts/net_rollback_input_timeline.mjs',
                 'scripts/net_lockstep_core.mjs','tests/quiescent_wasm_snapshot.mjs']
@@ -167,12 +172,14 @@ int main(void){
             shutil.copyfile(source,destination)
         directory=mirror/'src/slippi_profile/tests'
         for module in ['cpu_restore_runner.mjs','cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
+                       'cpu_corrected_runner.mjs','cpu_endpoint.mjs',
                        'run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)
             (mirror/(module+'.syntax.log')).write_text(result.stdout+result.stderr)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         result=subprocess.run([str(node_runtime()),'--test',str(directory/'test_cpu_restore_runner.mjs'),
                                str(directory/'test_cpu_two_tick_runner.mjs'),str(directory/'test_cpu_seven_tick_runner.mjs'),
+                               str(directory/'test_cpu_corrected_runner.mjs'),str(directory/'test_cpu_endpoint.mjs'),
                                str(directory/'test_write_census_contract.mjs')],cwd=mirror,
                               capture_output=True,text=True,timeout=60)
         (mirror/'node-contracts.log').write_text(result.stdout+result.stderr)

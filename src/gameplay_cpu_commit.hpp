@@ -38,4 +38,7 @@ enum class GameplayCpuCommitResult : std::uint32_t {
  * This method itself repeats every admission, then prepares the statics last.
  * Every normal refusal happens before the first source-state write. */
 GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners&) noexcept;
+/* Same owner admissions and fixed writer order, selecting only the
+ * one-shot corrected ActionStore endpoint. Exact replay keeps the API above. */
+GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwners&) noexcept;
 }

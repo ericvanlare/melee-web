@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restore_runner.mjs';
 import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_tick_runner.mjs';
 import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_SAMPLES} from './cpu_seven_tick_runner.mjs';
+import {runBrowserCpuCorrectedSeven} from './cpu_corrected_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -28,7 +29,7 @@ const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
 const LOBJ_CURRENT_SET_V15_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15';
-const PARTICLE_MEASUREMENT_V17_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17';
+const STABLE_ACTION_ASSETS_V18_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -157,16 +158,18 @@ export function validateCpuRestoreRouteSelection(values) {
   const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
   const sevenTick = values['--aggregate-cpu-drawn-reference-seven-tick'] === true;
+  const corrected = values['--correct-predicted-branch'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
   const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
   const multiTick = twoTick || sevenTick;
   if (sevenTick && !particle) {
-    throw new Error('The seven-tick route requires the private v17 particle measurement profile');
+    throw new Error('The seven-tick route requires the private v18 stable action asset profile');
   }
+  if (corrected && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick route');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
-    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
+    throw new Error('The v18 stable action asset lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
   }
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
@@ -178,7 +181,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
@@ -189,12 +192,12 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   if (lobjPresentationCache && !multiTick) throw new Error('The v7 light owner requires two or seven ticks');
   if(tobjPresentationCache && (!lobjPresentationCache || !multiTick)) throw new Error('The v15 current light set lane requires v7 and two or seven ticks');
   if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !multiTick)) {
-    throw new Error('The v17 particle measurement lane requires v15 TObj, v7 LObj, and two or seven ticks');
+    throw new Error('The v18 stable action asset lane requires v15 TObj, v7 LObj, and two or seven ticks');
   }
   if (sevenTickDrawnReference && !particlePresentationCache) {
-    throw new Error('The seven-tick route requires the private v17 particle measurement profile');
+    throw new Error('The seven-tick route requires the private v18 stable action asset profile');
   }
-  const expectedProfile = particlePresentationCache ? PARTICLE_MEASUREMENT_V17_PROFILE :
+  const expectedProfile = particlePresentationCache ? STABLE_ACTION_ASSETS_V18_PROFILE :
     tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
@@ -205,7 +208,7 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   }
   if (sevenTickDrawnReference && (!sevenTickExports ||
       sevenTickExports.evidence !== true || sevenTickExports.evidenceBytes !== true)) {
-    throw new Error('Seven-tick evidence exports are unavailable for the linked v17 profile');
+    throw new Error('Seven-tick evidence exports are unavailable for the linked v18 profile');
   }
   return expectedProfile;
 }
@@ -216,7 +219,7 @@ export function parseArgs(argv) {
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
     '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
-    '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache']);
+    '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -307,6 +310,11 @@ function sourceHashes() {
     'src/slippi_profile/tests/cpu_seven_tick_runner.mjs',
     'src/slippi_profile/tests/test_cpu_seven_tick_runner.mjs',
     'src/slippi_profile/tests/cpu_restore_adapter.inc',
+    'src/slippi_profile/tests/cpu_corrected_adapter.inc',
+    'src/slippi_profile/tests/cpu_corrected_runner.mjs',
+    'src/slippi_profile/tests/cpu_endpoint.mjs',
+    'src/slippi_profile/tests/test_cpu_endpoint.mjs',
+    'src/gameplay_cpu_endpoint.cpp','src/gameplay_cpu_endpoint.hpp',
     'scripts/net_rollback_input_timeline.mjs',
     'scripts/net_lockstep_core.mjs',
     'src/gameplay_cpu_checkpoint.cpp','src/gameplay_cpu_commit.cpp','src/gameplay_cpu_statics.cpp','src/gameplay_cpu_interval.c',
@@ -426,6 +434,7 @@ export function recordCpuRestoreFailure(report,error) {
   if(error.cpuSevenTickPartialReadError)report.execution.cpuSevenTickPartialReadError=error.cpuSevenTickPartialReadError;
   if(error.cpuSevenTickPredictedPartial)report.execution.predictedInstanceProgress=error.cpuSevenTickPredictedPartial;
   if(error.cpuSevenTickPredictedPartialReadError)report.execution.predictedInstanceProgressReadError=error.cpuSevenTickPredictedPartialReadError;
+  if(error.cpuCorrectedPartial)report.execution.cpuCorrected=error.cpuCorrectedPartial;
   if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
   report.execution.cpuOuterValidation='failed';
   return report;
@@ -603,6 +612,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const twoTickDrawnReference=options['--aggregate-cpu-drawn-reference-two-tick']===true;
   const sevenTickDrawnReference=options['--aggregate-cpu-drawn-reference-seven-tick']===true;
+  const correctedPrediction=options['--correct-predicted-branch']===true;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const particlePresentationCache=options['--slippi-particle-presentation-cache']===true;
@@ -722,6 +732,15 @@ async function main() {
       ...(sevenTickDrawnReference?['No H1 or whole-session acceptance']:['No seven-tick/H1/whole-session acceptance']),
       ...(sevenTickDrawnReference?['No restore from the predicted instance; no changed-action, live-packet, or repeated rollback claim']:[]),
       'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    if(correctedPrediction){
+      report.schema='melee-web-independent-browser-correction-component-v1';
+      report.statement='Two identically prepared private browsers compare complete declared PRE state, then a wrong-input seven-tick drawn branch is restored and re-simulated without draw against the independent authoritative browser. Exact declared CPU_END/raw pairs and final DRAW_END are separate checks. Component evidence only; no repeated rollback, live relay or profile acceptance.';
+      report.execution={status:'incomplete',prefixSamples:300,samples:CPU_SEVEN_TICK_SAMPLES,
+        cpuCorrected:{enabled:true,status:'not-started'},restorePerformed:'not-yet-observed'};
+      report.exclusions=['No #341 milestone closure','No repeated correction or rolling snapshot ring',
+        'No live packet delivery or relay match','No whole-profile, vanilla, H1 or whole-session acceptance',
+        'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    }
   }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
@@ -801,7 +820,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: particlePresentationCache ? PARTICLE_MEASUREMENT_V17_PROFILE :
+      name: particlePresentationCache ? STABLE_ACTION_ASSETS_V18_PROFILE :
         tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache, particlePresentationCache};
@@ -945,6 +964,20 @@ async function main() {
         decodeDrawSource:decodeDrawDiagnostics.toString()};
       if(sevenTickDrawnReference){
         if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
+        if(correctedPrediction){
+          const result=await runBrowserCpuCorrectedSeven(predictedPage,page,cpuWire,checkpoint,
+            expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics);
+          report.execution={status:'completed',prefixSamples:300,samples:CPU_SEVEN_TICK_SAMPLES,
+            cpuCorrected:result,restorePerformed:true,
+            scope:'one independent-reference wrong-input browser correction with a final present'};
+          report.cpuResult={comparisons:result.comparisons,
+            referenceScreenshot:await screenshotRecord(page,options['--out'],'reference-final.png'),
+            correctedScreenshot:await screenshotRecord(predictedPage,options['--out'],'corrected-final.png')};
+          report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,
+            sourceStateManifestComplete:false,wasmAndMapBound:true,staticRows:cpuWire.length};
+          if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+          report.result='passed';writeReport();return;
+        }
         const sample=await runBrowserCpuSevenTick(predictedPage,page,cpuWire,checkpoint,
           expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,helpers);
         retainCpuSevenTickSample(report,sample);writeReport();
@@ -1144,7 +1177,7 @@ async function main() {
     const cleanupFailures = [];
     if(predictedPage){
       try{
-        const closed=await closeBrowser(predictedPage,false,false);
+        const closed=await closeBrowser(predictedPage,false,correctedPrediction);
         if(!closed?.closed)cleanupFailures.push({step:'predicted-renderer-close',error:JSON.stringify(closed)});
         report.cleanup={...(report.cleanup||{}),predictedRenderer:closed};
       }catch(error){cleanupFailures.push({step:'predicted-renderer-close',error:String(error)});}

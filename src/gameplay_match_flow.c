@@ -292,6 +292,23 @@ void melee_web_match_flow_cpu_snapshot_destroy(MeleeWebMatchFlowCpuSnapshot* sna
     melee_web_source_cadence_snapshot_destroy(snapshot->cadence);
     free(snapshot);
 }
+
+MeleeWebMatchFlowCpuEndpoint melee_web_match_flow_cpu_endpoint_read(
+    MeleeWebMatchFlow* flow,const MeleeWebMatchFlowCpuSnapshot* snapshot)
+{
+    MeleeWebMatchFlowCpuEndpoint result={0};
+    result.status=1;
+    if(!melee_web_match_flow_cpu_snapshot_admit(flow,snapshot,NULL,0))
+        return result;
+    result.status=0;
+    result.identity=(uint64_t)(uintptr_t)flow;
+    result.epoch=owner_epoch;
+    result.generation=flow->generation;
+    result.source_valid=flow->source_valid;
+    result.complete=flow->complete;
+    result.opening_demo=flow->opening_demo;
+    return result;
+}
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 int melee_web_match_flow_pause_observation(const MeleeWebMatchFlow* flow,
                                          MeleeWebMatchPauseObservation* out)

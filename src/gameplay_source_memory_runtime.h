@@ -103,6 +103,7 @@ typedef enum MeleeWebSourceMemoryPayloadSnapshotStatus {
     MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE = 6,
     MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED = 7,
     MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE = 8,
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX = 9,
 } MeleeWebSourceMemoryPayloadSnapshotStatus;
 typedef struct MeleeWebSourceMemoryPayloadSnapshotCaptureResult {
     MeleeWebSourceMemoryPayloadSnapshotStatus status;
@@ -113,6 +114,47 @@ melee_web_source_memory_payload_snapshot_capture(void);
 MeleeWebSourceMemoryPayloadSnapshotStatus
 melee_web_source_memory_payload_snapshot_admit(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+/* Read-only endpoint values for the trusted snapshot owned by the caller's
+ * checked capsule. Call full admit before and after a getter batch. Header
+ * performs full admission; indexed getters do bounded O(1) owner/layout and
+ * row/cell checks and do not independently establish batch admission. Every
+ * result is returned by value and contains no metadata on refusal. These APIs
+ * do not restore, allocate, or accept caller-selected memory ranges. */
+typedef struct MeleeWebSourcePayloadEndpointHeader {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    uint32_t schema, bytes;
+    int32_t source_heap_handle;
+    uint32_t heap_bytes, reserved;
+    uint64_t owner_epoch, world_generation, allocation_watermark;
+    uint64_t topology_revision, arena_begin, arena_end;
+    uint64_t row_count, free_cell_count, allocated_cell_count, payload_bytes;
+} MeleeWebSourcePayloadEndpointHeader;
+typedef struct MeleeWebSourcePayloadEndpointRow {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    uint32_t schema, bytes, source_address, requested_bytes;
+    uint32_t reserved;
+    uint64_t index, host_address, allocation_generation;
+} MeleeWebSourcePayloadEndpointRow;
+typedef enum MeleeWebSourcePayloadEndpointCellKind {
+    MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL = 1,
+    MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL = 2,
+} MeleeWebSourcePayloadEndpointCellKind;
+typedef struct MeleeWebSourcePayloadEndpointCell {
+    MeleeWebSourceMemoryPayloadSnapshotStatus status;
+    uint32_t schema, bytes, kind, source_address, cell_bytes;
+    uint64_t index;
+} MeleeWebSourcePayloadEndpointCell;
+MeleeWebSourcePayloadEndpointHeader
+melee_web_source_memory_payload_endpoint_header(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot);
+MeleeWebSourcePayloadEndpointRow melee_web_source_memory_payload_endpoint_row(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index);
+MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_endpoint_free_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index);
+MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_endpoint_allocated_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index);
 MeleeWebSourceMemoryPayloadSnapshotStatus
 melee_web_source_memory_payload_snapshot_restore(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot);

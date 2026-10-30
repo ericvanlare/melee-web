@@ -21,6 +21,26 @@ struct CpuStaticRow {
 static_assert(sizeof(CpuStaticRow)==16);
 struct CpuIntervalSpan { const void* address; std::size_t bytes; };
 struct CpuStaticBounds { std::uintptr_t global_begin, data_end; };
+enum class CpuStaticEndpointStatus : std::uint32_t {
+    Ok = 0, WrongPhase = 1, InvalidLayout = 2, InvariantChanged = 3,
+    InvalidIndex = 4,
+};
+enum class CpuStaticEndpointPhase : std::uint32_t {
+    Captured = 1, Sealed = 2, Restored = 3,
+};
+struct CpuStaticEndpointHeader {
+    CpuStaticEndpointStatus status{};
+    std::uint32_t schema{}, bytes{};
+    CpuStaticEndpointPhase phase{};
+    std::uint32_t reserved{}, reserved2{};
+    std::uint64_t table_identity{}, row_count{};
+};
+struct CpuStaticEndpointRow {
+    CpuStaticEndpointStatus status{};
+    std::uint32_t schema{}, bytes{}, index{}, address{}, extent{}, policy{}, domain{};
+};
+static_assert(sizeof(CpuStaticEndpointHeader)==40);
+static_assert(sizeof(CpuStaticEndpointRow)==32);
 class GameplayCpuStatics final {
 public:
     static std::unique_ptr<GameplayCpuStatics> configure(
@@ -39,6 +59,12 @@ public:
     CpuComparison compare_expected(std::span<const std::byte>) const noexcept;
     bool matches_post() const noexcept;
     CpuComparison compare_post() const noexcept;
+    /* Read-only endpoint guard for the immutable reviewed table. The header
+     * checks complete layout and invariant state in Captured, Sealed or
+     * Restored phase. Call it before and after a row batch. Indexed row reads
+     * then do O(1) phase/index checks only; they do not establish admission. */
+    CpuStaticEndpointHeader endpoint_header() const noexcept;
+    CpuStaticEndpointRow endpoint_row(std::uint64_t index) const noexcept;
     std::uint64_t table_identity() const noexcept { return table_identity_; }
     std::size_t row_count() const noexcept { return rows_.size(); }
 private:

@@ -75,6 +75,27 @@ void same_bytes(const unsigned char* actual, const unsigned char* expected,
                 size_t count, const char* message) {
     check(std::memcmp(actual, expected, count) == 0, message);
 }
+void check_endpoint_row_refusal(const MeleeWebSourcePayloadEndpointRow& row,
+        MeleeWebSourceMemoryPayloadSnapshotStatus status,const char* message) {
+    check(row.status==status&&!row.schema&&!row.bytes&&!row.source_address&&
+          !row.requested_bytes&&!row.reserved&&!row.index&&!row.host_address&&
+          !row.allocation_generation,message);
+}
+void check_endpoint_cell_refusal(const MeleeWebSourcePayloadEndpointCell& cell,
+        MeleeWebSourceMemoryPayloadSnapshotStatus status,const char* message) {
+    check(cell.status==status&&!cell.schema&&!cell.bytes&&!cell.kind&&
+          !cell.source_address&&!cell.cell_bytes&&!cell.index,message);
+}
+void check_endpoint_header_refusal(const MeleeWebSourcePayloadEndpointHeader& header,
+        MeleeWebSourceMemoryPayloadSnapshotStatus status,const char* message) {
+    check(header.status==status&&!header.schema&&!header.bytes&&
+          !header.source_heap_handle&&!header.heap_bytes&&!header.owner_epoch&&
+          !header.reserved&&
+          !header.world_generation&&!header.allocation_watermark&&
+          !header.topology_revision&&!header.arena_begin&&!header.arena_end&&
+          !header.row_count&&!header.free_cell_count&&!header.allocated_cell_count&&
+          !header.payload_bytes,message);
+}
 
 void witness_refused(const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
                      MeleeWebSourceMemoryPayloadSnapshotStatus admission) {
@@ -257,8 +278,79 @@ void source_memory_payload_controls() {
           "unchanged payload topology admits");
     check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==1,
           "captured payload matches exact live bytes");
+    allocation_budget=0;
+    check(melee_web_source_memory_payload_snapshot_admit(snapshot)==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
+          "full payload endpoint batch admission before reads");
+    const auto endpoint=melee_web_source_memory_payload_endpoint_header(snapshot);
+    check(endpoint.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          endpoint.schema==1&&endpoint.bytes==sizeof(endpoint)&&
+          endpoint.source_heap_handle==3&&endpoint.heap_bytes&&!endpoint.reserved&&endpoint.owner_epoch&&
+          endpoint.world_generation==701&&
+          endpoint.allocation_watermark==initial_context.allocation_generation_watermark&&
+          endpoint.topology_revision&&endpoint.arena_begin<endpoint.arena_end&&
+          endpoint.row_count==2&&endpoint.free_cell_count==1&&
+          endpoint.allocated_cell_count==2&&endpoint.payload_bytes==sizeof(a)+sizeof(b),
+          "full endpoint header reports admitted owner, topology and counts");
+    const auto endpoint_a=melee_web_source_memory_payload_endpoint_row(snapshot,0);
+    const auto endpoint_b=melee_web_source_memory_payload_endpoint_row(snapshot,1);
+    check(endpoint_a.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          endpoint_a.schema==1&&endpoint_a.bytes==sizeof(endpoint_a)&&endpoint_a.index==0&&
+          !endpoint_a.reserved&&
+          endpoint_a.host_address==reinterpret_cast<uintptr_t>(a)&&
+          endpoint_a.source_address>=endpoint.arena_begin&&
+          endpoint_a.source_address<endpoint.arena_end&&
+          endpoint_a.requested_bytes==sizeof(a)&&
+          endpoint_a.allocation_generation==initial_a.allocation_generation&&
+          endpoint_b.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          endpoint_b.index==1&&endpoint_b.host_address==reinterpret_cast<uintptr_t>(b)&&
+          endpoint_b.source_address>=endpoint.arena_begin&&
+          endpoint_b.source_address<endpoint.arena_end&&
+          endpoint_b.requested_bytes==sizeof(b)&&
+          endpoint_b.allocation_generation==initial_b.allocation_generation,
+          "endpoint rows expose exact ordered live allocation identities");
+    const auto free_cell=melee_web_source_memory_payload_endpoint_free_cell(snapshot,0);
+    const auto allocated_b=melee_web_source_memory_payload_endpoint_allocated_cell(snapshot,0);
+    const auto allocated_a=melee_web_source_memory_payload_endpoint_allocated_cell(snapshot,1);
+    check(free_cell.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          free_cell.kind==MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL&&free_cell.index==0&&
+          free_cell.source_address>=endpoint.arena_begin&&free_cell.cell_bytes&&
+          uint64_t(free_cell.source_address)+free_cell.cell_bytes==endpoint.arena_end&&
+          allocated_b.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          allocated_b.kind==MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL&&
+          uint64_t(allocated_b.source_address)+32==endpoint_b.source_address&&
+          allocated_b.cell_bytes==128&&
+          allocated_a.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+          uint64_t(allocated_a.source_address)+32==endpoint_a.source_address&&
+          allocated_a.cell_bytes==160,
+          "endpoint preserves ordered live free and allocated source cells");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(snapshot,2),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX,
+          "endpoint bad row index returns no row metadata");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(snapshot,
+              std::numeric_limits<uint64_t>::max()),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX,
+          "endpoint maximum row index refuses before narrowing");
+    check_endpoint_cell_refusal(melee_web_source_memory_payload_endpoint_free_cell(snapshot,1),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX,
+          "endpoint bad free-cell index returns no metadata");
+    check_endpoint_cell_refusal(melee_web_source_memory_payload_endpoint_allocated_cell(snapshot,2),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX,
+          "endpoint bad allocated-cell index returns no metadata");
+    check_endpoint_cell_refusal(melee_web_source_memory_payload_endpoint_allocated_cell(snapshot,
+              std::numeric_limits<uint64_t>::max()),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX,
+          "endpoint maximum cell index refuses before narrowing");
+    check(melee_web_source_memory_payload_snapshot_admit(snapshot)==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&allocation_budget==0,
+          "payload endpoint getter batch is allocation-free and re-admitted");
+    allocation_budget=-1;
     fill(a, sizeof(a), 99);
     fill(b, sizeof(b), 171);
+    check(reinterpret_cast<const unsigned char*>(endpoint_a.host_address)[0]==a[0]&&
+          reinterpret_cast<const unsigned char*>(endpoint_b.host_address)[0]==b[0]&&
+          a[0]!=expected_a[0]&&b[0]!=expected_b[0],
+          "endpoint row addresses name current bytes rather than saved payload bytes");
     allocation_budget = 0;
     check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==0,
           "changed payload bytes fail pure equality without allocating");
@@ -304,6 +396,12 @@ void source_memory_payload_controls() {
     check(melee_web_source_memory_payload_snapshot_restore(snapshot) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
           "new allocation refuses payload restore");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(snapshot,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "changed topology refuses indexed row without metadata");
+    check_endpoint_cell_refusal(melee_web_source_memory_payload_endpoint_allocated_cell(snapshot,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED,
+          "changed topology refuses indexed cell without metadata");
     check(melee_web_source_memory_payload_snapshot_matches_live(snapshot)==0,
           "equality refuses changed allocation topology");
     same_bytes(a, before_a, sizeof(a), "topology refusal preserves A");
@@ -386,6 +484,9 @@ void source_memory_payload_controls() {
     check(melee_web_source_memory_payload_snapshot_restore(old_world.snapshot) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER,
           "changed world refuses old payload snapshot");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(old_world.snapshot,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER,
+          "changed world refuses old endpoint row without metadata");
     same_bytes(a, before_a, sizeof(a), "world refusal preserves A");
     same_bytes(b, before_b, sizeof(b), "world refusal preserves B");
     same_context(world_context);
@@ -464,6 +565,14 @@ void source_memory_payload_controls() {
               unhealthy_snapshot.snapshot) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY,
           "unhealthy owner refuses payload restore");
+    check_endpoint_header_refusal(melee_web_source_memory_payload_endpoint_header(
+              unhealthy_snapshot.snapshot),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY,
+          "unhealthy owner refuses full endpoint header without metadata");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(
+              unhealthy_snapshot.snapshot,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY,
+          "unhealthy owner refuses indexed endpoint row without metadata");
     same_bytes(a, before_a, sizeof(a), "unhealthy refusal preserves A");
     same_bytes(b, before_b, sizeof(b), "unhealthy refusal preserves B");
     melee_web_source_memory_payload_snapshot_destroy(unhealthy_snapshot.snapshot);
@@ -482,6 +591,15 @@ int main() {
     check(melee_web_source_memory_payload_snapshot_admit(nullptr) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
           "null payload admission refusal");
+    check_endpoint_header_refusal(melee_web_source_memory_payload_endpoint_header(nullptr),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
+          "null endpoint header refusal has no metadata");
+    check_endpoint_row_refusal(melee_web_source_memory_payload_endpoint_row(nullptr,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
+          "null endpoint row refusal has no metadata");
+    check_endpoint_cell_refusal(melee_web_source_memory_payload_endpoint_free_cell(nullptr,0),
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
+          "null endpoint cell refusal has no metadata");
     check(melee_web_source_memory_payload_snapshot_restore(nullptr) ==
           MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT,
           "null payload restore refusal");

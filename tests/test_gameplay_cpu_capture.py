@@ -46,22 +46,36 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         payload=payload[payload.index('typedef enum MeleeWebSourceMemoryPayloadSnapshotStatus'):payload.index('MeleeWebSourceMemoryPayloadSnapshotCaptureResult;')+len('MeleeWebSourceMemoryPayloadSnapshotCaptureResult;')]
         diag=header[header.index('enum class CpuCaptureRefusal'):header.index('class GameplayCpuCheckpoint final')]
         generated=source('tests/cpu_capture_refusal_control.cpp.in')
+        capture=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(')
+        capture=capture.replace('slippi_particle_presentation_anchor_capture','fixture_particle_anchor_capture')
+        capture=capture.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
         restore=function(src,'GameplayCpuCommitResult GameplayCpuCheckpoint::restore(')
         self.assertIn('slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)',restore)
+        self.assertIn('slippi_particle_source_reset_after_restore(commit_.particle_anchor)',restore)
         # Replace only the reset leaf with its counted fixture implementation;
         # keep the extracted production guards, ordering, and phase changes.
         restore=restore.replace('slippi_lobj_current_set_view_reset_after_restore','fixture_profile_reset_after_restore')
+        restore=restore.replace('slippi_particle_source_reset_after_restore','fixture_particle_source_reset_after_restore')
+        restore_corrected=function(src,'GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(')
+        restore_corrected=restore_corrected.replace('slippi_lobj_current_set_view_reset_after_restore','fixture_profile_reset_after_restore')
+        restore_corrected=restore_corrected.replace('slippi_particle_source_reset_after_restore','fixture_particle_source_reset_after_restore')
+        finish_corrected=function(src,'bool GameplayCpuCheckpoint::finish_corrected(')
+        finish_corrected=finish_corrected.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
+        disarm=function(src,'void GameplayCpuCheckpoint::disarm()')
+        disarm=disarm.replace('slippi_particle_presentation_anchor_disarm','fixture_particle_anchor_disarm')
         replacements={
             '@ACTUAL_COMPARISON@':comparison,'@ACTUAL_CAPTURE_DIAGNOSTIC@':diag,
             '@ACTUAL_PAYLOAD_RESULT@':payload,
-            '@ACTUAL_CAPTURE_FUNCTION@':function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture('),
+            '@ACTUAL_CAPTURE_FUNCTION@':capture,
             '@ACTUAL_INTERVAL_BOUNDARY@':function(src,'bool GameplayCpuCheckpoint::interval_boundary('),
             '@ACTUAL_SEAL_POST@':function(src,'bool GameplayCpuCheckpoint::seal_post('),
             '@ACTUAL_RESTORE@':restore,
+            '@ACTUAL_RESTORE_CORRECTED@':restore_corrected,
+            '@ACTUAL_FINISH_CORRECTED@':finish_corrected,
             '@ACTUAL_DRAWN_SEAL@':function(src,'bool GameplayCpuCheckpoint::seal_drawn_reference('),
             '@ACTUAL_DRAWN_MATCH@':function(src,'bool GameplayCpuCheckpoint::matches_drawn_reference('),
             '@ACTUAL_RELEASE_FUNCTION@':function(src,'void GameplayCpuCheckpoint::release()'),
-            '@ACTUAL_DISARM_FUNCTION@':function(src,'void GameplayCpuCheckpoint::disarm()'),
+            '@ACTUAL_DISARM_FUNCTION@':disarm,
             '@ACTUAL_DESTRUCTOR@':function(src,'GameplayCpuCheckpoint::~GameplayCpuCheckpoint()'),
         }
         for name,value in replacements.items():generated=generated.replace(name,value)
@@ -80,6 +94,7 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('eight first-leaf refusals',result.stdout)
             self.assertIn('restore commit/reset lifecycle guards passed',result.stdout)
+            self.assertIn('corrected restore selects its dedicated writer',result.stdout)
             print('Actual capture control profile/output:',profile,lane)
             print(result.stdout.strip())
 

@@ -17,6 +17,7 @@
 #include <memory>
 #include <new>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
@@ -583,6 +584,15 @@ struct MeleeWebSourceMemoryPayloadSnapshot {
     size_t allocated_offset;
     size_t payload_offset;
 };
+static_assert(std::is_standard_layout_v<MeleeWebSourcePayloadEndpointHeader> &&
+              std::is_trivially_copyable_v<MeleeWebSourcePayloadEndpointHeader> &&
+              sizeof(MeleeWebSourcePayloadEndpointHeader) == 104);
+static_assert(std::is_standard_layout_v<MeleeWebSourcePayloadEndpointRow> &&
+              std::is_trivially_copyable_v<MeleeWebSourcePayloadEndpointRow> &&
+              sizeof(MeleeWebSourcePayloadEndpointRow) == 48);
+static_assert(std::is_standard_layout_v<MeleeWebSourcePayloadEndpointCell> &&
+              std::is_trivially_copyable_v<MeleeWebSourcePayloadEndpointCell> &&
+              sizeof(MeleeWebSourcePayloadEndpointCell) == 32);
 
 namespace {
 constexpr uint64_t kPayloadSnapshotMagic = UINT64_C(0x4d57535041594c44);
@@ -786,6 +796,8 @@ MeleeWebSourceMemoryPayloadSnapshotStatus payload_snapshot_check(
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE;
     if (!healthy)
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY;
+    if (!source_address_heap || !source_address_heap->initialized())
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
     if (snapshot->epoch != owner_epoch ||
         snapshot->heap_handle != source_heap_handle ||
         snapshot->world != world_generation)
@@ -820,6 +832,45 @@ MeleeWebSourceMemoryPayloadSnapshotStatus payload_snapshot_check(
         !heap_state_matches(source_address_heap->state(), snapshot))
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
     return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+}
+
+MeleeWebSourceMemoryPayloadSnapshotStatus payload_snapshot_fast_check(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    if (!snapshot)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT;
+    if (!active)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE;
+    if (!healthy)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY;
+    if (!source_address_heap || !source_address_heap->initialized())
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+    if (snapshot->epoch != owner_epoch ||
+        snapshot->heap_handle != source_heap_handle ||
+        snapshot->world != world_generation)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER;
+    if (!snapshot_layout_valid(snapshot))
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+    const auto& current = source_address_heap->state();
+    if (snapshot->revision != topology_revision ||
+        snapshot->watermark != next_generation ||
+        snapshot->row_count != allocations.size() ||
+        snapshot->arena_begin != current.arena_begin.value() ||
+        snapshot->arena_end != current.arena_end.value() ||
+        snapshot->heap_bytes != current.heap_bytes ||
+        snapshot->free_count != current.free.size() ||
+        snapshot->allocated_count != current.allocated.size())
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+    return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+}
+
+bool endpoint_cell_valid(const melee_web::source::Cell& cell,
+                         const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    const uint64_t begin = cell.start.value();
+    const uint64_t end = begin + cell.bytes;
+    return cell.bytes && begin >= snapshot->arena_begin &&
+           end <= snapshot->arena_end && end > begin;
 }
 }
 
@@ -987,6 +1038,121 @@ melee_web_source_memory_payload_snapshot_admit(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
 {
     return payload_snapshot_check(snapshot);
+}
+
+extern "C" MeleeWebSourcePayloadEndpointHeader
+melee_web_source_memory_payload_endpoint_header(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    MeleeWebSourcePayloadEndpointHeader result{};
+    result.status = payload_snapshot_check(snapshot);
+    if (result.status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return result;
+    result.schema = 1;
+    result.bytes = static_cast<uint32_t>(sizeof(result));
+    result.source_heap_handle = snapshot->heap_handle;
+    result.heap_bytes = snapshot->heap_bytes;
+    result.owner_epoch = snapshot->epoch;
+    result.world_generation = snapshot->world;
+    result.allocation_watermark = snapshot->watermark;
+    result.topology_revision = snapshot->revision;
+    result.arena_begin = snapshot->arena_begin;
+    result.arena_end = snapshot->arena_end;
+    result.row_count = snapshot->row_count;
+    result.free_cell_count = snapshot->free_count;
+    result.allocated_cell_count = snapshot->allocated_count;
+    result.payload_bytes = snapshot->payload_bytes;
+    return result;
+}
+
+extern "C" MeleeWebSourcePayloadEndpointRow
+melee_web_source_memory_payload_endpoint_row(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index)
+{
+    MeleeWebSourcePayloadEndpointRow result{};
+    result.status = payload_snapshot_fast_check(snapshot);
+    if (result.status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return result;
+    if (index >= snapshot->row_count) {
+        result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX;
+        return result;
+    }
+    const auto& current = allocations[static_cast<size_t>(index)];
+    const auto& saved = payload_rows(snapshot)[static_cast<size_t>(index)];
+    uint64_t source_end = 0;
+    uintptr_t host_end = 0;
+    if (current.host != saved.host || current.requested != saved.requested ||
+        current.source != saved.source || current.generation != saved.generation ||
+        !host_interval(current.host, current.requested, &host_end) ||
+        !source_interval(current.source.value(), current.requested, &source_end)) {
+        result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+        return result;
+    }
+    (void)host_end;
+    (void)source_end;
+    result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+    result.schema = 1;
+    result.bytes = static_cast<uint32_t>(sizeof(result));
+    result.source_address = current.source.value();
+    result.requested_bytes = current.requested;
+    result.index = index;
+    result.host_address = static_cast<uint64_t>(current.host);
+    result.allocation_generation = current.generation;
+    return result;
+}
+
+namespace {
+MeleeWebSourcePayloadEndpointCell payload_endpoint_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index,
+    MeleeWebSourcePayloadEndpointCellKind kind)
+{
+    MeleeWebSourcePayloadEndpointCell result{};
+    result.status = payload_snapshot_fast_check(snapshot);
+    if (result.status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return result;
+    const auto& cells = kind == MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL
+        ? source_address_heap->state().free
+        : source_address_heap->state().allocated;
+    const size_t count = kind == MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL
+        ? snapshot->free_count : snapshot->allocated_count;
+    if (index >= count) {
+        result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_INDEX;
+        return result;
+    }
+    const auto& current = cells[static_cast<size_t>(index)];
+    const auto& saved = kind == MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL
+        ? payload_free_cells(snapshot)[static_cast<size_t>(index)]
+        : payload_allocated_cells(snapshot)[static_cast<size_t>(index)];
+    if (current.start != saved.start || current.bytes != saved.bytes ||
+        !endpoint_cell_valid(current, snapshot)) {
+        result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+        return result;
+    }
+    result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+    result.schema = 1;
+    result.bytes = static_cast<uint32_t>(sizeof(result));
+    result.kind = static_cast<uint32_t>(kind);
+    result.index = index;
+    result.source_address = current.start.value();
+    result.cell_bytes = current.bytes;
+    return result;
+}
+}
+
+extern "C" MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_endpoint_free_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index)
+{
+    return payload_endpoint_cell(snapshot, index,
+        MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL);
+}
+
+extern "C" MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_endpoint_allocated_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index)
+{
+    return payload_endpoint_cell(snapshot, index,
+        MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL);
 }
 
 extern "C" MeleeWebSourceMemoryPayloadSnapshotStatus

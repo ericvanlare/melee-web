@@ -14,7 +14,8 @@ public:
         const FighterCostume& identity,
         std::shared_ptr<const DatArchive> nana_popo_fighter = {},
         const FighterCostume* nana_popo_identity = nullptr,
-        std::span<const uint8_t> nana_popo_animation = {});
+        std::span<const uint8_t> nana_popo_animation = {},
+        GameplayActionStorePolicy action_policy = GameplayActionStorePolicy::Legacy);
     ~GameplayFighterAssets();
     GameplayFighterAssets(const GameplayFighterAssets&)=delete;
     GameplayFighterAssets& operator=(const GameplayFighterAssets&)=delete;

@@ -1,6 +1,7 @@
 #include "gameplay_class_piece_diagnostic.h"
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
+#include "slippi_profile/particle_source_schedule.h"
 /* Actual production capture/restore bodies below with explicitly modeled
  * owner/factory/commit/reset leaves. This proves lifecycle ordering, not live
  * owner admission, engine-state rollback, or a complete game checkpoint. */
@@ -21,7 +22,7 @@
 namespace melee_web {
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
-    Statics, UnexpectedWriterFailure, LObj, TObj
+    Statics, UnexpectedWriterFailure, LObj, TObj, Particle
 };
 }
 @ACTUAL_COMPARISON@
@@ -89,10 +90,18 @@ std::uint32_t live_frame=176;
 bool effect_ok=true,action_ok=true,payload_ok=true,flow_ok=true,bytes_ok=true;
 std::array<unsigned,16> trace{};unsigned count=0;
 std::array<unsigned char,64> source_bytes{};
-unsigned commit_calls=0,profile_reset_calls=0;
+unsigned commit_calls=0,corrected_commit_calls=0,profile_reset_calls=0;
+unsigned particle_reset_calls=0,particle_anchor_disarms=0,corrected_seal_calls=0;
+unsigned finish_replay_calls=0;
 melee_web::GameplayCpuCommitResult modeled_commit_result=melee_web::GameplayCpuCommitResult::Ok;
+melee_web::GameplayCpuCommitResult modeled_corrected_commit_result=melee_web::GameplayCpuCommitResult::Ok;
 bool profile_reset_ok=true;
+bool particle_anchor_ok=true,particle_reset_ok=true,corrected_action_ok=true;
 SlippiLObjAnchor last_profile_reset_anchor{};
+SlippiParticlePresentationAnchor fixture_particle_anchor_capture(){return {1,1,1,1,1};}
+int fixture_particle_anchor_admit(SlippiParticlePresentationAnchor a){return particle_anchor_ok&&a.world==1&&a.token==1;}
+void fixture_particle_anchor_disarm(SlippiParticlePresentationAnchor a){if(a.token)++particle_anchor_disarms;}
+int fixture_particle_source_reset_after_restore(SlippiParticlePresentationAnchor a){++particle_reset_calls;return particle_reset_ok&&a.world==1&&a.token==1;}
 void visit(unsigned leaf){trace[count++]=leaf;if(throw_leaf==leaf)throw std::bad_alloc();}
 Snapshot* snapshot(unsigned leaf){visit(leaf);if(refuse_leaf==leaf)return nullptr;++created;return new Snapshot{leaf};}
 void destroy(Snapshot* p){if(p){++destroyed;delete p;}}
@@ -125,7 +134,9 @@ int melee_web_action_interval_admit(Snapshot*){return action_ok;}
 int melee_web_action_interval_matches_finished(Snapshot*){return action_ok;}
 int melee_web_action_interval_seal_record(Snapshot*){return action_ok;}
 std::uint32_t melee_web_action_interval_active_failure(Snapshot*){return action_ok?0:99;}
-std::uint32_t melee_web_action_interval_failure_code(Snapshot*){return action_ok?0:99;}
+int melee_web_action_interval_seal_corrected(Snapshot*){++corrected_seal_calls;return corrected_action_ok;}
+int melee_web_action_interval_finish_replay(Snapshot*){++finish_replay_calls;return action_ok;}
+std::uint32_t melee_web_action_interval_failure_code(Snapshot*){return corrected_action_ok?(action_ok?0:99):98;}
 MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(const Snapshot*){return payload_ok?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;}
 struct Compare{std::uint32_t status=0,allocation_index=0,byte_offset=0,expected_byte=0,actual_byte=0;std::uintptr_t host_address=0;std::uint32_t requested_bytes=0,admission_status=0,source_address=0;};
 Compare melee_web_source_memory_payload_snapshot_compare_live(Snapshot*){Compare c;c.status=payload_ok?0:2;return c;}
@@ -139,10 +150,14 @@ class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool ca
  CpuComparison capture_expected(std::vector<std::byte>& out)const{out.assign(1,std::byte{0x5a});CpuComparison c;if(!bytes_ok)c.status=2;return c;}
  CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
 struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
- const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};};
+ const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};SlippiParticlePresentationAnchor particle_anchor{};};
 GameplayCpuCommitResult gameplay_cpu_commit(const Commit&) noexcept {
  ++commit_calls;
  return modeled_commit_result;
+}
+GameplayCpuCommitResult gameplay_cpu_commit_corrected(const Commit&) noexcept {
+ ++corrected_commit_calls;
+ return modeled_corrected_commit_result;
 }
 class GameplayCpuCheckpoint{public:
  static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {return capsule_alloc_failure?nullptr:std::malloc(n);}
@@ -153,21 +168,28 @@ class GameplayCpuCheckpoint{public:
  bool interval_boundary(const GameplayMatchSession&) noexcept;
  bool seal_post(const GameplayMatchSession&) noexcept;
  GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
+ GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
+ bool finish_corrected(const GameplayMatchSession&) noexcept;
  bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
  bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
  void fixture_sealed(){phase_=Phase::Sealed;post_frame_=176;commit_.effect_token=1;}
  void fixture_recording(){phase_=Phase::Recording;commit_.effect_token=1;}
  void fixture_replaying(){phase_=Phase::Replaying;}
+ void fixture_correcting(){phase_=Phase::Correcting;post_frame_=live_frame;commit_.effect_token=1;}
  void fixture_finished(){phase_=Phase::Finished;}
  bool fixture_failed()const{return phase_==Phase::Failed;}
  bool fixture_is_replaying()const{return phase_==Phase::Replaying;}
+ bool fixture_is_correcting()const{return phase_==Phase::Correcting;}
+ bool fixture_is_corrected_sealed()const{return phase_==Phase::CorrectedSealed;}
+ std::uint32_t checked_domains()const{return checked_domains_;}
+ std::uint32_t matched_domains()const{return matched_domains_;}
  void disarm() noexcept;
  void release() noexcept;
 private:
  explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
  const CpuCheckpointSpan span_;
- enum class Phase{Captured,Recording,Sealed,Replaying,Finished,Failed};Phase phase_=Phase::Captured;
- bool same_owner(const GameplayMatchSession&)const{return !owner_missing;}
+ enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed};Phase phase_=Phase::Captured;
+ bool same_owner(const GameplayMatchSession&)const{return !owner_missing&&fixture_particle_anchor_admit(commit_.particle_anchor);}
  using AudioRanges=std::array<int,16>;
  bool capture_post_bytes(const GameplayMatchSession&,std::vector<std::byte>& b,AudioRanges&,std::size_t& n){b.assign(1,std::byte{0x5a});n=1;return bytes_ok;}
  bool matches_post_bytes(const GameplayMatchSession&,const std::vector<std::byte>&,const AudioRanges&,std::size_t){return bytes_ok;}
@@ -211,6 +233,8 @@ void melee_web_tobj_writer_disarm(uint64_t session){assert(session==0);++tobj_di
 @ACTUAL_INTERVAL_BOUNDARY@
 @ACTUAL_SEAL_POST@
 @ACTUAL_RESTORE@
+@ACTUAL_RESTORE_CORRECTED@
+@ACTUAL_FINISH_CORRECTED@
 @ACTUAL_DRAWN_SEAL@
 @ACTUAL_DRAWN_MATCH@
 @ACTUAL_RELEASE_FUNCTION@
@@ -225,7 +249,7 @@ int main(){
 #if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
  const auto disabled_tobj=slippi_tobj_anchor_capture();assert(disabled_tobj.token==0&&slippi_tobj_anchor_admit(disabled_tobj)==1&&slippi_tobj_failure()==0);slippi_tobj_anchor_disarm(disabled_tobj);
 #endif
- auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=profile_reset_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=true;last_profile_reset_anchor={};};
+ auto reset=[](){live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=corrected_commit_calls=profile_reset_calls=particle_reset_calls=particle_anchor_disarms=corrected_seal_calls=finish_replay_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;modeled_corrected_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=particle_anchor_ok=particle_reset_ok=corrected_action_ok=true;last_profile_reset_anchor={};};
  const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
  for(unsigned failure=1;failure<=8;++failure){reset();refuse_leaf=failure;CpuCaptureDiagnostic d;
   auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),d);assert(!c);
@@ -365,10 +389,98 @@ int main(){
  assert(profile_reset_calls==0);
 #endif
  successful_restore.reset();
+
+ // Corrected restore selects its own ActionStore writer and remains in a
+ // distinct phase until the local corrected action endpoint is sealed.
+ reset();CpuCaptureDiagnostic corrected_wrong_phase_diag;
+ auto corrected_wrong_phase=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),corrected_wrong_phase_diag);
+ assert(corrected_wrong_phase);
+ assert(corrected_wrong_phase->restore_corrected(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(corrected_commit_calls==0&&commit_calls==0&&particle_reset_calls==0&&!corrected_wrong_phase->fixture_failed());
+ corrected_wrong_phase.reset();
+ reset();auto corrected_wrong_owner=sealed_checkpoint();owner_missing=true;
+ assert(corrected_wrong_owner->restore_corrected(session)==GameplayCpuCommitResult::MissingOwner);owner_missing=false;
+ assert(corrected_commit_calls==0&&commit_calls==0&&particle_reset_calls==0);corrected_wrong_owner.reset();
+ reset();auto corrected_wrong_frame=sealed_checkpoint();++live_frame;
+ assert(corrected_wrong_frame->restore_corrected(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(corrected_commit_calls==0&&commit_calls==0&&particle_reset_calls==0);corrected_wrong_frame.reset();
+ reset();auto corrected_bad_anchor=sealed_checkpoint();particle_anchor_ok=false;
+ assert(corrected_bad_anchor->restore_corrected(session)==GameplayCpuCommitResult::MissingOwner);particle_anchor_ok=true;
+ assert(corrected_commit_calls==0&&commit_calls==0&&particle_reset_calls==0);corrected_bad_anchor.reset();
+ reset();auto corrected_refused=sealed_checkpoint();modeled_corrected_commit_result=GameplayCpuCommitResult::Action;
+ assert(corrected_refused->restore_corrected(session)==GameplayCpuCommitResult::Action);
+ assert(corrected_commit_calls==1&&commit_calls==0&&particle_reset_calls==0&&corrected_refused->fixture_failed());
+ assert(corrected_refused->restore_corrected(session)==GameplayCpuCommitResult::MissingOwner);
+ assert(corrected_commit_calls==1&&commit_calls==0);corrected_refused.reset();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ reset();auto corrected_lobj_reset_failed=sealed_checkpoint();profile_reset_ok=false;
+ assert(corrected_lobj_reset_failed->restore_corrected(session)==GameplayCpuCommitResult::UnexpectedWriterFailure);
+ assert(corrected_commit_calls==1&&commit_calls==0&&profile_reset_calls==1&&particle_reset_calls==0);
+ assert(corrected_lobj_reset_failed->fixture_failed()&&!corrected_lobj_reset_failed->fixture_is_correcting());
+ corrected_lobj_reset_failed.reset();
+#endif
+ reset();auto corrected_particle_reset_failed=sealed_checkpoint();particle_reset_ok=false;
+ assert(corrected_particle_reset_failed->restore_corrected(session)==GameplayCpuCommitResult::UnexpectedWriterFailure);
+ assert(corrected_commit_calls==1&&commit_calls==0&&particle_reset_calls==1);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ assert(profile_reset_calls==1);
+#else
+ assert(profile_reset_calls==0);
+#endif
+ assert(corrected_particle_reset_failed->fixture_failed()&&!corrected_particle_reset_failed->fixture_is_correcting());
+ corrected_particle_reset_failed.reset();
+ auto corrected_sealed_checkpoint=[&](){
+   reset();auto checkpoint=sealed_checkpoint();
+   assert(checkpoint->restore_corrected(session)==GameplayCpuCommitResult::Ok);
+   assert(checkpoint->fixture_is_correcting()&&corrected_commit_calls==1&&commit_calls==0);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+   assert(profile_reset_calls==1);
+#else
+   assert(profile_reset_calls==0);
+#endif
+   assert(particle_reset_calls==1);return checkpoint;
+ };
+ auto corrected=corrected_sealed_checkpoint();
+ assert(corrected->interval_boundary(session));
+ action_ok=false;assert(!corrected->interval_boundary(session)&&corrected->comparison().domain==3);action_ok=true;
+ assert(corrected->fixture_failed()&&!corrected->interval_boundary(session));
+ corrected.reset();
+ corrected=corrected_sealed_checkpoint();
+ assert(corrected->interval_boundary(session));
+ assert(corrected->finish_corrected(session));
+ assert(corrected->fixture_is_corrected_sealed()&&!corrected->fixture_failed());
+ assert(corrected_seal_calls==1&&finish_replay_calls==0);
+ assert(corrected->comparison().status==0&&corrected->checked_domains()==0&&corrected->matched_domains()==0);
+ corrected.reset();
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+ auto corrected_tobj_refusal=corrected_sealed_checkpoint();tobj_ok=false;
+ assert(!corrected_tobj_refusal->finish_corrected(session)&&corrected_tobj_refusal->fixture_failed());
+ assert(corrected_seal_calls==0&&finish_replay_calls==0);tobj_ok=true;corrected_tobj_refusal.reset();
+#endif
+ for(unsigned refusal=0;refusal<7;++refusal){
+   auto candidate=corrected_sealed_checkpoint();
+   switch(refusal){
+   case 0: owner_missing=true;break;
+   case 1: ++live_frame;break;
+   case 2: lobj_ok=false;break;
+   case 3: particle_anchor_ok=false;break;
+   case 4: effect_ok=false;break;
+   case 5: action_ok=false;break;
+   case 6: corrected_action_ok=false;break;
+   }
+   const auto old_seal_calls=corrected_seal_calls;
+   assert(!candidate->finish_corrected(session));
+   assert(candidate->fixture_failed()&&!candidate->fixture_is_corrected_sealed());
+   assert(corrected_seal_calls==old_seal_calls+(refusal==6?1u:0u));
+   assert(finish_replay_calls==0);
+   owner_missing=false;live_frame=176;lobj_ok=true;particle_anchor_ok=effect_ok=action_ok=corrected_action_ok=true;
+   candidate.reset();unchanged();
+ }
  reset();CpuCaptureDiagnostic early;auto t=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),early,CpuCheckpointSpan::TwoTicks);assert(t);
  t->fixture_recording();++live_frame;assert(!t->seal_post(session));t.reset();unchanged();
  std::puts("Actual one/two span bounds, interval owner/effect/journal refusals and exact seal endpoints passed (named leaves modeled)");
  std::puts("Actual read-only drawn endpoint seal/match predicates, factory order, domain refusals and source nonmutation passed (named owner leaves modeled)");
  std::puts("Actual capture body: eight first-leaf refusals and exceptions, Owner/alloc/missing guards, exact text/status, order, cleanup and source nonmutation passed (factory leaves modeled)");
  std::puts("restore commit/reset lifecycle guards passed (leaves modeled; engine-state rollback is outside this control)");
+ std::puts("corrected restore selects its dedicated writer, permits only Correcting boundaries, and seals local action state without replay/post-state equality claims");
 }

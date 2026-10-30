@@ -182,4 +182,53 @@ CpuComparison GameplayCpuStatics::compare_expected(std::span<const std::byte> ex
 bool GameplayCpuStatics::matches_post() const noexcept
 {return compare_post().status==0;}
 
+CpuStaticEndpointHeader GameplayCpuStatics::endpoint_header() const noexcept
+{
+    CpuStaticEndpointHeader result{};
+    if(phase_!=Phase::Captured&&phase_!=Phase::Sealed&&phase_!=Phase::Restored){
+        result.status=CpuStaticEndpointStatus::WrongPhase;
+        return result;
+    }
+    if(!layout_valid()){
+        result.status=CpuStaticEndpointStatus::InvalidLayout;
+        return result;
+    }
+    if(!invariants_match()){
+        result.status=CpuStaticEndpointStatus::InvariantChanged;
+        return result;
+    }
+    result.status=CpuStaticEndpointStatus::Ok;
+    result.schema=1;
+    result.bytes=static_cast<std::uint32_t>(sizeof(result));
+    result.phase=phase_==Phase::Captured?CpuStaticEndpointPhase::Captured:
+        phase_==Phase::Sealed?CpuStaticEndpointPhase::Sealed:
+        CpuStaticEndpointPhase::Restored;
+    result.table_identity=table_identity_;
+    result.row_count=static_cast<std::uint64_t>(rows_.size());
+    return result;
+}
+
+CpuStaticEndpointRow GameplayCpuStatics::endpoint_row(std::uint64_t index) const noexcept
+{
+    CpuStaticEndpointRow result{};
+    if(phase_!=Phase::Captured&&phase_!=Phase::Sealed&&phase_!=Phase::Restored){
+        result.status=CpuStaticEndpointStatus::WrongPhase;
+        return result;
+    }
+    if(index>=rows_.size()||index>std::numeric_limits<std::uint32_t>::max()){
+        result.status=CpuStaticEndpointStatus::InvalidIndex;
+        return result;
+    }
+    const auto& row=rows_[static_cast<std::size_t>(index)];
+    result.status=CpuStaticEndpointStatus::Ok;
+    result.schema=1;
+    result.bytes=static_cast<std::uint32_t>(sizeof(result));
+    result.index=static_cast<std::uint32_t>(index);
+    result.address=row.address;
+    result.extent=row.bytes;
+    result.policy=static_cast<std::uint32_t>(row.policy);
+    result.domain=static_cast<std::uint32_t>(row.domain);
+    return result;
+}
+
 }

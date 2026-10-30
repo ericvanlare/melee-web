@@ -1,0 +1,123 @@
+/* Actual old/new adapter includes, actual commit/statics engines. Source,
+ * checkpoint corrected writer and endpoint reader are explicit phase models;
+ * no aggregate admission, source-world replay or browser equality claim. */
+@BASE_CONTROL@
+
+namespace melee_web {
+GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
+    const GameplayMatchSession& session) noexcept { return restore(session); }
+bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Replaying||session.source_frames()!=post_frame_||
+       !melee_web_cpu_interval_admit(effect_token_)||fail_replay)return false;
+    phase_=Phase::Finished;return true;
+}
+/* Explicit reader phase model only: actual reader/leaf admission has a separate
+ * control. Native adapter's guard and begin/end lifetime execute unchanged. */
+bool GameplayCpuEndpointReader::begin(const GameplayMatchSession&,
+    const GameplayCpuCheckpoint&,GameplayCpuEndpointView view,
+    GameplayCpuEndpointProvenance provenance) noexcept {
+    if(active_)return false;view_=view;provenance_=provenance;active_=true;return true;
+}
+GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
+    GameplayCpuEndpointDomain domain,GameplayCpuEndpointRowKind kind,uint32_t index) const noexcept {
+    GameplayCpuEndpointRecord r{};
+    if(!active_||index>0){r.status=5;return r;}
+    r.schema=1;r.domain=static_cast<uint32_t>(domain);r.row_kind=static_cast<uint32_t>(kind);
+    r.view=static_cast<uint32_t>(view_);r.provenance=static_cast<uint32_t>(provenance_);
+    r.count=1;return r;
+}
+bool GameplayCpuEndpointReader::revalidate() noexcept {bool prior=active_;active_=false;return prior;}
+}
+namespace {
+void corrected_reset(){
+    cpu_corrected.~CpuCorrectedControl();
+    ::new(static_cast<void*>(&cpu_corrected)) CpuCorrectedControl{};
+    corrected_runtime_refused=false;
+    reset_fixture();check(configure_valid(),"Corrected configuration refused");
+    check(melee_web_synctest_cpu_corrected_command(32)==0,"Corrected capture refused");
+    check(observation.frame==176&&cpu_corrected.evidence.pre_frame==176&&
+          cpu_corrected.phase==CpuCorrectedControl::Recording,"PRE setup cursor/phase differs");
+}
+void endpoint_batch(uint32_t view,uint32_t provenance){
+    check(melee_web_synctest_cpu_endpoint_begin(view,provenance)==0&&cpu_restore.inflight,
+          "Endpoint begin did not hold native guard");
+    check(melee_web_synctest_cpu_endpoint_record(1,1,0)==0,"Endpoint record refused");
+    const auto* row=static_cast<const melee_web::GameplayCpuEndpointRecord*>(melee_web_synctest_cpu_endpoint_data());
+    check(row->view==view&&row->provenance==provenance&&row->status==0,"Endpoint route provenance changed");
+    check(melee_web_synctest_cpu_endpoint_end()==0&&!cpu_restore.inflight,"Endpoint end did not release native guard");
+}
+void baseline(){
+    for(unsigned i=0;i<7;++i){
+        pending_submission=false;
+        check(melee_web_synctest_cpu_corrected_command(33+i)==0,"Baseline step refused");
+        check(tick_calls==i+1&&draw_calls==std::min(i+1u,6u),"Baseline draw/step count differs");
+    }
+    check(cpu_corrected.phase==CpuCorrectedControl::BaselineCpuEnd&&!pending_submission&&draw_calls==6,
+          "Seventh baseline step did not pause before draw");
+}
+void baseline_present(){
+    check(melee_web_synctest_cpu_corrected_command(40)==0&&pending_submission&&draw_calls==7,
+          "Last baseline draw missing");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_corrected_command(41)==0,"Last baseline idle refused");
+}
+void verify_routes(){
+    // First page's PRE/reference endpoint and release.
+    corrected_reset();endpoint_batch(1,1);baseline();endpoint_batch(2,2);
+    baseline_present();endpoint_batch(3,2);
+    check(melee_web_synctest_cpu_corrected_command(52)==0,"Reference release refused");
+    close_and_retire();check(capsule_destroys==1,"Reference capsule not retired");
+    // Second page performs identical PRE setup before its branch/recovery.
+    corrected_reset();const auto captured=observation;endpoint_batch(1,1);
+    baseline();baseline_present();
+    check(melee_web_synctest_cpu_corrected_command(42)==0&&match->source_frames()==176&&
+          !memcmp(&captured,&observation,sizeof(captured)),"Restore lost exact captured observer");
+    for(unsigned i=0;i<7;++i){
+        check(melee_web_synctest_cpu_corrected_command(43+i)==0&&
+              tick_calls==8+i&&draw_calls==7&&!pending_submission&&observation.frame==177+i,
+              "Correction drew, repeated or lost cursor");
+    }
+    check(cpu_corrected.phase==CpuCorrectedControl::CorrectedCpuEnd&&
+          cpu_corrected.evidence.replay_step_no_draw_mask==0x7f&&
+          !cpu_corrected.evidence.cpu_equality&&!cpu_corrected.evidence.drawn_equality,
+          "Local completion invented cross-instance equality");
+    endpoint_batch(2,3);
+    check(melee_web_synctest_cpu_corrected_command(50)==0&&draw_calls==8&&pending_submission,
+          "Corrected final present missing");
+    pending_submission=false;check(melee_web_synctest_cpu_corrected_command(51)==0,"Final idle refused");
+    endpoint_batch(3,3);check(melee_web_synctest_cpu_corrected_command(52)==0,"Corrected release refused");
+    close_and_retire();check(capsule_destroys==1&&action_destroys==1,"Corrected owner retirement failed");
+}
+void verify_refusals(){
+    corrected_reset();check(melee_web_synctest_cpu_corrected_command(34)!=0&&tick_calls==0&&draw_calls==0,
+          "Out of order command executed source");close_and_retire();
+    corrected_reset();check(melee_web_synctest_cpu_endpoint_begin(2,3)!=0&&!cpu_restore.inflight,
+          "Wrong PRE provenance admitted");close_and_retire();
+    corrected_reset();observation.frame=183;
+    check(melee_web_synctest_cpu_corrected_command(33)!=0&&tick_calls==0,"Stale observer reached step");close_and_retire();
+    corrected_reset();fail_baseline_sample300=true;
+    check(melee_web_synctest_cpu_corrected_command(33)!=0&&tick_calls==0&&
+          std::string(error).find("fixture sample300 source sentinel")!=std::string::npos,
+          "Leaf source failure text lost");close_and_retire();
+    corrected_reset();check(melee_web_synctest_cpu_endpoint_begin(1,1)==0,"Record failure setup");
+    check(melee_web_synctest_cpu_endpoint_record(1,1,1)!=0,"Bad record admitted");
+    const auto failure=cpu_restore.first_failure;
+    const auto* evidence=static_cast<const CpuSevenTickEvidence*>(melee_web_synctest_cpu_corrected_evidence());
+    check(evidence->first_failure==failure,"Endpoint refusal left corrected evidence stale");
+    check(melee_web_synctest_cpu_endpoint_end()==failure&&!cpu_restore.inflight,"Failed batch could not end");close_and_retire();
+    corrected_reset();check(melee_web_synctest_cpu_endpoint_begin(1,1)==0,"Runtime guard setup");
+    corrected_runtime_refused=true;
+    check(melee_web_synctest_cpu_endpoint_record(1,1,0)!=0,"Unsafe endpoint runtime admitted");
+    corrected_runtime_refused=false;(void)melee_web_synctest_cpu_endpoint_end();
+    check(!cpu_restore.inflight,"Runtime failure stranded native guard");close_and_retire();
+    corrected_reset();check(melee_web_synctest_cpu_endpoint_begin(1,1)==0,"Deferred close setup");
+    check(melee_web_synctest_cpu_restore_command(5)!=0&&cpu_restore.close_requested,
+          "Reentrant close was not deferred");
+    (void)melee_web_synctest_cpu_endpoint_end();
+    check(!cpu_restore.inflight&&!cpu_restore.close_requested&&cpu_restore.state==CpuRestoreControl::Closed,
+          "Endpoint end failed deferred cleanup");close_and_retire();
+}
+}
+int main(){try{verify_routes();verify_refusals();
+    std::puts("Actual corrected adapter control PASS: two PRE setups, 7 baseline/7 correction, last-draw pause, provenance, no equality claims, guards and retirement; modeled checkpoint/reader/source leaves.");return 0;
+}catch(const std::exception& e){std::fprintf(stderr,"Corrected control: %s\n",e.what());return 1;}}

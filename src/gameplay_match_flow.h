@@ -28,6 +28,18 @@ int melee_web_match_flow_cpu_snapshot_restore(
     MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t);
 int melee_web_match_flow_cpu_snapshot_matches(
     MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t);
+/* Private read-only endpoint values. The existing owned snapshot supplies
+ * lifetime admission only; values come from the current live flow. status 0
+ * means admitted, 1 means refusal with every identity/value zero. No source
+ * storage or caller-provided output pointer is written. Clock and cadence
+ * retain their separate typed storage getters and this same CPU admission. */
+typedef struct MeleeWebMatchFlowCpuEndpoint {
+    uint32_t status;
+    uint64_t identity, epoch, generation;
+    int32_t source_valid, complete, opening_demo;
+} MeleeWebMatchFlowCpuEndpoint;
+MeleeWebMatchFlowCpuEndpoint melee_web_match_flow_cpu_endpoint_read(
+    MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*);
 void melee_web_match_flow_cpu_snapshot_destroy(MeleeWebMatchFlowCpuSnapshot*);
 
 int melee_web_match_flow_renew(void*, char*, size_t);

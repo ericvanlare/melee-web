@@ -74,6 +74,9 @@ extern "C" {
 #include <melee/pl/forward.h>
 #include "gameplay_trophy_roots.hpp"
 #include "gameplay_fighter_assets.hpp"
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include "slippi_profile/profile.h"
+#endif
 #include <iostream>
 #include <algorithm>
 #include <iterator>
@@ -830,9 +833,17 @@ struct GameplayWorld::Storage {
             nana_popo_fighter=archive(popo->fighter_filename);
             nana_popo_animation=file(*runtime_files,popo->animation_filename);
         }
+        auto action_policy=GameplayActionStorePolicy::Legacy;
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+        // This private profile requires stable borrowed animation identities.
+        // Results remain local and use their existing separate archive policy.
+        static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY==SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18);
+        if(purpose==GameplayWorldPurpose::Match)
+            action_policy=GameplayActionStorePolicy::ResidentOrdinaryActions;
+#endif
         auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
             archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity,
-            std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation);
+            std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation,action_policy);
         for(const auto& costume:fighter_costumes())
             if(costume.fighter_kind==kind&&costume.costume_index!=0&&
                selected_costumes[kind].contains(costume.costume_index)&&

@@ -4575,7 +4575,7 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..fa59ffe92b201056c2655f359d365ea9
  /// @brief returns a pointer to the current scenes enter data
  void* gm_GetCurrentSceneEnterData(void)
  {
-@@ -376,3 +386,471 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
+@@ -376,3 +386,495 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
      }
      HSD_VIWaitXFBFlush();
  }
@@ -4665,6 +4665,30 @@ index b7e470cfb7ffb2addf957104eb65b2e931996edb..fa59ffe92b201056c2655f359d365ea9
 +    result.record_bytes = sizeof(gm_80479D58);
 +    result.process_mask = &melee_source_clock_process_mask;
 +    result.process_mask_bytes = sizeof(melee_source_clock_process_mask);
++    return result;
++}
++MeleeWebClockCpuEndpoint melee_web_source_clock_cpu_endpoint(void)
++{
++    MeleeWebClockCpuEndpoint result = {0};
++    if (!melee_source_clock_snapshot_boundary()) return result;
++    result.valid = 1;
++    result.unk_0 = gm_80479D58.unk_0;
++    result.unk_4 = gm_80479D58.unk_4;
++    result.unk_8 = gm_80479D58.unk_8;
++    result.unk_C = gm_80479D58.unk_C;
++    result.callback_x0 = gm_80479D58.unk_10.x0;
++    result.callback_x1 = gm_80479D58.unk_10.x1;
++    result.callback_x2 = gm_80479D58.unk_10.x2;
++    result.callback_x3 = gm_80479D58.unk_10.x3;
++    result.callback_x4_0 = (uintptr_t) gm_80479D58.unk_10.x4[0];
++    result.callback_x4_1 = (uintptr_t) gm_80479D58.unk_10.x4[1];
++    result.unk_10_xC = (uintptr_t) gm_80479D58.unk_10.xC;
++    result.unk_10_x20 = gm_80479D58.unk_10.unk_20;
++    result.unk_10_x28 = gm_80479D58.unk_10.unk_28;
++    result.unk_10_x30 = (uintptr_t) gm_80479D58.unk_10.unk_30;
++    result.unk_10_x34 = gm_80479D58.unk_10.unk_34;
++    result.unk_10_x38_0 = gm_80479D58.unk_10.unk_38_0;
++    result.unk_10_x38_1 = gm_80479D58.unk_10.unk_38_1;
 +    return result;
 +}
 +
@@ -14444,7 +14468,7 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..2444b24137f8aff89ba53aa995831a4e
      lb_800192A8(lb_8001955C);
      lb_8001CC84();
  }
-@@ -190,3 +205,146 @@ void lb_80019AAC(Event arg0)
+@@ -190,3 +205,165 @@ void lb_80019AAC(Event arg0)
  
      lb_80019628();
  }
@@ -14536,6 +14560,25 @@ index 62a9ddb3bb3ebbe42bfd021d99f0e54e66916278..2444b24137f8aff89ba53aa995831a4e
 +    if (!melee_source_cadence_snapshot_boundary()) return result;
 +    result.record = &lb_804329F0;
 +    result.record_bytes = sizeof(lb_804329F0);
++    return result;
++}
++MeleeWebCadenceCpuEndpoint melee_web_source_cadence_cpu_endpoint(void)
++{
++    MeleeWebCadenceCpuEndpoint result = {0};
++    if (!melee_source_cadence_snapshot_boundary()) return result;
++    result.valid = 1;
++    result.x0_0_x0 = lb_804329F0.x0[0].x0;
++    result.x0_0_x8 = lb_804329F0.x0[0].x8;
++    result.x0_0_x10 = lb_804329F0.x0[0].x10;
++    result.x0_1_x0 = lb_804329F0.x0[1].x0;
++    result.x0_1_x8 = lb_804329F0.x0[1].x8;
++    result.x0_1_x10 = lb_804329F0.x0[1].x10;
++    result.x4 = lb_804329F0.x4;
++    result.x38 = lb_804329F0.x38;
++    result.x40 = lb_804329F0.x40;
++    result.x48 = lb_804329F0.x48;
++    result.alarm = &lb_804329F0.alarm;
++    result.alarm_bytes = sizeof(lb_804329F0.alarm);
 +    return result;
 +}
 +MeleeWebSourceCadenceSnapshot* melee_web_source_cadence_snapshot_capture(

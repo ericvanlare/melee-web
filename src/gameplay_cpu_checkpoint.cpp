@@ -136,9 +136,12 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
 bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
     comparison_={};
     auto refuse=[this](CpuComparisonDomain domain,std::uint32_t detail=0){
-        comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};return false;
+        comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};
+        if(phase_==Phase::Correcting)phase_=Phase::Failed;
+        return false;
     };
-    if((phase_!=Phase::Recording&&phase_!=Phase::Replaying)||!same_owner(session))
+    if((phase_!=Phase::Recording&&phase_!=Phase::Replaying&&phase_!=Phase::Correcting)||
+       !same_owner(session))
         return refuse(CpuComparisonDomain::Owner);
     if((!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor)))
         return refuse(CpuComparisonDomain::Owner,(slippi_lobj_failure()|(slippi_tobj_failure()<<16)));
@@ -226,6 +229,51 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSessio
     }
     phase_=result==GameplayCpuCommitResult::Ok?Phase::Replaying:Phase::Failed;
     return result;
+}
+GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
+    const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
+        return GameplayCpuCommitResult::MissingOwner;
+    const auto result=gameplay_cpu_commit_corrected(commit_);
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    if(result==GameplayCpuCommitResult::Ok&&
+       !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
+        phase_=Phase::Failed;
+        return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
+#endif
+    if(result==GameplayCpuCommitResult::Ok&&
+       !slippi_particle_source_reset_after_restore(commit_.particle_anchor)){
+        phase_=Phase::Failed;
+        return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
+    phase_=result==GameplayCpuCommitResult::Ok?Phase::Correcting:Phase::Failed;
+    return result;
+}
+bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session) noexcept {
+    comparison_={};checked_domains_=matched_domains_=0;
+    auto refuse=[this](CpuComparisonDomain domain,std::uint32_t detail=0){
+        comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};
+        phase_=Phase::Failed;
+        return false;
+    };
+    if(phase_!=Phase::Correcting||!same_owner(session)||
+       session.source_frames()!=post_frame_||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor))
+        return refuse(CpuComparisonDomain::Owner,
+                      (slippi_lobj_failure()|(slippi_tobj_failure()<<16)));
+    if(!melee_web_cpu_interval_admit(commit_.effect_token))
+        return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
+    const auto action_failure=melee_web_action_interval_active_failure(commit_.actions);
+    if(action_failure)
+        return refuse(CpuComparisonDomain::Actions,action_failure);
+    if(melee_web_action_interval_seal_corrected(commit_.actions)!=1)
+        return refuse(CpuComparisonDomain::Actions,
+                      melee_web_action_interval_failure_code(commit_.actions));
+    phase_=Phase::CorrectedSealed;
+    return true;
 }
 bool GameplayCpuCheckpoint::matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>& bytes,const AudioRanges& ranges,std::size_t count) noexcept {
     struct Visit {const AudioRanges* ranges;std::size_t count,n;bool failed;};Visit visit{&ranges,count,0,false};

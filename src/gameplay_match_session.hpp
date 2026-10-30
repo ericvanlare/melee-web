@@ -142,6 +142,10 @@ public:
     MeleeWebPipelineSourceContext provenance_context() const;
 #endif
 private:
+#if defined(MELEE_WEB_CPU_ENDPOINT_TEST)
+    friend struct GameplayCpuEndpointTestFixture;
+    GameplayMatchSession() noexcept;
+#endif
     struct Storage;
     std::unique_ptr<Storage> storage_;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)

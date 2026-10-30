@@ -130,7 +130,7 @@ export function planCpuSevenTickCorrection(timeline, baselineRows, localPort, re
     remoteContiguousThrough: state.remote_contiguous_through, replay, frames, remoteRows};
 }
 
-export function decodeCpuSevenTickEvidence(bytes) {
+export function decodeCpuSevenTickEvidence(bytes, expectedSchema = 1) {
   const size = CPU_SEVEN_TICK_EVIDENCE_BYTES, pairSize = CPU_SEVEN_TICK_PAIR_BYTES;
   const diagnosticStride = CPU_SEVEN_TICK_DIAGNOSTIC_BYTES;
   const diagnosticOffset = 91400;
@@ -138,7 +138,7 @@ export function decodeCpuSevenTickEvidence(bytes) {
     throw new Error('Seven-tick evidence extent');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u32 = offset => view.getUint32(offset, true);
-  if (u32(0) !== 1 || u32(4) !== size || u32(8) !== 7)
+  if (![1,2].includes(expectedSchema) || u32(0) !== expectedSchema || u32(4) !== size || u32(8) !== 7)
     throw new Error('Seven-tick evidence schema/mode');
   const b64 = value => encode(value);
   const decodePair = offset => {

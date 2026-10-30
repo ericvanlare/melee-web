@@ -62,6 +62,9 @@ static void refused(MeleeWebMatchFlow* flow,MeleeWebMatchFlowCpuSnapshot* snapsh
  u64 cadence_lifetime=melee_source_cadence_lifetime;
  unsigned a=allocations,f=releases;
  assert(!melee_web_match_flow_cpu_snapshot_restore(flow,snapshot,error,sizeof(error)));
+ const MeleeWebMatchFlowCpuEndpoint endpoint=melee_web_match_flow_cpu_endpoint_read(flow,snapshot);
+ assert(endpoint.status==1&&!endpoint.identity&&!endpoint.epoch&&!endpoint.generation&&
+        !endpoint.source_valid&&!endpoint.complete&&!endpoint.opening_demo);
  assert(melee_source_clock_record_equal(&clock,&gm_80479D58));
  assert(melee_source_cadence_record_equal(&cadence,&lb_804329F0));
  assert(!memcmp(&saved,flow,sizeof(saved)));
@@ -145,6 +148,24 @@ int main(void)
  assert(melee_web_source_cadence_begin());
  MeleeWebMatchFlowCpuSnapshot* pre=melee_web_match_flow_cpu_snapshot_capture(&flow,error,sizeof(error));
  assert(pre&&melee_web_match_flow_cpu_snapshot_matches(&flow,pre,error,sizeof(error)));
+ /* Endpoint read is allocation-free, by value, and observes current values
+  * rather than the pre-snapshot's stored flow values. */
+ unsigned read_allocations=allocations,read_releases=releases;
+ const MeleeWebMatchFlowCpuEndpoint initial=melee_web_match_flow_cpu_endpoint_read(&flow,pre);
+ assert(!initial.status&&initial.identity==(uint64_t)(uintptr_t)&flow&&
+        initial.epoch==owner_epoch&&initial.generation==flow.generation&&
+        initial.source_valid==1&&!initial.complete&&!initial.opening_demo);
+ flow.source_valid=0;flow.complete=1;
+ const MeleeWebMatchFlowCpuEndpoint changed=melee_web_match_flow_cpu_endpoint_read(&flow,pre);
+ assert(!changed.status&&!changed.source_valid&&changed.complete==1&&!changed.opening_demo);
+ /* opening_demo is source scene identity, not a mutable endpoint value. */
+ flow.opening_demo=1;
+ const MeleeWebMatchFlowCpuEndpoint wrong_scene=melee_web_match_flow_cpu_endpoint_read(&flow,pre);
+ assert(wrong_scene.status==1&&!wrong_scene.identity&&!wrong_scene.generation);
+ flow.source_valid=1;flow.complete=0;flow.opening_demo=0;
+ assert(melee_web_match_flow_cpu_endpoint_read(NULL,pre).status==1);
+ assert(melee_web_match_flow_cpu_endpoint_read(&flow,NULL).status==1);
+ assert(read_allocations==allocations&&read_releases==releases);
  u64 immutable_bootstrap_mask=*fixture_bootstrap_mask();*fixture_bootstrap_mask()^=1;
  refused(&flow,pre);assert(*fixture_bootstrap_mask()==(immutable_bootstrap_mask^1));
  *fixture_bootstrap_mask()=immutable_bootstrap_mask;

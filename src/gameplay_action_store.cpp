@@ -49,8 +49,18 @@ struct MeleeWebActionInterval {
     using Cache = melee_web::DatFighterAnimationStore;
     using CacheEntry = Cache::Entry;
 
-    enum class Phase : uint8_t { Captured, Recording, Sealed, Replaying, Finished, Failed, Disarmed };
+    enum class Phase : uint8_t {
+        Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
+        Finished, Failed, Disarmed
+    };
     enum class EventKind : uint8_t { CacheHit, CacheMiss, ActionSelection };
+    static_assert(static_cast<uint32_t>(EventKind::CacheHit)==MELEE_WEB_ACTION_ENDPOINT_CACHE_HIT &&
+                  static_cast<uint32_t>(EventKind::CacheMiss)==MELEE_WEB_ACTION_ENDPOINT_CACHE_MISS &&
+                  static_cast<uint32_t>(EventKind::ActionSelection)==MELEE_WEB_ACTION_ENDPOINT_ACTION_SELECTION);
+    static_assert(sizeof(MeleeWebActionEndpointHeader)==32 && sizeof(MeleeWebActionEndpointBinding)==64 &&
+                  sizeof(MeleeWebActionEndpointSlot)==112 && sizeof(MeleeWebActionEndpointCacheEntry)==32 &&
+                  sizeof(MeleeWebActionEndpointCache)==144 && sizeof(MeleeWebActionEndpointEvent)==152);
+
 
     struct SlotState {
         std::array<std::shared_ptr<Clip>, 2> active;
@@ -65,6 +75,7 @@ struct MeleeWebActionInterval {
         SlotState before;
         SlotState before_lease;
         SlotState after;
+        SlotState corrected_after;
     };
     struct CacheState {
         Store* root = nullptr;
@@ -74,10 +85,12 @@ struct MeleeWebActionInterval {
         std::shared_ptr<const melee_web::DatFighterRuntime> runtime;
         std::array<CacheEntry, 2> before;
         std::array<CacheEntry, 2> after;
+        std::array<CacheEntry, 2> corrected_after;
         Cache::CacheHooks hooks{};
         std::array<std::shared_ptr<const melee_web::DatAnimation>, 2> before_animation_leases;
         std::size_t before_next = 0;
         std::size_t after_next = 0;
+        std::size_t corrected_after_next = 0;
     };
     struct Event {
         EventKind kind = EventKind::ActionSelection;
@@ -106,7 +119,9 @@ struct MeleeWebActionInterval {
     std::array<BindingState, 6> stores{};
     std::vector<CacheState> caches;
     std::vector<Event> events;
+    std::vector<Event> corrected_events;
     std::size_t replay_cursor = 0;
+    bool correction_used = false;
 
     bool initialize()
     {
@@ -299,6 +314,26 @@ struct MeleeWebActionInterval {
         return true;
     }
 
+    bool capture_corrected_after()
+    {
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+        if (interval_test_fail_next_seal_capture) {
+            interval_test_fail_next_seal_capture = false;
+            throw std::bad_alloc();
+        }
+#endif
+        if (!live_bindings() || !live_cache_owners()) return false;
+        for (auto& binding : stores) if (binding.store) {
+            if (!capture_slots(*binding.store, binding.corrected_after) ||
+                binding.before.table != binding.corrected_after.table) return false;
+        }
+        for (auto& cache : caches) {
+            cache.corrected_after = cache.cache->cache_;
+            cache.corrected_after_next = cache.cache->next_;
+        }
+        return true;
+    }
+
     bool state_matches(bool final) const noexcept
     {
         if (!live_bindings() || !live_cache_owners()) return false;
@@ -311,6 +346,173 @@ struct MeleeWebActionInterval {
             if (!same_cache_state(cache, *cache.cache, final)) return false;
         }
         return true;
+    }
+
+    bool state_matches_corrected() const noexcept
+    {
+        if (!live_bindings() || !live_cache_owners()) return false;
+        for (const auto& binding : stores) if (binding.store) {
+            SlotState current;
+            if (!capture_slots(*binding.store, current) ||
+                !same_slot_state(current, binding.corrected_after)) return false;
+        }
+        for (const auto& cache : caches) {
+            bool same = cache.cache->next_ == cache.corrected_after_next;
+            for (std::size_t i = 0; i < cache.corrected_after.size(); ++i) {
+                same = same && same_cache_entry(cache.cache->cache_[i], cache.corrected_after[i]);
+            }
+            if (!same) return false;
+        }
+        return true;
+    }
+
+    template<class T> static T endpoint_refusal(uint32_t status) noexcept
+    { T value{}; value.status = status; return value; }
+    template<class T> static uint64_t endpoint_pointer(T* value) noexcept
+    { return static_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(value)); }
+    static bool endpoint_string(const std::string& text, uint32_t& bytes,
+                                uint64_t& data) noexcept
+    {
+        if (text.size() > UINT32_MAX) return false;
+        bytes = static_cast<uint32_t>(text.size());
+        data = text.empty() ? 0 : endpoint_pointer(text.data());
+        return true;
+    }
+    uint32_t endpoint_phase() const noexcept
+    {
+        if (failure) return MELEE_WEB_ACTION_ENDPOINT_PHASE;
+        if (phase == Phase::Recording && active_interval == this &&
+            events.empty() && corrected_events.empty()) return MELEE_WEB_ACTION_ENDPOINT_OK;
+        if (phase == Phase::Sealed && !active_interval) return MELEE_WEB_ACTION_ENDPOINT_OK;
+        if (phase == Phase::CorrectedSealed && active_interval == this)
+            return MELEE_WEB_ACTION_ENDPOINT_OK;
+        return MELEE_WEB_ACTION_ENDPOINT_PHASE;
+    }
+    const std::vector<Event>& endpoint_tape() const noexcept
+    { return phase == Phase::CorrectedSealed ? corrected_events : events; }
+    uint32_t endpoint_admit() const noexcept
+    {
+        if (const auto status = endpoint_phase()) return status;
+        // Prove raw Store/cache owners live before resident member inspection.
+        if (!live_bindings() || !live_cache_owners() || !resident_correction_owners())
+            return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        if (phase == Phase::Recording ? !state_matches(false) :
+            phase == Phase::Sealed ? !state_matches(true) : !state_matches_corrected())
+            return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        if (caches.size() > UINT32_MAX || endpoint_tape().size() > UINT32_MAX)
+            return MELEE_WEB_ACTION_ENDPOINT_OVERFLOW;
+        return MELEE_WEB_ACTION_ENDPOINT_OK;
+    }
+    // Indexed getters assume the collector's full admit-before/after batch.
+    // Only fixed-width/local owner checks run here, never all cache/event rows.
+    bool endpoint_binding_live(uint32_t index) const noexcept
+    {
+        if (index >= bindings.size()) return false;
+        MeleeWebActionBindingSnapshot current{};
+        return melee_web_action_binding_snapshot(index, &current) &&
+            same_binding(current, bindings[index]);
+    }
+    MeleeWebActionEndpointHeader endpoint_header() const noexcept
+    {
+        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointHeader>(status);
+        if (caches.size() > UINT32_MAX || endpoint_tape().size() > UINT32_MAX)
+            return endpoint_refusal<MeleeWebActionEndpointHeader>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
+        MeleeWebActionEndpointHeader out{};
+        out.schema = 1;
+        out.view = phase == Phase::Recording ? MELEE_WEB_ACTION_ENDPOINT_PRE : MELEE_WEB_ACTION_ENDPOINT_END;
+        out.provenance = phase == Phase::CorrectedSealed ?
+            MELEE_WEB_ACTION_ENDPOINT_CORRECTED : MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+        out.binding_count = static_cast<uint32_t>(bindings.size());
+        out.slots_per_binding = 2;
+        out.cache_count = static_cast<uint32_t>(caches.size());
+        out.event_count = static_cast<uint32_t>(endpoint_tape().size());
+        return out;
+    }
+    MeleeWebActionEndpointBinding endpoint_binding(uint32_t index) const noexcept
+    {
+        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointBinding>(status);
+        if (index >= bindings.size()) return endpoint_refusal<MeleeWebActionEndpointBinding>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        if (!endpoint_binding_live(index)) return endpoint_refusal<MeleeWebActionEndpointBinding>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
+        const auto& b = bindings[index];
+        MeleeWebActionEndpointBinding out{};
+        out.index = index; out.present = b.fighter ? 1 : 0;
+        out.generation = b.generation; out.fighter = endpoint_pointer(b.fighter);
+        out.store = endpoint_pointer(b.context); out.select_callback = endpoint_pointer(b.select);
+        out.transfer_callback = endpoint_pointer(b.transfer);
+        if (stores[index].store) out.table = endpoint_pointer(melee_web_action_fighter_table(b.fighter));
+        return out;
+    }
+    MeleeWebActionEndpointSlot endpoint_slot(uint32_t index, uint32_t slot) const noexcept
+    {
+        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointSlot>(status);
+        if (index >= bindings.size() || slot >= 2) return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        if (!endpoint_binding_live(index)) return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
+        MeleeWebActionEndpointSlot out{}; out.binding = index; out.slot = slot;
+        const auto* store = stores[index].store;
+        if (!store) return out;
+        MeleeWebActionFighterClipState source{};
+        if (!melee_web_action_fighter_clip_state(bindings[index].fighter, &source))
+            return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
+        out.present = 1; out.motion = store->motions_[slot];
+        out.fighter = endpoint_pointer(bindings[index].fighter); out.store = endpoint_pointer(store);
+        out.table = endpoint_pointer(melee_web_action_fighter_table(bindings[index].fighter));
+        out.tree = endpoint_pointer(source.trees[slot]); out.row_identity = endpoint_pointer(source.identities[slot]);
+        const auto& clip = store->active_[slot];
+        if (clip) {
+            out.clip = endpoint_pointer(clip.get()); out.animation = endpoint_pointer(clip->selected.animation.get());
+            out.row_owner = endpoint_pointer(clip->identity_rows.get()); out.command_owner = endpoint_pointer(clip->command_owner.get());
+            out.offset = clip->selected.action.container_offset; out.archive_bytes = clip->selected.action.archive_bytes;
+            if (!endpoint_string(clip->selected.action.symbol, out.symbol_bytes, out.symbol_data))
+                return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
+        }
+        return out;
+    }
+    MeleeWebActionEndpointCache endpoint_cache(uint32_t index) const noexcept
+    {
+        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointCache>(status);
+        if (index >= caches.size()) return endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        const auto& saved = caches[index];
+        const auto* root = store_state(saved.root); // six authored binding slots, fixed bound
+        if (!root || !endpoint_binding_live(root->binding.slot) || saved.owner != saved.root ||
+            saved.cache != &saved.root->store_)
+            return endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
+        const auto& cache = *saved.cache;
+        if (cache.next_ > UINT32_MAX) return endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
+        MeleeWebActionEndpointCache out{}; out.index = index; out.next = static_cast<uint32_t>(cache.next_);
+        out.root = endpoint_pointer(saved.root); out.owner = endpoint_pointer(saved.owner); out.cache = endpoint_pointer(saved.cache);
+        out.runtime = endpoint_pointer(cache.fighter_.get()); out.interval_owner = endpoint_pointer(cache.interval_owner_);
+        out.hit_callback = endpoint_pointer(cache.cache_hooks_.hit); out.miss_replay_callback = endpoint_pointer(cache.cache_hooks_.miss_replay);
+        out.miss_record_callback = endpoint_pointer(cache.cache_hooks_.miss_record);
+        for (unsigned i = 0; i < 2; ++i) {
+            const auto& entry = cache.cache_[i]; auto& row = out.entries[i];
+            row.offset = entry.offset; row.archive_bytes = entry.size; row.native_action = entry.native_action ? 1 : 0;
+            row.animation = endpoint_pointer(entry.animation.get());
+            if (!endpoint_string(entry.symbol, row.symbol_bytes, row.symbol_data))
+                return endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
+        }
+        return out;
+    }
+    MeleeWebActionEndpointEvent endpoint_event(uint32_t index) const noexcept
+    {
+        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointEvent>(status);
+        const auto& tape = endpoint_tape();
+        if (index >= tape.size()) return endpoint_refusal<MeleeWebActionEndpointEvent>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        const auto& event = tape[index];
+        MeleeWebActionEndpointEvent out{}; out.index = index; out.kind = static_cast<uint32_t>(event.kind);
+        out.policy = static_cast<uint32_t>(event.policy); out.cache_hit = event.cache_hit ? 1 : 0;
+        out.motion = event.motion; out.slot = event.slot; out.result_domain = event.result_domain ? 1 : 0;
+        out.cache = endpoint_pointer(event.cache); out.runtime = endpoint_pointer(event.runtime); out.row = endpoint_pointer(event.row);
+        out.animation = endpoint_pointer(event.animation.get()); out.destination = endpoint_pointer(event.destination); out.source = endpoint_pointer(event.source);
+        out.destination_generation = event.destination_generation; out.source_generation = event.source_generation;
+        out.source_table = endpoint_pointer(event.source_table); out.row_owner = endpoint_pointer(event.row_owner.get()); out.clip = endpoint_pointer(event.clip.get());
+        if (event.clip) {
+            const auto& clip = *event.clip;
+            out.animation = endpoint_pointer(clip.selected.animation.get()); out.command_owner = endpoint_pointer(clip.command_owner.get());
+            out.offset = clip.selected.action.container_offset; out.archive_bytes = clip.selected.action.archive_bytes;
+            if (!endpoint_string(clip.selected.action.symbol, out.symbol_bytes, out.symbol_data))
+                return endpoint_refusal<MeleeWebActionEndpointEvent>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
+        }
+        return out;
     }
 
     bool begin()
@@ -350,10 +552,35 @@ struct MeleeWebActionInterval {
         if (!live_cache_owners() || !state_matches(true)) return MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED;
         return MELEE_WEB_ACTION_INTERVAL_OK;
     }
+    uint32_t corrected_validation_failure() const noexcept
+    {
+        if (!live_bindings()) return MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED;
+        if (!live_cache_owners() || !state_matches_corrected())
+            return MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED;
+        return MELEE_WEB_ACTION_INTERVAL_OK;
+    }
     int admit() const noexcept
     {
         return phase == Phase::Sealed && !failure && !active_interval &&
             validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
+    }
+    bool resident_correction_owners() const noexcept
+    {
+        std::size_t live = 0;
+        for (const auto& binding : stores) if (binding.store) {
+            const Store* store = binding.store;
+            if (store->policy_ != melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions ||
+                !store->resident_catalog_ready_ || store->nana_popo_fallback_) return false;
+            ++live;
+        }
+        return live != 0;
+    }
+    int admit_corrected() const noexcept
+    {
+        return phase == Phase::Sealed && !failure && !active_interval &&
+            !correction_used &&
+            validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK &&
+            resident_correction_owners();
     }
     int restore()
     {
@@ -379,6 +606,61 @@ struct MeleeWebActionInterval {
         replay_cursor = 0;
         phase = Phase::Replaying;
         active_interval = this;
+        return 1;
+    }
+
+    int restore_corrected()
+    {
+        if (!admit_corrected()) {
+            uint32_t invalid = MELEE_WEB_ACTION_INTERVAL_BAD_PHASE;
+            if (phase == Phase::Sealed && !failure && !active_interval &&
+                !correction_used) {
+                // The binding ledger must prove raw Store pointers are live
+                // before any resident policy/catalog member is inspected.
+                invalid = validation_failure();
+                if (!invalid) invalid = MELEE_WEB_ACTION_INTERVAL_BAD_PHASE;
+            }
+            fail(invalid);
+            return 0;
+        }
+        /* This commit is swaps only. Corrected tape growth happens later as
+         * source selections execute; a push failure is terminal and checked
+         * before any new Clip or Fighter field is published. */
+        for (auto& state : caches) {
+            state.cache->cache_.swap(state.before);
+            std::swap(state.cache->next_, state.before_next);
+        }
+        for (auto& state : stores) if (state.store) {
+            state.store->active_.swap(state.before.active);
+            state.store->motions_.swap(state.before.motions);
+        }
+        correction_used = true;
+        phase = Phase::Correcting;
+        active_interval = this;
+        return 1;
+    }
+
+    int seal_corrected()
+    {
+        if (phase != Phase::Correcting || active_interval != this) {
+            fail(MELEE_WEB_ACTION_INTERVAL_BAD_PHASE);
+            return 0;
+        }
+        bool captured = false;
+        try { captured = !failure && capture_corrected_after(); }
+        catch (...) {
+            fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED);
+            phase = Phase::Failed;
+            return 0;
+        }
+        if (!captured) {
+            fail(failure ? failure : MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED);
+            phase = Phase::Failed;
+            return 0;
+        }
+        // Keep corrected routing armed until explicit disarm: no action
+        // selection may execute after this immutable endpoint is sealed.
+        phase = Phase::CorrectedSealed;
         return 1;
     }
 
@@ -415,14 +697,16 @@ struct MeleeWebActionInterval {
     void fail(uint32_t code) noexcept
     {
         if (!failure) failure = code ? code : MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED;
+        if (phase == Phase::Correcting || phase == Phase::CorrectedSealed) phase = Phase::Failed;
     }
     void owner_unbound(const Store* store) noexcept
     {
         if (active_interval == this &&
-            (phase == Phase::Recording || phase == Phase::Replaying) && store_state(store))
+            (phase == Phase::Recording || phase == Phase::Replaying ||
+             phase == Phase::Correcting || phase == Phase::CorrectedSealed) && store_state(store))
             fail(MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED);
     }
-    void push(Event&& event) noexcept
+    void push_to(std::vector<Event>& tape, Event&& event) noexcept
     {
         if (failure) return;
         try {
@@ -432,10 +716,13 @@ struct MeleeWebActionInterval {
                 throw std::bad_alloc();
             }
 #endif
-            events.push_back(std::move(event));
+            tape.push_back(std::move(event));
         }
         catch (...) { fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED); }
     }
+    void push(Event&& event) noexcept { push_to(events, std::move(event)); }
+    void push_corrected(Event&& event) noexcept
+    { push_to(corrected_events, std::move(event)); }
 
     bool cache_event_matches(const Event& event, EventKind kind, const Cache* cache,
         const std::shared_ptr<const melee_web::DatFighterRuntime>& runtime,
@@ -466,11 +753,12 @@ struct MeleeWebActionInterval {
         const std::shared_ptr<const melee_web::DatAnimation>& animation) noexcept
     {
         if (!live_cache_owner(cache)) { fail(MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH); return; }
-        if (phase == Phase::Recording) {
+        if (phase == Phase::Recording || phase == Phase::Correcting) {
             Event event; event.kind = EventKind::CacheHit; event.cache = const_cast<Cache*>(cache);
             event.runtime = runtime.get(); event.row = row; event.runtime_owner = runtime;
             event.policy = policy; event.cache_hit = true; event.animation = animation;
-            push(std::move(event));
+            if (phase == Phase::Correcting) push_corrected(std::move(event));
+            else push(std::move(event));
         } else if (phase == Phase::Replaying) {
             Event* event = next_event(EventKind::CacheHit);
             if (event && !cache_event_matches(*event, EventKind::CacheHit, cache, runtime, row, policy, animation)) {
@@ -482,6 +770,10 @@ struct MeleeWebActionInterval {
         const std::shared_ptr<const melee_web::DatFighterRuntime>& runtime,
         const melee_web::DatRuntimeAction* row, melee_web::DatAnimationPolicy policy) noexcept
     {
+        if (phase == Phase::Correcting) {
+            if (!live_cache_owner(cache)) fail(MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH);
+            return {};
+        }
         if (phase != Phase::Replaying) return {};
         if (!live_cache_owner(cache)) { fail(MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH); return {}; }
         Event* event = next_event(EventKind::CacheMiss);
@@ -497,12 +789,13 @@ struct MeleeWebActionInterval {
         const melee_web::DatRuntimeAction* row, melee_web::DatAnimationPolicy policy,
         const std::shared_ptr<const melee_web::DatAnimation>& animation) noexcept
     {
-        if (phase != Phase::Recording) return;
+        if (phase != Phase::Recording && phase != Phase::Correcting) return;
         if (!live_cache_owner(cache)) { fail(MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH); return; }
         Event event; event.kind = EventKind::CacheMiss; event.cache = const_cast<Cache*>(cache);
         event.runtime = runtime.get(); event.row = row; event.runtime_owner = runtime;
         event.policy = policy; event.cache_hit = false; event.animation = animation;
-        push(std::move(event));
+        if (phase == Phase::Correcting) push_corrected(std::move(event));
+        else push(std::move(event));
     }
 
     bool selection_key_matches(const Event& event, Store* destination, Store* source,
@@ -527,7 +820,7 @@ struct MeleeWebActionInterval {
         const std::shared_ptr<MeleeWebNativeActionRows>& row_owner,
         const std::shared_ptr<Clip>& clip) noexcept
     {
-        if (phase != Phase::Recording) return;
+        if (phase != Phase::Recording && phase != Phase::Correcting) return;
         if (!store_state(destination) || !store_state(source) || !row_owner || !clip) {
             fail(MELEE_WEB_ACTION_INTERVAL_SELECTION_MISMATCH);
             return;
@@ -538,7 +831,8 @@ struct MeleeWebActionInterval {
         event.source_generation = source->binding_generation_;
         event.source_table = source_table; event.result_domain = result_domain;
         event.motion = motion; event.slot = slot; event.row_owner = row_owner; event.clip = clip;
-        push(std::move(event));
+        if (phase == Phase::Correcting) push_corrected(std::move(event));
+        else push(std::move(event));
     }
     std::shared_ptr<Clip> replay_selection(Store* destination, Store* source, void* source_table,
         bool result_domain, uint32_t motion, unsigned slot,
@@ -1007,6 +1301,10 @@ int GameplayActionStore::transfer(void* destination_context, void* source_contex
 int GameplayActionStore::select_from(GameplayActionStore& source, int motion, unsigned slot,
     FigaTree** tree, void** identity, char* error, size_t error_size)
 {
+    if (active_interval && active_interval->phase == MeleeWebActionInterval::Phase::CorrectedSealed)
+        active_interval->fail(MELEE_WEB_ACTION_INTERVAL_BAD_PHASE);
+    require(!(active_interval && active_interval->phase == MeleeWebActionInterval::Phase::Failed),
+            "ActionStore interval failed; source selection is terminal until teardown");
     require(motion >= 0 && slot < 2, "Action selection is out of range");
     require(fighter_, "Destination action store is unbound");
     require(bool(source.rows_), "Source action rows are unavailable");
@@ -1031,6 +1329,8 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     std::shared_ptr<DatCommands> command_owner;
     auto selected = source.select_source_action(uint32_t(motion), result_domain,
                                                 &identity_rows, &command_owner);
+    require(!(active_interval && active_interval->phase == MeleeWebActionInterval::Phase::Failed),
+            "ActionStore interval failed before Clip publication");
     // The result table is a second authored motion domain.  Compare the
     // selected row itself so a result clip can be retained in the active
     // slot instead of being compared with the ordinary Pl*AJ row at the
@@ -1064,10 +1364,14 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
         clip->identity_rows = identity_rows;
         clip->command_owner = std::move(command_owner);
     }
-    if (active_interval && active_interval->phase == MeleeWebActionInterval::Phase::Recording) {
+    if (active_interval &&
+        (active_interval->phase == MeleeWebActionInterval::Phase::Recording ||
+         active_interval->phase == MeleeWebActionInterval::Phase::Correcting)) {
         active_interval->record_selection(this, &source, source_table, result_domain,
             uint32_t(motion), slot, identity_rows, clip);
     }
+    require(!(active_interval && active_interval->phase == MeleeWebActionInterval::Phase::Failed),
+            "ActionStore interval failed before Fighter clip publication");
     active_[slot] = clip; motions_[slot] = uint32_t(motion);
     *tree = melee_web_native_clip_tree(clip->native.get());
     /* x5A4/x5A8 are source-row identities in ftData_80085CD8. */
@@ -1150,6 +1454,31 @@ extern "C" int melee_web_action_interval_finish_replay(MeleeWebActionInterval* i
 {
     return interval && interval->finish() == 1;
 }
+extern "C" int melee_web_action_interval_admit_corrected(
+    const MeleeWebActionInterval* interval)
+{
+    return interval && interval->admit_corrected() == 1;
+}
+extern "C" int melee_web_action_interval_restore_corrected(MeleeWebActionInterval* interval)
+{
+    return interval && interval->restore_corrected() == 1;
+}
+extern "C" int melee_web_action_interval_seal_corrected(MeleeWebActionInterval* interval)
+{
+    return interval && interval->seal_corrected() == 1;
+}
+extern "C" uint32_t melee_web_action_interval_endpoint_admit(const MeleeWebActionInterval* value)
+{ return value ? value->endpoint_admit() : MELEE_WEB_ACTION_ENDPOINT_INVALID; }
+extern "C" MeleeWebActionEndpointHeader melee_web_action_interval_endpoint_header(const MeleeWebActionInterval* value)
+{ return value ? value->endpoint_header() : MeleeWebActionInterval::endpoint_refusal<MeleeWebActionEndpointHeader>(MELEE_WEB_ACTION_ENDPOINT_INVALID); }
+extern "C" MeleeWebActionEndpointBinding melee_web_action_interval_endpoint_binding(const MeleeWebActionInterval* value,uint32_t index)
+{ return value ? value->endpoint_binding(index) : MeleeWebActionInterval::endpoint_refusal<MeleeWebActionEndpointBinding>(MELEE_WEB_ACTION_ENDPOINT_INVALID); }
+extern "C" MeleeWebActionEndpointSlot melee_web_action_interval_endpoint_slot(const MeleeWebActionInterval* value,uint32_t index,uint32_t slot)
+{ return value ? value->endpoint_slot(index,slot) : MeleeWebActionInterval::endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_INVALID); }
+extern "C" MeleeWebActionEndpointCache melee_web_action_interval_endpoint_cache(const MeleeWebActionInterval* value,uint32_t index)
+{ return value ? value->endpoint_cache(index) : MeleeWebActionInterval::endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_INVALID); }
+extern "C" MeleeWebActionEndpointEvent melee_web_action_interval_endpoint_event(const MeleeWebActionInterval* value,uint32_t index)
+{ return value ? value->endpoint_event(index) : MeleeWebActionInterval::endpoint_refusal<MeleeWebActionEndpointEvent>(MELEE_WEB_ACTION_ENDPOINT_INVALID); }
 extern "C" int melee_web_action_interval_matches_finished(const MeleeWebActionInterval* interval)
 {
     return interval && interval->phase == MeleeWebActionInterval::Phase::Finished &&
@@ -1161,7 +1490,8 @@ extern "C" uint32_t melee_web_action_interval_active_failure(const MeleeWebActio
     if (!interval) return MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED;
     if (interval->failure) return interval->failure;
     if ((interval->phase != MeleeWebActionInterval::Phase::Recording &&
-         interval->phase != MeleeWebActionInterval::Phase::Replaying) ||
+         interval->phase != MeleeWebActionInterval::Phase::Replaying &&
+         interval->phase != MeleeWebActionInterval::Phase::Correcting) ||
         active_interval != interval) return MELEE_WEB_ACTION_INTERVAL_BAD_PHASE;
     if (!interval->live_bindings()) return MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED;
     if (!interval->live_cache_owners()) return MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED;
@@ -1177,6 +1507,9 @@ extern "C" uint32_t melee_web_action_interval_failure_code(const MeleeWebActionI
          interval->phase == MeleeWebActionInterval::Phase::Replaying) &&
         interval->validation_failure() != MELEE_WEB_ACTION_INTERVAL_OK)
         return interval->validation_failure();
+    if (interval->phase == MeleeWebActionInterval::Phase::CorrectedSealed &&
+        interval->corrected_validation_failure() != MELEE_WEB_ACTION_INTERVAL_OK)
+        return interval->corrected_validation_failure();
     return MELEE_WEB_ACTION_INTERVAL_OK;
 }
 extern "C" void melee_web_action_interval_disarm(MeleeWebActionInterval* interval)

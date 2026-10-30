@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 namespace melee_web {
+class GameplayCpuEndpointReader;
 /* Private fixed one/two/seven-tick CPU capsule. It owns pre/post evidence and typed
  * snapshots, never a renderer or arbitrary Wasm-memory snapshot. The fixture
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
@@ -37,6 +38,8 @@ public:
     bool interval_boundary(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
+    GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
+    bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
@@ -51,7 +54,12 @@ public:
     std::uint32_t matched_domains() const noexcept {return matched_domains_;}
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
 private:
-    enum class Phase { Captured, Recording, Sealed, Replaying, Finished, Failed, Retired };
+    friend class GameplayCpuEndpointReader;
+#if defined(MELEE_WEB_CPU_ENDPOINT_TEST)
+    friend struct GameplayCpuEndpointTestFixture;
+#endif
+    enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
+                       Finished, Failed, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
     const CpuCheckpointSpan span_;

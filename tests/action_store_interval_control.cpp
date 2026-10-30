@@ -342,29 +342,20 @@ void run_retention_gate(bool corrected)
                   "Resident action selection allocated a native Clip after preparation");
             check(melee_web_action_interval_seal_record(interval) == 1 &&
                   melee_web_action_interval_admit(interval) == 1 &&
-                  melee_web_action_interval_restore(interval) == 1,
-                  "Existing ActionStore capsule could not restore the A branch prestate");
+                  melee_web_action_interval_admit_corrected(interval) == 1 &&
+                  melee_web_action_interval_restore_corrected(interval) == 1,
+                  "ActionStore capsule could not enter admitted corrected recording from A");
             gate_result.destroys_after_restore = melee_web_action_interval_test_clip_destroy_count();
             melee_web_action_interval_test_set_fighter_clip_state(h.p2, &baseline_p2);
             check(h.store2.selected_motion(1) == 14 &&
                   gate_slot(h.p2, 1, 14).tree == gate_result.pre_p2.tree &&
                   gate_slot(h.p2, 1, 14).row_identity == gate_result.pre_p2.row_identity,
                   "Modeled later Fighter-payload owner did not restore Wait14 pointer fields");
-            melee_web_action_interval_disarm(interval);
-            check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_DISARMED,
-                  "Corrected-branch journal did not explicitly disarm after restore");
-            gate_result.destroys_after_disarm = melee_web_action_interval_test_clip_destroy_count();
             gate_result.branch_a_after_restore = gate_tree(
                 reinterpret_cast<FigaTree*>(gate_result.branch_a.tree),
                 reinterpret_cast<void*>(gate_result.branch_a.row_identity), action_a);
             gate_result.a_lease_unchanged_after_restore =
                 same_gate_tree(gate_result.branch_a, gate_result.branch_a_after_restore);
-            gate_result.a_lease_unchanged_after_disarm =
-                gate_result.destroys_after_a == gate_result.destroys_after_restore &&
-                gate_result.destroys_after_restore == gate_result.destroys_after_disarm &&
-                gate_result.a_lease_unchanged_after_restore;
-            check(gate_result.a_lease_unchanged_after_disarm,
-                  "Restore or disarm released/changed the speculative A source lease");
         } else {
             /* The clean lane goes through the same capture/begin setup, then
              * retires an empty journal before its first post-boundary load. */
@@ -374,14 +365,35 @@ void run_retention_gate(bool corrected)
             gate_result.destroys_after_disarm = melee_web_action_interval_test_clip_destroy_count();
         }
 
+        /* Both lanes take the same source cache-hit then cache-miss path to B.
+         * In the corrected lane this stays inside the distinct correction tape. */
+        h.load(h.p2, 14, 1);
         h.load(h.p2, int(action_b), 1);
         check(h.store2.selected_motion(1) == action_b,
               "Authoritative branch did not select authored action B");
+        if (corrected) {
+            check(melee_web_action_interval_active_failure(interval) == MELEE_WEB_ACTION_INTERVAL_OK &&
+                  melee_web_action_interval_seal_corrected(interval) == 1 &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+                  "Corrected B selection did not seal as its separate source tape");
+        }
         gate_result.endpoint_p2 = gate_slot(h.p2, 1, action_b);
         gate_result.creates_after_endpoint = melee_web_action_interval_test_clip_create_count();
         gate_result.destroys_after_endpoint = melee_web_action_interval_test_clip_destroy_count();
         check(gate_result.creates_after_endpoint == gate_result.creates_before_branch,
               "Resident action selection allocated a native Clip after preparation");
+        if (corrected) {
+            melee_web_action_interval_disarm(interval);
+            check(melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_DISARMED,
+                  "Corrected-branch journal did not disarm after its B endpoint was sealed");
+            gate_result.destroys_after_disarm = melee_web_action_interval_test_clip_destroy_count();
+            gate_result.a_lease_unchanged_after_disarm =
+                gate_result.destroys_after_a == gate_result.destroys_after_restore &&
+                gate_result.destroys_after_restore == gate_result.destroys_after_disarm &&
+                gate_result.a_lease_unchanged_after_restore;
+            check(gate_result.a_lease_unchanged_after_disarm,
+                  "Restore or disarm released/changed the speculative A source lease");
+        }
 
         /* Disarm first, retire the real source stores, then destroy the
          * capsule. The A tree is still readable only while the capsule leases
@@ -664,6 +676,398 @@ void verify_resident_action_catalog()
           "Resident private policy admitted Nana/Popo fallback ownership");
 }
 
+template<class T> void endpoint_refusal_zero(const T& result, uint32_t status)
+{
+    T expected{}; expected.status = status;
+    check(result.status == status && std::memcmp(&result, &expected, sizeof(T)) == 0,
+          "Endpoint refusal returned metadata or the wrong status");
+}
+void verify_action_endpoint_getters()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_header(nullptr), MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_binding(nullptr, 0), MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_slot(nullptr, 0, 0), MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_cache(nullptr, 0), MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_event(nullptr, 0), MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    check(melee_web_action_interval_endpoint_admit(nullptr) == MELEE_WEB_ACTION_ENDPOINT_INVALID,
+          "Null endpoint admission succeeded");
+    Harness h(Policy::ResidentOrdinaryActions); h.prepare_wait_only();
+    MeleeWebActionFighterClipState before_p2{};
+    check(melee_web_action_fighter_clip_state(h.p2, &before_p2), "Endpoint source baseline unavailable");
+    auto* interval = melee_web_action_interval_capture();
+    check(interval, "Endpoint capsule capture failed");
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_header(interval), MELEE_WEB_ACTION_ENDPOINT_PHASE);
+    check(melee_web_action_interval_begin_record(interval) == 1, "Endpoint record failed");
+    auto read_batch = [&](uint32_t expected_view, uint32_t expected_provenance) {
+        const State before = state(h);
+        const auto failure_before = melee_web_action_interval_failure_code(interval);
+        watched_allocations = 0; watched_deallocations = 0; watch_allocations = true;
+        fail_next_allocation = true;
+        check(melee_web_action_interval_endpoint_admit(interval) == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Actual endpoint full admission failed");
+        const auto header = melee_web_action_interval_endpoint_header(interval);
+        check(header.status == 0 && header.schema == 1 && header.view == expected_view &&
+                  header.provenance == expected_provenance && header.binding_count == 6 &&
+                  header.slots_per_binding == 2 && header.cache_count == 2,
+              "Endpoint header counts/provenance drifted");
+        uint32_t live = 0, action_events = 0;
+        for (uint32_t i = 0; i < header.binding_count; ++i) {
+            const auto binding = melee_web_action_interval_endpoint_binding(interval, i);
+            MeleeWebActionBindingSnapshot actual{};
+            check(melee_web_action_binding_snapshot(i, &actual) && binding.status == 0 &&
+                      binding.index == i && binding.generation == actual.generation &&
+                      binding.fighter == reinterpret_cast<std::uintptr_t>(actual.fighter) &&
+                      binding.store == reinterpret_cast<std::uintptr_t>(actual.context),
+                  "Endpoint binding differs from actual source binding");
+            live += binding.present;
+            for (uint32_t slot = 0; slot < 2; ++slot) {
+                const auto value = melee_web_action_interval_endpoint_slot(interval, i, slot);
+                check(value.status == 0 && value.binding == i && value.slot == slot && value.present == binding.present,
+                      "Endpoint slot identity drifted");
+                if (!binding.present) continue;
+                auto* fighter = actual.fighter;
+                MeleeWebActionFighterClipState clips{};
+                check(melee_web_action_fighter_clip_state(fighter, &clips) &&
+                          value.tree == reinterpret_cast<std::uintptr_t>(clips.trees[slot]) &&
+                          value.row_identity == reinterpret_cast<std::uintptr_t>(clips.identities[slot]),
+                      "Endpoint slot lost actual source tree/row identity");
+                if (value.clip) {
+                    const auto& runtime = fighter == h.p1 ? h.store1.runtime() : h.store2.runtime();
+                    const auto& row = runtime.action(value.motion);
+                    check(value.symbol_bytes == row.symbol.size() &&
+                              (!value.symbol_bytes || std::memcmp(reinterpret_cast<const void*>(std::uintptr_t(value.symbol_data)),
+                                                                  row.symbol.data(), value.symbol_bytes) == 0),
+                          "Endpoint slot string transport changed authored key bytes");
+                }
+            }
+        }
+        check(live == 2, "Endpoint lost a live source binding");
+        for (uint32_t i = 0; i < header.cache_count; ++i) {
+            const auto cache = melee_web_action_interval_endpoint_cache(interval, i);
+            check(cache.status == 0 && cache.index == i && cache.next < 2 && cache.root &&
+                      cache.owner == cache.root && cache.cache && cache.runtime &&
+                      cache.interval_owner == cache.owner && cache.hit_callback &&
+                      cache.miss_replay_callback && cache.miss_record_callback,
+                  "Endpoint logical cache owner/hooks lost exact identity");
+            for (const auto& entry : cache.entries)
+                check(!entry.animation || (entry.native_action == 1 && entry.symbol_bytes && entry.symbol_data),
+                      "Endpoint cache entry transport is incomplete");
+        }
+        for (uint32_t i = 0; i < header.event_count; ++i) {
+            const auto event = melee_web_action_interval_endpoint_event(interval, i);
+            check(event.status == 0 && event.index == i && event.kind <= MELEE_WEB_ACTION_ENDPOINT_ACTION_SELECTION,
+                  "Endpoint event kind/order/extent drifted");
+            if (event.kind == MELEE_WEB_ACTION_ENDPOINT_ACTION_SELECTION) {
+                ++action_events;
+                check(event.source && event.destination && event.source_generation && event.destination_generation &&
+                          event.source_table && event.row_owner && event.clip && event.command_owner &&
+                          !event.result_domain && event.slot < 2,
+                      "Endpoint action event lost source/domain/row/command provenance");
+                const auto& row = h.store2.runtime().action(event.motion);
+                check(event.offset == row.container_offset && event.archive_bytes == row.archive_bytes &&
+                          event.symbol_bytes == row.symbol.size() &&
+                          (!event.symbol_bytes || std::memcmp(reinterpret_cast<const void*>(std::uintptr_t(event.symbol_data)),
+                                                              row.symbol.data(), event.symbol_bytes) == 0),
+                      "Endpoint actual requested action row changed");
+            } else {
+                check(event.cache && event.runtime && event.row && event.animation &&
+                          event.cache_hit == (event.kind == MELEE_WEB_ACTION_ENDPOINT_CACHE_HIT),
+                      "Endpoint cache event lost exact key identity");
+            }
+        }
+        check((expected_view == MELEE_WEB_ACTION_ENDPOINT_PRE) == (header.event_count == 0) &&
+                  (expected_view == MELEE_WEB_ACTION_ENDPOINT_PRE || action_events != 0),
+              "Endpoint selected the wrong reference/corrected journal");
+        endpoint_refusal_zero(melee_web_action_interval_endpoint_binding(interval, 6), MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        endpoint_refusal_zero(melee_web_action_interval_endpoint_slot(interval, 0, 2), MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        endpoint_refusal_zero(melee_web_action_interval_endpoint_cache(interval, header.cache_count), MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        endpoint_refusal_zero(melee_web_action_interval_endpoint_event(interval, header.event_count), MELEE_WEB_ACTION_ENDPOINT_INDEX);
+        check(melee_web_action_interval_endpoint_admit(interval) == 0,
+              "Endpoint post-batch owner admission failed");
+        const bool allocation_guard_unused = fail_next_allocation.exchange(false);
+        watch_allocations = false;
+        check(allocation_guard_unused && watched_allocations == 0 && watched_deallocations == 0 &&
+                  same(state(h), before) && melee_web_action_interval_failure_code(interval) == failure_before,
+              "Endpoint getter allocated, released, mutated source state or latched a failure");
+    };
+    read_batch(MELEE_WEB_ACTION_ENDPOINT_PRE, MELEE_WEB_ACTION_ENDPOINT_REFERENCE);
+    h.load(h.p2, ftMr_SM_SpecialN, 1);
+    h.load(h.p2, ftCo_SM_AttackS4, 1);
+    h.load(h.p2, 14, 1);
+    check(melee_web_action_interval_seal_record(interval) == 1, "Endpoint reference seal failed");
+    read_batch(MELEE_WEB_ACTION_ENDPOINT_END, MELEE_WEB_ACTION_ENDPOINT_REFERENCE);
+    check(melee_web_action_interval_restore_corrected(interval) == 1, "Endpoint corrected restore failed");
+    melee_web_action_interval_test_set_fighter_clip_state(h.p2, &before_p2);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_header(interval), MELEE_WEB_ACTION_ENDPOINT_PHASE);
+    h.load(h.p2, ftCo_SM_AttackS4, 1);
+    check(melee_web_action_interval_seal_corrected(interval) == 1, "Endpoint corrected seal failed");
+    read_batch(MELEE_WEB_ACTION_ENDPOINT_END, MELEE_WEB_ACTION_ENDPOINT_CORRECTED);
+    melee_web_action_interval_disarm(interval);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_header(interval), MELEE_WEB_ACTION_ENDPOINT_PHASE);
+    h.store1.unbind(); h.store2.unbind(); melee_web_action_interval_destroy(interval);
+}
+
+void verify_corrected_recording()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    constexpr auto predicted_action = std::uint32_t(ftMr_SM_SpecialN);
+    constexpr auto corrected_action = std::uint32_t(ftCo_SM_AttackS4);
+    MeleeWebActionInterval* interval = nullptr;
+    State corrected_endpoint{};
+    GateTreeWitness predicted_lease{};
+    std::uint64_t creates_before = 0, destroys_before = 0;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        const State baseline = state(h);
+        MeleeWebActionFighterClipState p2_baseline{};
+        check(melee_web_action_fighter_clip_state(h.p2, &p2_baseline),
+              "Could not capture corrected-branch Fighter payload baseline");
+        creates_before = melee_web_action_interval_test_clip_create_count();
+        destroys_before = melee_web_action_interval_test_clip_destroy_count();
+        interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not begin predicted action branch for corrected recording");
+        h.load(h.p2, int(predicted_action), 1);
+        check(h.store2.selected_motion(1) == predicted_action &&
+                  melee_web_action_interval_seal_record(interval) == 1 &&
+                  melee_web_action_interval_admit_corrected(interval) == 1,
+              "Predicted authored action did not seal for corrected recording admission");
+        predicted_lease = gate_slot(h.p2, 1, predicted_action);
+        check(melee_web_action_interval_restore_corrected(interval) == 1 &&
+                  h.store2.selected_motion(1) == 14,
+              "Corrected recording did not restore the original ActionStore prestate");
+        /* The interval owns ActionStore slots/cache only. Model the later
+         * source-payload owner before taking the corrected branch. */
+        melee_web_action_interval_test_set_fighter_clip_state(h.p2, &p2_baseline);
+        check(same(state(h), baseline),
+              "Corrected branch did not begin from the original Fighter payload");
+
+        /* Wait14 is an actual cache hit, then the new B row is a miss. Both
+         * and their source selection keys belong to the fresh corrected tape. */
+        h.load(h.p2, 14, 1);
+        check(melee_web_action_interval_active_failure(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Corrected cache-hit event was not accepted");
+        h.load(h.p2, int(corrected_action), 1);
+        check(h.store2.selected_motion(1) == corrected_action &&
+                  corrected_action != predicted_action &&
+                  melee_web_action_interval_active_failure(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Corrected branch did not record a different authored action after its cache miss");
+        check(melee_web_action_interval_seal_corrected(interval) == 1 &&
+                  melee_web_action_interval_failure_code(interval) == MELEE_WEB_ACTION_INTERVAL_OK,
+              "Fresh corrected hit/miss/action tape did not seal independently of predicted A");
+        corrected_endpoint = state(h);
+        check(melee_web_action_interval_test_clip_create_count() == creates_before &&
+                  melee_web_action_interval_test_clip_destroy_count() == destroys_before,
+              "Resident corrected recording created or released a Clip");
+
+        // No post-seal action may execute, even if a later A->B->A cycle
+        // would otherwise restore identical endpoint values. Use the actual
+        // checked callback; original void source load must still abort on0.
+        MeleeWebActionBindingSnapshot binding{};
+        check(melee_web_action_binding_for_context(&h.store2, &binding) == 1,
+              "Sealed correction lost its actual binding");
+        for (int motion : {int(predicted_action), int(corrected_action)}) {
+            auto* tree = reinterpret_cast<FigaTree*>(std::uintptr_t(1));
+            void* identity = reinterpret_cast<void*>(std::uintptr_t(2));
+            char error[256]{};
+            check(binding.select(binding.context, motion, 1, &tree, &identity,
+                                 error, sizeof(error)) == 0 && error[0] &&
+                      tree == reinterpret_cast<FigaTree*>(std::uintptr_t(1)) &&
+                      identity == reinterpret_cast<void*>(std::uintptr_t(2)) &&
+                      same(state(h), corrected_endpoint) &&
+                      melee_web_action_interval_failure_code(interval) ==
+                          MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,
+                  "Sealed correction permitted unjournaled action or lost sticky refusal");
+        }
+        check(melee_web_action_interval_seal_corrected(interval) == 0 &&
+                  melee_web_action_interval_failure_code(interval) ==
+                      MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,
+              "Post-seal refusal resumed corrected recording");
+        melee_web_action_interval_disarm(interval);
+        h.store1.unbind();
+        h.store2.unbind();
+    }
+    const auto destroys_after_owner_retirement = melee_web_action_interval_test_clip_destroy_count();
+    const auto predicted_after_owner_retirement = gate_tree(
+        reinterpret_cast<FigaTree*>(predicted_lease.tree),
+        reinterpret_cast<void*>(predicted_lease.row_identity), predicted_action);
+    check(same_gate_tree(predicted_lease, predicted_after_owner_retirement),
+          "Predicted borrowed tree was not retained through source-owner retirement");
+    melee_web_action_interval_destroy(interval);
+    check(melee_web_action_interval_test_clip_destroy_count() > destroys_after_owner_retirement,
+          "Corrected and predicted Clip leases did not release after source-owner retirement");
+    check(corrected_endpoint.p2_motion == corrected_action,
+          "Corrected endpoint witness lost the different authored action key");
+}
+
+void verify_corrected_recording_failure_refuses_publication()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    constexpr auto predicted_action = std::uint32_t(ftMr_SM_SpecialN);
+    constexpr auto corrected_action = std::uint32_t(ftCo_SM_AttackS4);
+    MeleeWebActionInterval* interval = nullptr;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        const State baseline = state(h);
+        MeleeWebActionFighterClipState p2_baseline{};
+        check(melee_web_action_fighter_clip_state(h.p2, &p2_baseline),
+              "Could not capture allocation-failure Fighter baseline");
+        interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Could not begin corrected event-allocation control");
+        h.load(h.p2, int(predicted_action), 1);
+        check(melee_web_action_interval_seal_record(interval) == 1 &&
+                  melee_web_action_interval_admit_corrected(interval) == 1 &&
+                  melee_web_action_interval_restore_corrected(interval) == 1,
+              "Could not restore predicted action before corrected event-allocation control");
+        melee_web_action_interval_test_set_fighter_clip_state(h.p2, &p2_baseline);
+        check(same(state(h), baseline),
+              "Allocation-failure branch did not restore the original Fighter payload");
+
+        // The original void action loader aborts on callback refusal. Exercise
+        // its actual checked binding callback directly for expected negatives;
+        // production fail-loud semantics stay unchanged.
+        auto refused_load = [&](int motion) {
+            MeleeWebActionBindingSnapshot binding{};
+            check(melee_web_action_binding_for_context(&h.store2, &binding) == 1 &&
+                      binding.fighter == h.p2 && binding.select,
+                  "Expected-refusal control lost its actual source binding");
+            auto* tree = reinterpret_cast<FigaTree*>(std::uintptr_t(1));
+            void* identity = reinterpret_cast<void*>(std::uintptr_t(2));
+            char error[256]{};
+            check(binding.select(binding.context, motion, 1, &tree, &identity,
+                                 error, sizeof(error)) == 0 && error[0] &&
+                      tree == reinterpret_cast<FigaTree*>(std::uintptr_t(1)) &&
+                      identity == reinterpret_cast<void*>(std::uintptr_t(2)),
+                  "Failed actual selection callback published outputs or hid refusal");
+        };
+        melee_web_action_interval_test_fail_next_event_push();
+        refused_load(int(corrected_action));
+        check(same(state(h), baseline) &&
+                  melee_web_action_interval_active_failure(interval) ==
+                      MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+              "Corrected event allocation failure published a borrowed Fighter pointer");
+        refused_load(int(predicted_action));
+        check(same(state(h), baseline) &&
+                  melee_web_action_interval_failure_code(interval) ==
+                      MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+              "Selection resumed after terminal corrected event allocation failure");
+        check(melee_web_action_interval_seal_corrected(interval) == 0,
+              "Failed corrected event tape was accepted at seal");
+        refused_load(int(corrected_action));
+        check(same(state(h), baseline) &&
+                  melee_web_action_interval_failure_code(interval) ==
+                      MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED,
+              "Selection resumed after failed corrected seal entered its terminal phase");
+        melee_web_action_interval_disarm(interval);
+        h.store1.unbind();
+        h.store2.unbind();
+    }
+    melee_web_action_interval_destroy(interval);
+}
+
+void verify_corrected_admission_refusals()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    constexpr auto predicted_action = std::uint32_t(ftMr_SM_SpecialN);
+    MeleeWebActionInterval* captured_phase = nullptr;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        const State before = state(h);
+        captured_phase = melee_web_action_interval_capture();
+        check(captured_phase && !melee_web_action_interval_admit_corrected(captured_phase) &&
+                  !melee_web_action_interval_restore_corrected(captured_phase) && same(state(h), before) &&
+                  melee_web_action_interval_failure_code(captured_phase) == MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,
+              "Corrected restore accepted the wrong Captured phase or wrote source state");
+        melee_web_action_interval_disarm(captured_phase);
+        h.store1.unbind();
+        h.store2.unbind();
+    }
+    melee_web_action_interval_destroy(captured_phase);
+
+    MeleeWebActionInterval* stale_binding = nullptr;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        stale_binding = melee_web_action_interval_capture();
+        check(stale_binding && melee_web_action_interval_begin_record(stale_binding) == 1,
+              "Could not begin stale-binding corrected-admission control");
+        h.load(h.p1, int(predicted_action), 0);
+        check(melee_web_action_interval_seal_record(stale_binding) == 1,
+              "Could not seal stale-binding corrected-admission control");
+        h.store1.unbind();
+        h.store1.bind(h.p1);
+        melee_web_action_interval_test_set_fighter_table(h.p1, h.store1.action_rows());
+        const State before = state(h);
+        check(!melee_web_action_interval_admit_corrected(stale_binding) &&
+                  !melee_web_action_interval_restore_corrected(stale_binding) && same(state(h), before) &&
+                  melee_web_action_interval_failure_code(stale_binding) ==
+                      MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED,
+              "Corrected restore crossed a stale binding generation or wrote source state");
+        melee_web_action_interval_disarm(stale_binding);
+        h.store1.unbind();
+        h.store2.unbind();
+    }
+    melee_web_action_interval_destroy(stale_binding);
+
+    MeleeWebActionInterval* repeated = nullptr;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        repeated = melee_web_action_interval_capture();
+        check(repeated && melee_web_action_interval_begin_record(repeated) == 1,
+              "Could not begin repeat-correction control");
+        h.load(h.p1, int(predicted_action), 0);
+        check(melee_web_action_interval_seal_record(repeated) == 1 &&
+                  melee_web_action_interval_admit_corrected(repeated) == 1 &&
+                  melee_web_action_interval_restore_corrected(repeated) == 1,
+              "Could not enter the one-shot corrected phase for repeat control");
+        h.load(h.p1, 14, 0);
+        check(melee_web_action_interval_seal_corrected(repeated) == 1,
+              "Could not seal the first corrected phase for repeat control");
+        const State before = state(h);
+        check(!melee_web_action_interval_admit_corrected(repeated) &&
+                  !melee_web_action_interval_restore_corrected(repeated) && same(state(h), before) &&
+                  melee_web_action_interval_failure_code(repeated) == MELEE_WEB_ACTION_INTERVAL_BAD_PHASE,
+              "A second corrected recording was admitted or mutated source state");
+        melee_web_action_interval_disarm(repeated);
+        h.store1.unbind();
+        h.store2.unbind();
+    }
+    melee_web_action_interval_destroy(repeated);
+}
+
+void verify_corrected_retired_store_refusal()
+{
+    MeleeWebActionInterval* interval = nullptr;
+    {
+        Harness h(melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        interval = melee_web_action_interval_capture();
+        check(interval && melee_web_action_interval_begin_record(interval) == 1,
+              "Retired-store correction setup failed");
+        h.load(h.p1, ftMr_SM_SpecialN, 0);
+        check(melee_web_action_interval_seal_record(interval) == 1,
+              "Retired-store predicted endpoint did not seal");
+    } // Binding rows retire and the actual C++ stores are destroyed here.
+    check(melee_web_action_interval_endpoint_admit(interval) == MELEE_WEB_ACTION_ENDPOINT_OWNER,
+          "Endpoint full admission accepted retired stores");
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_binding(interval, 0), MELEE_WEB_ACTION_ENDPOINT_OWNER);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_slot(interval, 0, 0), MELEE_WEB_ACTION_ENDPOINT_OWNER);
+    endpoint_refusal_zero(melee_web_action_interval_endpoint_cache(interval, 0), MELEE_WEB_ACTION_ENDPOINT_OWNER);
+    check(melee_web_action_interval_admit_corrected(interval) == 0 &&
+              melee_web_action_interval_restore_corrected(interval) == 0 &&
+              melee_web_action_interval_failure_code(interval) ==
+                  MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED,
+          "Corrected admission dereferenced retired store or lost binding refusal");
+    melee_web_action_interval_disarm(interval);
+    melee_web_action_interval_destroy(interval);
+}
+
 void verify_active_binding_guard()
 {
     Harness h;h.prepare();auto* interval=melee_web_action_interval_capture();
@@ -930,6 +1334,11 @@ int main(int argc, char** argv)
         verify_round_trip(melee_web::GameplayActionStorePolicy::Legacy);
         verify_round_trip(melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
         verify_resident_action_catalog();
+        verify_action_endpoint_getters();
+        verify_corrected_recording();
+        verify_corrected_recording_failure_refuses_publication();
+        verify_corrected_admission_refusals();
+        verify_corrected_retired_store_refusal();
         verify_active_binding_guard();
         verify_capture_failure_is_read_only();
         verify_event_allocation_failure_refuses_admission();

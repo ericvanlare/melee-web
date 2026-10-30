@@ -7,9 +7,15 @@
 #include "../../../tests/gameplay_snapshot_probe.cpp"
 #if defined(MELEE_WEB_SYNCTEST_CPU_RESTORE)
 #include "gameplay_cpu_checkpoint.hpp"
+#include "gameplay_cpu_endpoint.hpp"
 #include "gameplay_match_clock.h"
 #include <emscripten/heap.h>
-namespace { bool cpu_native_active(); }
+#define MELEE_WEB_SYNCTEST_CORRECTED_CPU 1
+namespace {
+bool cpu_native_active();
+bool cpu_corrected_active();
+void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>&);
+}
 #endif
 
 #include "slippi_profile/profile.h"
@@ -1118,6 +1124,7 @@ melee_web_synctest_payload_admission_command(uint32_t command)
 // END MELEE_WEB_SOURCE_PAYLOAD_ADMISSION_ADAPTER
 
 #include "cpu_restore_adapter.inc"
+#include "cpu_corrected_adapter.inc"
 
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_renderer_shutdown(void)
 {

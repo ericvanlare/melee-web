@@ -69,6 +69,63 @@ int melee_web_action_interval_admit(const MeleeWebActionInterval*);
  * later source-payload owner restores Fighter x590/x598/x5A4/x5A8 fields. */
 int melee_web_action_interval_restore(MeleeWebActionInterval*);
 int melee_web_action_interval_finish_replay(MeleeWebActionInterval*);
+/* One-shot corrected recording for an admitted resident-action interval.
+ * The corrected tape and endpoint are separate from exact-replay evidence;
+ * this component does not restore the Fighter source payload or accept a
+ * corrected endpoint against an authoritative reference. */
+int melee_web_action_interval_admit_corrected(const MeleeWebActionInterval*);
+int melee_web_action_interval_restore_corrected(MeleeWebActionInterval*);
+int melee_web_action_interval_seal_corrected(MeleeWebActionInterval*);
+/* Private read-only endpoint transport. These are internal C APIs, never
+ * direct Web exports. The trusted synchronous collector must call admit
+ * before AND after a getter batch, with no source work/yield between them.
+ * Transport string addresses name bytes to copy, not semantic identities.
+ * All getters return POD by value; refusal has status!=0 and zero metadata. */
+typedef enum MeleeWebActionEndpointStatus {
+    MELEE_WEB_ACTION_ENDPOINT_OK=0, MELEE_WEB_ACTION_ENDPOINT_INVALID=1,
+    MELEE_WEB_ACTION_ENDPOINT_PHASE=2, MELEE_WEB_ACTION_ENDPOINT_OWNER=3,
+    MELEE_WEB_ACTION_ENDPOINT_INDEX=4, MELEE_WEB_ACTION_ENDPOINT_OVERFLOW=5
+} MeleeWebActionEndpointStatus;
+enum { MELEE_WEB_ACTION_ENDPOINT_PRE=1, MELEE_WEB_ACTION_ENDPOINT_END=2,
+       MELEE_WEB_ACTION_ENDPOINT_REFERENCE=1, MELEE_WEB_ACTION_ENDPOINT_CORRECTED=2,
+       MELEE_WEB_ACTION_ENDPOINT_CACHE_HIT=0, MELEE_WEB_ACTION_ENDPOINT_CACHE_MISS=1,
+       MELEE_WEB_ACTION_ENDPOINT_ACTION_SELECTION=2 };
+typedef struct MeleeWebActionEndpointHeader {
+    uint32_t status,schema,view,provenance;
+    uint32_t binding_count,slots_per_binding,cache_count,event_count;
+} MeleeWebActionEndpointHeader;
+typedef struct MeleeWebActionEndpointBinding {
+    uint32_t status,index,present,reserved;
+    uint64_t generation,fighter,store,select_callback,transfer_callback,table;
+} MeleeWebActionEndpointBinding;
+typedef struct MeleeWebActionEndpointSlot {
+    uint32_t status,binding,slot,present,motion,offset,archive_bytes,symbol_bytes;
+    uint64_t fighter,store,table,clip,tree,row_identity,animation,row_owner,command_owner;
+    uint64_t symbol_data;
+} MeleeWebActionEndpointSlot;
+typedef struct MeleeWebActionEndpointCacheEntry {
+    uint32_t offset,archive_bytes,native_action,symbol_bytes;
+    uint64_t animation,symbol_data;
+} MeleeWebActionEndpointCacheEntry;
+typedef struct MeleeWebActionEndpointCache {
+    uint32_t status,index,next,reserved;
+    uint64_t root,owner,cache,runtime,interval_owner,hit_callback,miss_replay_callback,miss_record_callback;
+    MeleeWebActionEndpointCacheEntry entries[2];
+} MeleeWebActionEndpointCache;
+typedef struct MeleeWebActionEndpointEvent {
+    uint32_t status,index,kind,policy,cache_hit,motion,slot,result_domain;
+    uint32_t offset,archive_bytes,symbol_bytes,reserved;
+    uint64_t cache,runtime,row,animation,destination,source;
+    uint64_t destination_generation,source_generation,source_table,row_owner,clip,command_owner;
+    uint64_t symbol_data;
+} MeleeWebActionEndpointEvent;
+uint32_t melee_web_action_interval_endpoint_admit(const MeleeWebActionInterval*);
+MeleeWebActionEndpointHeader melee_web_action_interval_endpoint_header(const MeleeWebActionInterval*);
+MeleeWebActionEndpointBinding melee_web_action_interval_endpoint_binding(const MeleeWebActionInterval*,uint32_t);
+MeleeWebActionEndpointSlot melee_web_action_interval_endpoint_slot(const MeleeWebActionInterval*,uint32_t,uint32_t);
+MeleeWebActionEndpointCache melee_web_action_interval_endpoint_cache(const MeleeWebActionInterval*,uint32_t);
+MeleeWebActionEndpointEvent melee_web_action_interval_endpoint_event(const MeleeWebActionInterval*,uint32_t);
+
 /* Read-only phase-matched postpresent proof; no status/lifetime mutation. */
 int melee_web_action_interval_matches_finished(const MeleeWebActionInterval*);
 uint32_t melee_web_action_interval_failure_code(const MeleeWebActionInterval*);

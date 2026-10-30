@@ -414,7 +414,7 @@ uint32_t cpu_execute_seven(uint32_t command){
     if(command==14)cpu_restore.seven_active=true;
 #if !defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) || !MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK || \
     !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-    return cpu_fail(0x4d0u,"seven-tick route requires the private v17 particle measurement profile");
+    return cpu_fail(0x4d0u,"seven-tick route requires the private v18 stable action asset profile");
 #else
     if(command==14){
         if(cpu_restore.state!=C::Configured||!cpu_restore.configured_statics)
@@ -747,6 +747,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_configur
         {audio.command_budget,sizeof(uint32_t)},{audio.sound_mode,sizeof(uint32_t)}};
 #define CPU_FORBID(value) forbidden.push_back({&(value),sizeof(value)})
     if(clock.profile_phase)forbidden.push_back({clock.profile_phase,clock.profile_phase_bytes});
+#if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)
+    cpu_corrected_forbid(forbidden);
+#endif
     CPU_FORBID(cpu_restore);CPU_FORBID(files);CPU_FORBID(match);CPU_FORBID(archive_cache);CPU_FORBID(attempted);CPU_FORBID(error);
     CPU_FORBID(audio_phase);CPU_FORBID(pcm);CPU_FORBID(input_bytes);CPU_FORBID(configured_source_seed);CPU_FORBID(native_initializer_enabled);
     CPU_FORBID(rng_profile_enabled);CPU_FORBID(rng_profile_gobj);CPU_FORBID(rng_profile_observation);CPU_FORBID(rng_profile_expected_callback_frame);
@@ -779,6 +782,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
         if(cpu_restore.seven_active)cpu_restore.seven.last_command=5;
         return cpu_close();
     }
+#if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)
+    if(cpu_corrected_active())return cpu_fail(0x50au,"command cannot change the active corrected route");
+#endif
     if(cpu_restore.first_failure)return cpu_restore.first_failure;
     if((command>=8&&command<=13)||cpu_restore.two_active)cpu_restore.two.last_command=command;
     if((command>=14&&command<=31)||cpu_restore.seven_active)cpu_restore.seven.last_command=command;
