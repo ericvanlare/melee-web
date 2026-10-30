@@ -1142,7 +1142,7 @@ async function main() {
             relayRuntime=await startRoomRelayRuntime({producer,evidenceDir:path.join(options['--out'],'packet-worker-evidence'),
               diagnostic:message=>{(report.packetInputRuntimeLog??=[]).push(String(message));writeReport();}});
             const agreement=packetModule.buildCpuCorrectedLoopPacketAgreement({producer,profile:report.profile,
-              initializer:init.initializer,inputMapping:expectedInputMapping,
+              initializer:init.initializer,inputMapping:expectedInputMapping,slotCount:drawDiagnostics.slotCount,
               sourceStateManifest:report.sourceStateManifest,
               runtimeSha256:report.runtimeSha256,harnessSha256:report.harnessSha256,
               worker:{identity:relayRuntime.runtimeIdentity,hashes:relayRuntime.hashes}});

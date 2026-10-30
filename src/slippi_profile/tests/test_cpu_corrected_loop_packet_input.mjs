@@ -19,15 +19,19 @@ const toolsAvailable=Boolean(toolsPath&&path.isAbsolute(toolsPath)&&
   .every(file=>existsSync(path.join(toolsPath,file))));
 const evidenceConfigured=Boolean(OUT&&path.isAbsolute(OUT));
 const diagnosticProfile={identity:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
-  sourceIdentity:'snapshot-source-identity-hash',rngHelper:'source-rng-profile-identity',
-  stageBridge:'source-stage-kind-bridge-identity',seed:7,
-  name:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
+  sourceIdentity:'122a2a6d4e5361b0733c9d2b22c2865e01a81d960848bb79e82ce120b5cef271',
+  rngHelper:'2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e',
+  stageBridge:'a81e21f9629e711b3975ca93b821bedd2c13cf06fde6381585bc3918a8aef3db',
+  seed:324508639,name:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
   sourceTextureMatrixWriterDiagnostic:'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15',
   sourceLvecWriterDiagnostic:'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'};
+const observedInitializer={valid:1,profile:0,seed:324508639,stage_kind:37,player_count:2,
+  players:[{color:0,controller:0,fighter:8,port:0,stocks:4},
+    {color:1,controller:1,fighter:8,port:0,stocks:4}]};
+const observedInputMapping=[{sourceSlot:0,initializerPort:0,rawController:0},
+  {sourceSlot:1,initializerPort:0,rawController:1}];
 const agreementInputs={producer:{commit:'a'.repeat(40),tree:'b'.repeat(40)},profile:diagnosticProfile,
-  initializer:'{"profile":"diagnostic"}',
-  inputMapping:[{sourceSlot:0,initializerPort:0,rawController:0},
-    {sourceSlot:1,initializerPort:1,rawController:1}],
+  initializer:JSON.stringify(observedInitializer),inputMapping:observedInputMapping,slotCount:6,
   sourceStateManifest:{configurationIdentitySha256:'c'.repeat(64),wasmSha256:'d'.repeat(64)},
   runtimeSha256:{runtime:'e'.repeat(64)},harnessSha256:{runner:'f'.repeat(64)},
   worker:{identity:{runtime:'owned-worker'},hashes:{worker:'1'.repeat(64)}}};
@@ -37,14 +41,28 @@ test('invalid start identity is rejected before opening the loopback relay',asyn
     /start identity is not bound/);
 });
 
-test('A2 agreement binds the initialized report sourceIdentity field',()=>{
+test('A2 agreement binds the initialized source identity and observed port/controller map',()=>{
   const agreement=buildCpuCorrectedLoopPacketAgreement(agreementInputs);
   assert.equal(agreement.profile.identity,diagnosticProfile.identity);
   assert.equal(agreement.profile.sourceIdentity,diagnosticProfile.sourceIdentity);
   assert.equal(agreement.profile.rngHelper,diagnosticProfile.rngHelper);
   assert.equal(agreement.profile.stageBridge,diagnosticProfile.stageBridge);
+  assert.deepEqual(agreement.profile.inputMapping,observedInputMapping);
   assert.throws(()=>buildCpuCorrectedLoopPacketAgreement({...agreementInputs,
     profile:{...diagnosticProfile,sourceIdentity:null}}),/start identity is not bound/);
+  const changedInitializer={...observedInitializer,players:observedInitializer.players.map((player,index)=>
+    index===1?{...player,port:2}:player)};
+  assert.throws(()=>buildCpuCorrectedLoopPacketAgreement({...agreementInputs,
+    initializer:JSON.stringify(changedInitializer)}),/differs from the parsed diagnostic initializer/);
+  assert.throws(()=>buildCpuCorrectedLoopPacketAgreement({...agreementInputs,
+    inputMapping:[observedInputMapping[0],{sourceSlot:1,initializerPort:1,rawController:1}]}),
+    /raw controller does not match the initializer formula/);
+  const equivalentInitializer={...observedInitializer,players:observedInitializer.players.map((player,index)=>
+    index===1?{...player,port:2}:player)};
+  const equivalentMapping=[observedInputMapping[0],{sourceSlot:1,initializerPort:2,rawController:1}];
+  assert.deepEqual(buildCpuCorrectedLoopPacketAgreement({...agreementInputs,
+    initializer:JSON.stringify(equivalentInitializer),inputMapping:equivalentMapping})
+    .profile.inputMapping,equivalentMapping);
 });
 
 test('actual local Worker carries all 44 A2 remote PAD contributions with bounded one-capsule authority',
@@ -59,7 +77,7 @@ test('actual local Worker carries all 44 A2 remote PAD contributions with bounde
     let packetInput=null,refusalInput=null,passed=false,primary=null;
     try{
       const agreement=buildCpuCorrectedLoopPacketAgreement({...agreementInputs,producer,
-        initializer:'{"test":"identity only"}',profile:diagnosticProfile,
+        initializer:agreementInputs.initializer,inputMapping:observedInputMapping,slotCount:6,
         sourceStateManifest:{configurationIdentitySha256:'a'.repeat(64),wasmSha256:'b'.repeat(64)},
         runtimeSha256:{runtime:'c'.repeat(64)},harnessSha256:{runner:'d'.repeat(64)},
         worker:{identity:runtime.runtimeIdentity,hashes:runtime.hashes}});

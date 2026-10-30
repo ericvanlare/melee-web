@@ -4,6 +4,7 @@
 import {createHash} from 'node:crypto';
 import {LockstepPeer,LOCKSTEP_VERSION,lockstepConstants} from '../../../scripts/net_lockstep_protocol.mjs';
 import {createTransportCallbackQueue,openLockstepPeerPair} from '../../../scripts/net_lockstep_transport.mjs';
+import {validateSourceInputMapping} from './runner_contract.mjs';
 
 export const CPU_CORRECTED_LOOP_PACKET_WAIT_MS=3000;
 export const CPU_CORRECTED_LOOP_PEER_TIMEOUT_MS=5000;
@@ -38,6 +39,31 @@ function deadlinePromise(timeoutMs,label){
   return {promise,clear:()=>clearTimeout(timer)};
 }
 
+function checkedAgreementMapping(mapping){
+  try{
+    const checked=validateSourceInputMapping(mapping,2);
+    if(JSON.stringify(checked)!==JSON.stringify(mapping))return false;
+    return checked.every((row,index)=>row.sourceSlot===index&&row.rawController===index);
+  }catch{return false;}
+}
+
+function mappingFromInitializer(initializerText,inputMapping,slotCount){
+  if(typeof initializerText!=='string'||!initializerText.length)
+    throw new Error('Corrected-loop packet identity requires the serialized diagnostic initializer');
+  let initializer;
+  try{initializer=JSON.parse(initializerText);}
+  catch{throw new Error('Corrected-loop packet initializer is not valid JSON');}
+  if(!initializer||!Array.isArray(initializer.players)||initializer.players.length!==2)
+    throw new Error('Corrected-loop packet initializer must contain its two actual players');
+  const declared=validateSourceInputMapping(inputMapping,slotCount);
+  const observed=validateSourceInputMapping(initializer.players.map((player,sourceSlot)=>({
+    sourceSlot,initializerPort:player?.port,rawController:player?.controller,
+  })),slotCount);
+  if(JSON.stringify(declared)!==JSON.stringify(observed))
+    throw new Error('Corrected-loop packet mapping differs from the parsed diagnostic initializer');
+  return observed;
+}
+
 function expectedAgreement(agreement){
   if(!agreement||agreement.protocol!=='melee-web-local-lockstep-a2-v1'||
      agreement.scope!=='cpu-corrected-loop-packet-input-v1'||
@@ -54,20 +80,19 @@ function expectedAgreement(agreement){
      !/^[0-9a-f]{64}$/.test(agreement.profile.configurationIdentitySha256||'')||
      !/^[0-9a-f]{64}$/.test(agreement.profile.wasmSha256||'')||
      !agreement.worker?.identity||!agreement.worker?.hashes||
-     JSON.stringify(agreement.profile.inputMapping)!==JSON.stringify([
-       {sourceSlot:0,initializerPort:0,rawController:0},
-       {sourceSlot:1,initializerPort:1,rawController:1},
-     ]))
+     !checkedAgreementMapping(agreement.profile.inputMapping))
     throw new Error('Corrected-loop A2 start identity is not bound to the diagnostic producer/profile');
   return agreement;
 }
 
 /** Construct the exact hello agreement from the frozen diagnostic/profile report. */
 export function buildCpuCorrectedLoopPacketAgreement({producer,profile,initializer,inputMapping,
-  sourceStateManifest,runtimeSha256,harnessSha256,worker}={}){
-  if(!producer||!profile||!initializer||!Array.isArray(inputMapping)||!sourceStateManifest||
+  slotCount=2,sourceStateManifest,runtimeSha256,harnessSha256,worker}={}){
+  if(!producer||!profile||typeof initializer!=='string'||!Array.isArray(inputMapping)||
+     !Number.isInteger(slotCount)||slotCount<2||!sourceStateManifest||
      !runtimeSha256||!harnessSha256||!worker)
     throw new Error('Corrected-loop packet identity requires producer, profile, initializer, mapping, manifest, and runtime evidence');
+  const observedMapping=mappingFromInitializer(initializer,inputMapping,slotCount);
   const agreement={protocol:'melee-web-local-lockstep-a2-v1',
     scope:'cpu-corrected-loop-packet-input-v1',samples:{first:FIRST_SAMPLE,last:LAST_SAMPLE},
     producer:{commit:producer.commit,tree:producer.tree},
@@ -77,8 +102,7 @@ export function buildCpuCorrectedLoopPacketAgreement({producer,profile,initializ
       configurationIdentitySha256:sourceStateManifest.configurationIdentitySha256,
       wasmSha256:sourceStateManifest.wasmSha256,
       runtimeSha256:{...runtimeSha256},harnessSha256:{...harnessSha256},
-      inputMapping:inputMapping.map(row=>({sourceSlot:row.sourceSlot,
-        initializerPort:row.initializerPort,rawController:row.rawController}))},
+      inputMapping:observedMapping},
     worker:{identity:{...worker.identity},hashes:{...worker.hashes}}};
   return expectedAgreement(agreement);
 }
