@@ -81,7 +81,8 @@ def validate_reports(directory, expected_commit):
             raise ValueError(f"partition {group} target list does not match expected targets")
 
     discovered = {group: _inventory(reports[group], "discovered") for group in UNIT_GROUPS}
-    if discovered[UNIT_GROUPS[0]] != discovered[UNIT_GROUPS[1]]:
+    expected = discovered[UNIT_GROUPS[0]]
+    if any(value != expected for value in discovered.values()):
         raise ValueError("unit discovered inventories do not match")
 
     selected = {
@@ -92,17 +93,22 @@ def validate_reports(directory, expected_commit):
         group: _inventory(reports[group], "deferred", require_ids=True)
         for group in UNIT_GROUPS
     }
-    first_ids = set(selected[UNIT_GROUPS[0]]["ids"])
-    second_ids = set(selected[UNIT_GROUPS[1]]["ids"])
-    overlap = sorted(first_ids & second_ids)
-    if overlap:
-        raise ValueError(f"unit selected inventories overlap: {overlap}")
-    deferred_ids = set().union(*(set(value["ids"]) for value in deferred.values()))
-    first_deferred = set(deferred[UNIT_GROUPS[0]]["ids"])
-    second_deferred = set(deferred[UNIT_GROUPS[1]]["ids"])
-    if first_deferred & second_deferred:
-        raise ValueError("unit deferred inventories overlap")
-    if (first_ids | second_ids) & deferred_ids:
+    selected_sets = {group: set(value["ids"]) for group, value in selected.items()}
+    deferred_sets = {group: set(value["ids"]) for group, value in deferred.items()}
+    selected_ids = set().union(*selected_sets.values())
+    deferred_ids = set().union(*deferred_sets.values())
+    for index, group in enumerate(UNIT_GROUPS):
+        other_selected = set().union(*(
+            selected_sets[other] for other in UNIT_GROUPS[index + 1:]
+        ))
+        if selected_sets[group] & other_selected:
+            raise ValueError("unit selected inventories overlap")
+        other_deferred = set().union(*(
+            deferred_sets[other] for other in UNIT_GROUPS[index + 1:]
+        ))
+        if deferred_sets[group] & other_deferred:
+            raise ValueError("unit deferred inventories overlap")
+    if selected_ids & deferred_ids:
         raise ValueError("unit selected and deferred inventories overlap")
     for group in UNIT_GROUPS:
         shard = UNIT_GROUPS.index(group)
@@ -151,8 +157,7 @@ def validate_reports(directory, expected_commit):
             "sha256": _canonical_hash(group_deferred),
         }
 
-    union = first_ids | second_ids | deferred_ids
-    expected = discovered[UNIT_GROUPS[0]]
+    union = selected_ids | deferred_ids
     if len(union) != expected["count"]:
         raise ValueError("unit selected union count does not match discovered inventory")
     if _canonical_hash(union) != expected["sha256"]:

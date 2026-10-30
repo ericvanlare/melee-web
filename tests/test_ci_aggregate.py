@@ -22,7 +22,10 @@ class CiAggregateTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         directory = Path(temporary.name)
         overrides = overrides or {}
-        selected = selected or {group: [] for group in ci_aggregate.UNIT_GROUPS}
+        selected = {
+            group: list((selected or {}).get(group, ()))
+            for group in ci_aggregate.UNIT_GROUPS
+        }
         if deferred is None:
             deferred = {group: [] for group in ci_aggregate.UNIT_GROUPS}
             for owner, modules in ci_verify.REHOMED_TEST_MODULES.items():
@@ -33,6 +36,11 @@ class CiAggregateTests(unittest.TestCase):
                         ci_verify.unit_shard(test_id.split(".", 1)[0])
                     ]
                     deferred[group].append(test_id)
+        else:
+            deferred = {
+                group: list(deferred.get(group, ()))
+                for group in ci_aggregate.UNIT_GROUPS
+            }
         discovered_ids = discovered_ids if discovered_ids is not None else sorted(
             set().union(*(set(ids) for ids in (*selected.values(), *deferred.values())))
         )
@@ -94,17 +102,23 @@ class CiAggregateTests(unittest.TestCase):
         return directory
 
     def test_good_reports_pass_and_return_summary(self):
-        unit0 = self._id_for_shard(0, "unit_case_zero")
-        unit1 = self._id_for_shard(1, "unit_case_one")
+        selected = {
+            group: [self._id_for_shard(index, f"unit_case_{index}")]
+            for index, group in enumerate(ci_aggregate.UNIT_GROUPS)
+        }
         reports = self._write_reports(
-            selected={"unit-0": [unit0], "unit-1": [unit1]},
+            selected=selected,
         )
         summary = ci_aggregate.validate_reports(reports, self.commit)
         self.assertEqual(summary["status"], "passed")
-        self.assertEqual(summary["discovered"]["count"], 8)
+        self.assertEqual(sum(value["count"] for value in summary["selected"].values()), 3)
+        self.assertEqual(set(summary["selected"]), set(ci_aggregate.UNIT_GROUPS))
 
     @staticmethod
     def _id_for_shard(shard, suffix):
+        for module, owner in ci_verify.UNIT_SHARD_OVERRIDES.items():
+            if owner == shard:
+                return f"{module}.Case.test_{suffix}"
         index = 0
         while True:
             module = f"test_{suffix}_{index}"
@@ -114,7 +128,7 @@ class CiAggregateTests(unittest.TestCase):
 
     def test_empty_discovery_is_rejected(self):
         reports = self._write_reports(
-            deferred={"unit-0": [], "unit-1": []}, discovered_ids=[],
+            deferred={group: [] for group in ci_aggregate.UNIT_GROUPS}, discovered_ids=[],
         )
         with self.assertRaisesRegex(ValueError, "discovered inventory count"):
             ci_aggregate.validate_reports(reports, self.commit)
@@ -136,7 +150,7 @@ class CiAggregateTests(unittest.TestCase):
 
     def test_missing_selected_case_is_rejected(self):
         reports = self._write_reports(
-            selected={"unit-0": [self._id_for_shard(0, "missing_zero")], "unit-1": []},
+            selected={"unit-0": [self._id_for_shard(0, "missing_zero")]},
             discovered_ids=[self._id_for_shard(0, "missing_zero"),
                             self._id_for_shard(1, "missing_one")],
         )
@@ -146,9 +160,16 @@ class CiAggregateTests(unittest.TestCase):
     def test_overlapping_selected_case_is_rejected(self):
         case = self._id_for_shard(0, "overlap")
         reports = self._write_reports(
-            selected={"unit-0": [case], "unit-1": [case]},
+            selected={"unit-0": [case], "unit-2": [case]},
         )
         with self.assertRaisesRegex(ValueError, "overlap"):
+            ci_aggregate.validate_reports(reports, self.commit)
+
+        reports = self._write_reports(
+            deferred={"unit-0": [case], "unit-2": [case]},
+            discovered_ids=[case],
+        )
+        with self.assertRaisesRegex(ValueError, "deferred inventories overlap"):
             ci_aggregate.validate_reports(reports, self.commit)
 
     def test_rehomed_module_must_be_selected_by_its_owner(self):
