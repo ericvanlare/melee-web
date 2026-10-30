@@ -47,7 +47,7 @@ if(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE AND NOT MELEE_WEB_AURORA_STAGING_SHA
   message(FATAL_ERROR "The private presentation profile requires the Aurora staging-shadow inventory and CPU owner provenance")
 endif()
 option(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-  "Enable the private v19 TEV stage scratch profile" OFF)
+  "Enable the private v20 camera history profile" OFF)
 if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND
    NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
   message(FATAL_ERROR "Particle presentation requires the private v15 TObj profile")
@@ -179,6 +179,7 @@ if(EMSCRIPTEN)
   if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
     target_sources(gameplay_runtime PRIVATE
       src/slippi_profile/particle_presentation.c
+      src/slippi_profile/camera_source_prepare.c
       src/slippi_profile/particle_source_schedule.c
       src/slippi_profile/particle_pass_plan.c)
     target_compile_definitions(gameplay_runtime PUBLIC

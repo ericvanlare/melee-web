@@ -11342,7 +11342,7 @@
           "next": "One immutable confirmed PRE with checked current-end advancement and two actual late-input corrections; no ring, delayed dirty repair or guessed live-input API."
         },
         "payload_index_integration_v1": {
-          "status": "REVIEWED_LOCAL_VALIDATION_PASS_PUBLICATION_CI_PENDING",
+          "status": "MERGED_EXACT_HEAD_CI_PASS",
           "validation_source": "27c854da5c896caafd26cc648e9ff115f57a34b6",
           "regression": {
             "tests": 3077,
@@ -11364,6 +11364,18 @@
           "producer_archive": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-producer-archive/archive.json",
             "sha256": "2cd4ecc9ac9872747684781982d3cf5adb74e7e1aed55fa6a44c6677f64f76a6"
+          },
+          "pull_request": 360,
+          "publication_head": "7d0fc413b8a8b879c821f0dd601a7b186523e7ff",
+          "merge_commit": "3d24a67d1716f12f816e19d880649080243e2731",
+          "reviewed_and_merged_tree": "2b4008b7f733b556214e2f874b31ac23748c2c72",
+          "exact_head_ci": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-integration-v1/final-ci.json",
+            "sha256": "ae3aecdb0e7a5a843787c462ad312c0c1442bb087742e306c308ab976ac28c03"
+          },
+          "merge_verification": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-integration-v1/merge-verification.json",
+            "sha256": "9e92fb85e2b99e765a81ca239299102d52066c716cd5adb6a070afce1830baf8"
           }
         }
       }

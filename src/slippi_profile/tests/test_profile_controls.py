@@ -55,10 +55,10 @@ def _source_function(source, signature):
 
 
 class ProfileControlsTests(unittest.TestCase):
-    def test_v15_v19_profile_identity_boundary_compiles_profile_c_only(self):
+    def test_v15_v20_profile_identity_boundary_compiles_profile_c_only(self):
         work_root = ROOT / "work"
         work_root.mkdir(exist_ok=True)
-        output = Path(tempfile.mkdtemp(prefix="slippi-profile-v15-v19-", dir=work_root))
+        output = Path(tempfile.mkdtemp(prefix="slippi-profile-v15-v20-", dir=work_root))
         source = output / "identity_control.c"
         source.write_text(r'''#include <assert.h>
 #include <string.h>
@@ -67,7 +67,7 @@ class ProfileControlsTests(unittest.TestCase):
 int main(void)
 {
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE)
-    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19;
+    const SlippiProfileIdentity active = SLIPPI_PROFILE_IDENTITY_CAMERA_HISTORY_V20;
     assert(strcmp(SLIPPI_PROFILE_STABLE_ACTION_ASSETS_V18_ID,
                   "slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18") == 0);
     assert(strcmp(SLIPPI_PROFILE_TEV_STAGE_SCRATCH_V19_ID,
@@ -77,7 +77,10 @@ int main(void)
     assert(strcmp(SLIPPI_PROFILE_PARTICLE_PRESENTATION_V16_ID,
                   "slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16") == 0);
     assert(strcmp(slippi_profile_identity_name(active),
-                  SLIPPI_PROFILE_TEV_STAGE_SCRATCH_V19_ID) == 0);
+                  SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID) == 0);
+    assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19) == 0);
+    assert(slippi_profile_source_draw_decision(SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19,
+                  SLIPPI_TICK_CORRECTION) == SLIPPI_SOURCE_DRAW_ERROR);
     assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18) == 0);
     assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_MEASUREMENT_V17) == 0);
     assert(slippi_profile_identity_name(SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16) == 0);
@@ -99,7 +102,7 @@ int main(void)
         try:
             for name, definitions in (
                 ("v15", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1"]),
-                ("v19", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1",
+                ("v20", ["-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1",
                           "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1"]),
             ):
                 executable = output / f"profile-{name}"
@@ -112,7 +115,7 @@ int main(void)
                 subprocess.run(wrapped, cwd=ROOT, check=True)
                 subprocess.run([str(executable)], cwd=ROOT, check=True)
         except Exception as error:
-            self.fail(f"V15/V19 identity controls failed: {error}; retained reproducer directory: {output}")
+            self.fail(f"V15/V20 identity controls failed: {error}; retained reproducer directory: {output}")
         else:
             shutil.rmtree(output)
 
@@ -161,24 +164,24 @@ int main(void)
             str(ROOT / "scripts/agent_workspace.py"),
             "run", "--", *v10_command,
         ]
-        v19_command = list(command)
-        v19_command[v19_command.index("-o"):v19_command.index("-o")] = [
+        v20_command = list(command)
+        v20_command[v20_command.index("-o"):v20_command.index("-o")] = [
             "-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1",
             "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1",
         ]
-        v19_command[v19_command.index("-o") + 1] = str(output / "profile-controls-v19")
-        wrapped_v19 = [
+        v20_command[v20_command.index("-o") + 1] = str(output / "profile-controls-v20")
+        wrapped_v20 = [
             os.environ.get("PYTHON", "python3"),
             str(ROOT / "scripts/agent_workspace.py"),
-            "run", "--", *v19_command,
+            "run", "--", *v20_command,
         ]
         try:
             subprocess.run(wrapped, cwd=ROOT, check=True)
             subprocess.run([str(executable)], cwd=ROOT, check=True)
             subprocess.run(wrapped_v10, cwd=ROOT, check=True)
             subprocess.run([str(output / "profile-controls-v10")], cwd=ROOT, check=True)
-            subprocess.run(wrapped_v19, cwd=ROOT, check=True)
-            subprocess.run([str(output / "profile-controls-v19")], cwd=ROOT, check=True)
+            subprocess.run(wrapped_v20, cwd=ROOT, check=True)
+            subprocess.run([str(output / "profile-controls-v20")], cwd=ROOT, check=True)
         except Exception as error:
             self.fail(f"Profile controls failed: {error}; retained reproducer directory: {output}")
         else:

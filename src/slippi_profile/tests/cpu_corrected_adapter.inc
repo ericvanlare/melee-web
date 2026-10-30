@@ -221,7 +221,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
     using C=CpuCorrectedControl;auto& c=cpu_corrected;auto& e=c.evidence;
     const uint32_t span=cpu_corrected_reuse.loop_mode?cpu_corrected_reuse.selected_span:7u;
 #if !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-    return cpu_corrected_error(0x510u,"corrected route requires the private v19 TEV stage scratch profile");
+    return cpu_corrected_error(0x510u,"corrected route requires the private v20 camera history profile");
 #else
     if(command==32){
         if(c.active||cpu_restore.state!=CpuRestoreControl::Configured||!cpu_restore.configured_statics||

@@ -21,11 +21,11 @@ const toolsAvailable=Boolean(toolsPath&&path.isAbsolute(toolsPath)&&
   ['wrangler/package.json','miniflare/package.json','workerd/package.json']
   .every(file=>existsSync(path.join(toolsPath,file))));
 const evidenceConfigured=Boolean(OUT&&path.isAbsolute(OUT));
-const diagnosticProfile={identity:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
+const diagnosticProfile={identity:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20',
   sourceIdentity:'122a2a6d4e5361b0733c9d2b22c2865e01a81d960848bb79e82ce120b5cef271',
   rngHelper:'2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e',
   stageBridge:'a81e21f9629e711b3975ca93b821bedd2c13cf06fde6381585bc3918a8aef3db',
-  seed:324508639,name:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
+  seed:324508639,name:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20',
   sourceTextureMatrixWriterDiagnostic:'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15',
   sourceLvecWriterDiagnostic:'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'};
 const observedInitializer={valid:1,profile:0,seed:324508639,stage_kind:37,player_count:2,

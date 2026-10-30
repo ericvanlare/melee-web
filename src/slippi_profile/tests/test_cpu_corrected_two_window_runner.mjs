@@ -96,7 +96,7 @@ test('five bridge lanes compare exact bytes and reject a differing transfer byte
   assert.throws(()=>compareCpuCorrectedRawFive(a,b,'bridge tick 308'),/raw transfer differs at byte 39/);
 });
 
-test('two-window CLI is opt-in and requires the existing seven-tick v19 profile',()=>{
+test('two-window CLI is opt-in and requires the existing seven-tick v20 profile',()=>{
   const route={'--correct-predicted-branch-two-window':true,
     '--aggregate-cpu-drawn-reference-seven-tick':true,'--aggregate-cpu-restore-config':'config',
     '--slippi-lobj-presentation-cache':true,'--slippi-tobj-presentation-cache':true,
@@ -104,7 +104,7 @@ test('two-window CLI is opt-in and requires the existing seven-tick v19 profile'
   assert.equal(validateCpuRestoreRouteSelection(route),'independent-browser-correction-two-window-v1');
   assert.throws(()=>validateCpuRestoreRouteSelection({'--correct-predicted-branch-two-window':true}),/fixed seven-tick/);
   assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--correct-predicted-branch':true}),/mutually exclusive/);
-  const profile={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19'};
+  const profile={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20'};
   const seven={evidence:true,evidenceBytes:true},reuse={enable:true,evidence:true,evidenceBytes:true};
   assert.equal(validateBrowserProfileForRoute(profile,false,null,true,true,true,true,seven,reuse),profile.profile);
   assert.throws(()=>validateBrowserProfileForRoute(profile,false,null,true,true,true,true,seven,

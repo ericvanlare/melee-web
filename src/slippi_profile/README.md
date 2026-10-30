@@ -260,7 +260,7 @@ completed browser rollback or an admitted online profile.
 
 ### Private TEV stage scratch v19
 
-The existing particle-presentation diagnostic option now selects
+Historical V19 artifacts identify
 `slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19`.
 Historical V18 artifacts keep their original identity. V19 preserves the
 resident action catalog and typed particle ownership prerequisites, and resolves
@@ -274,4 +274,27 @@ claim of equivalence to a separate Slippi gameplay patch. The GPL helper is
 [texp_stage_scratch.h](texp_stage_scratch.h). The focused control compares actual
 source setup bodies through modeled GX sinks; browser results, exact producer
 identities and remaining gates belong to the
+[rollback boundary](../../docs/status/2026-10-12-match-only-rollback-feasibility.md).
+
+
+### Private camera history v20
+
+The particle-presentation diagnostic option now selects
+`slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20`.
+V19 remains a historical identity and is rejected by the active V20 lane.
+The default-off vanilla path is unchanged.
+
+The original main-camera draw prepares world positions and matrices that the
+next source nametag process reads. Skipping that preparation during correction
+leaves stale camera history. V20 moves the selected camera preparation to the
+existing post-source boundary for an armed CPU interval, using original camera
+and matrix routines without drawing or submitting GPU work. The initial
+capability is the checked standard camera on Final Destination; unsupported
+owners or modes refuse before camera mutation. The original warm draws retain
+first-use allocation, and correction requires the existing inverse matrix.
+
+This is a source-port dependency repair, not an implementation claim for a
+separate Slippi gameplay patch. The isolated GPL helper is
+[camera_source_prepare.c](camera_source_prepare.c). Actual controls, browser
+results and remaining gates belong to the
 [rollback boundary](../../docs/status/2026-10-12-match-only-rollback-feasibility.md).

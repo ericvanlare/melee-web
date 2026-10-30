@@ -257,6 +257,7 @@ export async function runBrowserCpuHistory(predictedPage,referencePage,wire,chec
         validateCpuParticleEndpointAgainstPre(refCpu,current.armed.reference);
         validateCpuParticleEndpointAgainstPre(predCpu,current.armed.predicted);
         const refDraw=await draw(referencePage);
+        incarnation.finalPresents={reference:refDraw};
         if(correct){
           const requested=process.hrtime.bigint().toString();
           const submitted=operate(predictedPage,67,{draw:true}).then(result=>{
@@ -264,9 +265,10 @@ export async function runBrowserCpuHistory(predictedPage,referencePage,wire,chec
           });
           const results=await Promise.allSettled([submitted,packetInput.publishCapsule(spec,{predictedDrawRequestNs:requested})]);
           for(const result of results)if(result.status==='rejected')throw result.reason;
-          await operate(predictedPage,68);
+          incarnation.finalPresents.predicted=await operate(predictedPage,68);
         }else{
           const predDraw=await draw(predictedPage);
+          incarnation.finalPresents.predicted=predDraw;
           incarnation.comparisons.push(compareCpuCorrectedRawFive(refDraw.raw,predDraw.raw,
             'confirmed history rebase final present'));
         }
@@ -303,6 +305,7 @@ export async function runBrowserCpuHistory(predictedPage,referencePage,wire,chec
           const correctedCpu=await endpoint(predictedPage,2,3);incarnation.endpoints.correctedCpu=correctedCpu;
           incarnation.comparisons.push(compareCpuParticleEndpoints(refCpu,correctedCpu,{preLeft:current.armed.reference,preRight:current.armed.predicted}));
           const correctedDraw=await draw(predictedPage),correctedDrawEnd=await endpoint(predictedPage,3,3);
+          incarnation.finalPresents.corrected=correctedDraw;
           incarnation.endpoints.correctedDraw=correctedDrawEnd;
           incarnation.comparisons.push(compareCpuParticleEndpoints(refDrawEnd,correctedDrawEnd,{preLeft:current.armed.reference,preRight:current.armed.predicted}));
           incarnation.comparisons.push(compareCpuCorrectedRawFive(refDraw.raw,correctedDraw.raw,`history final present ${index}`));

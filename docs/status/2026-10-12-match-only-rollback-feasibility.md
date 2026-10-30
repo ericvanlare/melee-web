@@ -1796,8 +1796,10 @@ The `payload_index_component_v1` receipt binds all producers, reviews and result
 
 The final local regression at `27c854da` passes 3,077 tests with 238 skips and
 no failures; the ordinary Release runtime also builds successfully. Independent
-publication review passes subject to exact publication-head CI. Validation and
-archive identities remain in `payload_index_integration_v1`.
+publication review passes. PR #360 merged as `3d24a67d`, with the same tree as
+reviewed head `7d0fc413`. All 14 exact-head CI jobs completed with 12 successes
+and two expected skips (run 41087668744). Validation, merge and archive
+identities remain in `payload_index_integration_v1`.
 
 The next capability is one immutable confirmed PRE retained across two actual
 late-input corrections, with the current end derived from actual source frames

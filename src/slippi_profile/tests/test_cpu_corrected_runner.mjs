@@ -48,7 +48,7 @@ test('changed-input route requires the existing seven-tick private profile',()=>
     '--slippi-tobj-presentation-cache':true,'--slippi-particle-presentation-cache':true};
   assert.equal(validateCpuRestoreRouteSelection(config),'independent-browser-correction-v1');
   assert.throws(()=>validateCpuRestoreRouteSelection({'--correct-predicted-branch':true}),/fixed seven-tick/);
-  assert.throws(()=>validateCpuRestoreRouteSelection({...config,'--slippi-particle-presentation-cache':false}),/private v19/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({...config,'--slippi-particle-presentation-cache':false}),/private v20/);
 });
 test('wrong-branch proof needs changed selection requests, not changed cache identity',()=>{
   const endpoint=motion=>({domains:[{id:3,records:[{kindName:'ActionEvent',index:0,
