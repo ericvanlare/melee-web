@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**The private seven-tick wrong-prediction component passes for one window. Its two-window successor passes window one, a 35-neutral-tick bridge, and second-window PRE, then stops at a strict CPU payload-byte mismatch. The second window's final present and full or continuous rollback remain unproven.**
+**A private fixed-seven-tick component now passes two separate wrong-input correction windows on one persistent timeline, including the neutral bridge, both final presents, and checked capsule retirement. This remains bounded component evidence; continuous rollback and full-match acceptance are unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1525,7 +1525,7 @@ The generic destructor/retirement guards stay intact. The controls execute the
 actual ActionStore and extracted checkpoint/session code with modeled leaves;
 they do not establish a new browser result. Fixture stack, destroyed-store status
 and short-circuit expectation failures remain retained with their reviewed repairs.
-The two-window successor now has three separately retained browser attempts.
+The two-window successor now has four separately retained browser attempts.
 V1 stops in host startup ordering because reuse validation dereferences
 `predictedPage` before that page is initialized; no correction window runs.
 Its native producer is `4a13106d`, and the host repair is recorded at
@@ -1547,9 +1547,27 @@ artifacts are archived. Component-control reporting is scoped in the structured
 receipt: the combined host run had 13 passes and one negative-fixture failure,
 then the repaired sidecar test passed alone; this is not a single 14/14 run.
 Native helper, aggregate and adapter review receipts are retained there as well.
+V4 uses the V19 TEV scratch profile as a changed source hypothesis. It passes
+both actual wrong-prediction windows on the same persistent input timeline: the
+first starts at sample 300 (source frames 176–183), then 35 literal-neutral
+bridge ticks advance the same timeline to sample 342, where the second window
+runs (source frames 218–225). For each window, PRE, corrected CPU_END and
+DRAW_END compare equal across all nine declared domains; typed particle-cell
+identity/provenance and the five raw lanes are retained and checked. Each
+window also completes its corrected final present and checked retirement, with
+at most one capsule active. The two final screenshots are byte-identical. The
+run retains the original schema-312 endpoint and validates differing local
+particle serial provenance through the typed sidecar; it does not normalize
+other endpoint fields. The nine producer artifacts are archived, recorded PIDs
+are absent, and independent offline review replayed the retained endpoint
+comparisons. The V19 hypothesis passes this run but does not establish the exact
+owner or type of the two payload rows that differed in V3. This is not a
+continuous rolling rollback, relay, whole-profile, or full-match result.
+
 The successor branch remains unmerged, with no successor full regression or CI.
-Repeated correction, combat, frame-budget, profile admission and full-match or
-online rollback remain open.
+The next boundary is a reusable-owner loop under root design review; it is not
+implemented here. General rolling correction, combat, frame-budget, profile admission
+and full-match or online rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

@@ -9820,7 +9820,7 @@
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
       "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and nine producer pins unchanged.",
-      "next": "The two-window successor's v3 capture reaches the second corrected CPU comparison and stops on changed PayloadRow bytes. Resolve the payload owner/type with a bounded source diagnosis before considering another capture. The second window's final present remains unrun; this result does not close #341 or establish continuous rollback.",
+      "next": "The two-window v4 actual run passes both fixed seven-tick wrong-prediction windows, the 35-tick neutral bridge, each corrected final present and confirmed retirement. This is bounded component evidence, not continuous rollback or #341 closure. The next boundary is a reusable-owner loop under root design review; it is not implemented.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
@@ -9922,7 +9922,7 @@
         "failures": "Retain the ActionStore fixture stack overflow and derived destroyed-store status failure, plus the extracted coordinator short-circuit order expectation failure. Reviewed fixture-only repairs preserve production checks."
       },
       "successive_wrong_prediction_windows_v1": {
-        "status": "v3_second_corrected_cpu_payload_mismatch",
+        "status": "v4_two_actual_wrong_prediction_windows_pass",
         "scope": "Two wrong-input seven-tick windows on one persistent input timeline, separated by a bounded neutral bridge, with one reusable checkpoint slot. This remains a private fixed-window component.",
         "attempts": [
           {
@@ -10060,6 +10060,109 @@
               "sha256": "28ad5cf3bd0cd3db30261589590be216c71635220def1e589b04c95175c0cf37",
               "status": "owner_type_not_proven"
             }
+          },
+          {
+            "id": "two_window_v4_two_actual_wrong_prediction_windows_pass",
+            "native_and_host_source_head": "d6bb480ecf43f3899b940bb54ff5b72cf3878177",
+            "profile_identity": "slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19",
+            "elapsed_seconds": 42.072778,
+            "result": "Both wrong-prediction correction windows pass on one persistent input timeline. Each PRE, corrected CPU_END and DRAW_END comparison matches all nine declared domains, raw lanes match, actual corrected presents complete, and each capsule is confirmed retired. This is a changed V19 TEV scratch hypothesis; it does not identify the owner/type of the earlier V3 payload mismatch.",
+            "first_window": {
+              "status": "complete",
+              "start_sample": 300,
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true,
+              "confirmed_retirement": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "sample_ticks": [
+                307,
+                341
+              ],
+              "same_persistent_timeline": true,
+              "raw_lane_comparison": "passed"
+            },
+            "second_window": {
+              "status": "complete",
+              "start_sample": 342,
+              "source_frames": [
+                218,
+                225
+              ],
+              "pre_cpu_draw_domains": 9,
+              "pre_particle_cells": {
+                "live": 25,
+                "captured": 25,
+                "incarnation_relations": 25
+              },
+              "cpu_and_draw_particle_cells": {
+                "live": 27,
+                "captured": 25,
+                "incarnation_relations": 27
+              },
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true,
+              "confirmed_retirement": true
+            },
+            "particle_serial_provenance": {
+              "first_window_reference_and_predicted": "1879",
+              "second_pre_reference": "2103",
+              "second_pre_predicted": "2127",
+              "historical_schema312_unchanged": true,
+              "typed_local_sidecar_validation": "passed",
+              "other_endpoint_metadata_remains_strict": true
+            },
+            "reuse": {
+              "windows_captured": 2,
+              "windows_retired": 2,
+              "active_capsules": 0,
+              "maximum_active_capsules": 1,
+              "same_match_pages": 2,
+              "match_closed": false
+            },
+            "final_present": {
+              "both_pages_completed": true,
+              "corrected_present_command": 50,
+              "gpu_idle_command": 51,
+              "screenshot_bytes_identical": true,
+              "screenshot_sha256": "43b1a4f434f61bf1e5d8d1873856955fd6bc7fc836da9cdd8e344ef539694f8a"
+            },
+            "evidence": {
+              "path": "browser-two-window-v4/runner/evidence.json",
+              "sha256": "e6f101b96b619881c60a10e2b06aa714ca4425750fdcdbc363018ebff93136cf"
+            },
+            "postflight": {
+              "path": "browser-two-window-v4/independent-postflight.json",
+              "sha256": "87e8e3de10ad0d7cc969e9394e49289347a3bf7dfd7e8f6745787fba73eeba70",
+              "all_recorded_pids_absent": true,
+              "nine_producer_pins_unchanged": true
+            },
+            "producer_archive": {
+              "path": "two-window-v4-producer-archive/archive.json",
+              "sha256": "85faf7c0440cc070f868632a594ed73b600466d350ace867a8ab87360c0116b3",
+              "native_source_head": "d6bb480ecf43f3899b940bb54ff5b72cf3878177",
+              "artifact_count": 9,
+              "verified_copied": true
+            },
+            "independent_review": {
+              "path": "two-window-v4-independent-sol-review.json",
+              "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4",
+              "decision": "GO_SCOPED_TWO_WINDOW_COMPONENT_RESULT",
+              "raw_lane_comparisons": 255,
+              "bridge_ticks": 35,
+              "interpretation": "Offline replay of retained envelopes and complete native evidence; no browser replay. The prior V3 mismatching payload nodes remain without exact historical type/owner attribution."
+            },
+            "configuration": {
+              "path": "linked-config-two-window-v3/final-linked-configuration-v1.json",
+              "sha256": "52ea790f323d94bce405309c0b4bd19c504c38075ec2be1a5a98018db4fdab4e"
+            }
           }
         ],
         "host_typed_particle_endpoint_v2": {
@@ -10113,6 +10216,11 @@
             "path": "adapter-and-particle-first-cause-luna-review-v1.json",
             "sha256": "31cab6fb33b94b0be7d5b59a0e6a04365ec0858541943a20a4352baea5fe35a7",
             "decision": "GO"
+          },
+          "two_window_v4_independent_sol": {
+            "path": "two-window-v4-independent-sol-review.json",
+            "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4",
+            "decision": "GO_SCOPED_TWO_WINDOW_COMPONENT_RESULT"
           }
         },
         "validation": {
@@ -10143,7 +10251,18 @@
             "texp-stage-scratch-v3",
             "texp-stage-scratch-v4"
           ],
-          "browser_result": "pending"
+          "browser_result": {
+            "status": "passed_as_changed_hypothesis",
+            "evidence": {
+              "path": "browser-two-window-v4/runner/evidence.json",
+              "sha256": "e6f101b96b619881c60a10e2b06aa714ca4425750fdcdbc363018ebff93136cf"
+            },
+            "independent_review": {
+              "path": "two-window-v4-independent-sol-review.json",
+              "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4"
+            },
+            "limitation": "Passing V4 does not prove the V3 changed PayloadRow bytes belonged to this TEV dependency; the two earlier payload nodes remain unattributed."
+          }
         }
       }
     }
