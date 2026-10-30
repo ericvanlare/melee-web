@@ -10467,7 +10467,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Reviewed packet and cost components pass. Reduce the quadratic payload validator before implementing one retained confirmed anchor for repeated corrections; full-match rollback remains open.",
+        "next": "Payload index capture/restore optimization passes independent native and browser review. Implement one immutable confirmed anchor for two arrival-driven corrections, preserving source and host-owner checks. Whole-match rollback remains open.",
         "limitations": [
           "Capture-only motor publication; physical haptics remain unimplemented.",
           "V9 spans eight intervals and 44 inputs with one- and two-tick wrong branches. The earlier V4 independently covers two seven-tick corrections. No rolling history, complete match or live network result.",
@@ -11110,7 +11110,7 @@
           "next": "Reduce and repair quadratic payload allocation-overlap validation with snapshot-owned checked sorted indexes. Preserve every owner/topology/heap/storage/interval condition, original ledger order and no-allocation restore; prove against prior algorithm before another browser experiment. Its share of browser cost is not yet attributed. Retained-anchor history remains next after cost."
         },
         "packet_cost_integration_v1": {
-          "status": "REVIEWED_LOCAL_VALIDATION_PASS_PUBLICATION_CI_PENDING",
+          "status": "MERGED_REVIEWED_TREE_AND_EXACT_HEAD_CI",
           "validation_source": "acad72d291f68fdac071eeca6311f3bd94b55200",
           "regression": {
             "tests": 3077,
@@ -11134,6 +11134,236 @@
           "publication_review": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-loop-integration-v1/publication-pre-review.json",
             "sha256": "d8f61ba5ba2b2e10c8bbe6c6967223694eb4fd3f9ef3bcdf2f3ad3993b234619"
+          },
+          "pull_request": 359,
+          "publication_head": "3e0b9fe8c8d4361f118c5ddbb5fb6883ba4858ae",
+          "merge_commit": "e51a7fe9a339bf0620bfb521d53f387e6dd1d674",
+          "merged_tree": "8f04bcc8559c8fc492dd65ff903f52ad1a7d861a",
+          "reviewed_tree": "8f04bcc8559c8fc492dd65ff903f52ad1a7d861a",
+          "trees_match": true,
+          "ci": {
+            "run_id": 41083405433,
+            "jobs": 14,
+            "successes": 12,
+            "expected_skips": 2,
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-loop-integration-v1/final-ci.json",
+              "sha256": "4bf34f4de55f99899b1433501e23791044037bfcf2c0c284aa0fdf1a0718ba6e"
+            }
+          },
+          "merge_receipt": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-loop-integration-v1/merge-verification.json",
+            "sha256": "d1a21f83ab922fba713126f5287eff4f7d27f1b832dc75f2950fca6bb351f251"
+          }
+        },
+        "payload_index_component_v1": {
+          "status": "REVIEWED_TWO_WINDOW_CAPTURE_RESTORE_COST_REDUCTION",
+          "native_and_harness_producer": "684ba68358422641edb57e5becf81a7b1bd2ede1",
+          "integration_source": "27c854da5c896caafd26cc648e9ff115f57a34b6",
+          "tree_equivalence": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-validation-index-v1/main-integration.json",
+            "sha256": "7bf2e85dcebcc06fb7c0087f15009621f83ada4bbeb5f9fee6d7585601ba4992"
+          },
+          "elapsed_seconds": 42.398504292126745,
+          "capture": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-command-cost-v2/runner/evidence.json",
+            "sha256": "9cc367fe2a31c7200bdddb73102cd8c33d5ba321e779c0f01e50c62e294b7db2"
+          },
+          "summary": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-command-cost-v2/command-cost-summary.json",
+            "sha256": "768d2b0e8eee48407ec1ae7b338f0d3162a16819391b4e8b8af74ed948f9b510"
+          },
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-command-cost-v2/independent-result-review.json",
+            "sha256": "22a58a0024553ccb6a094a732eede3513f582e2df4355868f948157491cbfd93"
+          },
+          "postflight": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-command-cost-v2/independent-postflight.json",
+            "sha256": "bc2507dda3146fba4111bf079a5964674a6ff4b1da8243ff98cd9d5a7127ea1f"
+          },
+          "source_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-validation-index-v1/independent-sol-review-v1.json",
+            "sha256": "31881bf579696d2fa62443be49cb9850a7dad65aebbefe747697bfd0827216b6"
+          },
+          "candidate": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-validation-index-v1/receipt.json",
+            "sha256": "3400ea9c620180f0ff4c6213410bd8fb1bff8eccd4a87151e8cd1bab2537782c"
+          },
+          "focused_controls": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-validation-index-v1/root-focused.json",
+            "sha256": "5587e4d4c3684c69ac46218f08f4c0373567e2b1c707c9a44668ba022501956e"
+          },
+          "integrated_source_pins": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-validation-index-v1/root-integration.json",
+            "sha256": "ae5184d6df4c773fdfbfbc06d5b4446cb4faab114d93c141fc3db2d3417c380a"
+          },
+          "build_inventory": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-payload-index-v1/artifact-inventory.json",
+            "sha256": "9a187f09f821ca85ce7d95c7a26a7a2c59e2d93873e1a3a8407161704e021e66"
+          },
+          "linked_policy": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-payload-index-v1/generation-result.json",
+            "sha256": "4f6f8493f5e2d79385b3d13ffa582e7eb4f0220103d8ecf04fe78df0c490ab73"
+          },
+          "measurements": [
+            {
+              "window": 1,
+              "lane": "reference",
+              "pre_frame": 176,
+              "post_frame": 183,
+              "costs_ms": {
+                "capture": {
+                  "preCallSetupMs": 2.7350001335144043,
+                  "nativeCallWallMs": 4.400000095367432,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.3249998092651367
+                },
+                "retire": {
+                  "preCallSetupMs": 0.009999752044677734,
+                  "nativeCallWallMs": 3.4750003814697266,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 0.034999847412109375
+                }
+              }
+            },
+            {
+              "window": 1,
+              "lane": "predicted",
+              "pre_frame": 176,
+              "post_frame": 183,
+              "costs_ms": {
+                "capture": {
+                  "preCallSetupMs": 2.3949999809265137,
+                  "nativeCallWallMs": 4.019999980926514,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.3050003051757812
+                },
+                "restore": {
+                  "preCallSetupMs": 0.010000228881835938,
+                  "nativeCallWallMs": 2.364999771118164,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.184999942779541
+                },
+                "seven_corrections_including_final_seal": {
+                  "preCallSetupMs": 0.07999992370605469,
+                  "nativeCallWallMs": 11.784999370574951,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 8.1850004196167
+                },
+                "present": {
+                  "preCallSetupMs": 0.010000228881835938,
+                  "nativeCallWallMs": 8.114999771118164,
+                  "gpuQuiescenceWaitMs": 11.900000095367432,
+                  "postCallEvidenceMs": 1.2800002098083496
+                },
+                "retire": {
+                  "preCallSetupMs": 0.005000114440917969,
+                  "nativeCallWallMs": 3.4650001525878906,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 0.034999847412109375
+                }
+              }
+            },
+            {
+              "window": 2,
+              "lane": "reference",
+              "pre_frame": 218,
+              "post_frame": 225,
+              "costs_ms": {
+                "capture": {
+                  "preCallSetupMs": 0.9449996948242188,
+                  "nativeCallWallMs": 1.6449999809265137,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.2100000381469727
+                },
+                "retire": {
+                  "preCallSetupMs": 0.005000114440917969,
+                  "nativeCallWallMs": 2.3249998092651367,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 0.02500009536743164
+                }
+              }
+            },
+            {
+              "window": 2,
+              "lane": "predicted",
+              "pre_frame": 218,
+              "post_frame": 225,
+              "costs_ms": {
+                "capture": {
+                  "preCallSetupMs": 0.9449996948242188,
+                  "nativeCallWallMs": 1.6050000190734863,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.195000171661377
+                },
+                "restore": {
+                  "preCallSetupMs": 0.014999866485595703,
+                  "nativeCallWallMs": 1.570000171661377,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 1.2049999237060547
+                },
+                "seven_corrections_including_final_seal": {
+                  "preCallSetupMs": 0.07499933242797852,
+                  "nativeCallWallMs": 14.054999828338623,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 8.269999980926514
+                },
+                "present": {
+                  "preCallSetupMs": 0.005000114440917969,
+                  "nativeCallWallMs": 7.789999961853027,
+                  "gpuQuiescenceWaitMs": 25.579999923706055,
+                  "postCallEvidenceMs": 1.309999942779541
+                },
+                "retire": {
+                  "preCallSetupMs": 0.005000114440917969,
+                  "nativeCallWallMs": 2.354999542236328,
+                  "gpuQuiescenceWaitMs": 0,
+                  "postCallEvidenceMs": 0.020000457763671875
+                }
+              }
+            }
+          ],
+          "comparisons": {
+            "endpoints": 6,
+            "domains_each": 9,
+            "raw_pairs": 51,
+            "raw_lanes": 255,
+            "timed_commands": 64
+          },
+          "implementation": "Snapshot owns two checked indexes sorted at capture. Exact current row identity gates indexed admission; changed current topology retains full validation. All source ledger order, interval, ownership, topology, heap and storage checks stay; restore allocates and sorts nothing.",
+          "limits": [
+            "Two observed headless intervals only; not foreground or production frame-budget acceptance.",
+            "Native call includes diagnostic admission/checks, Asyncify waits and final seal on command49.",
+            "Post-call evidence excludes Node validation/page.evaluate transport; no pure CPU or GPU measurement.",
+            "No native snapshot residency/capacity metric exists; serialized audit bytes are not RAM usage."
+          ],
+          "preserved_failures": "Initial native control dependency/unused-helper failures retained. Integrated trace preserves the previously merged explicit cstdint header.",
+          "added_storage": "Two size_t index arrays plus header offsets: 27,768 index bytes for 3,471 Wasm32 rows. Not total capsule residency.",
+          "next": "One immutable confirmed PRE with checked current-end advancement and two actual late-input corrections; no ring, delayed dirty repair or guessed live-input API."
+        },
+        "payload_index_integration_v1": {
+          "status": "REVIEWED_LOCAL_VALIDATION_PASS_PUBLICATION_CI_PENDING",
+          "validation_source": "27c854da5c896caafd26cc648e9ff115f57a34b6",
+          "regression": {
+            "tests": 3077,
+            "skipped": 238,
+            "failures": 0,
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-full-regression-v1/result.json",
+              "sha256": "9ffdbbed190482e7b282b7b6007467d83664595cc5b3c9ee9ff2c4d45dbe096c"
+            }
+          },
+          "ordinary_release": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-ordinary-release-v1/result.json",
+            "sha256": "002821dc09653a4b5da2860a4e37be4e95c2ef85a936affe82013ef6df52dd1f"
+          },
+          "publication_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-integration-v1/publication-pre-review.json",
+            "sha256": "d4b616d5ccd460c9e8eb8263005f20b52e1d1ead37b6de1644a700d4d31c4c70"
+          },
+          "producer_archive": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-producer-archive/archive.json",
+            "sha256": "2cd4ecc9ac9872747684781982d3cf5adb74e7e1aed55fa6a44c6677f64f76a6"
           }
         }
       }

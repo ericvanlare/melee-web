@@ -1753,22 +1753,57 @@ This is not pure CPU/GPU timing or production frame-budget acceptance. Native
 snapshot residency is still unmeasured; serialized audit size is not RAM usage.
 Exact timings and producer/review identities are in `command_cost_component_v1`.
 
-Source review identifies quadratic allocation-overlap validation, run twice
-per restore, as the next bounded target. Its share of the observed cost is not
-measured yet. The next repair will retain every ownership, topology, heap,
-storage and interval check while using snapshot-owned sorted indexes; a reduced
-native control must prove equivalence and no-allocation restoration first.
-The earlier timing freeze omitted one tested fixture from its patch; the reviewed
-seven-file freeze retains that omission and repairs its manifest. Rolling
-history, correction across refill, combat/KO breadth, combined frame budget,
-full-match play and public profile admission remain open.
+The packet/timing batch merged in PR #359 as `e51a7fe9`. The merged tree
+matches reviewed publication head `3e0b9fe8`. The full local regression at
+`acad72d2` passed 3,077 tests with 238 skips and no failures, the ordinary
+Release runtime build passed, and all 14 publication-head CI jobs completed
+with 12 successes and two expected skips (run 41083405433). The retained
+metadata-writer failures were repaired without repeating the build. The earlier
+timing freeze's omitted fixture remains recorded with its repaired seven-file
+manifest. Exact identities remain in `packet_cost_integration_v1`.
 
-The packet/timing batch passes the full local regression at `acad72d2`: 3,077
-tests, 238 skips and no failures. The ordinary Release runtime build passes at
-that source; its metadata-writer failures were retained and the output inventory
-corrected without repeating the build. Independent publication review passes
-subject to final-head CI. The existing `packet_cost_integration_v1` receipt
-retains exact validation and review identities; publication CI remains pending.
+The payload validation repair replaces repeated all-pairs overlap checks with
+two snapshot-owned indexes sorted once at capture. Admission still checks every
+interval, exact current identity, owner, topology, heap and storage condition;
+changed current topology uses the existing full validation. Restore allocates
+and sorts nothing. Native controls cover overlapping/adjacent/overflow ranges,
+invalid indexes and generations, allocation failure, failure before payload
+writes, topology growth and allocation-free restore. The initial native fixture
+failures remain retained; integration preserves the previously merged
+`<cstdint>` include.
+
+One changed-hypothesis browser run at native/harness `684ba683` passes the same
+two-window recipe in 42.40 seconds. Independent review reproduces all six
+nine-domain endpoint comparisons, 255 raw lanes and 64 command timings; both
+wrong branches, final presents, retirements and owned cleanup pass. All 2,171
+declared source policy rows retain their modes and sizes; the 3,266 mutable
+manifest rows change only their linked addresses.
+
+| Predicted-page native-call wall-time | First window, before → after | Second window, before → after |
+| --- | ---: | ---: |
+| Capture | 43.14 → 4.02 ms | 18.91 → 1.61 ms |
+| Restore | 38.28 → 2.36 ms | 37.27 → 1.57 ms |
+| Seven correction commands, including final seal | 11.61 → 11.78 ms | 14.09 → 14.05 ms |
+| Present command | 8.01 → 8.11 ms | 7.69 → 7.79 ms |
+
+These observations include the same `SAFE_HEAP=1`, `ASSERTIONS=2`, native
+diagnostics and Asyncify path. Separate GPU waits and page evidence costs remain
+in the receipt; this is not a production or foreground frame-budget result.
+The new index arrays add 27,768 bytes at 3,471 Wasm32 rows, plus header offsets;
+total capsule residency remains unmeasured. Integration source `27c854da`
+has exactly the tested producer's tree after rebasing onto merged PR #359.
+The `payload_index_component_v1` receipt binds all producers, reviews and results.
+
+The final local regression at `27c854da` passes 3,077 tests with 238 skips and
+no failures; the ordinary Release runtime also builds successfully. Independent
+publication review passes subject to exact publication-head CI. Validation and
+archive identities remain in `payload_index_integration_v1`.
+
+The next capability is one immutable confirmed PRE retained across two actual
+late-input corrections, with the current end derived from actual source frames
+inside the existing seven-tick bound. Rolling history, correction across refill,
+combat/KO breadth, combined frame budget, full-match play and public profile
+admission remain open.
 
 
 ## Stage decision dependencies, issue #333
