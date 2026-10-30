@@ -29,7 +29,9 @@ class CiVerifyTests(unittest.TestCase):
             for group, suite in selected.items()
         }
         self.assertEqual(set().union(*shard_ids.values()), all_ids)
-        self.assertEqual(shard_ids["unit-0"] & shard_ids["unit-1"], set())
+        for index, group in enumerate(ci_verify.UNIT_GROUPS):
+            for other in ci_verify.UNIT_GROUPS[index + 1:]:
+                self.assertEqual(shard_ids[group] & shard_ids[other], set())
 
     def test_unit_shards_keep_each_module_cohort_together(self):
         loader = unittest.TestLoader()
@@ -47,6 +49,44 @@ class CiVerifyTests(unittest.TestCase):
         for module, ids in by_module.items():
             owners = {group for group, shard_ids in selected.items() if ids & shard_ids}
             self.assertEqual(owners, {ci_verify.UNIT_GROUPS[ci_verify.unit_shard(module)]})
+
+    def test_rebalance_moves_only_complete_slow_modules_to_third_shard(self):
+        discovered = unittest.TestLoader().discover(str(ROOT / "tests"))
+        all_cases = list(ci_verify._test_cases(discovered))
+        modules = {ci_verify._test_module(test) for test in all_cases}
+        self.assertTrue(set(ci_verify.UNIT_SHARD_OVERRIDES).issubset(modules))
+        changed_owners = {
+            module for module in modules
+            if ci_verify.unit_shard(module) != ci_verify._stable_unit_shard(module)
+        }
+        self.assertEqual(changed_owners, set(ci_verify.UNIT_SHARD_OVERRIDES))
+        self.assertEqual(ci_verify.UNIT_SHARD_OVERRIDES, {
+            "test_source_lbaudio_joined_runtime": 2,
+            "test_first_results_state_compare": 2,
+            "test_whole_session_state_compare": 2,
+        })
+
+        all_ids = {test.id() for test in all_cases}
+        shard_ids = {
+            group: {
+                test.id() for test in ci_verify._test_cases(
+                    ci_verify._filter_suite(discovered, ci_verify._shard_index(group))
+                )
+            }
+            for group in ci_verify.UNIT_GROUPS
+        }
+        self.assertEqual(set().union(*shard_ids.values()), all_ids)
+        for index, group in enumerate(ci_verify.UNIT_GROUPS):
+            for other in ci_verify.UNIT_GROUPS[index + 1:]:
+                self.assertTrue(shard_ids[group].isdisjoint(shard_ids[other]))
+        for module in modules:
+            expected_shard = ci_verify.UNIT_SHARD_OVERRIDES.get(
+                module, ci_verify._stable_unit_shard(module),
+            )
+            module_ids = {test.id() for test in all_cases
+                          if ci_verify._test_module(test) == module}
+            owners = {group for group, ids in shard_ids.items() if ids & module_ids}
+            self.assertEqual(owners, {ci_verify.UNIT_GROUPS[expected_shard]})
 
     def test_rehomed_repository_modules_are_deferred_exactly_to_linked_owner(self):
         loader = unittest.TestLoader()
@@ -169,11 +209,13 @@ class CiVerifyTests(unittest.TestCase):
         self.assertEqual({row["test"] for row in owner_report["tests"]}, set(ids))
 
     def test_inventory_requires_both_unit_shards(self):
-        groups = dict(ci_verify.GROUPS)
-        del groups["unit-1"]
-        with patch.object(ci_verify, "GROUPS", groups):
-            with self.assertRaisesRegex(ValueError, "both unit-0 and unit-1"):
-                ci_verify.check_inventory()
+        for missing_shard in ci_verify.UNIT_GROUPS:
+            with self.subTest(missing_shard=missing_shard):
+                groups = dict(ci_verify.GROUPS)
+                del groups[missing_shard]
+                with patch.object(ci_verify, "GROUPS", groups):
+                    with self.assertRaisesRegex(ValueError, "every configured unit shard"):
+                        ci_verify.check_inventory()
 
     def test_inventory_rejects_an_omitted_target(self):
         groups = dict(ci_verify.GROUPS)

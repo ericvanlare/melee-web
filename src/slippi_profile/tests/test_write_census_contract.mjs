@@ -1940,20 +1940,20 @@ test('current light set v15 identity requires explicit light owner and two-tick 
 });
 
 
-test('TEV stage scratch v19 is explicit atop the unchanged v15 route and refuses prior identities', () => {
+test('Camera history v20 is explicit atop the unchanged v15 route and refuses prior identities', () => {
   const exports={evidence:true,evidenceBytes:true,payloadWitness:true,payloadWitnessBytes:true};
   const v15={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15'};
   const v16={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'};
   const v18={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18'};
-  const v19={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19'};
+  const v20={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20'};
   assert.equal(validateBrowserProfileForRoute(v15,true,exports,true,true),v15.profile);
-  assert.equal(validateBrowserProfileForRoute(v19,true,exports,true,true,true),v19.profile);
+  assert.equal(validateBrowserProfileForRoute(v20,true,exports,true,true,true),v20.profile);
   assert.throws(()=>validateBrowserProfileForRoute(v16,true,exports,true,true,true),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute(v18,true,exports,true,true,true),/Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v19,true,exports,true,true),/Unexpected profile identity/);
+  assert.throws(()=>validateBrowserProfileForRoute(v20,true,exports,true,true),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute(v15,true,exports,true,true,true),/Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v19,true,exports,false,false,true),/requires v15 TObj/);
-  assert.throws(()=>validateBrowserProfileForRoute(v19,false,exports,true,true,true),/requires/);
+  assert.throws(()=>validateBrowserProfileForRoute(v20,true,exports,false,false,true),/requires v15 TObj/);
+  assert.throws(()=>validateBrowserProfileForRoute(v20,false,exports,true,true,true),/requires/);
   for (const profile of [
     'slippi-render-dependencies-logical-frame-lobj-tobj-v8',
     'slippi-render-dependencies-logical-frame-lobj-tobj-stateless-v9',
@@ -1965,6 +1965,7 @@ test('TEV stage scratch v19 is explicit atop the unchanged v15 route and refuses
     'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16',
     'slippi-render-dependencies-logical-frame-lobj-tobj-particle-measurement-v17',
     'slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18',
+    'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
   ]) assert.throws(()=>validateBrowserProfileForRoute({profile},true,exports,true,true,true),/Unexpected profile identity/);
   assert.throws(()=>validateCpuRestoreRouteSelection({'--slippi-particle-presentation-cache':true}),/requires v15 TObj/);
   const route={'--aggregate-cpu-drawn-reference-two-tick':true,
@@ -1975,14 +1976,14 @@ test('TEV stage scratch v19 is explicit atop the unchanged v15 route and refuses
     '--slippi-particle-presentation-cache']),/requires v15 TObj/);
 });
 
-test('seven-tick route requires the exact private v19 profile and keeps its ABI selection explicit', () => {
+test('seven-tick route requires the exact private v20 profile and keeps its ABI selection explicit', () => {
   const config='config.json';
   const route={'--aggregate-cpu-drawn-reference-seven-tick':true,
     '--aggregate-cpu-restore-config':config,'--slippi-lobj-presentation-cache':true,
     '--slippi-tobj-presentation-cache':true,'--slippi-particle-presentation-cache':true};
   assert.equal(validateCpuRestoreRouteSelection(route),'drawn-reference-no-draw-seven-tick-v1');
   assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--slippi-particle-presentation-cache':false}),
-    /seven-tick route requires the private v19/);
+    /seven-tick route requires the private v20/);
   assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--aggregate-cpu-drawn-reference-two-tick':true}),
     /mutually exclusive/);
   assert.equal(validateCpuRestoreRouteSelection({...route,'--correct-predicted-branch-loop-packets':true}),
@@ -1993,20 +1994,20 @@ test('seven-tick route requires the exact private v19 profile and keeps its ABI 
     /fixed seven-tick-capable preparation route/);
   assert.throws(()=>parseArgs(['--browser-runtime','runtime.mjs','--assets','assets','--manifest','manifest.json','--out','new-output',
     '--aggregate-cpu-drawn-reference-seven-tick','--aggregate-cpu-restore-config',config,
-    '--slippi-lobj-presentation-cache','--slippi-tobj-presentation-cache']),/seven-tick route requires the private v19/);
+    '--slippi-lobj-presentation-cache','--slippi-tobj-presentation-cache']),/seven-tick route requires the private v20/);
 
   const exports={evidence:true,evidenceBytes:true};
   const v18={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18'};
-  const v19={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19'};
-  assert.equal(validateBrowserProfileForRoute(v19,false,null,true,true,true,true,exports),v19.profile);
+  const v20={profile:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20'};
+  assert.equal(validateBrowserProfileForRoute(v20,false,null,true,true,true,true,exports),v20.profile);
   assert.throws(()=>validateBrowserProfileForRoute(v18,false,null,true,true,true,true,exports),
     /Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v19,false,null,true,true,false,true,exports),
-    /seven-tick route requires the private v19/);
+  assert.throws(()=>validateBrowserProfileForRoute(v20,false,null,true,true,false,true,exports),
+    /seven-tick route requires the private v20/);
   assert.throws(()=>validateBrowserProfileForRoute(
     {profile:'slippi-render-dependencies-logical-frame-lobj-tobj-particle-preparation-v16'},
     false,null,true,true,true,true,exports),/Unexpected profile identity/);
-  assert.throws(()=>validateBrowserProfileForRoute(v19,false,null,true,true,true,true,{evidence:true,evidenceBytes:false}),
+  assert.throws(()=>validateBrowserProfileForRoute(v20,false,null,true,true,true,true,{evidence:true,evidenceBytes:false}),
     /evidence exports are unavailable/);
 });
 
@@ -2022,7 +2023,7 @@ test('packet opt-in hashes its adapter and loaded relay/runtime source chain onl
     'net_lockstep_websocket_relay.mjs','net_room_relay_runtime_owner.mjs',
     'net_room_relay_direct_runtime.mjs','net_room_relay_miniflare_options.mjs'])
     assert.ok(packetHashes.includes(name),`packet route hashes loaded source ${name}`);
-  assert.match(source,/harnessSha256: sourceHashes\(\{packetInput: correctedLoopPackets\}\)/);
+  assert.match(source,/harnessSha256: sourceHashes\(\{packetInput: correctedLoopPackets\|\|correctedHistory\}\)/);
   assert.match(source,/const packetModule=await import\('\.\/cpu_corrected_loop_packet_input\.mjs'\)/);
   assert.match(source,/!relayTools\|\|!path\.isAbsolute\(relayTools\)/);
   assert.match(source,/wrangler\/package\.json','miniflare\/package\.json','workerd\/package\.json/);
@@ -2034,11 +2035,11 @@ test('actual initialized profile assignment retains writer scope, not zero-count
   const initial=source.match(/profile: (\{identity: null, sourceIdentity: null,[\s\S]*?\}),\n    input:/)?.[1];
   const initialized=source.match(/report\.profile = \{\.\.\.report\.profile, identity: init\.profile,[\s\S]*?\};/)?.[0];
   assert.ok(initial,'actual initial profile object is extracted');assert.ok(initialized,'actual post-initialization profile assignment is extracted');
-  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15','slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19'];
+  const profiles=['slippi-render-dependencies-dbooc-shield-drop-v5','slippi-render-dependencies-logical-frame-v6','slippi-render-dependencies-logical-frame-lobj-v7','slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15','slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20'];
   for(let i=0;i<profiles.length;i++) {
     const context={init:{profile:profiles[i],source:'actual-source',rngHelper:'rng',stageBridge:'stage'},SOURCE_SEED:7,
       SYNCTEST_PROFILE:profiles[0],LOGICAL_FRAME_V6_PROFILE:profiles[1],LOBJ_PRESENTATION_V7_PROFILE:profiles[2],LOBJ_CURRENT_SET_V15_PROFILE:profiles[3],
-      TEV_STAGE_SCRATCH_V19_PROFILE:profiles[4],
+      CAMERA_HISTORY_V20_PROFILE:profiles[4],
       twoTickDrawnReference:i>0,lobjPresentationCache:i>1,tobjPresentationCache:i>2,particlePresentationCache:i>3};
     context.report={profile:vm.runInNewContext('('+initial+')',context)};
     const prior=context.report.profile.sourceTextureMatrixWriterDiagnostic;

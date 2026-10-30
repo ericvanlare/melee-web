@@ -1244,7 +1244,7 @@ def main():
     parser.add_argument("--slippi-tobj-presentation-cache", action="store_true",
                         help="Enable the isolated private incomplete v9 stateless texture matrix presentation")
     parser.add_argument("--slippi-particle-presentation-cache", action="store_true",
-                        help="Enable the private v19 TEV stage scratch profile")
+                        help="Enable the private v20 camera history profile")
     parser.add_argument("--stage-arena-owner-diagnostic", action="store_true",
                         help="Enable the private Release Slippi stage-arena owner inventory")
     args = parser.parse_args()

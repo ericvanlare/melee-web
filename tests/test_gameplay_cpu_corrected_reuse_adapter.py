@@ -59,7 +59,10 @@ class GameplayCpuCorrectedReuseAdapterTests(OwnedWorkspaceTests):
         base=base.replace('@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@',browser[start:end].rstrip())
         base=base.replace('#include "cpu_restore_adapter.inc"',
             '#include "gameplay_cpu_endpoint.hpp"\n#define MELEE_WEB_SYNCTEST_CORRECTED_CPU 1\n'
-            'namespace { bool cpu_corrected_active(); void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>&); }\n'
+            'namespace { // This fixture links only the legacy reusable route; history has no owner here.\n'
+            'bool cpu_history_active(){ return false; }\n'
+            'void cpu_history_forbid(std::vector<melee_web::CpuIntervalSpan>&) { if(cpu_history_active()) std::abort(); }\n'
+            'bool cpu_corrected_active(); void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>&); }\n'
             '#include "cpu_restore_adapter.inc"\n#include "cpu_corrected_adapter.inc"')
         base=base.replace('std::uint32_t payload_admission_runtime_boundary() { return 0; }',
             'bool corrected_runtime_refused=false;\n'

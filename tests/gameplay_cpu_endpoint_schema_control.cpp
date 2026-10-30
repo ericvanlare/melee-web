@@ -1,4 +1,5 @@
 #include "gameplay_cpu_endpoint.hpp"
+#include "gameplay_cpu_checkpoint.hpp"
 #include "gameplay_match_session.hpp"
 #include <cassert>
 #include <cstdio>
@@ -10,6 +11,24 @@ namespace melee_web {
 std::uint32_t GameplayMatchSession::source_frames() const { return 0; }
 GameplayMatchCpuOwners GameplayMatchSession::diagnostic_cpu_owners() const noexcept { return {}; }
 CpuStaticEndpointRow GameplayCpuStatics::endpoint_row(std::uint64_t) const noexcept { return {}; }
+CpuStaticEndpointRow GameplayCpuStatics::history_endpoint_row(std::uint64_t) const noexcept { return {}; }
+CpuStaticEndpointRow GameplayCpuCheckpoint::history_static_row(std::uint64_t) const noexcept { return {}; }
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::endpoint_binding(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::endpoint_slot(std::uint32_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::endpoint_cache(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::endpoint_event(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_captured_pre_binding(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_captured_pre_slot(std::uint32_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_captured_pre_cache(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_captured_pre_event(std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_armed_pre_binding(std::uint64_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_armed_pre_slot(std::uint64_t,std::uint32_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_armed_pre_cache(std::uint64_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_armed_pre_event(std::uint64_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_restored_pre_binding(std::uint64_t,std::uint64_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_restored_pre_slot(std::uint64_t,std::uint64_t,std::uint32_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_restored_pre_cache(std::uint64_t,std::uint64_t,std::uint32_t) const noexcept { return {}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_restored_pre_event(std::uint64_t,std::uint64_t,std::uint32_t) const noexcept { return {}; }
 }
 
 extern "C" {

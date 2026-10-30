@@ -8,7 +8,8 @@ import {access,mkdir,mkdtemp,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildCpuCorrectedLoopCapsules} from './cpu_corrected_loop_runner.mjs';
-import {buildCpuCorrectedLoopPacketAgreement,openCpuCorrectedLoopPacketInput} from './cpu_corrected_loop_packet_input.mjs';
+import {buildCpuCorrectedLoopPacketAgreement,buildCpuHistoryPacketAgreement,
+  CpuCorrectedLoopPacketInput,openCpuCorrectedLoopPacketInput} from './cpu_corrected_loop_packet_input.mjs';
 import {LOCKSTEP_VERSION} from '../../../scripts/net_lockstep_protocol.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
@@ -20,11 +21,11 @@ const toolsAvailable=Boolean(toolsPath&&path.isAbsolute(toolsPath)&&
   ['wrangler/package.json','miniflare/package.json','workerd/package.json']
   .every(file=>existsSync(path.join(toolsPath,file))));
 const evidenceConfigured=Boolean(OUT&&path.isAbsolute(OUT));
-const diagnosticProfile={identity:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
+const diagnosticProfile={identity:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20',
   sourceIdentity:'122a2a6d4e5361b0733c9d2b22c2865e01a81d960848bb79e82ce120b5cef271',
   rngHelper:'2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e',
   stageBridge:'a81e21f9629e711b3975ca93b821bedd2c13cf06fde6381585bc3918a8aef3db',
-  seed:324508639,name:'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19',
+  seed:324508639,name:'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20',
   sourceTextureMatrixWriterDiagnostic:'NOT_APPLICABLE_STATELESS_TOBJ_PRESENTATION_V15',
   sourceLvecWriterDiagnostic:'NOT_APPLICABLE_SOURCE_CACHE_RELOCATED_V7'};
 const observedInitializer={valid:1,profile:0,seed:324508639,stage_kind:37,player_count:2,
@@ -38,6 +39,54 @@ const agreementInputs={producer:{commit:'a'.repeat(40),tree:'b'.repeat(40)},prof
   runtimeSha256:{runtime:'e'.repeat(64)},harnessSha256:{runner:'f'.repeat(64)},
   worker:{identity:{runtime:'owned-worker'},hashes:{worker:'1'.repeat(64)}}};
 
+function createMockPair(){
+  const listeners={alpha:null,beta:null},pending={alpha:new Set(),beta:new Set()};
+  let closed=false;
+  const endpoint=role=>({
+    send(text){
+      if(closed)return Promise.reject(new Error('mock pair is closed'));
+      const receiver=role==='alpha'?'beta':'alpha',listener=listeners[receiver];
+      if(typeof listener!=='function')return Promise.reject(new Error(`mock ${receiver} listener is not attached`));
+      const task=Promise.resolve().then(()=>listener(text));
+      pending[receiver].add(task);
+      task.finally(()=>pending[receiver].delete(task)).catch(()=>{});
+      task.catch(()=>{});
+      return Promise.resolve();
+    },
+    onMessage(listener){listeners[role]=listener;},
+    async drainInbound(timeoutMs){
+      const deadline=Date.now()+timeoutMs;
+      while(pending[role].size){
+        const remaining=deadline-Date.now();
+        if(remaining<=0)throw new Error(`mock ${role} inbound callbacks exceeded ${timeoutMs} ms`);
+        let timer;
+        try{await Promise.race([Promise.all([...pending[role]]),new Promise((_,reject)=>{
+          timer=setTimeout(()=>reject(new Error(`mock ${role} inbound callbacks exceeded ${timeoutMs} ms`)),remaining);
+        })]);}
+        finally{clearTimeout(timer);}
+      }
+    },
+  });
+  return {alpha:endpoint('alpha'),beta:endpoint('beta'),transport:{type:'in-memory-test-only'},
+    async close(){
+      const drained=await Promise.allSettled([
+        Promise.all([...pending.alpha]),Promise.all([...pending.beta])]);
+      closed=true;
+      const failure=drained.find(row=>row.status==='rejected');
+      if(failure)throw failure.reason;
+      return {closed:true};
+    }};
+}
+
+function mockHistoryRows(){
+  return Array.from({length:4},(_,index)=>{
+    const frame=Buffer.alloc(44),p0=Buffer.alloc(11),p1=Buffer.alloc(11);
+    p0[0]=0x10+index;p1[2]=0x40+index;
+    frame.set(p0,0);frame.set(p1,11);frame[32]=0xff;frame[43]=0xff;
+    return frame.toString('base64');
+  });
+}
+
 test('invalid start identity is rejected before opening the loopback relay',async()=>{
   await assert.rejects(()=>openCpuCorrectedLoopPacketInput({runtime:{base:'http://127.0.0.1:1'},agreement:{}}),
     /start identity is not bound/);
@@ -45,6 +94,8 @@ test('invalid start identity is rejected before opening the loopback relay',asyn
 
 test('A2 agreement binds the initialized source identity and observed port/controller map',()=>{
   const agreement=buildCpuCorrectedLoopPacketAgreement(agreementInputs);
+  assert.equal(agreement.scope,'cpu-corrected-loop-packet-input-v1');
+  assert.deepEqual(agreement.samples,{first:300,last:343});
   assert.equal(agreement.profile.identity,diagnosticProfile.identity);
   assert.equal(agreement.profile.sourceIdentity,diagnosticProfile.sourceIdentity);
   assert.equal(agreement.profile.rngHelper,diagnosticProfile.rngHelper);
@@ -65,6 +116,73 @@ test('A2 agreement binds the initialized source identity and observed port/contr
   assert.deepEqual(buildCpuCorrectedLoopPacketAgreement({...agreementInputs,
     initializer:JSON.stringify(equivalentInitializer),inputMapping:equivalentMapping})
     .profile.inputMapping,equivalentMapping);
+});
+
+test('retained-PRE agreement and bounded mock peer carry exactly four rows in 2+1+1 capsules',async()=>{
+  const agreement=buildCpuHistoryPacketAgreement(agreementInputs);
+  assert.equal(agreement.protocol,'melee-web-local-lockstep-a2-v1');
+  assert.equal(agreement.scope,'cpu-history-packet-input-v1');
+  assert.deepEqual(agreement.samples,{first:300,last:303});
+  assert.deepEqual(agreement.profile.inputMapping,observedInputMapping);
+  assert.throws(()=>new CpuCorrectedLoopPacketInput(createMockPair(),
+    {...agreement,samples:{first:300,last:343}}),/start identity is not bound/,
+    'history admission must reject a 44-row extent under the four-row scope');
+
+  const pair=createMockPair(),packetInput=new CpuCorrectedLoopPacketInput(pair,agreement);
+  try{
+    const startup=await packetInput.start();
+    assert.deepEqual(startup.neutralPreroll,{alpha:2,beta:2});
+    assert.deepEqual(startup.protocolFrameRows,{alpha:2,beta:2});
+    const rows=mockHistoryRows();
+    const capsules=[
+      {startSample:300,span:2,kind:'speculative-history',rows:rows.slice(0,2)},
+      {startSample:302,span:1,kind:'speculative-history',rows:rows.slice(2,3)},
+      {startSample:303,span:1,kind:'confirmed-rebase',rows:rows.slice(3)},
+    ];
+    const receipts=[];
+    for(const capsule of capsules){
+      packetInput.prepareCapsule(capsule);
+      if(capsule.kind.startsWith('speculative')){
+        const requestNs=process.hrtime.bigint().toString();
+        let resolveDraw;
+        const drawPending=new Promise(resolve=>{resolveDraw=resolve;});
+        const drawResult=drawPending.then(()=>packetInput.notePredictedDrawResolved(capsule.startSample));
+        const published=await packetInput.publishCapsule(capsule,{predictedDrawRequestNs:requestNs});
+        assert.equal(published.receivedRowCount,capsule.span);
+        resolveDraw();
+        await drawResult;
+      }else await packetInput.publishCapsule(capsule);
+      const receipt=await packetInput.drainCapsule(capsule);
+      assert.equal(receipt.sourceStartSample,capsule.startSample);
+      assert.equal(receipt.receivedRowCount,capsule.span);
+      assert.equal(receipt.agreementScope,'cpu-history-packet-input-v1');
+      assert.equal(receipt.transport,'in-memory-test-only');
+      assert.equal(receipt.socketOwner,'test-only endpoint adapter; no browser execution');
+      if(capsule.kind.startsWith('speculative')){
+        assert.equal(receipt.releasedWithPredictedCommand67,true);
+        assert.equal(receipt.predictedCommand67ReceiveCallbackOverlap,true);
+        assert.equal('releasedWithPredictedCommand40' in receipt,false);
+      }else assert.equal(receipt.releasedWithPredictedCommand67,false);
+      receipts.push(receipt);
+      assert.equal(packetInput.summary().pendingInboxRows,0);
+    }
+    const summary=packetInput.summary();
+    assert.equal(summary.agreementScope,'cpu-history-packet-input-v1');
+    assert.deepEqual(summary.expectedSamples,{first:300,last:303});
+    assert.equal(summary.expectedRows,4);
+    assert.equal(summary.expectedSourceTicks,6);
+    assert.equal(summary.receivedRows,4);
+    assert.equal(summary.receivedHistoryRows,4);
+    assert.equal(summary.completedCapsules,3);
+    assert.deepEqual(summary.protocolFrameRows,{alpha:6,beta:6});
+    assert.equal(summary.peers.alpha.remote_contiguous_input,3);
+    assert.equal(summary.peers.beta.remote_contiguous_input,3);
+    for(let index=0;index<rows.length;index++){
+      const expected=Buffer.from(rows[index],'base64').subarray(11,22);
+      assert.deepEqual(packetInput.getRemotePad(300+index),expected);
+    }
+    assert.equal(receipts.length,3);
+  }finally{await packetInput.close();}
 });
 
 test('actual local Worker carries all 44 A2 remote PAD contributions with bounded one-capsule authority',

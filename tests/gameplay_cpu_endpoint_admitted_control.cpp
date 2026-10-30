@@ -22,6 +22,12 @@ std::uint32_t cache_next=21;
 std::uint32_t action_view=MELEE_WEB_ACTION_ENDPOINT_PRE;
 std::uint32_t action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
 bool action_admitted=true;
+bool source_files_quiet=true;
+bool history_captured_action_ok=true,history_armed_action_ok=true,history_restored_action_ok=true;
+bool history_corrected_tape_empty=true;
+std::uint64_t history_action_incarnation=1;
+std::uint32_t history_action_restore_count=1;
+std::uint32_t history_action_role=0; // 1 captured PRE, 2 restored PRE, 3 selected END, 4 armed PRE
 std::uint32_t source_word=0x13579bdf;
 std::uint64_t process_mask=0x123456789abcdef0ULL;
 std::uint32_t profile_phase=6;
@@ -48,8 +54,9 @@ std::uint8_t owner_token=0,context_token=0,flow_token=0,audio_token=0;
 std::uint8_t snapshot_token=0,payload_token=0,bootstrap_token=0,action_token=0;
 std::uint32_t marker=0;
 std::uint8_t session_storage[256]{};
+MeleeWebCpuMotorEvidence history_motor_evidence{};
 alignas(GameplayMatchSession) std::byte session_memory[sizeof(GameplayMatchSession)];
-alignas(GameplayCpuCheckpoint) std::byte checkpoint_memory[4][sizeof(GameplayCpuCheckpoint)];
+alignas(GameplayCpuCheckpoint) std::byte checkpoint_memory[10][sizeof(GameplayCpuCheckpoint)];
 
 template<class T> T* handle(std::uintptr_t n)
 { return reinterpret_cast<T*>(n); }
@@ -78,6 +85,98 @@ std::unique_ptr<GameplayCpuStatics> statics_at(CpuStaticEndpointPhase phase)
     assert(value->endpoint_header().status==CpuStaticEndpointStatus::Ok);
     return value;
 }
+
+std::unique_ptr<GameplayCpuStatics> history_statics_pre(std::uint32_t pre_frame)
+{
+    auto value=statics_at(CpuStaticEndpointPhase::Captured);
+    assert(value->begin_history(pre_frame));
+    return value;
+}
+
+std::unique_ptr<GameplayCpuStatics> history_statics_armed(std::uint32_t pre_frame)
+{
+    auto value=history_statics_pre(pre_frame);
+    assert(value->history_begin_incarnation(1,pre_frame));
+    return value;
+}
+
+std::unique_ptr<GameplayCpuStatics> history_statics_end(std::uint32_t pre_frame,
+    std::uint64_t incarnation,std::uint32_t end_frame,std::uint32_t end_word)
+{
+    source_word=0x13579bdf;
+    auto value=history_statics_pre(pre_frame);
+    assert(value->history_begin_incarnation(incarnation,pre_frame));
+    source_word=end_word;
+    assert(value->history_seal_endpoint(incarnation,end_frame));
+    return value;
+}
+
+std::unique_ptr<GameplayCpuStatics> history_statics_restored_pre(
+    std::uint32_t pre_frame,std::uint64_t incarnation,std::uint32_t end_frame,
+    std::uint32_t pre_word,std::uint32_t end_word)
+{
+    source_word=pre_word;
+    auto value=history_statics_pre(pre_frame);
+    assert(value->history_begin_incarnation(incarnation,pre_frame));
+    source_word=end_word;
+    assert(value->history_seal_endpoint(incarnation,end_frame));
+    assert(value->history_close_endpoint(incarnation,end_frame));
+    assert(value->history_prepare_commit(incarnation,end_frame));
+    assert(value->history_admit_commit(incarnation,end_frame));
+    value->history_commit_prevalidated();
+    assert(source_word==pre_word);
+    assert(value->history_restored_pre_admit(incarnation,1,pre_frame));
+    return value;
+}
+
+std::unique_ptr<GameplayCpuStatics> history_statics_restored_second_incarnation(
+    std::uint32_t pre_frame,std::uint32_t pre_word)
+{
+    source_word=pre_word;
+    auto value=history_statics_pre(pre_frame);
+    assert(value->history_begin_incarnation(1,pre_frame));
+    source_word=0x2468ace0;
+    assert(value->history_seal_endpoint(1,11));
+    assert(value->history_close_endpoint(1,11));
+    assert(value->history_begin_incarnation(2,11));
+    source_word=0x369cf258;
+    assert(value->history_seal_endpoint(2,12));
+    assert(value->history_close_endpoint(2,12));
+    assert(value->history_prepare_commit(2,12));
+    assert(value->history_admit_commit(2,12));
+    value->history_commit_prevalidated();
+    assert(source_word==pre_word);
+    assert(value->history_restored_pre_admit(2,1,pre_frame));
+    return value;
+}
+
+std::unique_ptr<GameplayCpuStatics> history_statics_restored_twice(
+    std::uint32_t pre_frame,std::uint32_t pre_word)
+{
+    source_word=pre_word;
+    auto value=history_statics_pre(pre_frame);
+    assert(value->history_begin_incarnation(1,pre_frame));
+    source_word=0x2468ace0;
+    assert(value->history_seal_endpoint(1,12));
+    assert(value->history_close_endpoint(1,12));
+    assert(value->history_prepare_commit(1,12));
+    assert(value->history_admit_commit(1,12));
+    value->history_commit_prevalidated();
+    assert(source_word==pre_word);
+    source_word=0x13572468;
+    assert(value->history_seal_endpoint(1,12));
+    assert(value->history_close_endpoint(1,12));
+    assert(value->history_begin_incarnation(2,12));
+    source_word=0x369cf258;
+    assert(value->history_seal_endpoint(2,14));
+    assert(value->history_close_endpoint(2,14));
+    assert(value->history_prepare_commit(2,14));
+    assert(value->history_admit_commit(2,14));
+    value->history_commit_prevalidated();
+    assert(source_word==pre_word);
+    assert(value->history_restored_pre_admit(2,2,pre_frame));
+    return value;
+}
 }
 
 void* operator new(std::size_t size)
@@ -99,6 +198,8 @@ GameplayMatchCpuOwners GameplayMatchSession::diagnostic_cpu_owners() const noexc
 { return live_owners; }
 std::uint32_t GameplayMatchSession::source_frames() const
 { return live_frame; }
+bool GameplayMatchSession::diagnostic_source_files_quiescent() const noexcept
+{ return source_files_quiet; }
 }
 
 namespace melee_web {
@@ -138,10 +239,71 @@ struct GameplayCpuEndpointTestFixture {
     { return checkpoint(slot,std::move(statics),GameplayCpuCheckpoint::Phase::Sealed); }
     static GameplayCpuCheckpoint* corrected_sealed(unsigned slot,std::unique_ptr<GameplayCpuStatics> statics)
     { return checkpoint(slot,std::move(statics),GameplayCpuCheckpoint::Phase::CorrectedSealed); }
+    static GameplayCpuCheckpoint* history(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics,GameplayCpuCheckpoint::Phase phase,
+        std::uint64_t incarnation,std::uint32_t end_frame,
+        std::uint32_t restore_end,std::uint32_t restore_count)
+    {
+        auto* value=checkpoint(slot,std::move(statics),phase);
+        value->history_mode_=true;
+        value->history_incarnation_=incarnation;
+        value->history_start_frame_=10;
+        value->history_end_frame_=end_frame;
+        value->history_restore_end_=restore_end;
+        value->history_restore_count_=restore_count;
+        value->commit_.effect_token=phase==GameplayCpuCheckpoint::Phase::HistoryReady?0:0x10b;
+        value->history_actions_=GameplayActionStoreHistory::capture();
+        assert(value->history_actions_);
+        return value;
+    }
+    static GameplayCpuCheckpoint* history_ready(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics)
+    { return history(slot,std::move(statics),GameplayCpuCheckpoint::Phase::HistoryReady,0,0,0,0); }
+    static GameplayCpuCheckpoint* history_armed(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics)
+    { return history(slot,std::move(statics),GameplayCpuCheckpoint::Phase::HistoryRecording,1,0,0,0); }
+    static GameplayCpuCheckpoint* history_predicted(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics,std::uint32_t end_frame)
+    { return history(slot,std::move(statics),GameplayCpuCheckpoint::Phase::HistorySealed,1,end_frame,0,0); }
+    static GameplayCpuCheckpoint* history_correcting(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics,std::uint64_t incarnation,
+        std::uint32_t end_frame,std::uint32_t restore_count)
+    { return history(slot,std::move(statics),GameplayCpuCheckpoint::Phase::HistoryCorrecting,
+        incarnation,end_frame,end_frame,restore_count); }
+    static GameplayCpuCheckpoint* history_corrected(unsigned slot,
+        std::unique_ptr<GameplayCpuStatics> statics,std::uint64_t incarnation,
+        std::uint32_t end_frame,std::uint32_t restore_count)
+    { return history(slot,std::move(statics),GameplayCpuCheckpoint::Phase::HistoryCorrectedSealed,
+        incarnation,end_frame,end_frame,restore_count); }
     static GameplayCpuCheckpoint* captured(unsigned slot,std::unique_ptr<GameplayCpuStatics> statics)
     { return checkpoint(slot,std::move(statics),GameplayCpuCheckpoint::Phase::Captured); }
     static void release_statics(GameplayCpuCheckpoint& value)
     { value.commit_.statics=nullptr;value.statics_.reset(); }
+    static void release_history(GameplayCpuCheckpoint& value)
+    { value.history_actions_.reset(); }
+    static void set_history_identity(GameplayCpuCheckpoint& value,
+        GameplayCpuCheckpoint::Phase phase,std::uint64_t incarnation,
+        std::uint32_t end_frame,std::uint32_t restore_end,std::uint32_t restore_count)
+    {
+        value.phase_=phase;value.history_incarnation_=incarnation;
+        value.history_end_frame_=end_frame;value.history_restore_end_=restore_end;
+        value.history_restore_count_=restore_count;
+    }
+    static void set_history_phase_recording(GameplayCpuCheckpoint& value)
+    { value.phase_=GameplayCpuCheckpoint::Phase::HistoryRecording; }
+    static void set_history_end(GameplayCpuCheckpoint& value,std::uint32_t end_frame)
+    { value.history_end_frame_=end_frame; }
+    static void set_history_restore_count(GameplayCpuCheckpoint& value,std::uint32_t count)
+    { value.history_restore_count_=count; }
+    static void set_history_effect_token(GameplayCpuCheckpoint& value,std::uint64_t token)
+    { value.commit_.effect_token=token; }
+    static void reset_history_ready(GameplayCpuCheckpoint& value)
+    {
+        value.phase_=GameplayCpuCheckpoint::Phase::HistoryReady;
+        value.history_incarnation_=0;value.history_start_frame_=10;
+        value.history_end_frame_=0;value.history_restore_end_=0;
+        value.history_restore_count_=0;value.commit_.effect_token=0;
+    }
 };
 }
 
@@ -151,7 +313,40 @@ using K=GameplayCpuEndpointRowKind;
 using V=GameplayCpuEndpointView;
 using P=GameplayCpuEndpointProvenance;
 
-void emit(GameplayCpuEndpointReader& reader,std::uint32_t& emitted,
+void hash_bytes(std::uint64_t& hash,const void* bytes,std::size_t count)
+{
+    const auto* values=static_cast<const std::uint8_t*>(bytes);
+    for(std::size_t i=0;i<count;++i){hash^=values[i];hash*=1099511628211ULL;}
+}
+
+void digest_record(std::uint64_t& hash,const GameplayCpuEndpointRecord& row)
+{
+    hash_bytes(hash,&row.status,sizeof(row.status));
+    hash_bytes(hash,&row.schema,sizeof(row.schema));
+    hash_bytes(hash,&row.view,sizeof(row.view));
+    hash_bytes(hash,&row.provenance,sizeof(row.provenance));
+    hash_bytes(hash,&row.domain,sizeof(row.domain));
+    hash_bytes(hash,&row.row_kind,sizeof(row.row_kind));
+    hash_bytes(hash,&row.index,sizeof(row.index));
+    hash_bytes(hash,&row.count,sizeof(row.count));
+    hash_bytes(hash,&row.metadata_bytes,sizeof(row.metadata_bytes));
+    hash_bytes(hash,&row.flags,sizeof(row.flags));
+    hash_bytes(hash,row.fields,sizeof(row.fields));
+    hash_bytes(hash,&row.borrowed_address,sizeof(row.borrowed_address));
+    hash_bytes(hash,&row.borrowed_bytes,sizeof(row.borrowed_bytes));
+    hash_bytes(hash,&row.reserved,sizeof(row.reserved));
+    if(row.borrowed_bytes)
+        hash_bytes(hash,reinterpret_cast<const void*>(
+            static_cast<std::uintptr_t>(row.borrowed_address)),row.borrowed_bytes);
+}
+
+struct BatchResult {
+    std::uint64_t cache_next{},clock_unk4{},cadence_x0_0_x8{},digest{},effect_token{};
+    std::uint32_t rows{},payload_value{};
+};
+
+GameplayCpuEndpointRecord emit(GameplayCpuEndpointReader& reader,std::uint32_t& emitted,
+          std::uint64_t& digest,
           V view,P provenance,D domain,K kind,std::uint32_t index,
           std::uint32_t count,std::uint32_t fields,
           const void* borrowed=nullptr,std::uint32_t borrowed_bytes=0)
@@ -170,30 +365,34 @@ void emit(GameplayCpuEndpointReader& reader,std::uint32_t& emitted,
         assert(row.borrowed_address==reinterpret_cast<std::uintptr_t>(borrowed));
         assert(row.borrowed_bytes==borrowed_bytes);
     }else assert(row.borrowed_address==0&&row.borrowed_bytes==0);
+    digest_record(digest,row);
     ++emitted;
+    return row;
 }
 
-struct BatchResult {std::uint64_t cache_next{},clock_unk4{},cadence_x0_0_x8{};std::uint32_t rows{},payload_value{};};
 BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& checkpoint,
-                           V view,P provenance,std::uint32_t frame)
+                           V view,P provenance,std::uint32_t frame,bool history=false)
 {
     live_frame=frame;
     const auto strict_before=strict_payload_calls,current_before=current_payload_calls;
     GameplayCpuEndpointReader reader;
     watch_new=true;watched_new=0;
-    assert(reader.begin(session,checkpoint,view,provenance));
+    assert(history?reader.begin_history(session,checkpoint,view,provenance):
+                   reader.begin(session,checkpoint,view,provenance));
     assert(reader.status()==GameplayCpuEndpointStatus::Ok&&reader.active());
     std::uint32_t n=0;
-    emit(reader,n,view,provenance,D::Owner,K::Owner,0,1,7);
-    emit(reader,n,view,provenance,D::Effects,K::EffectToken,0,1,1);
-    emit(reader,n,view,provenance,D::Effects,K::LObjAnchor,0,1,5);
-    emit(reader,n,view,provenance,D::Effects,K::TObjAnchor,0,1,5);
-    emit(reader,n,view,provenance,D::Effects,K::ParticleAnchor,0,1,5);
-    emit(reader,n,view,provenance,D::Actions,K::Header,0,1,5);
-    emit(reader,n,view,provenance,D::Actions,K::ActionBinding,0,1,7);
-    emit(reader,n,view,provenance,D::Actions,K::ActionSlot,0,2,16,symbol_a,sizeof(symbol_a));
-    emit(reader,n,view,provenance,D::Actions,K::ActionSlot,1,2,16,symbol_b,sizeof(symbol_b));
     BatchResult result{};
+    std::uint64_t digest=14695981039346656037ULL;
+    emit(reader,n,digest,view,provenance,D::Owner,K::Owner,0,1,7);
+    const auto effect=emit(reader,n,digest,view,provenance,D::Effects,K::EffectToken,0,1,1);
+    result.effect_token=effect.fields[GameplayCpuEndpointField::Effects::Token];
+    emit(reader,n,digest,view,provenance,D::Effects,K::LObjAnchor,0,1,5);
+    emit(reader,n,digest,view,provenance,D::Effects,K::TObjAnchor,0,1,5);
+    emit(reader,n,digest,view,provenance,D::Effects,K::ParticleAnchor,0,1,5);
+    emit(reader,n,digest,view,provenance,D::Actions,K::Header,0,1,5);
+    emit(reader,n,digest,view,provenance,D::Actions,K::ActionBinding,0,1,7);
+    emit(reader,n,digest,view,provenance,D::Actions,K::ActionSlot,0,2,16,symbol_a,sizeof(symbol_a));
+    emit(reader,n,digest,view,provenance,D::Actions,K::ActionSlot,1,2,16,symbol_b,sizeof(symbol_b));
     for(std::uint32_t i=0;i<2;++i){
         const auto row=reader.record(D::Actions,K::ActionCacheEntry,i);
         assert(row.status==static_cast<std::uint32_t>(GameplayCpuEndpointStatus::Ok));
@@ -205,14 +404,16 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
         for(std::uint32_t slot=GameplayCpuEndpointField::ActionCacheEntry::Count;slot<32;++slot)
             assert(row.fields[slot]==0);
         if(i==0)result.cache_next=row.fields[GameplayCpuEndpointField::ActionCacheEntry::Next];
+        digest_record(digest,row);
         ++n;
     }
-    emit(reader,n,view,provenance,D::Actions,K::ActionEvent,0,1,21,
-        symbol_event,sizeof(symbol_event));
-    emit(reader,n,view,provenance,D::Payload,K::Header,0,1,13);
+    if(!history||view!=V::Pre)
+        emit(reader,n,digest,view,provenance,D::Actions,K::ActionEvent,0,1,21,
+            symbol_event,sizeof(symbol_event));
+    emit(reader,n,digest,view,provenance,D::Payload,K::Header,0,1,13);
     const unsigned payload_count=view==V::Pre?1:2;
     for(unsigned i=0;i<payload_count;++i){
-        emit(reader,n,view,provenance,D::Payload,K::PayloadRow,i,payload_count,5,
+        emit(reader,n,digest,view,provenance,D::Payload,K::PayloadRow,i,payload_count,5,
              &payload_data[i],sizeof(std::uint32_t));
         const auto row=reader.record(D::Payload,K::PayloadRow,i);
         result.payload_value=*reinterpret_cast<const std::uint32_t*>(row.borrowed_address);
@@ -221,10 +422,10 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
             assert(row.fields[GameplayCpuEndpointField::PayloadRow::SourceAddress]==0x700+i*4);
             assert(row.fields[GameplayCpuEndpointField::PayloadRow::AllocationGeneration]==40+i);
         }
-        emit(reader,n,view,provenance,D::Payload,K::PayloadFreeCell,i,payload_count,4);
-        emit(reader,n,view,provenance,D::Payload,K::PayloadAllocatedCell,i,payload_count,4);
+        emit(reader,n,digest,view,provenance,D::Payload,K::PayloadFreeCell,i,payload_count,4);
+        emit(reader,n,digest,view,provenance,D::Payload,K::PayloadAllocatedCell,i,payload_count,4);
     }
-    emit(reader,n,view,provenance,D::Flow,K::Header,0,1,10);
+    emit(reader,n,digest,view,provenance,D::Flow,K::Header,0,1,10);
     const auto clock=reader.record(D::Flow,K::FlowClockRecord,0);
     assert(clock.status==0&&clock.metadata_bytes==GameplayCpuEndpointField::FlowClock::Count*8);
     assert(clock.fields[GameplayCpuEndpointField::FlowClock::Unk4]==clock_values.unk_4);
@@ -233,10 +434,11 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
     assert(clock.borrowed_address==0&&clock.borrowed_bytes==0&&clock.flags==0&&clock.reserved==0);
     for(std::uint32_t slot=GameplayCpuEndpointField::FlowClock::Count;slot<32;++slot)
         assert(clock.fields[slot]==0);
-    result.clock_unk4=clock.fields[GameplayCpuEndpointField::FlowClock::Unk4];++n;
-    emit(reader,n,view,provenance,D::Flow,K::FlowProcessMask,0,1,2,
+    result.clock_unk4=clock.fields[GameplayCpuEndpointField::FlowClock::Unk4];
+    digest_record(digest,clock);++n;
+    emit(reader,n,digest,view,provenance,D::Flow,K::FlowProcessMask,0,1,2,
         &process_mask,sizeof(process_mask));
-    emit(reader,n,view,provenance,D::Flow,K::FlowProfilePhase,0,1,2,
+    emit(reader,n,digest,view,provenance,D::Flow,K::FlowProfilePhase,0,1,2,
         &profile_phase,sizeof(profile_phase));
     const auto cadence=reader.record(D::Flow,K::FlowCadenceRecord,0);
     assert(cadence.status==0&&cadence.metadata_bytes==GameplayCpuEndpointField::FlowCadence::Count*8);
@@ -248,20 +450,24 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
     assert(cadence.borrowed_bytes==alarm_bytes.size()&&cadence.flags==0&&cadence.reserved==0);
     for(std::uint32_t slot=GameplayCpuEndpointField::FlowCadence::Count;slot<32;++slot)
         assert(cadence.fields[slot]==0);
-    result.cadence_x0_0_x8=cadence.fields[GameplayCpuEndpointField::FlowCadence::X0_0_X8];++n;
-    emit(reader,n,view,provenance,D::Context,K::ContextRange,0,1,4,context_bytes,sizeof(context_bytes));
-    emit(reader,n,view,provenance,D::Bootstrap,K::Header,0,1,1);
-    emit(reader,n,view,provenance,D::Bootstrap,K::BootstrapTicks,0,1,2,&bootstrap_ticks,sizeof(bootstrap_ticks));
-    emit(reader,n,view,provenance,D::Bootstrap,K::BootstrapDisabledLinks,0,1,2,
+    result.cadence_x0_0_x8=cadence.fields[GameplayCpuEndpointField::FlowCadence::X0_0_X8];
+    digest_record(digest,cadence);++n;
+    emit(reader,n,digest,view,provenance,D::Context,K::ContextRange,0,1,4,context_bytes,sizeof(context_bytes));
+    emit(reader,n,digest,view,provenance,D::Bootstrap,K::Header,0,1,1);
+    emit(reader,n,digest,view,provenance,D::Bootstrap,K::BootstrapTicks,0,1,2,&bootstrap_ticks,sizeof(bootstrap_ticks));
+    emit(reader,n,digest,view,provenance,D::Bootstrap,K::BootstrapDisabledLinks,0,1,2,
         &bootstrap_disabled,sizeof(bootstrap_disabled));
-    emit(reader,n,view,provenance,D::Audio,K::Header,0,1,4);
-    emit(reader,n,view,provenance,D::Audio,K::AudioOwnedRange,0,2,5,audio_bytes_a,sizeof(audio_bytes_a));
-    emit(reader,n,view,provenance,D::Audio,K::AudioOwnedRange,1,2,5,audio_bytes_b,sizeof(audio_bytes_b));
-    emit(reader,n,view,provenance,D::Audio,K::AudioCommandBudget,0,1,2,&command_budget,sizeof(command_budget));
-    emit(reader,n,view,provenance,D::Audio,K::AudioSoundMode,0,1,2,&sound_mode,sizeof(sound_mode));
-    emit(reader,n,view,provenance,D::Statics,K::Header,0,1,2);
-    emit(reader,n,view,provenance,D::Statics,K::StaticRow,0,1,5,&source_word,sizeof(source_word));
-    assert(n==(view==V::Pre?32:35));
+    emit(reader,n,digest,view,provenance,D::Audio,K::Header,0,1,4);
+    emit(reader,n,digest,view,provenance,D::Audio,K::AudioOwnedRange,0,2,5,audio_bytes_a,sizeof(audio_bytes_a));
+    emit(reader,n,digest,view,provenance,D::Audio,K::AudioOwnedRange,1,2,5,audio_bytes_b,sizeof(audio_bytes_b));
+    emit(reader,n,digest,view,provenance,D::Audio,K::AudioCommandBudget,0,1,2,&command_budget,sizeof(command_budget));
+    emit(reader,n,digest,view,provenance,D::Audio,K::AudioSoundMode,0,1,2,&sound_mode,sizeof(sound_mode));
+    emit(reader,n,digest,view,provenance,D::Statics,K::Header,0,1,2);
+    emit(reader,n,digest,view,provenance,D::Statics,K::StaticRow,0,1,5,&source_word,sizeof(source_word));
+    assert(n==(view==V::Pre?(history?31u:32u):35u));
+    if(history&&view==V::Pre)
+        assert(reader.record(D::Actions,K::ActionEvent,0).status==
+            static_cast<std::uint32_t>(GameplayCpuEndpointStatus::LeafRefused));
     assert(reader.record(D::Payload,K::PayloadRow,payload_count).status==
         static_cast<std::uint32_t>(GameplayCpuEndpointStatus::InvalidIndex));
     const auto invalid=reader.record(D::Actions,K::ActionBinding,1);
@@ -279,6 +485,7 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
         for(unsigned i=0;i<4;++i)assert(current_payload_calls[i]>current_before[i]);
     }
     result.rows=n;
+    result.digest=digest;
     return result;
 }
 }
@@ -375,6 +582,130 @@ MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void)
 { return {cadence_record.data(),cadence_record.size()}; }
 MeleeWebCadenceCpuEndpoint melee_web_source_cadence_cpu_endpoint(void){return cadence_values;}
 int melee_web_cpu_interval_admit(uint64_t token){return token==0x10b;}
+const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_history_evidence_for(
+    uint64_t token,uint64_t world,const void* context,uint64_t context_epoch,
+    uint32_t pre_frame,uint64_t incarnation,uint32_t actual_end)
+{ return token==0x10b&&world==55&&context==handle<MeleeWebMatchContext>(0x901)&&
+    context_epoch==8&&pre_frame==10&&incarnation>0&&incarnation<=3&&
+    actual_end>pre_frame&&actual_end-pre_frame<=7?&history_motor_evidence:nullptr; }
+MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(
+    const MeleeWebSourceMemoryPayloadSnapshot* owner)
+{ return owner==const_handle<MeleeWebSourceMemoryPayloadSnapshot>(0x10a)?
+    MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_STALE_OWNER; }
+}
+
+namespace melee_web {
+GameplayActionStoreHistory::GameplayActionStoreHistory(
+    MeleeWebActionInterval* capsule) noexcept : capsule_(capsule) {}
+GameplayActionStoreHistory::~GameplayActionStoreHistory() = default;
+std::unique_ptr<GameplayActionStoreHistory> GameplayActionStoreHistory::capture()
+{
+    return std::unique_ptr<GameplayActionStoreHistory>(
+        new GameplayActionStoreHistory(nullptr));
+}
+std::uint32_t GameplayActionStoreHistory::history_captured_pre_admit() const noexcept
+{ return history_action_role==1u&&history_captured_action_ok?MELEE_WEB_ACTION_ENDPOINT_OK:MELEE_WEB_ACTION_ENDPOINT_OWNER; }
+MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_captured_pre_header() const noexcept
+{
+    if(history_captured_pre_admit()!=MELEE_WEB_ACTION_ENDPOINT_OK)
+        return {MELEE_WEB_ACTION_ENDPOINT_OWNER};
+    return {MELEE_WEB_ACTION_ENDPOINT_OK,1,MELEE_WEB_ACTION_ENDPOINT_PRE,
+        MELEE_WEB_ACTION_ENDPOINT_REFERENCE,1,2,1,0};
+}
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_captured_pre_binding(
+    std::uint32_t index) const noexcept
+{ return history_captured_pre_admit()==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_binding(nullptr,index):MeleeWebActionEndpointBinding{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_captured_pre_slot(
+    std::uint32_t binding,std::uint32_t slot) const noexcept
+{ return history_captured_pre_admit()==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_slot(nullptr,binding,slot):MeleeWebActionEndpointSlot{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_captured_pre_cache(
+    std::uint32_t index) const noexcept
+{ return history_captured_pre_admit()==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_cache(nullptr,index):MeleeWebActionEndpointCache{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_captured_pre_event(
+    std::uint32_t index) const noexcept
+{ (void)index;return {history_captured_pre_admit()==MELEE_WEB_ACTION_ENDPOINT_OK?
+    MELEE_WEB_ACTION_ENDPOINT_PHASE:MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+std::uint32_t GameplayActionStoreHistory::history_armed_pre_admit(
+    std::uint64_t incarnation) const noexcept
+{ return history_action_role==4u&&incarnation==1u&&
+    incarnation==history_action_incarnation&&history_armed_action_ok&&
+    history_corrected_tape_empty?MELEE_WEB_ACTION_ENDPOINT_OK:
+    MELEE_WEB_ACTION_ENDPOINT_OWNER; }
+MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_armed_pre_header(
+    std::uint64_t incarnation) const noexcept
+{
+    if(history_armed_pre_admit(incarnation)!=MELEE_WEB_ACTION_ENDPOINT_OK)
+        return {MELEE_WEB_ACTION_ENDPOINT_OWNER};
+    return {MELEE_WEB_ACTION_ENDPOINT_OK,1,MELEE_WEB_ACTION_ENDPOINT_PRE,
+        MELEE_WEB_ACTION_ENDPOINT_REFERENCE,1,2,1,0};
+}
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_armed_pre_binding(
+    std::uint64_t incarnation,std::uint32_t index) const noexcept
+{ return history_armed_pre_admit(incarnation)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_binding(nullptr,index):MeleeWebActionEndpointBinding{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_armed_pre_slot(
+    std::uint64_t incarnation,std::uint32_t binding,std::uint32_t slot) const noexcept
+{ return history_armed_pre_admit(incarnation)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_slot(nullptr,binding,slot):MeleeWebActionEndpointSlot{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_armed_pre_cache(
+    std::uint64_t incarnation,std::uint32_t index) const noexcept
+{ return history_armed_pre_admit(incarnation)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_cache(nullptr,index):MeleeWebActionEndpointCache{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_armed_pre_event(
+    std::uint64_t incarnation,std::uint32_t index) const noexcept
+{ (void)index;return {history_armed_pre_admit(incarnation)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    MELEE_WEB_ACTION_ENDPOINT_PHASE:MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+std::uint32_t GameplayActionStoreHistory::history_restored_pre_admit(
+    std::uint64_t incarnation,std::uint64_t restore_count) const noexcept
+{ return history_action_role==2u&&incarnation==history_action_incarnation&&
+    restore_count==history_action_restore_count&&restore_count>=1u&&restore_count<=2u&&
+    history_restored_action_ok&&history_corrected_tape_empty?
+    MELEE_WEB_ACTION_ENDPOINT_OK:MELEE_WEB_ACTION_ENDPOINT_OWNER; }
+MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_restored_pre_header(
+    std::uint64_t incarnation,std::uint64_t restore_count) const noexcept
+{
+    if(history_restored_pre_admit(incarnation,restore_count)!=MELEE_WEB_ACTION_ENDPOINT_OK)
+        return {MELEE_WEB_ACTION_ENDPOINT_OWNER};
+    return {MELEE_WEB_ACTION_ENDPOINT_OK,1,MELEE_WEB_ACTION_ENDPOINT_PRE,
+        MELEE_WEB_ACTION_ENDPOINT_REFERENCE,1,2,1,0};
+}
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_restored_pre_binding(
+    std::uint64_t incarnation,std::uint64_t restore_count,std::uint32_t index) const noexcept
+{ return history_restored_pre_admit(incarnation,restore_count)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_binding(nullptr,index):MeleeWebActionEndpointBinding{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_restored_pre_slot(
+    std::uint64_t incarnation,std::uint64_t restore_count,
+    std::uint32_t binding,std::uint32_t slot) const noexcept
+{ return history_restored_pre_admit(incarnation,restore_count)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_slot(nullptr,binding,slot):MeleeWebActionEndpointSlot{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::history_restored_pre_cache(
+    std::uint64_t incarnation,std::uint64_t restore_count,std::uint32_t index) const noexcept
+{ return history_restored_pre_admit(incarnation,restore_count)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    melee_web_action_interval_endpoint_cache(nullptr,index):MeleeWebActionEndpointCache{MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_restored_pre_event(
+    std::uint64_t incarnation,std::uint64_t restore_count,
+    std::uint32_t index) const noexcept
+{ (void)index;return {history_restored_pre_admit(incarnation,restore_count)==MELEE_WEB_ACTION_ENDPOINT_OK?
+    MELEE_WEB_ACTION_ENDPOINT_PHASE:MELEE_WEB_ACTION_ENDPOINT_OWNER}; }
+std::uint32_t GameplayActionStoreHistory::endpoint_admit() const noexcept
+{ return history_action_role==3u&&action_admitted?MELEE_WEB_ACTION_ENDPOINT_OK:MELEE_WEB_ACTION_ENDPOINT_OWNER; }
+MeleeWebActionEndpointHeader GameplayActionStoreHistory::endpoint_header() const noexcept
+{ return melee_web_action_interval_endpoint_header(nullptr); }
+MeleeWebActionEndpointBinding GameplayActionStoreHistory::endpoint_binding(
+    std::uint32_t index) const noexcept
+{ return melee_web_action_interval_endpoint_binding(nullptr,index); }
+MeleeWebActionEndpointSlot GameplayActionStoreHistory::endpoint_slot(
+    std::uint32_t binding,std::uint32_t slot) const noexcept
+{ return melee_web_action_interval_endpoint_slot(nullptr,binding,slot); }
+MeleeWebActionEndpointCache GameplayActionStoreHistory::endpoint_cache(
+    std::uint32_t index) const noexcept
+{ return melee_web_action_interval_endpoint_cache(nullptr,index); }
+MeleeWebActionEndpointEvent GameplayActionStoreHistory::endpoint_event(
+    std::uint32_t index) const noexcept
+{ return melee_web_action_interval_endpoint_event(nullptr,index); }
 }
 
 int main()
@@ -478,10 +809,195 @@ int main()
     assert(!changed_during_batch.revalidate());
     clock_values.unk_4--;
 
+    // History readers reuse the same nine-domain encoders but authenticate a
+    // distinct captured/restored PRE role and selected predicted/corrected END.
+    const std::uint32_t history_pre_word=0x13579bdf;
+    const std::uint32_t history_end_word=0x2468ace0;
+    source_word=history_pre_word;live_frame=10;source_files_quiet=true;
+    action_view=MELEE_WEB_ACTION_ENDPOINT_PRE;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+    history_action_role=1;history_captured_action_ok=true;
+    history_armed_action_ok=true;history_restored_action_ok=true;
+    history_corrected_tape_empty=true;
+    history_action_incarnation=1;
+    history_action_restore_count=1;
+    auto* history_pre=GameplayCpuEndpointTestFixture::history_ready(0,
+        history_statics_pre(10));
+
+    // Captured PRE authenticates exact Restore bytes; a corrupted source row
+    // refuses before the reader exposes any receipt.
+    source_word^=1;
+    GameplayCpuEndpointReader corrupted_history_pre;
+    assert(!corrupted_history_pre.begin_history(*session,*history_pre,V::Pre,P::SharedPre));
+    assert(corrupted_history_pre.status()==GameplayCpuEndpointStatus::OwnerRefused);
+    source_word=history_pre_word;
+    const auto captured_history=complete_batch(*session,*history_pre,V::Pre,P::SharedPre,10,true);
+    assert(captured_history.rows==31&&captured_history.effect_token==0);
+
+    // The armed PRE is captured after incarnation 1 binds the live motor and
+    // effect token but before the first source tick. It retains the same
+    // source/slot/cache PRE bytes while the live token differs from pre-arm.
+    history_action_role=4;
+    auto* history_armed=GameplayCpuEndpointTestFixture::history_armed(7,
+        history_statics_armed(10));
+    source_word^=1;
+    GameplayCpuEndpointReader corrupted_armed_history;
+    assert(!corrupted_armed_history.begin_history(*session,*history_armed,V::Pre,P::SharedPre));
+    assert(corrupted_armed_history.status()==GameplayCpuEndpointStatus::OwnerRefused);
+    source_word=history_pre_word;
+    history_corrected_tape_empty=false;
+    GameplayCpuEndpointReader dirty_armed_history;
+    assert(!dirty_armed_history.begin_history(*session,*history_armed,V::Pre,P::SharedPre));
+    assert(dirty_armed_history.status()==GameplayCpuEndpointStatus::OwnerRefused);
+    history_corrected_tape_empty=true;
+    const auto armed_history=complete_batch(*session,*history_armed,V::Pre,P::SharedPre,10,true);
+    assert(armed_history.rows==31&&armed_history.effect_token==0x10b&&
+           armed_history.effect_token!=captured_history.effect_token);
+    GameplayCpuEndpointReader changed_armed_token;
+    assert(changed_armed_token.begin_history(*session,*history_armed,V::Pre,P::SharedPre));
+    GameplayCpuEndpointTestFixture::set_history_effect_token(*history_armed,0);
+    assert(changed_armed_token.record(D::Effects,K::EffectToken,0).status==
+        static_cast<std::uint32_t>(GameplayCpuEndpointStatus::OwnerRefused));
+    assert(!changed_armed_token.revalidate());
+    GameplayCpuEndpointTestFixture::set_history_effect_token(*history_armed,0x10b);
+
+    // Actual selected END is admitted through the checkpoint's session-derived
+    // source frame, full owner guards, and history-only leaf/static endpoints.
+    history_action_role=3;
+    action_view=MELEE_WEB_ACTION_ENDPOINT_END;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+    live_frame=12;
+    auto* history_reference=GameplayCpuEndpointTestFixture::history_predicted(1,
+        history_statics_end(10,1,12,history_end_word),12);
+    assert(complete_batch(*session,*history_reference,V::CpuEnd,P::Reference,12,true).rows==35);
+    assert(complete_batch(*session,*history_reference,V::DrawEnd,P::Reference,12,true).rows==35);
+
+    // A restored PRE is only readable at the real PRE frame in Correcting,
+    // with the exact restore incarnation and an empty corrected event tape.
+    source_word=history_pre_word;live_frame=10;
+    action_view=MELEE_WEB_ACTION_ENDPOINT_PRE;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+    history_action_role=2;history_action_incarnation=1;history_action_restore_count=1;
+    auto* history_restored=GameplayCpuEndpointTestFixture::history_correcting(2,
+        history_statics_restored_pre(10,1,12,history_pre_word,history_end_word),1,12,1);
+    const auto restored_history=complete_batch(*session,*history_restored,V::Pre,P::SharedPre,10,true);
+    assert(restored_history.rows==31&&restored_history.effect_token==armed_history.effect_token&&
+           restored_history.digest==armed_history.digest);
+    history_corrected_tape_empty=false;
+    GameplayCpuEndpointReader dirty_history_pre;
+    assert(!dirty_history_pre.begin_history(*session,*history_restored,V::Pre,P::SharedPre));
+    assert(dirty_history_pre.status()==GameplayCpuEndpointStatus::OwnerRefused&&
+           source_word==history_pre_word);
+    history_corrected_tape_empty=true;
+    history_action_incarnation=2;history_action_restore_count=1;
+    auto* stale_history=GameplayCpuEndpointTestFixture::history_correcting(3,
+        history_statics_restored_pre(10,1,12,history_pre_word,history_end_word),2,12,1);
+    GameplayCpuEndpointReader stale_history_incarnation;
+    assert(!stale_history_incarnation.begin_history(*session,*stale_history,V::Pre,P::SharedPre));
+    assert(stale_history_incarnation.status()==GameplayCpuEndpointStatus::OwnerRefused);
+
+    // The first correction may follow a confirmed incarnation 1. Here the
+    // latest restored incarnation is 2 while cumulative restore_count is 1.
+    auto* history_restored_in_incarnation_two=GameplayCpuEndpointTestFixture::history_correcting(6,
+        history_statics_restored_second_incarnation(10,history_pre_word),2,12,1);
+    const auto restored_second_incarnation=complete_batch(*session,
+        *history_restored_in_incarnation_two,V::Pre,P::SharedPre,10,true);
+    assert(restored_second_incarnation.effect_token==armed_history.effect_token&&
+           restored_second_incarnation.digest==armed_history.digest);
+
+    // The second restore belongs to incarnation 2, with a cumulative restore
+    // count of 2, and still admits the exact immutable PRE bytes.
+    history_action_incarnation=2;
+    history_action_restore_count=2;
+    auto* history_restored_twice=GameplayCpuEndpointTestFixture::history_correcting(5,
+        history_statics_restored_twice(10,history_pre_word),2,14,2);
+    assert(complete_batch(*session,*history_restored_twice,V::Pre,P::SharedPre,10,true).rows==31);
+
+    // Static admission binds the actual cumulative count separately from
+    // the latest restored incarnation; mismatched counts refuse before rows.
+    history_action_restore_count=1;
+    auto* stale_restore_count=GameplayCpuEndpointTestFixture::history_correcting(8,
+        history_statics_restored_twice(10,history_pre_word),2,14,1);
+    GameplayCpuEndpointReader stale_history_count;
+    assert(!stale_history_count.begin_history(*session,*stale_restore_count,V::Pre,P::SharedPre));
+    assert(stale_history_count.status()==GameplayCpuEndpointStatus::OwnerRefused);
+
+    // Corrected CPU and DRAW endpoints remain distinct views over the selected
+    // corrected END and carry the corrected source provenance.
+    history_action_role=3;
+    action_view=MELEE_WEB_ACTION_ENDPOINT_END;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_CORRECTED;
+    live_frame=12;
+    auto* history_corrected=GameplayCpuEndpointTestFixture::history_corrected(4,
+        history_statics_end(10,1,12,history_end_word+1),1,12,1);
+    assert(complete_batch(*session,*history_corrected,V::CpuEnd,P::Corrected,12,true).rows==35);
+    assert(complete_batch(*session,*history_corrected,V::DrawEnd,P::Corrected,12,true).rows==35);
+
+    source_word=history_pre_word;
+    history_action_role=1;
+    action_view=MELEE_WEB_ACTION_ENDPOINT_PRE;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+    live_frame=10;
+    GameplayCpuEndpointReader changed_history_identity;
+    assert(changed_history_identity.begin_history(*session,*history_pre,V::Pre,P::SharedPre));
+    GameplayCpuEndpointTestFixture::set_history_restore_count(*history_pre,1);
+    assert(changed_history_identity.record(D::Owner,K::Owner,0).status==
+        static_cast<std::uint32_t>(GameplayCpuEndpointStatus::OwnerRefused));
+    assert(!changed_history_identity.revalidate());
+    GameplayCpuEndpointTestFixture::set_history_restore_count(*history_pre,0);
+
+    GameplayCpuEndpointReader changed_history_frame;
+    assert(changed_history_frame.begin_history(*session,*history_pre,V::Pre,P::SharedPre));
+    live_frame=11;
+    assert(changed_history_frame.record(D::Owner,K::Owner,0).status==
+        static_cast<std::uint32_t>(GameplayCpuEndpointStatus::OwnerRefused));
+    assert(!changed_history_frame.revalidate());
+    live_frame=10;
+
+    GameplayCpuEndpointTestFixture::set_history_phase_recording(*history_pre);
+    GameplayCpuEndpointReader history_wrong_phase;
+    assert(!history_wrong_phase.begin_history(*session,*history_pre,V::Pre,P::SharedPre));
+    GameplayCpuEndpointTestFixture::reset_history_ready(*history_pre);
+    source_files_quiet=false;
+    GameplayCpuEndpointReader history_non_quiet;
+    assert(!history_non_quiet.begin_history(*session,*history_pre,V::Pre,P::SharedPre));
+    source_files_quiet=true;
+
+    // The reader cannot accept a forged eight-frame endpoint; it rechecks the
+    // CPU checkpoint's actual-end admission instead of taking caller input.
+    action_view=MELEE_WEB_ACTION_ENDPOINT_END;
+    action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
+    history_action_role=3;live_frame=18;
+    GameplayCpuEndpointTestFixture::set_history_end(*history_reference,18);
+    GameplayCpuEndpointReader overwide_history;
+    assert(!overwide_history.begin_history(*session,*history_reference,V::CpuEnd,P::Reference));
+    assert(overwide_history.status()==GameplayCpuEndpointStatus::OwnerRefused);
+    GameplayCpuEndpointTestFixture::set_history_end(*history_reference,12);
+    live_frame=10;
+
     GameplayCpuEndpointTestFixture::release_statics(*pre);
     GameplayCpuEndpointTestFixture::release_statics(*reference);
     GameplayCpuEndpointTestFixture::release_statics(*corrected);
     GameplayCpuEndpointTestFixture::release_statics(*unsealed);
+    GameplayCpuEndpointTestFixture::release_statics(*history_pre);
+    GameplayCpuEndpointTestFixture::release_history(*history_pre);
+    GameplayCpuEndpointTestFixture::release_statics(*history_armed);
+    GameplayCpuEndpointTestFixture::release_history(*history_armed);
+    GameplayCpuEndpointTestFixture::release_statics(*history_reference);
+    GameplayCpuEndpointTestFixture::release_history(*history_reference);
+    GameplayCpuEndpointTestFixture::release_statics(*history_restored);
+    GameplayCpuEndpointTestFixture::release_history(*history_restored);
+    GameplayCpuEndpointTestFixture::release_statics(*stale_history);
+    GameplayCpuEndpointTestFixture::release_history(*stale_history);
+    GameplayCpuEndpointTestFixture::release_statics(*history_corrected);
+    GameplayCpuEndpointTestFixture::release_history(*history_corrected);
+    GameplayCpuEndpointTestFixture::release_statics(*history_restored_twice);
+    GameplayCpuEndpointTestFixture::release_history(*history_restored_twice);
+    GameplayCpuEndpointTestFixture::release_statics(*history_restored_in_incarnation_two);
+    GameplayCpuEndpointTestFixture::release_history(*history_restored_in_incarnation_two);
+    GameplayCpuEndpointTestFixture::release_statics(*stale_restore_count);
+    GameplayCpuEndpointTestFixture::release_history(*stale_restore_count);
+    puts("Retained-history captured/armed/restored PRE and predicted/corrected CPU/DRAW endpoint batches passed strict phase/incarnation/restore-count/static/event/source-frame admission");
     puts("Current END payload routing enumerates grown rows/cells for Reference and Corrected CPU/DRAW without allocation; PRE and stale-header refusals stay strict");
     puts("Admitted nine-domain PRE/reference/corrected batches, named flow fields, cache next, and read-only revalidation passed");
 }

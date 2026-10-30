@@ -114,6 +114,11 @@ class GameplayCpuEndpointReader final {
 public:
     bool begin(const GameplayMatchSession&,const GameplayCpuCheckpoint&,
                GameplayCpuEndpointView,GameplayCpuEndpointProvenance) noexcept;
+    /* Strict retained-history receipt path. It binds PRE reads to either the
+     * immutable captured anchor or the successfully restored PRE in the active
+     * correction, and END reads to a sealed predicted/corrected incarnation. */
+    bool begin_history(const GameplayMatchSession&,const GameplayCpuCheckpoint&,
+                       GameplayCpuEndpointView,GameplayCpuEndpointProvenance) noexcept;
     GameplayCpuEndpointRecord record(GameplayCpuEndpointDomain,
                                      GameplayCpuEndpointRowKind,
                                      std::uint32_t index=0) const noexcept;
@@ -141,15 +146,19 @@ private:
         std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX> audio_ranges{};
         std::uint32_t audio_count{};
         std::uint32_t source_frame{};
+        std::uint32_t history_phase{},history_pre_frame{},history_current_end{},
+                      history_restore_count{};
+        std::uint64_t history_incarnation{},history_effect_token{};
     };
     bool collect(BatchData&) const noexcept;
     bool same_batch(const BatchData&,const BatchData&) const noexcept;
+    bool history_identity_matches() const noexcept;
     const GameplayMatchSession* session_{};
     const GameplayCpuCheckpoint* checkpoint_{};
     GameplayCpuEndpointView view_{};
     GameplayCpuEndpointProvenance provenance_{};
     BatchData data_{};
     GameplayCpuEndpointStatus status_=GameplayCpuEndpointStatus::Invalid;
-    bool active_{};
+    bool active_{},history_mode_{};
 };
 }

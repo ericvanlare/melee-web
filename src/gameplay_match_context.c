@@ -4,12 +4,13 @@
 #include "gameplay_crowd.h"
 #include "gameplay_cpu_interval.h"
 #include "slippi_profile/particle_source_schedule.h"
+#include "slippi_profile/camera_source_prepare.h"
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 #include "slippi_profile/effect_matrix.h"
 #include "slippi_profile/profile.h"
 _Static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY ==
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-                   SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19,
+                   SLIPPI_PROFILE_IDENTITY_CAMERA_HISTORY_V20,
 #else
                    SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15,
 #endif
@@ -61,6 +62,8 @@ static int post_effect_matrices(void* context, char* error, size_t error_size)
 {
     (void) context;
     if (!slippi_profile_effect_matrices_post_step(error, error_size)) return 0;
+    if (!slippi_camera_source_prepare(melee_web_gameplay_generation(),
+            melee_web_cpu_interval_token(), error, error_size)) return 0;
     return slippi_particle_source_prepare(melee_web_gameplay_generation(),
         melee_web_cpu_interval_token(), error, error_size);
 }

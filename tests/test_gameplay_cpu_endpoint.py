@@ -70,6 +70,7 @@ class GameplayCpuEndpointControls(OwnedWorkspaceTests):
             capture_output=True,text=True,timeout=30)
         (directory/'run.log').write_text(run.stdout+run.stderr)
         self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+        self.assertIn('Retained-history captured/armed/restored PRE and predicted/corrected CPU/DRAW endpoint batches passed',run.stdout)
         self.assertIn('Admitted nine-domain PRE/reference/corrected batches',run.stdout)
         self.assertIn('Current END payload routing enumerates grown rows/cells',run.stdout)
 

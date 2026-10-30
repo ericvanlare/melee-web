@@ -60,6 +60,14 @@ class GameplayCpuCorrectedAdapterTests(OwnedWorkspaceTests):
         base=base.replace('#include "cpu_restore_adapter.inc"',
             '#include "gameplay_cpu_endpoint.hpp"\n#define MELEE_WEB_SYNCTEST_CORRECTED_CPU 1\n'
             'namespace { bool cpu_corrected_active(); void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>&); }\n'
+            '/* This legacy fixture intentionally omits the retained-history owner. */\n'
+            'namespace { bool cpu_history_active(){return false;} '
+            'void cpu_history_forbid(std::vector<melee_web::CpuIntervalSpan>&){} '
+            'uint32_t cpu_history_endpoint_begin(uint32_t,uint32_t){std::abort();} '
+            'uint32_t cpu_history_endpoint_record(uint32_t,uint32_t,uint32_t){std::abort();} '
+            'uint32_t cpu_history_endpoint_end(){std::abort();} '
+            'uint32_t cpu_history_particle_header(){std::abort();} '
+            'uint32_t cpu_history_particle_row(uint32_t,uint32_t){std::abort();} }\n'
             '#include "cpu_restore_adapter.inc"\n#include "cpu_corrected_adapter.inc"')
         base=base.replace('std::uint32_t payload_admission_runtime_boundary() { return 0; }',
             'bool corrected_runtime_refused=false;\nstd::uint32_t payload_admission_runtime_boundary() { return corrected_runtime_refused?1:0; }')

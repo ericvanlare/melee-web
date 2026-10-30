@@ -1796,14 +1796,68 @@ The `payload_index_component_v1` receipt binds all producers, reviews and result
 
 The final local regression at `27c854da` passes 3,077 tests with 238 skips and
 no failures; the ordinary Release runtime also builds successfully. Independent
-publication review passes subject to exact publication-head CI. Validation and
-archive identities remain in `payload_index_integration_v1`.
+publication review passes. PR #360 merged as `3d24a67d`, with the same tree as
+reviewed head `7d0fc413`. All 14 exact-head CI jobs completed with 12 successes
+and two expected skips (run 41087668744). Validation, merge and archive
+identities remain in `payload_index_integration_v1`.
 
-The next capability is one immutable confirmed PRE retained across two actual
-late-input corrections, with the current end derived from actual source frames
-inside the existing seven-tick bound. Rolling history, correction across refill,
-combat/KO breadth, combined frame budget, full-match play and public profile
-admission remain open.
+One immutable confirmed checkpoint now survives two actual late-input
+corrections. Browser V3 at native/harness `fc26c423` passes the four-sample
+`2+1+1` local Worker recipe: correct source frames 176–178, advance and correct
+176–179 from the same PRE 176, retire it, then capture PRE 179 and consume one
+confirmed tick. Each page captures and retires twice with at most one capsule;
+the predicted page restores the first capsule twice. Independent retained-byte
+review passes 12 nine-domain endpoint comparisons and 45 raw-lane comparisons,
+including both corrected runs, final presents and the confirmed rebase. All 12
+raw motor receipts agree with the declared intervals; this corpus has no motor
+events and claims no physical output. Wrong predicted action and motion are
+observed. Source/renderer shutdown and recorded Chrome/Worker absence pass.
+
+Two failed predecessors are retained. V1 (`655b9b6d`) stopped at an exact host
+ABI mismatch between the endpoint's decimal frame string and the motor's uint32.
+V2 (native `655b9b6d`, harness `f5ff4157`) restored twice and matched all five
+replayed ticks, but the second CPU endpoint diverged in payload row 12 at byte
+312. The smaller typed reduction joined those bytes to the main camera's view,
+main/copy camera positions, its inverse matrix and the nametag joint. Source
+draw prepares camera history that the following source nametag tick consumes.
+The unretired-capsule cleanup refusal in both failures is preserved separately
+from successful owned-process cleanup.
+
+Private profile V20 prepares that source-consumed camera state after the whole
+source scheduler, using the original camera update and matrix functions. It is
+limited to checked FD/standard-mode original camera owners with a prewarmed
+owned inverse; unsupported ownership refuses before camera writes. It does not
+allocate, call a render callback, mask payload bytes or change source arithmetic.
+The inactive warm path is inert. Actual-source controls cover the omitted-hook
+divergence, repeated-draw idempotence and negative admission; their owner seams
+and PRE reconstruction are modeled explicitly. V3 supplies the actual browser
+restore evidence. V19 remains a distinct historical producer.
+
+The exact runtime, harness, builds, typed diagnosis, source controls, raw review,
+failed artifacts and cleanup are recorded in `retained_history_component_v1`.
+The first full regression failed on stale legacy fixture interfaces/imports, a
+nested Git patch-isolation defect and strict unused-parameter warnings. The
+repair preserves every existing assertion; all six failed controls pass. The
+first focused launcher missed the repository import path, and that failed
+invocation is retained separately from the corrected two-control pass. The
+browser producer stays `fc26c423`; integration source `a0fec4bd` changes fixtures
+and explicit unused-parameter casts. Its rebuilt Wasm differs (including the
+SDL revision string); it is not represented as the captured binary.
+Final-present raw lanes are independently replayable; the saved command68 GPU
+return object is null, so its original online validation cannot be replayed
+from that field. The full regression passes 3,082 tests with 238 skips, and
+both Release builds pass at `a0fec4bd`. Initial publication CI exhausted the
+existing 15-minute unit-0 budget while assertions were passing. A reviewed
+three-shard rebalance preserves the full test inventory, compiler settings and
+deadline; its focused controls pass. New-head CI and merge remain pending in
+`retained_history_integration_v1`.
+
+This remains a four-tick component with Node-held local Worker sockets and
+authored PAD input. The next step is the ordinary runtime's existing match
+session, browser-local input and relay owner; the private diagnostic target does
+not link the ordinary input API. Sustained rolling history, correction across
+refill, combat/KO breadth, combined frame budget, full-match play and public
+profile admission remain open.
 
 
 ## Stage decision dependencies, issue #333

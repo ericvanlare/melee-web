@@ -149,6 +149,7 @@ Snapshot* melee_web_match_flow_cpu_snapshot_capture(MeleeWebMatchFlow*,char* p,s
 Snapshot* melee_web_match_context_snapshot_capture(MeleeWebMatchContext*,char* p,std::size_t n){leaf_error(p,n,3);return snapshot(3);}
 Snapshot* melee_web_audio_snapshot_capture(MeleeWebAudio* audio){++audio_scalar_capture_calls;return audio?snapshot(4):nullptr;}
 Snapshot* melee_web_audio_snapshot_capture_with_stream(MeleeWebAudio* audio){++audio_stream_capture_calls;return audio?snapshot(4):nullptr;}
+extern "C" int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*){std::abort();}
 int melee_web_audio_snapshot_interval_begin(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* captured,std::uint64_t token){
  ++audio_interval_begin_calls;
  if(!audio||!captured||captured->leaf!=4||!token||audio_interval_token)return 0;
@@ -234,8 +235,14 @@ private:
 };
 @ACTUAL_SESSION_SOURCE_QUIESCENT@
 class GameplayCpuStatics{public:~GameplayCpuStatics(){++static_destroys;}bool capture(){visit(7);return refuse_leaf!=7;}bool seal_post(){return bytes_ok;}
+ bool begin_history(std::uint32_t){std::abort();}
  CpuComparison capture_expected(std::vector<std::byte>& out)const{out.assign(1,std::byte{0x5a});CpuComparison c;if(!bytes_ok)c.status=2;return c;}
  CpuComparison compare_expected(std::span<const std::byte> out)const{CpuComparison c;if(!bytes_ok||out.size()!=1)c.status=2;return c;}};
+class GameplayActionStoreHistory{public:
+ static std::unique_ptr<GameplayActionStoreHistory> capture(){std::abort();}
+ std::uint32_t active_failure()const noexcept{std::abort();}
+ void disarm()noexcept{std::abort();}
+};
 struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
  const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};SlippiParticlePresentationAnchor particle_anchor{};};
 GameplayCpuCommitResult gameplay_cpu_commit(const Commit&) noexcept {
@@ -286,9 +293,13 @@ class GameplayCpuCheckpoint{public:
 private:
  explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop):span_(span),reusable_loop_(reusable_loop){}
  explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):GameplayCpuCheckpoint(static_cast<std::uint32_t>(span),false){}
- static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool) noexcept;
+ static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool,bool) noexcept;
  const std::uint32_t span_;const bool reusable_loop_;
- enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed,ConfirmedDetached,Retired};Phase phase_=Phase::Captured;
+ // This refusal fixture only invokes the legacy capture/capture_span entries.
+ // History-only leaves abort if an extracted production branch reaches them.
+ enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,
+                  HistoryReady,HistoryRecording,HistorySealed,HistoryCorrecting,
+                  HistoryCorrectedSealed,Finished,Failed,ConfirmedDetached,Retired};Phase phase_=Phase::Captured;
  bool same_owner(const GameplayMatchSession&)const{return !owner_missing&&fixture_particle_anchor_admit(commit_.particle_anchor);}
  using AudioRanges=std::array<int,16>;
  bool capture_post_bytes(const GameplayMatchSession&,std::vector<std::byte>& b,AudioRanges&,std::size_t& n){b.assign(1,std::byte{0x5a});n=1;return bytes_ok;}
@@ -299,7 +310,9 @@ private:
  std::uint32_t post_frame_{},checked_domains_{},matched_domains_{};CpuComparison comparison_{};bool confirmed_disarmed_=false;
  std::uint64_t lobj_writer_session_=0,tobj_writer_session_=0;
  MeleeWebClassPieceAnchor class_piece_anchor_{};
- GameplayMatchCpuOwners owner_{};std::unique_ptr<GameplayCpuStatics> statics_;Commit commit_{};std::uint64_t audio_generation_{};bool source_step_possible_=false;Snapshot *post_payload_{},*post_flow_{};
+ GameplayMatchCpuOwners owner_{};std::unique_ptr<GameplayCpuStatics> statics_;
+ std::unique_ptr<GameplayActionStoreHistory> history_actions_;bool history_mode_=false;
+ Commit commit_{};std::uint64_t audio_generation_{};bool source_step_possible_=false;Snapshot *post_payload_{},*post_flow_{};
 };
 // These existing capture tests intentionally model diagnostic unavailable.
 // Actual writer lifetime/correlation is tested in source_lobj_writer_control.

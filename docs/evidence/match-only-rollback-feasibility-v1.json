@@ -11342,7 +11342,7 @@
           "next": "One immutable confirmed PRE with checked current-end advancement and two actual late-input corrections; no ring, delayed dirty repair or guessed live-input API."
         },
         "payload_index_integration_v1": {
-          "status": "REVIEWED_LOCAL_VALIDATION_PASS_PUBLICATION_CI_PENDING",
+          "status": "MERGED_EXACT_HEAD_CI_PASS",
           "validation_source": "27c854da5c896caafd26cc648e9ff115f57a34b6",
           "regression": {
             "tests": 3077,
@@ -11364,6 +11364,216 @@
           "producer_archive": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-producer-archive/archive.json",
             "sha256": "2cd4ecc9ac9872747684781982d3cf5adb74e7e1aed55fa6a44c6677f64f76a6"
+          },
+          "pull_request": 360,
+          "publication_head": "7d0fc413b8a8b879c821f0dd601a7b186523e7ff",
+          "merge_commit": "3d24a67d1716f12f816e19d880649080243e2731",
+          "reviewed_and_merged_tree": "2b4008b7f733b556214e2f874b31ac23748c2c72",
+          "exact_head_ci": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-integration-v1/final-ci.json",
+            "sha256": "ae3aecdb0e7a5a843787c462ad312c0c1442bb087742e306c308ab976ac28c03"
+          },
+          "merge_verification": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-index-integration-v1/merge-verification.json",
+            "sha256": "9e92fb85e2b99e765a81ca239299102d52066c716cd5adb6a070afce1830baf8"
+          }
+        },
+        "retained_history_component_v1": {
+          "status": "BROWSER_COMPONENT_PASS_INDEPENDENT_RAW_REVIEW",
+          "runtime_producer": "fc26c423e0f07a5d0ec12421b49df625f97758b5",
+          "harness_producer": "fc26c423e0f07a5d0ec12421b49df625f97758b5",
+          "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20",
+          "scope": "Four authored ticks with actual local Worker receipt (2+1+1), two wrong-prediction corrections from immutable PRE176, then confirmed retirement and fresh PRE179. Two independent headless browser instances; Node owns the sockets.",
+          "implementation": "One immutable CPU/ActionStore PRE with variable actual end within seven ticks. Two restores retain selected motor prefix and checked owner identities. No ring or dirty-input deferral. Exact endpoint frame-string/motor-u32 join. Private V20 prepares source-consumed camera history after the source scheduler; default-off vanilla remains unchanged.",
+          "attempts": [
+            {
+              "runtime_producer": "655b9b6d6058ba8bdfa9a12025be95eae928cd8b",
+              "harness_producer": "655b9b6d6058ba8bdfa9a12025be95eae928cd8b",
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v1/first-failure-summary.json",
+                "sha256": "8e7143b3f5305459e54d62ac7de6f9158ef6d9e5ca1af8318b4cf44737584ea6"
+              },
+              "result": "Host frame ABI mismatch before restore. Canonical endpoint decimal string and motor uint32 were compared without an exact conversion. Raw motor was not saved before that failed validation. Active unretired cleanup refused 0x580; owned processes absent."
+            },
+            {
+              "runtime_producer": "655b9b6d6058ba8bdfa9a12025be95eae928cd8b",
+              "harness_producer": "f5ff4157ce0c8663321cd462e36b87f6e680080f",
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v2/first-failure-summary.json",
+                "sha256": "5d194516f1ae4ea88070154dba74235470eced4a8d1065c42eef8f07ac2616ef"
+              },
+              "result": "Two restores of PRE176 and five replay ticks pass raw lanes, but second CPU endpoint fails PayloadRow12 byte312. Smaller typed reduction proves source draw camera history is consumed by the next nametag tick. No retirement pass; active cleanup refuses 0x580, owned processes absent."
+            }
+          ],
+          "retained_failed_producer_archive": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-v1-producer-archive/archive.json",
+            "sha256": "49102827648802e7dea56e40a0531b9e2fe6faa9bbd0ac0ff44c943ea6a68a49"
+          },
+          "typed_camera_diagnosis": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-layout-sol-v1/typed-diagnosis-and-repair-contract.json",
+            "sha256": "06f152093665aef436cb356574a809a392ed488c5a2029aadd30a225133e76dc"
+          },
+          "camera_source_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/camera-history-source-sol-v1/root-review.json",
+            "sha256": "e21df21d5ebeedd1c155fe76a22f341d8c72901faf3486a4cf3e3c135c838c42"
+          },
+          "camera_source_controls": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/camera-history-source-sol-v1/freeze-v2.json",
+            "sha256": "407f1e3db6c41e36bed35b394c2e7192b631c8a9bccfa4f024e4e737ef5146a0"
+          },
+          "camera_identity_host_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/camera-history-profile-v20-root/independent-review.json",
+            "sha256": "77967f0b04fa3ea4973178729a7d4aff89a4dec86d1de5065fc7e279656aeff0"
+          },
+          "host_frame_abi_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-host-v3/independent-sol-review.json",
+            "sha256": "940749437b3288a27e6ca4fede24f5986dce0c1c316baa93046bce0633db47ec"
+          },
+          "ownership_composition_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-composed-review-v1.json",
+            "sha256": "8e0b0b1cf4ad0628f35bd0801c61845e5bf1dfb6de22cd43b03fd1e6a36ed233"
+          },
+          "host_history_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-host-v2/independent-sol-review.json",
+            "sha256": "a769a9f013705cb5cc361595c0aafd32f277d80d9b52728e049d0cbf8b5f0157"
+          },
+          "packet_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/history-packet-input-v1/independent-sol-review.json",
+            "sha256": "437aea0d801116da7d7872e1e5651e5ad41ff9d3f999f9b9fd00188828fac4b6"
+          },
+          "camera_scope": "FD, CAMERA_STANDARD, exact original registration and plain main/copy cameras, prewarmed owned 48-byte main inverse. Calls original Camera_8002A4AC, HSD_CObjSetupViewingMtx and main inverse getter; no new allocation or render callback, no source arithmetic/order changes. Copy view/inverse untouched; all unsupported admission refuses before camera writes.",
+          "camera_control_limit": "Actual composed camera/WObj/CObj/matrix/nametag code with explicit modeled owner/player/memory seams and modeled PRE reconstruction; omission diverges and repeated draw is idempotent. Not an actual snapshot-restore control; V3 supplies the actual browser restores.",
+          "producer_archive": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-v3-producer-archive/archive.json",
+            "sha256": "d2e8b46a35a3dd44013926f989a2272e3eef5ed68d6ef80e7eeeb0b71bdf79fb"
+          },
+          "build": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-camera-history-v20-v1/artifact-inventory.json",
+            "sha256": "decb4386ad7dce8a1e9116d52b47b07e35b6a607d147c5193a8694f03ec0eaff"
+          },
+          "linked_configuration": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-camera-history-v20-v1/final-linked-configuration-v1.json",
+            "sha256": "24f81115b50039dc26478f28c014c54b979b812986bb9b565f1681a7b60e89f8"
+          },
+          "linked_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-camera-history-v20-v1/row-review.json",
+            "sha256": "86216dd3fd5a3bddd19b11455a47f3c19cf1188f85914048575837aaa3cd97de"
+          },
+          "capture": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/runner/evidence.json",
+            "sha256": "06c516f84b4bd9eed813f26ef1187c836ce75dd14422d440db1de9254ec5d03f"
+          },
+          "command": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/command.json",
+            "sha256": "736c7fe7d7680acc0bd5fedc1cfb436fca3c4b7634f9fe665f9b48dda55c00d0"
+          },
+          "launch": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/launch-result.json",
+            "sha256": "2048cf04a43ab9beeb383dc31ac942129527a3d1d32f847ace1701907cface21"
+          },
+          "postflight": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/independent-postflight.json",
+            "sha256": "d8d41204da5314354d0a6f096e598298e48eefe4ad764118ada948ecd5ff867b"
+          },
+          "independent_result_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/result-review.json",
+            "sha256": "90cd0c8316f085e4a0bd15d7a27e661b6b4fdc6dc56a934d6b90273c1d1d53be"
+          },
+          "raw_intervals": [
+            {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/runner/intervals/0000-evidence.json",
+              "sha256": "633395f789d0ca89c0a513854b4a1202efd32c1fd815a76d0e39a4cceaca6625"
+            },
+            {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-retained-history-v3/runner/intervals/0001-evidence.json",
+              "sha256": "63e90efcb01fd8382ce5d4830a904316cadbc6af5770fe92c6dfc29f08555792"
+            }
+          ],
+          "comparisons": {
+            "nineDomainComparisons": 12,
+            "rawFiveComparisons": 9,
+            "rawLaneComparisons": 45,
+            "correctedReplayTicks": 5,
+            "authoritativeTicks": 4,
+            "rawMotorReceipts": 12,
+            "capturesPerLane": 2,
+            "retirementsPerLane": 2,
+            "maxActiveCapsules": 1,
+            "restoresFromSamePre": 2
+          },
+          "cleanup": "Both pages retire two captures, maximum one active; source and renderer close pass. All recorded Chrome/Worker PID/PGID owners absent and all nine runtime artifact pins unchanged.",
+          "limits": [
+            "Four authored ticks (2+1+1 packet plan), two restores of PRE176 then one confirmed rebase at PRE179; not continuous/rolling/full-match acceptance.",
+            "Node-held local Worker room WebSockets; browser pages do not own sockets; no public Internet, live physical input or transport-checksum claim.",
+            "Motor records are capture-only and contain zero events in this short witness; no physical output claim.",
+            "V20 source camera preparation remains FD/standard/plain-camera/prewarmed-inverse scoped; no broader stage/mode/profile acceptance.",
+            "Final-present raw five lanes and all declared nine-domain bytes were compared; screenshots are retained evidence, not original-game pixel equivalence.",
+            "Explicit schema2 particle sidecar retains and locally authenticates constructor Serial provenance instead of cross-page equality; no raw bytes are rewritten, and semantic identities/payload bytes remain strict under the reviewed fixed typed rule.",
+            "Final-present command68 records retain gpu:null, so those raw GPU return objects cannot be independently replayed; the original online runner checked them. No new GPU claim is inferred."
+          ],
+          "next": "Ordinary-runtime private rollback integration using its existing match session and browser-local input/relay owner; first close the linked API and owner adapter gap. Sustained confirmed-anchor advancement, correction across refill, combat/KO breadth, full-match play and complete-profile admission remain open."
+        },
+        "retained_history_integration_v1": {
+          "status": "LOCAL_VALIDATION_PASS_PUBLICATION_PENDING",
+          "validation_source": "a0fec4bd2adb9c7d10b3a13b8ddd572f676833f5",
+          "regression": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v2/result.json",
+            "sha256": "7030962e5b930047540659481fc50c2cd379a8cd71a41025cedd1946ee100bf5"
+          },
+          "ordinary_release": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-ordinary-release-v1/result.json",
+            "sha256": "8127ef18dff861ee81397288c6097f2a6216d5136af9edfc895c083c0c0ecd49"
+          },
+          "affected_diagnostic_build": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-history-regression-v1/artifact-inventory.json",
+            "sha256": "2fd2dbd192cf2192dc7db67f8e401a01adf2e6c789aad3d14e997c824e077af5"
+          },
+          "producer_delta": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-history-regression-v1/producer-delta.json",
+            "sha256": "bf3e104f360ef61f622220b5f9132c8ce50ebf3cbafa03cc06865099eb24759c"
+          },
+          "fixture_repair_root_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/root-review.json",
+            "sha256": "0392ff3dc299c425c702e4bcef0135300aeea4cbe92a20c44d462b183fcbf952"
+          },
+          "fixture_repair_independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/independent-review.json",
+            "sha256": "d63f1a181c5af02a2a452b72a0c7fc4c967aea385bb5499aca5967856cd1214d"
+          },
+          "focused_first_invocation": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/focused-result.json",
+            "sha256": "6515991794addf1f723ea0c09340041b520575e396972a8377bc781e038bd701"
+          },
+          "focused_profile_retry": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/focused-profile-result.json",
+            "sha256": "c551ee9be81bc5d735248d2cc8314c84142849a7b1878d4eec77be5111176af6"
+          },
+          "publication_head_ci": "Initial92d8044 run41107947034 unit-0 cancelled at existing15-minute cap; no assertion failure before cancellation. Current head pending after reviewed three-shard rebalance.",
+          "failed_full_regression": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v1/result.json",
+            "sha256": "12fd24eb2c3f11a2e9f50f06d7851da61467797f176a92f08c8b0aa22532aa39"
+          },
+          "preserved_failures": "V1 ABI join, V2 source-camera divergence, native fixture/extraction failures, full-regression legacy fixture closure and nested Git patch isolation errors, and stale host source-hashing assertion remain in retained evidence. Comparisons and timing guards were not weakened.",
+          "tests_run": 3082,
+          "tests_skipped": 238,
+          "publication_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/publication-review.json",
+            "sha256": "f6382dbdae601265041e13315aea5a50824ebba5ea2230bbf17321e8e718be7f"
+          },
+          "ci_timeout_repair": {
+            "candidate": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/ci-partition-rebalance-v1/candidate-receipt.json",
+              "sha256": "ce94dbee6f400aa1f175c74ac8832aeb1eac6b9085ffd219672e120d1c83fb42"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/ci-partition-rebalance-v1/root-review.json",
+              "sha256": "9bf51eed08cc19ad4dd21258097cfb9190f360914073d072305fba9d4eddaaaf"
+            },
+            "failed_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/ci-unit-0-attempt-1.log",
+              "sha256": "b4330086cd5bcd9f45554e5f9bf462c046f7e5bc10a99e14ce1ad22114ee3361"
+            },
+            "scope": "Same full test inventory, existing15-minute deadline and compiler-job settings; three slow complete modules gain their own unit shard."
           }
         }
       }

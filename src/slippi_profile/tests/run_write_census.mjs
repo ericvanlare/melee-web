@@ -9,6 +9,7 @@ import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_
 import {runBrowserCpuCorrectedSeven} from './cpu_corrected_runner.mjs';
 import {runBrowserCpuCorrectedTwoWindow} from './cpu_corrected_two_window_runner.mjs';
 import {runBrowserCpuCorrectedLoop} from './cpu_corrected_loop_runner.mjs';
+import {runBrowserCpuHistory} from './cpu_history_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -32,7 +33,7 @@ const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
 const LOBJ_CURRENT_SET_V15_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15';
-const TEV_STAGE_SCRATCH_V19_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19';
+const CAMERA_HISTORY_V20_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -198,20 +199,21 @@ export function validateCpuRestoreRouteSelection(values) {
   const correctedLoop = values['--correct-predicted-branch-loop'] === true ||
     values['--correct-predicted-branch-loop-packets'] === true;
   const correctedLoopPackets = values['--correct-predicted-branch-loop-packets'] === true;
+  const correctedHistory = values['--correct-predicted-branch-history-packets'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
   const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
   const multiTick = twoTick || sevenTick;
   if (sevenTick && !particle) {
-    throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
+    throw new Error('The seven-tick route requires the private v20 Camera history profile');
   }
-  if ((corrected || correctedTwoWindow || correctedLoop) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick-capable preparation route');
+  if ((corrected || correctedTwoWindow || correctedLoop || correctedHistory) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick-capable preparation route');
   if(values['--correct-predicted-branch-loop']===true&&correctedLoopPackets)
     throw new Error('Local and packet-backed reusable-loop routes are mutually exclusive');
-  if (Number(corrected)+Number(correctedTwoWindow)+Number(correctedLoop)>1) throw new Error('One-window, two-window and reusable-loop correction routes are mutually exclusive');
+  if (Number(corrected)+Number(correctedTwoWindow)+Number(correctedLoop)+Number(correctedHistory)>1) throw new Error('One-window, two-window, reusable-loop and retained-history correction routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
-    throw new Error('The v19 TEV stage scratch lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
+    throw new Error('The v20 Camera history lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
   }
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
@@ -223,7 +225,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return correctedLoopPackets ? 'independent-browser-correction-loop-packets-v1' : correctedLoop ? 'independent-browser-correction-loop-v1' : correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return correctedHistory ? 'independent-browser-retained-history-packets-v1' : correctedLoopPackets ? 'independent-browser-correction-loop-packets-v1' : correctedLoop ? 'independent-browser-correction-loop-v1' : correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
@@ -234,12 +236,12 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   if (lobjPresentationCache && !multiTick) throw new Error('The v7 light owner requires two or seven ticks');
   if(tobjPresentationCache && (!lobjPresentationCache || !multiTick)) throw new Error('The v15 current light set lane requires v7 and two or seven ticks');
   if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !multiTick)) {
-    throw new Error('The v19 TEV stage scratch lane requires v15 TObj, v7 LObj, and two or seven ticks');
+    throw new Error('The v20 Camera history lane requires v15 TObj, v7 LObj, and two or seven ticks');
   }
   if (sevenTickDrawnReference && !particlePresentationCache) {
-    throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
+    throw new Error('The seven-tick route requires the private v20 Camera history profile');
   }
-  const expectedProfile = particlePresentationCache ? TEV_STAGE_SCRATCH_V19_PROFILE :
+  const expectedProfile = particlePresentationCache ? CAMERA_HISTORY_V20_PROFILE :
     tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
@@ -250,11 +252,11 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   }
   if (sevenTickDrawnReference && (!sevenTickExports ||
       sevenTickExports.evidence !== true || sevenTickExports.evidenceBytes !== true)) {
-    throw new Error('Seven-tick evidence exports are unavailable for the linked v19 profile');
+    throw new Error('Seven-tick evidence exports are unavailable for the linked v20 profile');
   }
   if (reuseExports !== null && (!sevenTickDrawnReference || reuseExports.enable !== true ||
       reuseExports.evidence !== true || reuseExports.evidenceBytes !== true)) {
-    throw new Error('Two-window reuse exports are unavailable for the linked v19 profile');
+    throw new Error('Two-window reuse exports are unavailable for the linked v20 profile');
   }
   return expectedProfile;
 }
@@ -267,7 +269,7 @@ export function parseArgs(argv) {
     '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
     '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch',
     '--correct-predicted-branch-two-window','--correct-predicted-branch-loop',
-    '--correct-predicted-branch-loop-packets']);
+    '--correct-predicted-branch-loop-packets','--correct-predicted-branch-history-packets']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -398,6 +400,9 @@ function sourceHashes({packetInput = false} = {}) {
     'src/slippi_profile/tests/cpu_corrected_runner.mjs',
     'src/slippi_profile/tests/cpu_corrected_two_window_runner.mjs',
     'src/slippi_profile/tests/cpu_corrected_loop_runner.mjs',
+    'src/slippi_profile/tests/cpu_history_runner.mjs',
+    'src/slippi_profile/tests/cpu_history_input.mjs',
+    'src/slippi_profile/tests/cpu_history_adapter.inc',
     'src/slippi_profile/tests/test_cpu_loop_census.mjs',
     'src/slippi_profile/tests/test_cpu_corrected_two_window_runner.mjs',
     'src/slippi_profile/tests/cpu_endpoint.mjs',
@@ -534,6 +539,7 @@ export function recordCpuRestoreFailure(report,error) {
   if(error.cpuCorrectedPartial)report.execution.cpuCorrected=error.cpuCorrectedPartial;
   if(error.cpuCorrectedTwoWindowPartial)report.execution.correctedTwoWindow=error.cpuCorrectedTwoWindowPartial;
   if(error.cpuCorrectedLoopPartial)report.execution.correctedLoop=error.cpuCorrectedLoopPartial;
+  if(error.cpuHistoryReport)report.execution.retainedHistory=error.cpuHistoryReport;
   if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
   report.execution.cpuOuterValidation='failed';
   return report;
@@ -716,7 +722,8 @@ async function main() {
   const correctedLoopLocal=options['--correct-predicted-branch-loop']===true;
   const correctedLoopPackets=options['--correct-predicted-branch-loop-packets']===true;
   const correctedLoop=correctedLoopLocal||correctedLoopPackets;
-  const correctedRoute=correctedPrediction||correctedTwoWindow||correctedLoop;
+  const correctedHistory=options['--correct-predicted-branch-history-packets']===true;
+  const correctedRoute=correctedPrediction||correctedTwoWindow||correctedLoop||correctedHistory;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const particlePresentationCache=options['--slippi-particle-presentation-cache']===true;
@@ -738,7 +745,7 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(options['--manifest'], 'utf8'));
   const manifestInventory = validateSourceStateManifest(manifest);
   const tobjFailureStatics = tobjPresentationCache ? selectTobjFailureStatics(manifest) : null;
-  const cpuIntervalFailureStatics=correctedLoop?selectCpuIntervalFailureStatics(manifest):null;
+  const cpuIntervalFailureStatics=(correctedLoop||correctedHistory)?selectCpuIntervalFailureStatics(manifest):null;
   const runtimeHashes = Object.fromEntries([runtime, wasm, data].map(file => [path.basename(file), fileSha(file)]));
   if (manifestInventory.wasmSha256 !== runtimeHashes[path.basename(wasm)]) {
     throw new Error('Source-state manifest does not describe the supplied final browser Wasm');
@@ -803,7 +810,7 @@ async function main() {
       sourceCStaticCandidates: manifestInventory.sourceCStaticCandidates,
       excludedMutableInputSections: manifestInventory.excludedMutableInputSections,
       completeGameState: manifestInventory.completeGameState},
-    harnessSha256: sourceHashes({packetInput: correctedLoopPackets}),
+    harnessSha256: sourceHashes({packetInput: correctedLoopPackets||correctedHistory}),
     assetSha256: flatAssetHashes(options['--assets']),
     browser: null,
     browser_process_info: [],
@@ -874,9 +881,18 @@ async function main() {
       'No whole-profile, vanilla, H1 or whole-session acceptance','No renderer/host allocator rewind',
       'No #339 nonzero-history/drop workaround'];
   }
+  if(correctedHistory){
+    report.schema='melee-web-browser-retained-pre-history-component-v1';
+    report.statement='A private native PRE remains owned across two actual local-relay input corrections (two then three ticks), then retires and rebases. Both selected results are compared with an independent drawn instance using the unchanged nine-domain and raw-lane checks. Local Node-held sockets supply received PAD contributions; browser-owned networking, a whole match and public profile acceptance remain open.';
+    report.execution={status:'incomplete',prefixSamples:300,retainedHistory:{status:'not-started'},
+      intervalEvidence:[],restorePerformed:'not-yet-observed'};
+    report.exclusions=['No #341 milestone closure','No public Internet or browser-owned sockets',
+      'No whole-match rollback or combat/KO coverage','No complete profile or vanilla acceptance',
+      'No renderer/generic allocator rewind','No #339 nonzero-history/drop workaround'];
+  }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
-  const intervalSink=correctedLoop?createCpuIntervalEvidenceSink(options['--out']):null;
-  const onIntervalEvidence=correctedLoop?async(index,interval)=>{
+  const intervalSink=(correctedLoop||correctedHistory)?createCpuIntervalEvidenceSink(options['--out']):null;
+  const onIntervalEvidence=(correctedLoop||correctedHistory)?async(index,interval)=>{
     const receipt=await intervalSink(index,interval);
     report.execution.intervalEvidence.push({index,...receipt});
     writeReport();return receipt;
@@ -959,7 +975,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: particlePresentationCache ? TEV_STAGE_SCRATCH_V19_PROFILE :
+      name: particlePresentationCache ? CAMERA_HISTORY_V20_PROFILE :
         tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache, particlePresentationCache};
@@ -1048,6 +1064,19 @@ async function main() {
         reference:validateCpuLoopExports(await page.evaluate(readCpuLoopExportsInPage)),
         predicted:validateCpuLoopExports(await predictedPage.evaluate(readCpuLoopExportsInPage))};
     }
+    if(correctedHistory){
+      const readHistoryExports=()=>{
+        const {module}=window.__slippiSynctest;
+        const names=['enable','command','evidence','evidence_bytes','motor_evidence',
+          'motor_evidence_bytes','motor_commit_receipt','motor_commit_receipt_bytes'];
+        return Object.fromEntries(names.map(name=>[name,
+          typeof module['_melee_web_synctest_cpu_history_'+name]==='function']));
+      };
+      report.profile.retainedHistoryExports={reference:await page.evaluate(readHistoryExports),
+        predicted:await predictedPage.evaluate(readHistoryExports)};
+      if(Object.values(report.profile.retainedHistoryExports).some(lane=>Object.values(lane).some(value=>value!==true)))
+        throw new Error('Retained-history native exports are unavailable');
+    }
     report.initialization = {
       exactProfileSeedAndInitializer: true,
       initializer,
@@ -1128,8 +1157,8 @@ async function main() {
         decodeDrawSource:decodeDrawDiagnostics.toString()};
       if(sevenTickDrawnReference){
         if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
-        if(correctedLoop){
-          if(correctedLoopPackets){
+        if(correctedLoop||correctedHistory){
+          if(correctedLoopPackets||correctedHistory){
             const relayTools=process.env.MELEE_A3_ROOM_RELAY_TOOLS;
             if(!relayTools||!path.isAbsolute(relayTools)||
                !['wrangler/package.json','miniflare/package.json','workerd/package.json']
@@ -1141,7 +1170,8 @@ async function main() {
               tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:ROOT,encoding:'utf8'}).trim()};
             relayRuntime=await startRoomRelayRuntime({producer,evidenceDir:path.join(options['--out'],'packet-worker-evidence'),
               diagnostic:message=>{(report.packetInputRuntimeLog??=[]).push(String(message));writeReport();}});
-            const agreement=packetModule.buildCpuCorrectedLoopPacketAgreement({producer,profile:report.profile,
+            const buildAgreement=correctedHistory?packetModule.buildCpuHistoryPacketAgreement:packetModule.buildCpuCorrectedLoopPacketAgreement;
+            const agreement=buildAgreement({producer,profile:report.profile,
               initializer:init.initializer,inputMapping:expectedInputMapping,slotCount:drawDiagnostics.slotCount,
               sourceStateManifest:report.sourceStateManifest,
               runtimeSha256:report.runtimeSha256,harnessSha256:report.harnessSha256,
@@ -1154,12 +1184,14 @@ async function main() {
               neutralPreroll:packetInput.startup.neutralPreroll};
             writeReport();
           }
-          const result=await runBrowserCpuCorrectedLoop(predictedPage,page,cpuWire,checkpoint,
+          const runCorrection=correctedHistory?runBrowserCpuHistory:runBrowserCpuCorrectedLoop;
+          const result=await runCorrection(predictedPage,page,cpuWire,checkpoint,
             expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,onIntervalEvidence,
             packetInput?{packetInput}:{});
           packetRunPassed=result.status==='passed';
-          report.execution={...report.execution,status:'completed',correctedLoop:result,restorePerformed:true,
-            scope:packetInput?
+          report.execution={...report.execution,status:'completed',
+            [correctedHistory?'retainedHistory':'correctedLoop']:result,restorePerformed:true,
+            scope:correctedHistory?'one retained PRE with two local-relay corrections, checked retirement and rebase':packetInput?
               'bounded variable-span confirmed/speculative ownership, Node-held A2 input for 44 rows, one capsule and a persistent timeline':
               'bounded variable-span confirmed/speculative ownership with one capsule and a persistent timeline'};
           report.cpuResult={referenceScreenshot:await screenshotRecord(page,options['--out'],'reference-final.png'),

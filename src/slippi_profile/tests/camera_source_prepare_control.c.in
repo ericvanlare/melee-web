@@ -1,0 +1,173 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ * Actual camera/math/nametag bodies. Registration, input, source-memory and
+ * interval admissions are modeled; unsupported leaves abort, never succeed. */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <melee/cm/camera.h>
+#include <melee/cm/types.h>
+#include <melee/gr/types.h>
+#include <melee/gr/ground.h>
+#include <melee/gr/grcastle.h>
+#include <melee/gr/grcorneria.h>
+#include <melee/gr/grzebes.h>
+#include <melee/gr/grgarden.h>
+#include <melee/gr/grkinokoroute.h>
+#include <melee/gr/grhomerun.h>
+#include <melee/gm/gm_16AE.h>
+#include <melee/pl/player.h>
+#include <melee/if/ifnametag.h>
+#include <melee/lb/lbvector.h>
+#include <sysdolphin/baselib/cobj.h>
+#include <sysdolphin/baselib/wobj.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/sislib.h>
+#include <sysdolphin/baselib/mtx.h>
+#include <dolphin/gx.h>
+#include <dolphin/mtx.h>
+#include "gameplay_ps_math.h"
+#include "gameplay_cpu_interval.h"
+#include "gameplay_source_memory_runtime.h"
+#include "slippi_profile/camera_source_prepare.h"
+#undef VECNormalize
+#define VECNormalize melee_web_ps_vec_normalize
+#define C_MTXLookAt melee_web_mtx_look_at
+#include <sysdolphin/baselib/util.h>
+void __assert(char* f,u32 l,char* m) { fprintf(stderr,"assert %s:%u %s\n",f,l,m);abort(); }
+static void require(int yes) { if(!yes) abort(); }
+static Camera cm_80452C68;
+static HSD_CObj* cm_804D6464;
+CameraDebugMode cm_80453004;
+StageInfo stage_info;
+HSD_CObjInfo hsdCObj;
+HSD_WObjInfo hsdWObj;
+HSD_ObjAllocData gobj_alloc_data;
+HSD_GObjLibInitDataType HSD_GObjLibInitData;
+static HSD_GObj* heads[65], *tails[65];
+HSD_GObj** HSD_GObjGXLinkHead=heads;
+HSD_GObj** HSD_GObj_804D7820=tails;
+u8 HSD_GObj_CameraKind=1;
+static int active=1, healthy=1, inverse_live=1;
+static Mtx* expected_inverse;
+static unsigned alloc_calls;
+static void fn_800301D0(HSD_GObj* o,int c) { (void)o;(void)c;abort(); }
+void fn_8002F360(HSD_GObj* o) { (void)o;abort(); }
+int melee_web_cpu_interval_active(void) { return active; }
+uint64_t melee_web_cpu_interval_token(void) { return active ? 29 : 0; }
+int melee_web_cpu_interval_admit(uint64_t token) { return active && healthy && token==29; }
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(MeleeWebSourceMemoryContext* out) {
+ memset(out,0,sizeof(*out));out->world_generation=17;return MELEE_WEB_SOURCE_MEMORY_READ_OK;
+}
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(const void* p,MeleeWebSourceMemoryAllocation* out) {
+ memset(out,0,sizeof(*out));out->world_generation=17;out->requested_bytes=48;out->live=inverse_live;
+ return p==expected_inverse ? MELEE_WEB_SOURCE_MEMORY_READ_OK : MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+}
+void* HSD_MtxAlloc(void) { ++alloc_calls;abort(); }
+void HSD_JObjSetupMatrixSub(HSD_JObj* o) { (void)o;abort(); }
+void HSD_JObjSetMtxDirtySub(HSD_JObj* o) { (void)o;abort(); }
+float grCastle_801D0FF0(void) { abort(); }
+float grCorneria_801E2FCC(void) { abort(); }
+float grZebes_801DCCC8(void) { abort(); }
+float grGarden_80203624(void) { abort(); }
+float grKinokoRoute_802087B0(void) { abort(); }
+float grHomeRun_8021EF10(void) { abort(); }
+static Vec3 player;
+Gm_PKind Player_GetPlayerSlotType(s32 s) { (void)s;return Gm_PKind_Human; }
+s32 Player_GetPlayerState(s32 s) { (void)s;return 1; }
+s32 Player_GetStocks(int s) { (void)s;return 4; }
+u8 Player_GetNametagSlotID(int s) { (void)s;return NAMETAG_DISABLED; }
+melee_source_bool Player_80036058(s32 s) { (void)s;return 0; }
+melee_source_bool gm_8016B258(int s) { (void)s;return 0; }
+void Player_LoadPlayerCoords(s32 s,Vec3* out) { (void)s;*out=player; }
+float Player_800360D8(s32 s) { (void)s;return 5.0f; }
+static u8 un_804D6D70[6]={1};
+static int un_804A1EF8[6];
+static HSD_Text* un_804D6D78;
+void HSD_SisLib_803A746C(HSD_Text* t,int i,float x,float y) { (void)t;(void)i;(void)x;(void)y;abort(); }
+/* ACTUAL_SOURCE */
+
+typedef struct Scene { HSD_CObj main,copy; HSD_WObj eye,interest,copy_eye,copy_interest; Mtx inverse; HSD_GObj owner,tag_owner; HSD_GObjProc proc; HSD_JObj tag,child; u8 slot; } Scene;
+static void init(Scene* s) {
+ memset(s,0,sizeof(*s));
+ s->main.parent.parent.class_info=&hsdCObj.parent.parent;
+ s->copy.parent.parent.class_info=&hsdCObj.parent.parent;
+ s->eye.parent.parent.class_info=s->interest.parent.parent.class_info=s->copy_eye.parent.parent.class_info=s->copy_interest.parent.parent.class_info=&hsdWObj.parent.parent;
+ s->main.eyepos=&s->eye;s->main.interest=&s->interest;s->main.proj_mtx=&s->inverse;
+ s->copy.eyepos=&s->copy_eye;s->copy.interest=&s->copy_interest;
+ s->main.projection_type=s->copy.projection_type=PROJ_PERSPECTIVE;
+ s->main.projection_param.perspective.aspect=s->copy.projection_param.perspective.aspect=1.25f;
+ s->main.viewport.xmax=640;s->main.viewport.ymax=480;
+ s->owner.classifier=0x10;s->owner.p_link=0x12;s->owner.gx_link=64;s->owner.render_priority=2;s->owner.obj_kind=1;s->owner.render_cb=fn_800301D0;s->owner.hsd_obj=&s->main;s->owner.proc=&s->proc;
+ s->proc.gobj=&s->owner;s->proc.s_link=0x12;s->proc.on_invoke=fn_8002F360;
+ s->tag.flags=JOBJ_MTX_DIRTY;s->tag.child=&s->child;s->tag_owner.hsd_obj=&s->tag;s->tag_owner.user_data=&s->slot;
+}
+static void select_scene(Scene* s) {
+ cm_80452C68.gobj=&s->owner;cm_804D6464=&s->copy;expected_inverse=&s->inverse;
+ heads[64]=tails[64]=&s->owner;gobj_alloc_data.used=1;HSD_GObjLibInitData.gx_link_max=63;
+}
+static void inputs(int tick) {
+ cm_80452C68.mode=CAMERA_STANDARD; stage_info.grkind=Gr_Kind_Last;
+ cm_80452C68.transform.fov=37.0f+tick;
+ cm_80452C68.transform.position=(Vec3){2.0f*tick,12.0f+tick,130.0f-tick};
+ cm_80452C68.transform.interest=(Vec3){-1.0f*tick,3.0f,0};
+ cm_80452C68.transform_copy=cm_80452C68.transform;
+ cm_80452C68.transform_copy.position.z+=3;
+ cm_80452C68.translation=(Vec2){tick*.25f,tick*.125f};
+ cm_80452C68.nearz=.1f;cm_80452C68.farz=16384;
+ player=(Vec3){tick*1.25f,4.0f+tick,0};
+}
+static void original_draw_cpu(Scene* s) {
+ Camera_8002A4AC(&s->owner); HSD_CObjSetupViewingMtx(&s->main);(void)HSD_CObjGetInvViewingMtxPtrDirect(&s->main);
+}
+static void equal(Scene* a,Scene* b) {
+ require(!memcmp(&a->eye.pos,&b->eye.pos,sizeof(Vec3))&&!memcmp(&a->interest.pos,&b->interest.pos,sizeof(Vec3)));
+ require(!memcmp(&a->copy_eye,&b->copy_eye,sizeof(HSD_WObj))&&!memcmp(&a->copy_interest,&b->copy_interest,sizeof(HSD_WObj)));
+ require(!memcmp(a->main.view_mtx,b->main.view_mtx,sizeof(Mtx))&&!memcmp(a->inverse,b->inverse,sizeof(Mtx)));
+ require(a->main.flags==b->main.flags&&a->eye.flags==b->eye.flags&&a->interest.flags==b->interest.flags);
+ require(!memcmp(&a->main.projection_param,&b->main.projection_param,sizeof(a->main.projection_param)));
+ require(!memcmp(&a->copy.projection_param,&b->copy.projection_param,sizeof(a->copy.projection_param)));
+ require(a->main.near==b->main.near&&a->main.far==b->main.far&&a->copy.near==b->copy.near&&a->copy.far==b->copy.far&&a->copy.flags==b->copy.flags);
+ require(a->owner.hsd_obj==&a->main&&b->owner.hsd_obj==&b->main&&a->main.proj_mtx==&a->inverse&&b->main.proj_mtx==&b->inverse);
+ require(!memcmp(&a->tag.translate,&b->tag.translate,sizeof(Vec3)));
+ require(!memcmp(a->copy.view_mtx,b->copy.view_mtx,sizeof(Mtx))&&!a->copy.proj_mtx&&!b->copy.proj_mtx);
+}
+int main(void) {
+ Scene ref,candidate,omitted; char error[256];
+ init(&ref);init(&candidate);init(&omitted);
+ /* Warm original first-use arithmetic only; actual inverse allocation is a separate
+  * source lifetime gate. This fixture starts with three explicit owned matrices. */
+ inputs(0);select_scene(&ref);original_draw_cpu(&ref);
+ select_scene(&candidate);original_draw_cpu(&candidate);
+ select_scene(&omitted);original_draw_cpu(&omitted);
+ for(int tick=1;tick<=3;++tick) {
+  inputs(tick);select_scene(&ref);fn_802FCC44(&ref.tag_owner);original_draw_cpu(&ref);
+  select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(slippi_camera_source_prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);original_draw_cpu(&candidate);equal(&ref,&candidate);
+  select_scene(&omitted);fn_802FCC44(&omitted.tag_owner);
+ }
+ require(memcmp(&ref.tag.translate,&omitted.tag.translate,sizeof(Vec3))!=0);
+ /* Modeled in-place PRE restoration of these typed fixture values, not an
+  * aggregate checkpoint test; original warm computation is replayed exactly. */
+ init(&ref);init(&candidate);inputs(0);select_scene(&ref);original_draw_cpu(&ref);select_scene(&candidate);original_draw_cpu(&candidate);
+ for(int replay=0;replay<2;++replay) {
+  for(int tick=1;tick<=3;++tick) {
+   inputs(tick);select_scene(&ref);fn_802FCC44(&ref.tag_owner);original_draw_cpu(&ref);
+   select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(slippi_camera_source_prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);
+  }
+  init(&ref);init(&candidate);inputs(0);select_scene(&ref);original_draw_cpu(&ref);select_scene(&candidate);original_draw_cpu(&candidate);
+ }
+ select_scene(&candidate);Scene before=candidate;
+ healthy=0;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));healthy=1;require(!memcmp(&before,&candidate,sizeof(before)));
+ require(!slippi_camera_source_prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
+ candidate.main.proj_mtx=NULL;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));candidate.main.proj_mtx=&candidate.inverse;
+ active=0;candidate.main.proj_mtx=NULL;before=candidate;require(slippi_camera_source_prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));active=1;candidate.main.proj_mtx=&candidate.inverse;
+ inputs(1);cm_80452C68.mode=CAMERA_FREE;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));cm_80452C68.mode=CAMERA_STANDARD;
+ stage_info.grkind=Gr_Kind_Castle;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));stage_info.grkind=Gr_Kind_Last;
+ inverse_live=0;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));inverse_live=1;
+ candidate.owner.render_cb=NULL;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
+ require(!alloc_calls);puts("camera-history actual-source PASS");return 0;
+}

@@ -186,7 +186,7 @@ int main(void){char e[128]={0};reset();assert(melee_web_gameplay_step_post_sourc
         self.assertEqual(source.count("if(!match_gameplay_step(e,n))return 0;"), 2)
         self.assertIn("SLIPPI_PROFILE_ACTIVE_IDENTITY ==", source)
         self.assertIn("SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15", source)
-        self.assertIn("SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19", source)
+        self.assertIn("SLIPPI_PROFILE_IDENTITY_CAMERA_HISTORY_V20", source)
         self.assertIn(
             "#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && "
             "MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE",

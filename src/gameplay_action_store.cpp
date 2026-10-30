@@ -34,7 +34,11 @@ struct GameplayActionStore::Clip {
 };
 } // namespace melee_web
 
-namespace { MeleeWebActionInterval* active_interval = nullptr; }
+namespace {
+MeleeWebActionInterval* active_interval = nullptr;
+MeleeWebActionInterval* history_sealed_guard = nullptr;
+MeleeWebActionInterval* history_live_anchor = nullptr;
+}
 #if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
 namespace { bool interval_test_fail_next_event_push = false; bool interval_test_fail_next_seal_capture = false; }
 extern "C" void melee_web_action_interval_test_fail_next_event_push(void)
@@ -48,11 +52,17 @@ struct MeleeWebActionInterval {
     using Clip = Store::Clip;
     using Cache = melee_web::DatFighterAnimationStore;
     using CacheEntry = Cache::Entry;
+    static constexpr std::size_t HistoryRestoreLimit = 2;
+    // This private diagnostic has a bounded per-incarnation event budget.
+    // Overflow fails closed; no source event is silently dropped.
+    static constexpr std::size_t HistoryEventLimit = 256;
+    static constexpr std::uint64_t HistoryIncarnationLimit = HistoryRestoreLimit + 1;
 
     enum class Phase : uint8_t {
         Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
         Finished, Failed, Disarmed
     };
+    enum class HistoryPreRole : uint8_t { None, Captured, Armed, Restored };
     enum class EventKind : uint8_t { CacheHit, CacheMiss, ActionSelection };
     static_assert(static_cast<uint32_t>(EventKind::CacheHit)==MELEE_WEB_ACTION_ENDPOINT_CACHE_HIT &&
                   static_cast<uint32_t>(EventKind::CacheMiss)==MELEE_WEB_ACTION_ENDPOINT_CACHE_MISS &&
@@ -76,8 +86,16 @@ struct MeleeWebActionInterval {
         SlotState before_lease;
         SlotState after;
         SlotState corrected_after;
+        std::array<std::array<std::shared_ptr<Clip>, 2>, HistoryRestoreLimit>
+            history_restore_active{};
+        std::array<std::array<std::uint32_t, 2>, HistoryRestoreLimit>
+            history_restore_motions{};
     };
     struct CacheState {
+        struct HistoryCacheBank {
+            std::array<CacheEntry, 2> entries;
+            std::size_t next = 0;
+        };
         Store* root = nullptr;
         Store* owner = nullptr;
         Cache* cache = nullptr;
@@ -91,6 +109,10 @@ struct MeleeWebActionInterval {
         std::size_t before_next = 0;
         std::size_t after_next = 0;
         std::size_t corrected_after_next = 0;
+        std::array<CacheEntry, 2> history_pre;
+        std::size_t history_pre_next = 0;
+        std::array<HistoryCacheBank, HistoryRestoreLimit> history_restore_banks;
+        std::size_t history_max_symbol_bytes = 0;
     };
     struct Event {
         EventKind kind = EventKind::ActionSelection;
@@ -122,6 +144,15 @@ struct MeleeWebActionInterval {
     std::vector<Event> corrected_events;
     std::size_t replay_cursor = 0;
     bool correction_used = false;
+    bool history_mode = false;
+    bool history_unexpected_work = false;
+    bool history_endpoint_closed = false;
+    bool history_restored = false;
+    bool history_restore_prepared = false;
+    std::uint64_t history_incarnation = 0;
+    std::uint64_t history_restore_count = 0;
+    std::uint64_t history_prepared_incarnation = 0;
+    std::size_t history_prepared_bank = 0;
 
     bool initialize()
     {
@@ -145,7 +176,89 @@ struct MeleeWebActionInterval {
             stores[i].before_lease = stores[i].before;
             ++live;
         }
-        return live != 0;
+        return live != 0 && (!history_mode || prepare_history_anchor_storage());
+    }
+
+    bool prepare_history_anchor_storage()
+    {
+        if (!resident_correction_owners()) return false;
+        events.reserve(HistoryEventLimit);
+        corrected_events.reserve(HistoryEventLimit);
+        // Stage live cache entries too. The corrected-history endpoint banks
+        // copy cache entries after capture, and a failed capture must not
+        // leave a partially enlarged source cache behind.
+        std::vector<std::array<CacheEntry, 2>> prepared_live_caches;
+        prepared_live_caches.reserve(caches.size());
+        for (auto& cache : caches) {
+            if (!cache.owner || !cache.runtime || cache.root != cache.owner ||
+                cache.cache != &cache.owner->store_) return false;
+            for (const auto& row : cache.runtime->actions())
+                cache.history_max_symbol_bytes =
+                    std::max(cache.history_max_symbol_bytes, row.symbol.size());
+
+            auto live_entries = cache.cache->cache_;
+            for (auto& entry : live_entries)
+                entry.symbol.reserve(cache.history_max_symbol_bytes);
+            for (auto& entry : cache.before)
+                entry.symbol.reserve(cache.history_max_symbol_bytes);
+            cache.history_pre = cache.before;
+            cache.history_pre_next = cache.before_next;
+            cache.after = cache.history_pre;
+            cache.corrected_after = cache.history_pre;
+            for (auto* entries : {&cache.history_pre, &cache.after, &cache.corrected_after})
+                for (auto& entry : *entries)
+                    entry.symbol.reserve(cache.history_max_symbol_bytes);
+            for (auto& bank : cache.history_restore_banks) {
+                bank.entries = cache.history_pre;
+                bank.next = cache.history_pre_next;
+                for (auto& entry : bank.entries)
+                    entry.symbol.reserve(cache.history_max_symbol_bytes);
+            }
+            prepared_live_caches.push_back(std::move(live_entries));
+        }
+        for (auto& binding : stores) if (binding.store) {
+            for (std::size_t bank = 0; bank < HistoryRestoreLimit; ++bank) {
+                binding.history_restore_active[bank] = binding.before_lease.active;
+                binding.history_restore_motions[bank] = binding.before_lease.motions;
+            }
+        }
+        for (std::size_t i = 0; i < caches.size(); ++i) {
+            caches[i].cache->cache_.swap(prepared_live_caches[i]);
+        }
+        return !caches.empty();
+    }
+
+    bool history_maintain_source_cache_capacity(Cache* cache) noexcept
+    {
+        if (!history_mode || history_live_anchor != this) return true;
+        // Existing recording failures are already terminal for admission and
+        // should keep the legacy selection path's failure publication order.
+        if (failure) return true;
+        if ((phase != Phase::Recording && phase != Phase::Correcting) ||
+            active_interval != this || !cache || !live_cache_owner(cache)) {
+            fail(MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED);
+            return false;
+        }
+        CacheState* saved = cache_state(cache);
+        if (!saved || !saved->owner || saved->cache != &saved->owner->store_ ||
+            saved->runtime.get() != saved->owner->runtime_.get()) {
+            fail(MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED);
+            return false;
+        }
+        try {
+            for (auto& entry : saved->cache->cache_)
+                entry.symbol.reserve(saved->history_max_symbol_bytes);
+        } catch (...) {
+            fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED);
+            return false;
+        }
+        for (const auto& entry : saved->cache->cache_) {
+            if (entry.symbol.capacity() < saved->history_max_symbol_bytes) {
+                fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED);
+                return false;
+            }
+        }
+        return true;
     }
 
     bool capture_slots(Store& store, SlotState& state) const
@@ -388,6 +501,54 @@ struct MeleeWebActionInterval {
             return MELEE_WEB_ACTION_ENDPOINT_OK;
         return MELEE_WEB_ACTION_ENDPOINT_PHASE;
     }
+    uint32_t history_pre_admit(HistoryPreRole role, std::uint64_t incarnation,
+                               std::uint64_t restore_count) const noexcept
+    {
+        if (!history_mode || history_live_anchor != this || failure || history_unexpected_work)
+            return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        const bool captured = role == HistoryPreRole::Captured && incarnation == 0 &&
+            restore_count == 0 && phase == Phase::Captured && history_incarnation == 0 &&
+            history_restore_count == 0 && !active_interval &&
+            !history_sealed_guard && !history_restored && !history_restore_prepared &&
+            !history_endpoint_closed && events.empty() && corrected_events.empty();
+        const bool armed = role == HistoryPreRole::Armed && incarnation == 1 &&
+            restore_count == 0 && history_incarnation == 1 && phase == Phase::Recording &&
+            active_interval == this && !history_sealed_guard && !history_restored &&
+            !history_restore_prepared && !history_endpoint_closed && events.empty() &&
+            corrected_events.empty();
+        const bool restored_pre = role == HistoryPreRole::Restored && incarnation &&
+            incarnation == history_incarnation && restore_count &&
+            restore_count <= HistoryRestoreLimit && restore_count == history_restore_count &&
+            phase == Phase::Correcting && history_incarnation != 0 && history_restored &&
+            active_interval == this && !history_sealed_guard &&
+            !history_restore_prepared && !history_endpoint_closed && corrected_events.empty();
+        if (!(captured || armed || restored_pre)) return MELEE_WEB_ACTION_ENDPOINT_PHASE;
+        // Validate the binding ledger before touching captured Store/cache
+        // owners. This read role exposes only the immutable PRE image.
+        if (!live_bindings()) return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        if (!live_cache_owners() || !resident_correction_owners())
+            return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        for (const auto& binding : stores) if (binding.store) {
+            SlotState current;
+            if (!capture_slots(*binding.store, current) ||
+                !same_slot_state(current, binding.before_lease))
+                return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        }
+        for (const auto& saved : caches) {
+            if (!saved.cache || saved.cache->next_ != saved.history_pre_next)
+                return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+            for (std::size_t i = 0; i < saved.history_pre.size(); ++i)
+                if (!same_cache_entry(saved.cache->cache_[i], saved.history_pre[i]))
+                    return MELEE_WEB_ACTION_ENDPOINT_OWNER;
+        }
+        return MELEE_WEB_ACTION_ENDPOINT_OK;
+    }
+    uint32_t endpoint_read_status(HistoryPreRole pre_role, std::uint64_t incarnation,
+                                  std::uint64_t restore_count) const noexcept
+    {
+        return pre_role != HistoryPreRole::None ?
+            history_pre_admit(pre_role, incarnation, restore_count) : endpoint_phase();
+    }
     const std::vector<Event>& endpoint_tape() const noexcept
     { return phase == Phase::CorrectedSealed ? corrected_events : events; }
     uint32_t endpoint_admit() const noexcept
@@ -412,25 +573,44 @@ struct MeleeWebActionInterval {
         return melee_web_action_binding_snapshot(index, &current) &&
             same_binding(current, bindings[index]);
     }
-    MeleeWebActionEndpointHeader endpoint_header() const noexcept
+    MeleeWebActionEndpointHeader endpoint_header_role(
+        HistoryPreRole pre_role, std::uint64_t incarnation,
+        std::uint64_t restore_count) const noexcept
     {
-        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointHeader>(status);
-        if (caches.size() > UINT32_MAX || endpoint_tape().size() > UINT32_MAX)
+        if (const auto status = endpoint_read_status(pre_role, incarnation, restore_count))
+            return endpoint_refusal<MeleeWebActionEndpointHeader>(status);
+        const bool is_pre = pre_role != HistoryPreRole::None;
+        const std::size_t event_count = is_pre ? 0 : endpoint_tape().size();
+        if (caches.size() > UINT32_MAX || event_count > UINT32_MAX)
             return endpoint_refusal<MeleeWebActionEndpointHeader>(MELEE_WEB_ACTION_ENDPOINT_OVERFLOW);
         MeleeWebActionEndpointHeader out{};
         out.schema = 1;
-        out.view = phase == Phase::Recording ? MELEE_WEB_ACTION_ENDPOINT_PRE : MELEE_WEB_ACTION_ENDPOINT_END;
-        out.provenance = phase == Phase::CorrectedSealed ?
+        out.view = is_pre || phase == Phase::Recording ?
+            MELEE_WEB_ACTION_ENDPOINT_PRE : MELEE_WEB_ACTION_ENDPOINT_END;
+        out.provenance = !is_pre && phase == Phase::CorrectedSealed ?
             MELEE_WEB_ACTION_ENDPOINT_CORRECTED : MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
         out.binding_count = static_cast<uint32_t>(bindings.size());
         out.slots_per_binding = 2;
         out.cache_count = static_cast<uint32_t>(caches.size());
-        out.event_count = static_cast<uint32_t>(endpoint_tape().size());
+        out.event_count = static_cast<uint32_t>(event_count);
         return out;
     }
-    MeleeWebActionEndpointBinding endpoint_binding(uint32_t index) const noexcept
+    MeleeWebActionEndpointHeader endpoint_header() const noexcept
+    { return endpoint_header_role(HistoryPreRole::None, 0, 0); }
+    MeleeWebActionEndpointHeader history_captured_pre_header() const noexcept
+    { return endpoint_header_role(HistoryPreRole::Captured, 0, 0); }
+    MeleeWebActionEndpointHeader history_armed_pre_header(std::uint64_t incarnation) const noexcept
+    { return endpoint_header_role(HistoryPreRole::Armed, incarnation, 0); }
+    MeleeWebActionEndpointHeader history_restored_pre_header(
+        std::uint64_t incarnation, std::uint64_t restore_count) const noexcept
+    { return endpoint_header_role(HistoryPreRole::Restored, incarnation, restore_count); }
+
+    MeleeWebActionEndpointBinding endpoint_binding_role(
+        HistoryPreRole pre_role, std::uint64_t incarnation,
+        std::uint64_t restore_count, uint32_t index) const noexcept
     {
-        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointBinding>(status);
+        if (const auto status = endpoint_read_status(pre_role, incarnation, restore_count))
+            return endpoint_refusal<MeleeWebActionEndpointBinding>(status);
         if (index >= bindings.size()) return endpoint_refusal<MeleeWebActionEndpointBinding>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
         if (!endpoint_binding_live(index)) return endpoint_refusal<MeleeWebActionEndpointBinding>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
         const auto& b = bindings[index];
@@ -442,9 +622,24 @@ struct MeleeWebActionInterval {
         if (stores[index].store) out.table = endpoint_pointer(melee_web_action_fighter_table(b.fighter));
         return out;
     }
-    MeleeWebActionEndpointSlot endpoint_slot(uint32_t index, uint32_t slot) const noexcept
+    MeleeWebActionEndpointBinding endpoint_binding(uint32_t index) const noexcept
+    { return endpoint_binding_role(HistoryPreRole::None, 0, 0, index); }
+    MeleeWebActionEndpointBinding history_captured_pre_binding(uint32_t index) const noexcept
+    { return endpoint_binding_role(HistoryPreRole::Captured, 0, 0, index); }
+    MeleeWebActionEndpointBinding history_armed_pre_binding(
+        std::uint64_t incarnation, uint32_t index) const noexcept
+    { return endpoint_binding_role(HistoryPreRole::Armed, incarnation, 0, index); }
+    MeleeWebActionEndpointBinding history_restored_pre_binding(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        uint32_t index) const noexcept
+    { return endpoint_binding_role(HistoryPreRole::Restored, incarnation, restore_count, index); }
+
+    MeleeWebActionEndpointSlot endpoint_slot_role(
+        HistoryPreRole pre_role, std::uint64_t incarnation,
+        std::uint64_t restore_count, uint32_t index, uint32_t slot) const noexcept
     {
-        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointSlot>(status);
+        if (const auto status = endpoint_read_status(pre_role, incarnation, restore_count))
+            return endpoint_refusal<MeleeWebActionEndpointSlot>(status);
         if (index >= bindings.size() || slot >= 2) return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
         if (!endpoint_binding_live(index)) return endpoint_refusal<MeleeWebActionEndpointSlot>(MELEE_WEB_ACTION_ENDPOINT_OWNER);
         MeleeWebActionEndpointSlot out{}; out.binding = index; out.slot = slot;
@@ -467,9 +662,25 @@ struct MeleeWebActionInterval {
         }
         return out;
     }
-    MeleeWebActionEndpointCache endpoint_cache(uint32_t index) const noexcept
+    MeleeWebActionEndpointSlot endpoint_slot(uint32_t index, uint32_t slot) const noexcept
+    { return endpoint_slot_role(HistoryPreRole::None, 0, 0, index, slot); }
+    MeleeWebActionEndpointSlot history_captured_pre_slot(
+        uint32_t index, uint32_t slot) const noexcept
+    { return endpoint_slot_role(HistoryPreRole::Captured, 0, 0, index, slot); }
+    MeleeWebActionEndpointSlot history_armed_pre_slot(
+        std::uint64_t incarnation, uint32_t index, uint32_t slot) const noexcept
+    { return endpoint_slot_role(HistoryPreRole::Armed, incarnation, 0, index, slot); }
+    MeleeWebActionEndpointSlot history_restored_pre_slot(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        uint32_t index, uint32_t slot) const noexcept
+    { return endpoint_slot_role(HistoryPreRole::Restored, incarnation, restore_count, index, slot); }
+
+    MeleeWebActionEndpointCache endpoint_cache_role(
+        HistoryPreRole pre_role, std::uint64_t incarnation,
+        std::uint64_t restore_count, uint32_t index) const noexcept
     {
-        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointCache>(status);
+        if (const auto status = endpoint_read_status(pre_role, incarnation, restore_count))
+            return endpoint_refusal<MeleeWebActionEndpointCache>(status);
         if (index >= caches.size()) return endpoint_refusal<MeleeWebActionEndpointCache>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
         const auto& saved = caches[index];
         const auto* root = store_state(saved.root); // six authored binding slots, fixed bound
@@ -492,9 +703,26 @@ struct MeleeWebActionInterval {
         }
         return out;
     }
-    MeleeWebActionEndpointEvent endpoint_event(uint32_t index) const noexcept
+    MeleeWebActionEndpointCache endpoint_cache(uint32_t index) const noexcept
+    { return endpoint_cache_role(HistoryPreRole::None, 0, 0, index); }
+    MeleeWebActionEndpointCache history_captured_pre_cache(uint32_t index) const noexcept
+    { return endpoint_cache_role(HistoryPreRole::Captured, 0, 0, index); }
+    MeleeWebActionEndpointCache history_armed_pre_cache(
+        std::uint64_t incarnation, uint32_t index) const noexcept
+    { return endpoint_cache_role(HistoryPreRole::Armed, incarnation, 0, index); }
+    MeleeWebActionEndpointCache history_restored_pre_cache(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        uint32_t index) const noexcept
+    { return endpoint_cache_role(HistoryPreRole::Restored, incarnation, restore_count, index); }
+
+    MeleeWebActionEndpointEvent endpoint_event_role(
+        HistoryPreRole pre_role, std::uint64_t incarnation,
+        std::uint64_t restore_count, uint32_t index) const noexcept
     {
-        if (const auto status = endpoint_phase()) return endpoint_refusal<MeleeWebActionEndpointEvent>(status);
+        if (const auto status = endpoint_read_status(pre_role, incarnation, restore_count))
+            return endpoint_refusal<MeleeWebActionEndpointEvent>(status);
+        if (pre_role != HistoryPreRole::None)
+            return endpoint_refusal<MeleeWebActionEndpointEvent>(MELEE_WEB_ACTION_ENDPOINT_PHASE);
         const auto& tape = endpoint_tape();
         if (index >= tape.size()) return endpoint_refusal<MeleeWebActionEndpointEvent>(MELEE_WEB_ACTION_ENDPOINT_INDEX);
         const auto& event = tape[index];
@@ -514,10 +742,22 @@ struct MeleeWebActionInterval {
         }
         return out;
     }
+    MeleeWebActionEndpointEvent endpoint_event(uint32_t index) const noexcept
+    { return endpoint_event_role(HistoryPreRole::None, 0, 0, index); }
+    MeleeWebActionEndpointEvent history_captured_pre_event(uint32_t index) const noexcept
+    { return endpoint_event_role(HistoryPreRole::Captured, 0, 0, index); }
+    MeleeWebActionEndpointEvent history_armed_pre_event(
+        std::uint64_t incarnation, uint32_t index) const noexcept
+    { return endpoint_event_role(HistoryPreRole::Armed, incarnation, 0, index); }
+    MeleeWebActionEndpointEvent history_restored_pre_event(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        uint32_t index) const noexcept
+    { return endpoint_event_role(HistoryPreRole::Restored, incarnation, restore_count, index); }
 
     bool begin()
     {
-        if (phase != Phase::Captured || failure || active_interval) return false;
+        if (phase != Phase::Captured || failure || active_interval || history_sealed_guard ||
+            history_live_anchor) return false;
         if (!state_matches(false)) return false;
         events.clear();
         replay_cursor = 0;
@@ -525,6 +765,310 @@ struct MeleeWebActionInterval {
         active_interval = this;
         return true;
     }
+
+    std::uint64_t history_begin_incarnation() noexcept
+    {
+        if (!history_mode || history_live_anchor != this || failure ||
+            history_incarnation >= HistoryIncarnationLimit || history_unexpected_work) return 0;
+        if (history_sealed_guard && history_sealed_guard != this) return 0;
+
+        const bool first = history_incarnation == 0;
+        if (first) {
+            if (phase != Phase::Captured || active_interval || history_restore_count != 0 ||
+                !state_matches(false)) return 0;
+            events.clear();
+            corrected_events.clear();
+        } else {
+            if (!history_endpoint_closed || history_restore_count > HistoryRestoreLimit ||
+                !live_bindings() || !live_cache_owners() ||
+                !resident_correction_owners()) return 0;
+            if (phase == Phase::Sealed) {
+                if (active_interval || history_sealed_guard != this ||
+                    !state_matches(true)) return 0;
+                // No correction selected this exact forward endpoint; retain
+                // its event prefix and append only future source events.
+            } else if (phase == Phase::CorrectedSealed) {
+                if (!history_restored || active_interval != this || history_sealed_guard ||
+                    corrected_validation_failure() != MELEE_WEB_ACTION_INTERVAL_OK) return 0;
+                // Promote the corrected full-prefix tape, leaving the old
+                // prediction to be released only after the receipt was copied.
+                events.swap(corrected_events);
+                corrected_events.clear();
+            } else return 0;
+        }
+
+        // A predicted sealed endpoint uses the global router guard; a
+        // corrected endpoint remains guarded by active_interval itself.
+        if (history_sealed_guard == this) history_sealed_guard = nullptr;
+        replay_cursor = 0;
+        history_incarnation++;
+        history_endpoint_closed = false;
+        history_restored = false;
+        history_restore_prepared = false;
+        history_prepared_incarnation = 0;
+        correction_used = false;
+        phase = Phase::Recording;
+        active_interval = this;
+        return history_incarnation;
+    }
+
+    bool history_seal_incarnation(std::uint64_t incarnation) noexcept
+    {
+        if (!history_mode || !incarnation || incarnation != history_incarnation ||
+            phase != Phase::Recording || active_interval != this || history_sealed_guard) return false;
+        if (seal() != 1) return false;
+        history_sealed_guard = this;
+        return true;
+    }
+
+    bool history_seal_corrected_incarnation(std::uint64_t incarnation) noexcept
+    {
+        if (!history_mode || !incarnation || incarnation != history_incarnation ||
+            phase != Phase::Correcting || active_interval != this || failure) return false;
+        bool captured = false;
+        try { captured = capture_corrected_after(); }
+        catch (...) {
+            fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED);
+            phase = Phase::Failed;
+            return false;
+        }
+        if (!captured) {
+            fail(failure ? failure : MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED);
+            phase = Phase::Failed;
+            return false;
+        }
+        phase = Phase::CorrectedSealed;
+        return true;
+    }
+
+    void history_refuse_unexpected_action() noexcept
+    {
+        if (!history_mode || (phase != Phase::Sealed && phase != Phase::Captured)) return;
+        history_unexpected_work = true;
+        fail(MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED);
+        phase = Phase::Failed;
+        history_restore_prepared = false;
+        history_prepared_incarnation = 0;
+    }
+
+    bool history_close_endpoint_batch(std::uint64_t incarnation) noexcept
+    {
+        const bool forward_selected = phase == Phase::Sealed && !active_interval &&
+            history_sealed_guard == this;
+        const bool corrected_selected = phase == Phase::CorrectedSealed &&
+            active_interval == this && !history_sealed_guard;
+        if (!history_mode || !incarnation || incarnation != history_incarnation ||
+            (!forward_selected && !corrected_selected) || history_endpoint_closed ||
+            endpoint_admit() != MELEE_WEB_ACTION_ENDPOINT_OK) return false;
+        history_endpoint_closed = true;
+        return true;
+    }
+
+    bool history_restore_bank_ready(std::size_t bank_index) const noexcept
+    {
+        if (bank_index >= HistoryRestoreLimit) return false;
+        for (const auto& saved : caches) {
+            const auto& bank = saved.history_restore_banks[bank_index];
+            if (bank.next != saved.history_pre_next) return false;
+            for (std::size_t i = 0; i < bank.entries.size(); ++i) {
+                if (!same_cache_entry(bank.entries[i], saved.history_pre[i]) ||
+                    bank.entries[i].symbol.capacity() < saved.history_max_symbol_bytes)
+                    return false;
+            }
+        }
+        for (const auto& binding : stores) if (binding.store) {
+            for (std::size_t slot = 0; slot < 2; ++slot) {
+                if (binding.history_restore_active[bank_index][slot].get() !=
+                        binding.before_lease.active[slot].get() ||
+                    binding.history_restore_motions[bank_index][slot] !=
+                        binding.before_lease.motions[slot]) return false;
+            }
+        }
+        return true;
+    }
+
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    bool interval_test_cache_string_layout(
+        std::uint32_t cache_index, std::uint32_t entry_index,
+        melee_web::GameplayActionStoreHistory::CacheStringBankTestLayout* out) const noexcept
+    {
+        if (!out) return false;
+        *out = {};
+        if (!history_mode || cache_index >= caches.size() || entry_index >= 2) return false;
+        const auto& saved = caches[cache_index];
+        if (!saved.cache || !saved.owner || saved.cache != &saved.owner->store_) return false;
+        out->catalog_max_symbol_bytes = saved.history_max_symbol_bytes;
+        const std::array<const std::string*, 7> strings{
+            &saved.cache->cache_[entry_index].symbol,
+            &saved.before[entry_index].symbol,
+            &saved.after[entry_index].symbol,
+            &saved.corrected_after[entry_index].symbol,
+            &saved.history_pre[entry_index].symbol,
+            &saved.history_restore_banks[0].entries[entry_index].symbol,
+            &saved.history_restore_banks[1].entries[entry_index].symbol};
+        for (std::size_t i = 0; i < strings.size(); ++i) {
+            out->symbol_data[i] = endpoint_pointer(strings[i]->data());
+            out->symbol_bytes[i] = strings[i]->size();
+            out->capacity[i] = strings[i]->capacity();
+        }
+        return true;
+    }
+    bool interval_test_event_tape_layout(
+        melee_web::GameplayActionStoreHistory::EventTapeTestLayout* out) const noexcept
+    {
+        if (!history_mode || !out) return false;
+        *out = {events.size(), corrected_events.size(), events.capacity(),
+                corrected_events.capacity()};
+        return true;
+    }
+#endif
+
+    bool history_latest_endpoint_valid(std::uint64_t incarnation) const noexcept
+    {
+        // Validate the binding ledger before dereferencing any captured Store
+        // or its resident catalog. Endpoint admission is pure and read-only.
+        return history_mode && history_live_anchor == this && !failure && incarnation &&
+            incarnation == history_incarnation && phase == Phase::Sealed &&
+            !history_unexpected_work &&
+            history_sealed_guard == this && !active_interval &&
+            history_restore_count < HistoryRestoreLimit && live_bindings() &&
+            live_cache_owners() && resident_correction_owners() &&
+            validation_failure() == MELEE_WEB_ACTION_INTERVAL_OK;
+    }
+
+    bool history_prepare_restore(std::uint64_t incarnation) noexcept
+    {
+        if (history_restore_prepared || !history_latest_endpoint_valid(incarnation) ||
+            !history_restore_bank_ready(static_cast<std::size_t>(history_restore_count)))
+            return false;
+        // Both cache banks, their exact source-sized string capacity, and both
+        // slot banks were prepared alongside the immutable PRE capture. This
+        // publishes one ready ticket without late heap/layout changes.
+        history_prepared_bank = static_cast<std::size_t>(history_restore_count);
+        history_prepared_incarnation = incarnation;
+        history_restore_prepared = true;
+        return true;
+    }
+
+    bool history_admit_restore(std::uint64_t incarnation) const noexcept
+    {
+        return history_restore_prepared &&
+            history_prepared_incarnation == incarnation &&
+            history_prepared_bank == history_restore_count &&
+            history_latest_endpoint_valid(incarnation) &&
+            history_restore_bank_ready(history_prepared_bank);
+    }
+
+    bool history_commit_restore(std::uint64_t incarnation) noexcept
+    {
+        if (!history_admit_restore(incarnation)) return false;
+        const std::size_t bank_index = history_prepared_bank;
+        // All checks are complete. CacheEntry strings and shared_ptr slots are
+        // exchanged with capture-time banks; this commit allocates, frees,
+        // invokes no callback, and leaves Fighter-owned tree/identity fields
+        // to the aggregate payload owner.
+        for (auto& saved : caches) {
+            auto& bank = saved.history_restore_banks[bank_index];
+            saved.cache->cache_.swap(bank.entries);
+            std::swap(saved.cache->next_, bank.next);
+        }
+        for (auto& saved : stores) if (saved.store) {
+            saved.store->active_.swap(saved.history_restore_active[bank_index]);
+            saved.store->motions_.swap(saved.history_restore_motions[bank_index]);
+        }
+        history_restore_count++;
+        history_restore_prepared = false;
+        history_prepared_incarnation = 0;
+        history_restored = true;
+        history_endpoint_closed = false;
+        correction_used = true;
+        history_sealed_guard = nullptr;
+        // The aggregate coordinator now replays corrected source inputs to
+        // the same END. ActionStore selections are recorded on a fresh tape.
+        phase = Phase::Correcting;
+        active_interval = this;
+        return true;
+    }
+
+    bool history_retirement_provenance_matches() const noexcept
+    {
+        for (const auto& binding : stores) if (binding.store) {
+            const Store* destination = binding.store;
+            if (!resident_store_complete(destination) ||
+                !retirement_slot_state_matches(destination, binding.before_lease) ||
+                !retirement_slot_state_matches(destination, binding.after) ||
+                (phase == Phase::CorrectedSealed &&
+                 !retirement_slot_state_matches(destination, binding.corrected_after))) return false;
+            for (std::size_t bank = 0; bank < HistoryRestoreLimit; ++bank) {
+                SlotState retained;
+                retained.table = melee_web_action_rows(destination->rows_.get());
+                retained.active = binding.history_restore_active[bank];
+                retained.motions = binding.history_restore_motions[bank];
+                if (!retirement_slot_retained_clips_match(destination, retained)) return false;
+            }
+            for (const auto& entry : destination->store_.cache_)
+                if (!retirement_cache_entry_matches(destination, entry)) return false;
+        }
+        for (const auto& saved : caches) {
+            const Store* owner = saved.owner;
+            if (!owner || saved.root != owner || saved.cache != &owner->store_ ||
+                saved.runtime.get() != owner->runtime_.get()) return false;
+            for (std::size_t i = 0; i < saved.history_pre.size(); ++i) {
+                if (!retirement_cache_entry_matches(owner, saved.history_pre[i]) ||
+                    !retirement_animation_is_catalogued(
+                        owner, saved.before_animation_leases[i].get()) ||
+                    !retirement_cache_entry_matches(owner, saved.after[i])) return false;
+                if (phase == Phase::CorrectedSealed &&
+                    !retirement_cache_entry_matches(owner, saved.corrected_after[i])) return false;
+                for (const auto& bank : saved.history_restore_banks)
+                    if (!retirement_cache_entry_matches(owner, bank.entries[i])) return false;
+                if (!retirement_cache_entry_matches(owner, saved.cache->cache_[i])) return false;
+            }
+        }
+        for (const auto& event : events) if (!retirement_event_matches(event)) return false;
+        for (const auto& event : corrected_events) if (!retirement_event_matches(event)) return false;
+        return true;
+    }
+
+    int history_retirement_admit() const noexcept
+    {
+        if (!history_mode || history_live_anchor != this || failure || history_unexpected_work ||
+            history_incarnation == 0 || !history_endpoint_closed || !live_bindings() || !live_cache_owners() ||
+            !resident_correction_owners()) return false;
+        // Final selected endpoints may be either an uncorrected forward run
+        // or a corrected replay. Reuse the strict resident-catalog proof.
+        const bool selected_phase =
+            (phase == Phase::Sealed && !active_interval && history_sealed_guard == this) ||
+            (phase == Phase::CorrectedSealed && active_interval == this && !history_sealed_guard);
+        return selected_phase && !history_restore_prepared &&
+            history_restore_count <= HistoryRestoreLimit &&
+            endpoint_admit() == MELEE_WEB_ACTION_ENDPOINT_OK &&
+            history_retirement_provenance_matches();
+    }
+
+    bool history_retire_confirmed() noexcept
+    {
+        if (!history_retirement_admit()) return false;
+        if (history_sealed_guard == this) history_sealed_guard = nullptr;
+        if (history_live_anchor == this) history_live_anchor = nullptr;
+        if (active_interval == this) active_interval = nullptr;
+        phase = Phase::Disarmed;
+        return true;
+    }
+
+    void history_disarm() noexcept
+    {
+        if (!history_mode || history_live_anchor != this || phase == Phase::Disarmed) return;
+        // Revoke only this capsule's routing. Keep the anchor, snapshots, and
+        // displaced leases alive until the owner itself is destroyed.
+        if (active_interval == this) active_interval = nullptr;
+        if (history_sealed_guard == this) history_sealed_guard = nullptr;
+        if (!failure) fail(MELEE_WEB_ACTION_INTERVAL_DISARMED);
+        history_restore_prepared = false;
+        history_prepared_incarnation = 0;
+        phase = Phase::Disarmed;
+    }
+
     int seal()
     {
         if (phase != Phase::Recording || active_interval != this) return 0;
@@ -990,6 +1534,10 @@ struct MeleeWebActionInterval {
     void push_to(std::vector<Event>& tape, Event&& event) noexcept
     {
         if (failure) return;
+        if (history_mode && tape.size() >= HistoryEventLimit) {
+            fail(MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED);
+            return;
+        }
         try {
 #if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
             if (interval_test_fail_next_event_push) {
@@ -1149,6 +1697,15 @@ extern "C" int melee_web_action_interval_test_rehome_first_selection_clip(
 #endif
 
 namespace {
+bool refuse_action_while_history_sealed(char* error, size_t error_size) noexcept
+{
+    if (!history_sealed_guard) return false;
+    history_sealed_guard->history_refuse_unexpected_action();
+    if (error && error_size)
+        std::snprintf(error, error_size, "%s", "Action selection attempted while retained PRE is sealed");
+    return true;
+}
+
 void action_interval_cache_hit_hook(const melee_web::DatFighterAnimationStore* cache,
     const std::shared_ptr<const melee_web::DatFighterRuntime>& runtime,
     const melee_web::DatRuntimeAction* row, melee_web::DatAnimationPolicy policy,
@@ -1494,6 +2051,13 @@ void GameplayActionStore::interval_test_change_cache_owner()
 { store_.set_interval_owner(nullptr); }
 void GameplayActionStore::interval_test_restore_cache_owner()
 { store_.set_interval_owner(this); }
+int GameplayActionStore::interval_test_try_select(int motion, unsigned slot)
+{
+    FigaTree* tree = nullptr;
+    void* identity = nullptr;
+    char error[128]{};
+    return select(this, motion, slot, &tree, &identity, error, sizeof(error));
+}
 #endif
 void GameplayActionStore::bind(Fighter* fighter)
 {
@@ -1550,6 +2114,7 @@ bool GameplayActionStore::interval_test_resident_catalog_row(
 int GameplayActionStore::select(void* context, int motion, unsigned slot, FigaTree** tree, void** identity,
     char* error, size_t error_size)
 {
+    if (refuse_action_while_history_sealed(error, error_size)) return 0;
     MeleeWebActionBindingSnapshot binding{};
     if (!melee_web_action_binding_for_context(context, &binding) ||
         binding.select != &select || binding.transfer != &transfer) return 0;
@@ -1566,6 +2131,7 @@ int GameplayActionStore::transfer(void* destination_context, void* source_contex
     Fighter* destination, Fighter* source, int motion, unsigned slot, FigaTree** tree,
     void** identity, char* error, size_t error_size)
 {
+    if (refuse_action_while_history_sealed(error, error_size)) return 0;
     MeleeWebActionBindingSnapshot destination_binding{}, source_binding{};
     if (!melee_web_action_binding_for_context(destination_context, &destination_binding) ||
         !melee_web_action_binding_for_context(source_context, &source_binding) ||
@@ -1693,15 +2259,22 @@ DatSelectedAction GameplayActionStore::select_source_action(uint32_t motion, boo
     }
     if (identity_rows) *identity_rows = rows_;
     if (command_owner) *command_owner = commands_;
-    return store_.select_native_action(motion);
+    auto selected = store_.select_native_action(motion);
+    if (history_live_anchor && history_live_anchor->history_mode)
+        require(history_live_anchor->history_maintain_source_cache_capacity(&store_),
+                "ActionStore retained-history cache capacity could not be maintained");
+    return selected;
 }
 }
 
 namespace {
-MeleeWebActionInterval* interval_create() noexcept
+MeleeWebActionInterval* interval_create(bool history_mode = false) noexcept
 {
+    if (history_sealed_guard || history_live_anchor || (history_mode && active_interval))
+        return nullptr;
     auto* interval = new (std::nothrow) MeleeWebActionInterval();
     if (!interval) return nullptr;
+    interval->history_mode = history_mode;
     try {
         if (!interval->initialize()) {
             delete interval;
@@ -1822,5 +2395,258 @@ extern "C" void melee_web_action_interval_destroy(MeleeWebActionInterval* interv
 {
     if (!interval) return;
     if (active_interval == interval) active_interval = nullptr;
+    if (history_sealed_guard == interval) history_sealed_guard = nullptr;
+    if (history_live_anchor == interval) history_live_anchor = nullptr;
     delete interval;
 }
+
+namespace melee_web {
+GameplayActionStoreHistory::GameplayActionStoreHistory(
+    ::MeleeWebActionInterval* capsule) noexcept : capsule_(capsule) {}
+
+std::unique_ptr<GameplayActionStoreHistory> GameplayActionStoreHistory::capture()
+{
+    auto* capsule = interval_create(true);
+    if (!capsule) return {};
+    auto* owner = new (std::nothrow) GameplayActionStoreHistory(capsule);
+    if (!owner) {
+        delete capsule;
+        return {};
+    }
+    if (history_live_anchor) {
+        delete owner;
+        delete capsule;
+        return {};
+    }
+    history_live_anchor = capsule;
+    return std::unique_ptr<GameplayActionStoreHistory>(owner);
+}
+
+GameplayActionStoreHistory::~GameplayActionStoreHistory()
+{
+    if (!capsule_) return;
+    if (active_interval == capsule_) active_interval = nullptr;
+    if (history_sealed_guard == capsule_) history_sealed_guard = nullptr;
+    if (history_live_anchor == capsule_) history_live_anchor = nullptr;
+    delete capsule_;
+}
+
+std::uint64_t GameplayActionStoreHistory::begin_incarnation() noexcept
+{ return capsule_ ? capsule_->history_begin_incarnation() : 0; }
+
+bool GameplayActionStoreHistory::seal_incarnation(std::uint64_t incarnation) noexcept
+{ return capsule_ && capsule_->history_seal_incarnation(incarnation); }
+
+bool GameplayActionStoreHistory::seal_corrected_incarnation(
+    std::uint64_t incarnation) noexcept
+{ return capsule_ && capsule_->history_seal_corrected_incarnation(incarnation); }
+
+std::uint32_t GameplayActionStoreHistory::endpoint_admit() const noexcept
+{ return capsule_ ? capsule_->endpoint_admit() : MELEE_WEB_ACTION_ENDPOINT_INVALID; }
+
+::MeleeWebActionEndpointHeader GameplayActionStoreHistory::endpoint_header() const noexcept
+{
+    return capsule_ ? capsule_->endpoint_header() :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointHeader>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+::MeleeWebActionEndpointBinding GameplayActionStoreHistory::endpoint_binding(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->endpoint_binding(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointBinding>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+::MeleeWebActionEndpointSlot GameplayActionStoreHistory::endpoint_slot(
+    std::uint32_t binding, std::uint32_t slot) const noexcept
+{
+    return capsule_ ? capsule_->endpoint_slot(binding, slot) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointSlot>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+::MeleeWebActionEndpointCache GameplayActionStoreHistory::endpoint_cache(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->endpoint_cache(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointCache>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+::MeleeWebActionEndpointEvent GameplayActionStoreHistory::endpoint_event(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->endpoint_event(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointEvent>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+bool GameplayActionStoreHistory::close_endpoint_batch(std::uint64_t incarnation) noexcept
+{ return capsule_ && capsule_->history_close_endpoint_batch(incarnation); }
+
+std::uint32_t GameplayActionStoreHistory::history_captured_pre_admit() const noexcept
+{ return capsule_ ? capsule_->history_pre_admit(
+    MeleeWebActionInterval::HistoryPreRole::Captured, 0, 0) :
+    MELEE_WEB_ACTION_ENDPOINT_INVALID; }
+::MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_captured_pre_header() const noexcept
+{
+    return capsule_ ? capsule_->history_captured_pre_header() :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointHeader>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_captured_pre_binding(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_captured_pre_binding(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointBinding>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_captured_pre_slot(
+    std::uint32_t binding, std::uint32_t slot) const noexcept
+{
+    return capsule_ ? capsule_->history_captured_pre_slot(binding, slot) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointSlot>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointCache GameplayActionStoreHistory::history_captured_pre_cache(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_captured_pre_cache(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointCache>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_captured_pre_event(
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_captured_pre_event(index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointEvent>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+std::uint32_t GameplayActionStoreHistory::history_armed_pre_admit(
+    std::uint64_t incarnation) const noexcept
+{ return capsule_ ? capsule_->history_pre_admit(
+    MeleeWebActionInterval::HistoryPreRole::Armed, incarnation, 0) :
+    MELEE_WEB_ACTION_ENDPOINT_INVALID; }
+::MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_armed_pre_header(
+    std::uint64_t incarnation) const noexcept
+{
+    return capsule_ ? capsule_->history_armed_pre_header(incarnation) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointHeader>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_armed_pre_binding(
+    std::uint64_t incarnation, std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_armed_pre_binding(incarnation, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointBinding>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_armed_pre_slot(
+    std::uint64_t incarnation, std::uint32_t binding, std::uint32_t slot) const noexcept
+{
+    return capsule_ ? capsule_->history_armed_pre_slot(incarnation, binding, slot) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointSlot>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointCache GameplayActionStoreHistory::history_armed_pre_cache(
+    std::uint64_t incarnation, std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_armed_pre_cache(incarnation, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointCache>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_armed_pre_event(
+    std::uint64_t incarnation, std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_armed_pre_event(incarnation, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointEvent>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+std::uint32_t GameplayActionStoreHistory::history_restored_pre_admit(
+    std::uint64_t incarnation, std::uint64_t restore_count) const noexcept
+{ return capsule_ ? capsule_->history_pre_admit(
+    MeleeWebActionInterval::HistoryPreRole::Restored, incarnation, restore_count) :
+    MELEE_WEB_ACTION_ENDPOINT_INVALID; }
+::MeleeWebActionEndpointHeader GameplayActionStoreHistory::history_restored_pre_header(
+    std::uint64_t incarnation, std::uint64_t restore_count) const noexcept
+{
+    return capsule_ ? capsule_->history_restored_pre_header(incarnation, restore_count) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointHeader>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointBinding GameplayActionStoreHistory::history_restored_pre_binding(
+    std::uint64_t incarnation, std::uint64_t restore_count,
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_restored_pre_binding(incarnation, restore_count, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointBinding>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointSlot GameplayActionStoreHistory::history_restored_pre_slot(
+    std::uint64_t incarnation, std::uint64_t restore_count,
+    std::uint32_t binding, std::uint32_t slot) const noexcept
+{
+    return capsule_ ? capsule_->history_restored_pre_slot(
+        incarnation, restore_count, binding, slot) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointSlot>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointCache GameplayActionStoreHistory::history_restored_pre_cache(
+    std::uint64_t incarnation, std::uint64_t restore_count,
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_restored_pre_cache(incarnation, restore_count, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointCache>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+::MeleeWebActionEndpointEvent GameplayActionStoreHistory::history_restored_pre_event(
+    std::uint64_t incarnation, std::uint64_t restore_count,
+    std::uint32_t index) const noexcept
+{
+    return capsule_ ? capsule_->history_restored_pre_event(incarnation, restore_count, index) :
+        MeleeWebActionInterval::endpoint_refusal<::MeleeWebActionEndpointEvent>(
+            MELEE_WEB_ACTION_ENDPOINT_INVALID);
+}
+
+bool GameplayActionStoreHistory::prepare_restore(std::uint64_t incarnation) noexcept
+{ return capsule_ && capsule_->history_prepare_restore(incarnation); }
+
+bool GameplayActionStoreHistory::admit_restore(std::uint64_t incarnation) const noexcept
+{ return capsule_ && capsule_->history_admit_restore(incarnation); }
+
+bool GameplayActionStoreHistory::restore_pre(std::uint64_t incarnation) noexcept
+{ return capsule_ && capsule_->history_commit_restore(incarnation); }
+
+std::uint32_t GameplayActionStoreHistory::failure_code() const noexcept
+{ return capsule_ ? melee_web_action_interval_failure_code(capsule_) : MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED; }
+
+std::uint32_t GameplayActionStoreHistory::active_failure() const noexcept
+{ return capsule_ ? melee_web_action_interval_active_failure(capsule_) : MELEE_WEB_ACTION_INTERVAL_CAPTURE_REFUSED; }
+
+bool GameplayActionStoreHistory::retire_admit() const noexcept
+{ return capsule_ && capsule_->history_retirement_admit(); }
+
+bool GameplayActionStoreHistory::retire_confirmed() noexcept
+{ return capsule_ && capsule_->history_retire_confirmed(); }
+
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+bool GameplayActionStoreHistory::interval_test_cache_string_layout(
+    std::uint32_t cache_index, std::uint32_t entry_index,
+    CacheStringBankTestLayout* out) const noexcept
+{
+    return capsule_ && capsule_->interval_test_cache_string_layout(cache_index, entry_index, out);
+}
+bool GameplayActionStoreHistory::interval_test_event_tape_layout(
+    EventTapeTestLayout* out) const noexcept
+{
+    return capsule_ && capsule_->interval_test_event_tape_layout(out);
+}
+#endif
+
+void GameplayActionStoreHistory::disarm() noexcept
+{ if (capsule_) capsule_->history_disarm(); }
+} // namespace melee_web

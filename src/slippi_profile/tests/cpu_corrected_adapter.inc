@@ -5,6 +5,13 @@
 #include <new>
 #if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)
 namespace {
+bool cpu_history_active();
+void cpu_history_forbid(std::vector<melee_web::CpuIntervalSpan>&);
+uint32_t cpu_history_endpoint_begin(uint32_t,uint32_t);
+uint32_t cpu_history_endpoint_record(uint32_t,uint32_t,uint32_t);
+uint32_t cpu_history_endpoint_end();
+uint32_t cpu_history_particle_header();
+uint32_t cpu_history_particle_row(uint32_t,uint32_t);
 struct CpuCorrectedControl {
     enum Phase : uint32_t { Idle, Recording, BaselineDrawSubmitted, BaselineCpuEnd,
         BaselineFinalSubmitted, BaselineReady, Correcting, CorrectedCpuEnd,
@@ -41,11 +48,12 @@ CpuCorrectedReuseEvidence cpu_corrected_reuse_evidence{};
 
 /* Once reuse is explicitly armed, fence off the legacy CPU adapter for the
  * lifetime of this page. The corrected adapter uses its own entry points. */
-bool cpu_corrected_active(){return cpu_corrected.active||cpu_corrected_reuse.enabled;}
+bool cpu_corrected_active(){return cpu_corrected.active||cpu_corrected_reuse.enabled||cpu_history_active();}
 void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>& spans){
     spans.push_back({&cpu_corrected,sizeof(cpu_corrected)});
     spans.push_back({&cpu_corrected_reuse,sizeof(cpu_corrected_reuse)});
     spans.push_back({&cpu_corrected_reuse_evidence,sizeof(cpu_corrected_reuse_evidence)});
+    cpu_history_forbid(spans);
 }
 bool cpu_corrected_same_owner(const CpuCorrectedOwnerTuple& a,
                               const CpuCorrectedOwnerTuple& b){
@@ -213,7 +221,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
     using C=CpuCorrectedControl;auto& c=cpu_corrected;auto& e=c.evidence;
     const uint32_t span=cpu_corrected_reuse.loop_mode?cpu_corrected_reuse.selected_span:7u;
 #if !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-    return cpu_corrected_error(0x510u,"corrected route requires the private v19 TEV stage scratch profile");
+    return cpu_corrected_error(0x510u,"corrected route requires the private v20 camera history profile");
 #else
     if(command==32){
         if(c.active||cpu_restore.state!=CpuRestoreControl::Configured||!cpu_restore.configured_statics||
@@ -449,6 +457,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_command(uint32_t command){
+    if(cpu_history_active())return cpu_fail(0x54du,"legacy corrected route is fenced by retained history");
     cpu_corrected.evidence.last_command=command;
     if(cpu_restore.inflight)return cpu_fail(0x533u,"corrected command reentered native work");
     if(payload_admission_runtime_boundary()!=0)return cpu_fail(0x534u,"corrected command runtime refused");
@@ -469,7 +478,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_reuse_
 #else
     // This is a one-time page-lifetime opt-in before any CPU adapter state or
     // capsule exists. Refusal is read-only and leaves the legacy path intact.
-    if(cpu_corrected_reuse.enabled||cpu_corrected.phase!=CpuCorrectedControl::Idle||
+    if(cpu_history_active()||cpu_corrected_reuse.enabled||cpu_corrected.phase!=CpuCorrectedControl::Idle||
        cpu_corrected.active||cpu_corrected.reader.active()||cpu_restore.inflight||
        cpu_corrected.evidence.first_failure||cpu_corrected.evidence.last_command||
        cpu_corrected.evidence.state||
@@ -555,14 +564,14 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_e
     return sizeof(cpu_corrected_reuse_evidence);
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loop_motor_evidence(){
-    return cpu_restore.capsule&&match?
+    return !cpu_history_active()&&cpu_restore.capsule&&match?
         cpu_restore.capsule->motor_evidence(*match):nullptr;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_motor_evidence_bytes(){
     return melee_web_cpu_interval_motor_evidence_bytes();
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loop_motor_commit_receipt(){
-    return melee_web_cpu_interval_motor_commit_receipt();
+    return cpu_history_active()?nullptr:melee_web_cpu_interval_motor_commit_receipt();
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes(){
     return melee_web_cpu_interval_motor_commit_receipt_bytes();
@@ -574,6 +583,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_evi
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_evidence_bytes(){return sizeof(cpu_corrected.evidence);}
 
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_begin(uint32_t view,uint32_t provenance){
+    if(cpu_history_active())return cpu_history_endpoint_begin(view,provenance);
     using C=CpuCorrectedControl;using V=melee_web::GameplayCpuEndpointView;
     using P=melee_web::GameplayCpuEndpointProvenance;
     auto& c=cpu_corrected;c.row={};
@@ -595,6 +605,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_begin(u
     return 0;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_record(uint32_t domain,uint32_t kind,uint32_t index){
+    if(cpu_history_active())return cpu_history_endpoint_record(domain,kind,index);
     auto& c=cpu_corrected;c.row={};
     if(!cpu_restore.inflight||!c.reader.active()||cpu_restore.first_failure||
        payload_admission_runtime_boundary()!=0||!cpu_corrected_reuse_live(c.endpoint_expected_frame))
@@ -609,6 +620,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_bytes()
 // These optional sidecar reads belong to the same synchronous endpoint batch.
 // They neither begin a new ownership interval nor admit caller-supplied anchors.
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_header(){
+    if(cpu_history_active())return cpu_history_particle_header();
     auto& c=cpu_corrected;c.particle_header={};
     if(!cpu_restore.inflight||!c.reader.active()||cpu_restore.first_failure||
        payload_admission_runtime_boundary()!=0||!cpu_corrected_reuse_live(c.endpoint_expected_frame))
@@ -620,6 +632,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoin
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_particle_endpoint_header_data(){return &cpu_corrected.particle_header;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_header_bytes(){return sizeof(cpu_corrected.particle_header);}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_row(uint32_t kind,uint32_t index){
+    if(cpu_history_active())return cpu_history_particle_row(kind,index);
     auto& c=cpu_corrected;c.particle_row={};
     if(!cpu_restore.inflight||!c.reader.active()||cpu_restore.first_failure||
        payload_admission_runtime_boundary()!=0||!cpu_corrected_reuse_live(c.endpoint_expected_frame))
@@ -631,6 +644,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoin
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_particle_endpoint_row_data(){return &cpu_corrected.particle_row;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_row_bytes(){return sizeof(cpu_corrected.particle_row);}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_end(){
+    if(cpu_history_active())return cpu_history_endpoint_end();
     auto& c=cpu_corrected;
     if(!cpu_restore.inflight||!c.reader.active())return cpu_fail(0x53bu,"endpoint end without batch");
     const bool admitted=c.reader.revalidate();cpu_restore.inflight=false;

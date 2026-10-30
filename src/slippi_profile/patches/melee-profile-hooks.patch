@@ -3152,3 +3152,23 @@ diff --git a/src/sysdolphin/baselib/texp.c b/src/sysdolphin/baselib/texp.c
      }
  }
  
+
+diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
+--- a/src/melee/cm/camera.c
++++ b/src/melee/cm/camera.c
+@@ -4309,6 +4309,15 @@
+ HSD_GObj* Camera_80030A50(void)
+ {
+     return cm_80452C68.gobj;
+ }
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++void slippi_camera_source_identity(HSD_CObj** copy, int* mode, int* stage)
++{
++    *copy = cm_804D6464;
++    *mode = cm_80452C68.mode;
++    *stage = stage_info.grkind;
++}
++#endif
+ 
+ void Camera_80030A60(melee_source_bool arg0)
