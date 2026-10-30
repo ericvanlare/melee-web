@@ -9,6 +9,7 @@
 #include "gameplay_prize_context.h"
 #include "gameplay_audio_bank_transport.h"
 #include "gameplay_source_files.h"
+#include "slippi_profile/particle_source_schedule.h"
 #include "hsd_native_joint.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/gm_1A3F.h>
@@ -2778,6 +2779,13 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
 static int host_draw_render(MeleeWebMenuHost* h,char* e,size_t n)
 {
     h->drawing=1;
+    /* The profile's patched source camera callbacks require the same bounded
+     * draw owner as match rendering. Keep menu traversal out of any active
+     * CPU interval; token zero is admitted only for an ordinary source draw. */
+    if(!slippi_particle_source_draw_begin(h->generation,0,e,n)){
+        h->drawing=0;
+        return 0;
+    }
     /* The source screen camera scales its authored viewport by the current
      * VI mode. Bootstrap owns HSD objects; Aurora owns display startup. Supply
      * the same NTSC mode selected by gmMain for this scoped source draw. */
@@ -2791,7 +2799,10 @@ static int host_draw_render(MeleeWebMenuHost* h,char* e,size_t n)
     const int prefix=h->first_sss_sequence_operation==3;
     MeleeWebMenuSssSequenceObservation* observation=prefix?&h->first_sss_prefix:&h->first_sss_draw;
     if(sequence && !sss_sequence_capture(h,prefix,MELEE_WEB_SSS_SAMPLE_DRAW_ENTER,&observation->draw_enter)){
-        *HSD_VIGetRenderMode()=saved_mode;h->drawing=0;
+        char ignored_error[1]={0};
+        (void)slippi_particle_source_draw_end(ignored_error,sizeof(ignored_error));
+        *HSD_VIGetRenderMode()=saved_mode;
+        h->drawing=0;
         return fail(e,n,observation->error);
     }
 #endif
@@ -2801,7 +2812,9 @@ static int host_draw_render(MeleeWebMenuHost* h,char* e,size_t n)
 #endif
     HSD_Init_803755A8();
     *HSD_VIGetRenderMode()=saved_mode;
+    const int particle_draw_ok=slippi_particle_source_draw_end(e,n);
     h->drawing=0;
+    if(!particle_draw_ok)return 0;
     if(!melee_web_menu_clock_present())return fail(e,n,"Original scene presentation clock lost ownership");
     if(!diagnostic_ok)return fail(e,n,"SSS draw-return comparator refused");
     return ok(e,n);

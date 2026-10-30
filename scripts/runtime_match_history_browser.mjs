@@ -69,13 +69,28 @@ const report={schema:'melee-web-runtime-match-history-admission-v1',
   checks:[],browser_errors:[],websockets:[],screenshots:[],
   cleanup:{native_owner:'not_started',browser:'not_started',server:'externally_owned_by_capture_owner_deadline'},
 };
-const pageErrors=[];
+const pageErrors=[],consoleMessages=[];
+let droppedConsoleMessages=0;
 let browser,context,page,driver,controllerInstalled=false,takenOver=false;
 let nativeCleanupSucceeded=false,browserCdp=null;
 let resultError=null;
 let hostAgreement=null,profileSnapshot=null,discIdentity=null;
 
 function addCheck(name,details=null){report.checks.push({name,details});}
+async function retainNativeLog(boundary){
+  if(!page)return;
+  try{
+    // The page keeps a 16,000-character log window. Retain the whole window,
+    // especially after native unload, where sticky owner failures are reported.
+    const text=await page.evaluate(()=>document.querySelector('#log')?.textContent??'');
+    const file=`native-log-${boundary}.txt`;
+    await fs.writeFile(path.join(out,file),text);
+    (report.native_logs??=[]).push({boundary,file,bytes:Buffer.byteLength(text),
+      sha256:sha256(Buffer.from(text)),scope:'current native/UI log window; not a complete session log'});
+  }catch(error){
+    (report.native_log_errors??=[]).push({boundary,error:String(error?.message||error)});
+  }
+}
 function noteFailure(stage,error){
   const message=`${stage}: ${String(error?.message||error)}`;
   (report.cleanup_failures??=[]).push(message);
@@ -134,8 +149,7 @@ async function waitForCssDoor(port,predicate,label,timeoutMs=10000){
   throw Error(`${label}: expected CSS door state not reached: ${JSON.stringify(door(last,port))}`);
 }
 
-async function waitNativePhase(phase,label,{timeoutMs=30000}={}){
-  const deadline=Date.now()+timeoutMs;
+async function waitNativePhase(phase,label,{timeoutMs=30000,deadline=Date.now()+timeoutMs}={}){
   let last=null;
   while(Date.now()<deadline){
     last=await observePageHealth(label);
@@ -150,6 +164,26 @@ async function waitNativePhase(phase,label,{timeoutMs=30000}={}){
     await page.waitForTimeout(20);
   }
   throw Error(`${label}: native phase ${phase} not reached: ${JSON.stringify(last)}`);
+}
+
+async function waitInitialCss(deadline){
+  // The source observer reports an unpublished dirty slider matrix as not
+  // ready. Phase 1 alone can precede the first draw that publishes it. Share
+  // the entry deadline; never advance source state or recover a runtime fault.
+  const readiness={null_observations:0,last_health:null};
+  report.route.css_readiness=readiness;
+  while(Date.now()<deadline){
+    readiness.last_health=await observePageHealth('original CSS publication',{requireRunning:true});
+    const setup=await page.evaluate(()=>window.menuObserveCssSetup?.()??null);
+    if(setup!==null){
+      assert(setup.cursors?.length===16&&setup.doors?.length===40&&setup.geometry?.length===48,
+        'Original CSS source observer returned malformed extents');
+      return setup;
+    }
+    readiness.null_observations++;
+    await page.waitForTimeout(20);
+  }
+  throw Error(`Original CSS source observation was not published within entry deadline: ${JSON.stringify(readiness)}`);
 }
 
 async function moveCursorToP2Toggle(){
@@ -195,8 +229,8 @@ async function configureControls(){
   addCheck('real controls select two-player keyboard for both ports',report.route.controls);
 }
 
-async function joinSecondHuman(){
-  let setup=await observeCss();
+async function joinSecondHuman(initialSetup){
+  let setup=initialSetup;
   report.route.css_before=[0,1,2,3].map(port=>door(setup,port));
   assert.deepEqual(report.route.css_before.map(row=>[row.kind,row.slotType]),
     [[0,0],[1,1],[3,3],[3,3]],'Original CSS did not present the expected P1 Human/P2 CPU pair');
@@ -391,7 +425,12 @@ try{
   page=await context.newPage();
   page.setDefaultTimeout(90000);page.setDefaultNavigationTimeout(90000);
   page.on('pageerror',error=>pageErrors.push(error.stack||error.message));
-  page.on('console',message=>{if(message.type()==='error')pageErrors.push(message.text());});
+  page.on('console',message=>{
+    const type=message.type(),text=message.text();
+    if(type==='error')pageErrors.push(text);
+    if(consoleMessages.length<10000)consoleMessages.push({type,text});
+    else droppedConsoleMessages++;
+  });
   page.on('websocket',socket=>report.websockets.push(socket.url()));
   page.on('request',request=>{
     const url=new URL(request.url());
@@ -447,9 +486,10 @@ try{
     fst:discIdentity.fst,dol_size:discIdentity.dolSize,fst_size:discIdentity.fstSize,
     canonical_identity_sha256:hostAgreement.asset_identity_sha256};
   report.host_identity=hostAgreement;
+  const cssEntryDeadline=Date.now()+90000;
   await page.locator('#launch').click();
-  await waitNativePhase(1,'original CSS entry',{timeoutMs:90000});
-  await joinSecondHuman();
+  await waitNativePhase(1,'original CSS entry',{deadline:cssEntryDeadline});
+  await joinSecondHuman(await waitInitialCss(cssEntryDeadline));
   await chooseFinalDestination();
   await admitTerminalTakeover();
   report.result='PASS';
@@ -458,6 +498,7 @@ try{
   report.result='FAIL';
   report.failure={name:error?.name||'Error',message:String(error?.message||error),stack:error?.stack||null};
 }finally{
+  await retainNativeLog('before-cleanup');
   if(resultError&&page){
     try{report.failure_diagnostics=await driver?.diagnostics?.()??{unavailable:'browser driver unavailable'};}
     catch(error){report.failure_diagnostics={unavailable:String(error?.message||error)};}
@@ -492,6 +533,7 @@ try{
     }catch(error){report.cleanup.native_owner=`failed: ${String(error?.message||error)}`;
       noteFailure('native/source cleanup failed',error);}
   }
+  await retainNativeLog('after-cleanup');
   if(browser){
     try{
       browserCdp=await browser.newBrowserCDPSession();
@@ -525,6 +567,10 @@ try{
       noteFailure('browser process cleanup failed',error);}
   }
   report.browser_errors=pageErrors;
+  await fs.writeFile(path.join(out,'console.json'),JSON.stringify({messages:consoleMessages,
+    dropped_messages:droppedConsoleMessages},null,2)+'\n');
+  report.console_log={file:'console.json',messages:consoleMessages.length,
+    dropped_messages:droppedConsoleMessages};
   report.finished_at=new Date().toISOString();
   report.resultError=resultError?String(resultError.message||resultError):null;
   await fs.writeFile(path.join(out,'result.json'),JSON.stringify(report,null,2)+'\n');
