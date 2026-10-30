@@ -75,6 +75,21 @@ test('all spans 1..7 replay a late dirty suffix through the whole captured prefi
   }
 });
 
+test('confirmed loop planning accepts an exact received remote PAD while speculative rows still predict',()=>{
+  const schedule=createCpuCorrectedLoopSchedule(),literal=decode(neutral),received=Buffer.from(literal.subarray(11,22));
+  received[2]=0x12;received[7]=0xa5;
+  try{
+    assert.throws(()=>planCpuCorrectedLoopForward(schedule,300,neutral,{remotePad:Buffer.alloc(10)}),/11 bytes/);
+    const plan=planCpuCorrectedLoopForward(schedule,300,neutral,{remotePad:received});
+    assert.equal(plan.remote_source,'actual');
+    assert.deepEqual(Buffer.from(plan.frame).subarray(11,22),received);
+    acknowledgeCpuCorrectedLoopForward(schedule,plan);
+    assert.deepEqual(schedule.lastRemotePad,received);
+    assert.throws(()=>planCpuCorrectedLoopForward(schedule,301,neutral,
+      {speculative:true,remotePad:received}),/cannot accept PAD before its final draw/);
+  }finally{schedule.timeline.dispose();}
+});
+
 test('later dirty suffix rejects a changed frozen prefix before source replay',()=>{
   const schedule=createCpuCorrectedLoopSchedule();
   try{

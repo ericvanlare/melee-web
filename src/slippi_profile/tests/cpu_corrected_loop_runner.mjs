@@ -86,21 +86,24 @@ export function createCpuCorrectedLoopSchedule(localPort=0,remotePort=1){
     lastAcknowledged:299};
 }
 
-export function planCpuCorrectedLoopForward(schedule,tick,pad44,{speculative=false}={}){
+export function planCpuCorrectedLoopForward(schedule,tick,pad44,{speculative=false,remotePad=null}={}){
   if(!schedule||schedule.pendingPlan||!Number.isSafeInteger(tick))
     throw new Error('Corrected loop forward plan is stale or malformed');
   const actual=validateLiteralPad(pad44,`sample ${tick}`),before=schedule.timeline.status();
   if(tick!==before.simulated_through+1||tick!==schedule.lastAcknowledged+1)
     throw new Error(`Corrected loop sample ${tick} is not contiguous`);
+  const authoritativeRemote=remotePad===null?padSlot(actual,schedule.remotePort):Buffer.from(remotePad);
+  if(authoritativeRemote.length!==PAD_BYTES)throw new Error(`Corrected loop remote PAD ${tick} must contain 11 bytes`);
+  if(speculative&&remotePad!==null)throw new Error(`Speculative corrected loop sample ${tick} cannot accept PAD before its final draw`);
   schedule.timeline.recordLocal(tick,padSlot(actual,schedule.localPort));
   if(!speculative){
-    const accepted=schedule.timeline.acceptRemote(tick,padSlot(actual,schedule.remotePort));
+    const accepted=schedule.timeline.acceptRemote(tick,authoritativeRemote);
     if(accepted.status!=='accepted'||accepted.earliest_changed_tick!==null)
       throw new Error(`Confirmed remote PAD ${tick} refused or dirtied history`);
   }
   const plan=schedule.timeline.planForward();
   const expected=Buffer.from(actual);
-  expected.set(speculative?schedule.lastRemotePad:padSlot(actual,schedule.remotePort),
+  expected.set(speculative?schedule.lastRemotePad:authoritativeRemote,
     schedule.remotePort*PAD_BYTES);
   const expectedSpeculative=speculative?tick-before.remote_contiguous_through:0;
   if(plan.kind!=='forward'||plan.tick!==tick||plan.frame.length!==FRAME_BYTES||
@@ -389,7 +392,7 @@ function checkActionAndMotionDivergence(referenceCpu,predictedCpu,referenceRows,
 }
 
 export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wire,checkpoint,
-  expectedInputMapping,stocks,previousFrame,beforeDiagnostics,onIntervalEvidence){
+  expectedInputMapping,stocks,previousFrame,beforeDiagnostics,onIntervalEvidence,{packetInput=null}={}){
   if(typeof onIntervalEvidence!=='function')throw new Error('Corrected loop requires its interval evidence sink');
   const mapping=validateSourceInputMapping(expectedInputMapping,beforeDiagnostics.slotCount);
   const localPort=mapping[0].rawController,remotePort=mapping[1].rawController;
@@ -403,7 +406,9 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
   const report={schema:'independent-browser-corrected-confirmed-loop-v1',status:'running',
     startSample:300,endSample:343,capsules:[],timeline:{persistent:true,initialRemotePadBase64:INITIAL_REMOTE_PAD,
       maxPredictionTicks:7,confirmedBoundary:true},
-    scope:'eight contiguous one-capsule intervals on two independently initialized pages; no live relay or rolling multi-checkpoint admission'};
+    scope:packetInput?
+      'eight contiguous one-capsule intervals on two independently initialized pages; Node-held local relay PAD receive authority for 44 rows; no browser-owned sockets or rolling multi-checkpoint admission':
+      'eight contiguous one-capsule intervals on two independently initialized pages; no live relay or rolling multi-checkpoint admission'};
   const defaults=correctedPageDefaults(mapping,stocks),gpu=new Map([[referencePage,previousFrame],[predictedPage,previousFrame]]);
   const diagnostics=new Map([[referencePage,beforeDiagnostics],[predictedPage,beforeDiagnostics]]);
   let loopEnabled=new Set(),current=null,sinkAttempted=false;
@@ -454,6 +459,13 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
         inputs:[],reference:{commands:[],draws:[],rows:[],endpoints:{}},
         predicted:{commands:[],draws:[],rows:[],endpoints:{}},comparisons:{}};
       current=interval;sinkAttempted=false;
+      if(packetInput){
+        packetInput.prepareCapsule(capsule);
+        if(!capsule.kind.startsWith('speculative')){
+          await packetInput.publishCapsule(capsule);
+          interval.packetAuthority=await packetInput.drainCapsule(capsule);
+        }
+      }
       report.capsules.push({index,startSample:capsule.startSample,span:capsule.span,kind:capsule.kind,status:'running'});
       const referenceCapture=await operate(interval,referencePage,32,{wire,
         loopEnableSchema:loopEnabled.has(referencePage)?undefined:CPU_CORRECTED_LOOP_SCHEMA,
@@ -475,21 +487,31 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       interval.baselineRaw=[];
       for(let i=0;i<capsule.span;i++){
         const sample=capsule.startSample+i,literal=capsule.rows[i];
-        const plan=planCpuCorrectedLoopForward(schedule,sample,literal,{speculative:capsule.kind.startsWith('speculative')});
+        const speculative=capsule.kind.startsWith('speculative');
+        let referencePad=literal,remotePad=null;
+        if(packetInput&&!speculative){
+          remotePad=packetInput.getRemotePad(sample);
+          const receivedReference=validateLiteralPad(literal,`reference sample ${sample}`);
+          receivedReference.set(remotePad,remotePort*PAD_BYTES);
+          if(!equal(receivedReference,decode(literal)))
+            throw new Error(`Received A2 PAD contribution differs from the immutable reference at ${sample}`);
+          referencePad=encode(receivedReference);
+        }
+        const plan=planCpuCorrectedLoopForward(schedule,sample,referencePad,{speculative,remotePad});
         const predictedPad=encode(plan.frame);
-        const ref=await operate(interval,referencePage,33+i,{pad:literal,draw:i<capsule.span-1});
+        const ref=await operate(interval,referencePage,33+i,{pad:referencePad,draw:i<capsule.span-1});
         const pred=await operate(interval,predictedPage,33+i,{pad:predictedPad,draw:i<capsule.span-1});
         const refPair=ref.evidence.tickPairs[i],predPair=pred.evidence.tickPairs[i];
         if(ref.result.boundary.sourceFrame!==interval.preFrame+i+1||
            pred.result.boundary.sourceFrame!==interval.preFrame+i+1||
-           !equal(decode(refPair.baselinePad),decode(literal))||
+           !equal(decode(refPair.baselinePad),decode(referencePad))||
            !equal(decode(predPair.baselinePad),decode(predictedPad)))
           throw new Error(`Corrected loop source frame/literal PAD differs at sample ${sample}`);
         const refRaw=rawFive(refPair,'baseline'),predRaw=rawFive(predPair,'baseline');
         interval.baselineRaw.push({sample,reference:refRaw,predicted:predRaw});
         if(!capsule.kind.startsWith('speculative'))
           compareCpuCorrectedLoopRawFive(refRaw,predRaw,`confirmed sample ${sample}`);
-        interval.reference.rows.push({sample,pad44Base64:literal,boundary:ref.result.boundary});
+        interval.reference.rows.push({sample,pad44Base64:referencePad,boundary:ref.result.boundary});
         interval.predicted.rows.push({sample,pad44Base64:predictedPad,predictedPad44Base64:predictedPad,
           boundary:pred.result.boundary});
         interval.inputs.push({sample,pad44Base64:literal,predictedPad44Base64:predictedPad,
@@ -508,7 +530,21 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
         interval.comparisons.cpu=compareCpuReferenceParticleEndpoints(refCpu,predBaselineCpu,
           {preLeft:refPre,preRight:predPre});
       await operate(interval,referencePage,40,{draw:true});
-      await operate(interval,predictedPage,40,{draw:true});
+      if(packetInput&&capsule.kind.startsWith('speculative')){
+        const predictedDrawRequestNs=process.hrtime.bigint();
+        const predictedDrawPromise=operate(interval,predictedPage,40,{draw:true}).then(result=>{
+          packetInput.notePredictedDrawResolved(capsule.startSample);
+          return result;
+        });
+        // Start the browser command first, then release actual peer input without
+        // awaiting either operation; both are outstanding in this Node turn.
+        const packetPublishPromise=packetInput.publishCapsule(capsule,
+          {predictedDrawRequestNs:predictedDrawRequestNs.toString()});
+        const [drawResult,packetResult]=await Promise.allSettled([predictedDrawPromise,packetPublishPromise]);
+        if(drawResult.status==='rejected')throw drawResult.reason;
+        if(packetResult.status==='rejected')throw packetResult.reason;
+        interval.packetAuthority=packetResult.value;
+      }else await operate(interval,predictedPage,40,{draw:true});
       const refIdle=await operate(interval,referencePage,41);
       const predIdle=await operate(interval,predictedPage,41);
       interval.reference.nativeEvidence=refIdle.evidence;
@@ -526,6 +562,8 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       validateCpuParticleEndpointAgainstPre(predBaselineDraw,predPre);
       interval.reference.endpoints.draw=refDraw;
       interval.predicted.endpoints.draw=predBaselineDraw;
+      if(packetInput&&capsule.kind.startsWith('speculative'))
+        interval.packetAuthority=await packetInput.drainCapsule(capsule);
       if(capsule.kind.startsWith('speculative')){
         interval.speculativeDivergence=checkActionAndMotionDivergence(refCpu,predBaselineCpu,
           interval.reference.rows,interval.predicted.rows,index);
@@ -538,7 +576,16 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
           `confirmed capsule ${index} final draw`);
       }
       if(capsule.kind.startsWith('speculative')){
-        const actualRows=interval.reference.rows.map(row=>({sample:row.sample,pad44Base64:row.pad44Base64}));
+        const actualRows=interval.reference.rows.map(row=>{
+          const actual=validateLiteralPad(row.pad44Base64,`actual sample ${row.sample}`);
+          if(packetInput){
+            const remote=packetInput.getRemotePad(row.sample);
+            actual.set(remote,remotePort*PAD_BYTES);
+            if(!equal(actual,decode(capsule.rows[row.sample-capsule.startSample])))
+              throw new Error(`Received A2 remote input does not reproduce the immutable PAD at ${row.sample}`);
+          }
+          return {sample:row.sample,pad44Base64:encode(actual)};
+        });
         const baselineRows=interval.predicted.rows.map(row=>({tick:row.sample,predictedPad44Base64:row.predictedPad44Base64}));
         const correction=planCpuCorrectedLoopReplay(schedule,baselineRows,actualRows,capsule.startSample);
         interval.correction={earliestChanged:correction.earliestChanged,dirtyFrom:correction.dirtyFrom,
@@ -590,6 +637,7 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       interval.status='compared';
       // Evidence is immutable before command53 retires native ownership.
       const summary=report.capsules[index];
+      if(packetInput)summary.packetAuthority={...interval.packetAuthority};
       await persistCpuCorrectedLoopInterval(index,interval,summary,async(sinkIndex,sinkInterval)=>{
         sinkAttempted=true;return onIntervalEvidence(sinkIndex,sinkInterval);
       },async()=>{
@@ -618,7 +666,22 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       throw new Error(`Corrected loop did not finish at confirmed sample343: ${JSON.stringify(timeline)}`);
     if(report.capsules.length!==8||report.capsules.some(row=>row.status!=='complete'))
       throw new Error('Corrected loop did not complete and retire all eight capsules');
-    report.finalTimeline=timeline;report.status='passed';return report;
+    report.finalTimeline=timeline;
+    if(packetInput){
+      const requiredIntervals=recipe.filter(row=>row.kind.startsWith('speculative')).length;
+      const overlapIntervals=report.capsules.filter(row=>row.packetAuthority?.releasedWithPredictedCommand40===true);
+      report.packetCommand40Overlap={requiredSpeculativeIntervals:requiredIntervals,
+        observedSpeculativeIntervals:overlapIntervals.length,
+        intervals:overlapIntervals.map(row=>({index:row.index,startSample:row.startSample,
+          endSample:row.endSample,acceptedReceiveEvents:row.packetAuthority.receiveEvents.length,
+          predictedCommand40ReceiveCallbackOverlap:row.packetAuthority.predictedCommand40ReceiveCallbackOverlap,
+          overlapEvidence:row.packetAuthority.overlapEvidence})),
+        status:overlapIntervals.length===requiredIntervals&&overlapIntervals.some(row=>
+          row.packetAuthority.predictedCommand40ReceiveCallbackOverlap===true)?'passed':'failed'};
+      if(report.packetCommand40Overlap.status!=='passed')
+        throw new Error('Packet-backed corrected loop did not observe an accepted remote receive callback overlap during predicted command 40 in either speculative interval');
+    }
+    report.status='passed';return report;
   }catch(error){
     report.status='failed';report.failure=String(error);report.timelineFailure=schedule.timeline.status();
     for(const [name,page] of [['reference',referencePage],['predicted',predictedPage]]){

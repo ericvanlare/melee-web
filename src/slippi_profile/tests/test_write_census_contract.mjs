@@ -1985,6 +1985,12 @@ test('seven-tick route requires the exact private v19 profile and keeps its ABI 
     /seven-tick route requires the private v19/);
   assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--aggregate-cpu-drawn-reference-two-tick':true}),
     /mutually exclusive/);
+  assert.equal(validateCpuRestoreRouteSelection({...route,'--correct-predicted-branch-loop-packets':true}),
+    'independent-browser-correction-loop-packets-v1');
+  assert.throws(()=>validateCpuRestoreRouteSelection({...route,'--correct-predicted-branch-loop':true,
+    '--correct-predicted-branch-loop-packets':true}),/mutually exclusive/);
+  assert.throws(()=>validateCpuRestoreRouteSelection({'--correct-predicted-branch-loop-packets':true}),
+    /fixed seven-tick-capable preparation route/);
   assert.throws(()=>parseArgs(['--browser-runtime','runtime.mjs','--assets','assets','--manifest','manifest.json','--out','new-output',
     '--aggregate-cpu-drawn-reference-seven-tick','--aggregate-cpu-restore-config',config,
     '--slippi-lobj-presentation-cache','--slippi-tobj-presentation-cache']),/seven-tick route requires the private v19/);
@@ -2002,6 +2008,24 @@ test('seven-tick route requires the exact private v19 profile and keeps its ABI 
     false,null,true,true,true,true,exports),/Unexpected profile identity/);
   assert.throws(()=>validateBrowserProfileForRoute(v19,false,null,true,true,true,true,{evidence:true,evidenceBytes:false}),
     /evidence exports are unavailable/);
+});
+
+test('packet opt-in hashes its adapter and loaded relay/runtime source chain only on that route',()=>{
+  const source=readFileSync(new URL('./run_write_census.mjs',import.meta.url),'utf8');
+  const hashFunction=source.match(/function sourceHashes\([\s\S]*?return Object\.fromEntries/)?.[0];
+  const packetHashes=source.match(/if\(packetInput\)files\.push\(([\s\S]*?)\);/)?.[1];
+  assert.ok(hashFunction,'the harness source hash function is present');
+  assert.ok(packetHashes,'packet-only harness witnesses are scoped behind the opt-in');
+  assert.ok(hashFunction.includes('net_lockstep_core.mjs'),'the existing protocol core remains hashed');
+  for(const name of ['cpu_corrected_loop_packet_input.mjs','net_lockstep_protocol.mjs',
+    'net_lockstep_transport.mjs','net_lockstep_relay.mjs',
+    'net_lockstep_websocket_relay.mjs','net_room_relay_runtime_owner.mjs',
+    'net_room_relay_direct_runtime.mjs','net_room_relay_miniflare_options.mjs'])
+    assert.ok(packetHashes.includes(name),`packet route hashes loaded source ${name}`);
+  assert.match(source,/harnessSha256: sourceHashes\(\{packetInput: correctedLoopPackets\}\)/);
+  assert.match(source,/const packetModule=await import\('\.\/cpu_corrected_loop_packet_input\.mjs'\)/);
+  assert.match(source,/!relayTools\|\|!path\.isAbsolute\(relayTools\)/);
+  assert.match(source,/wrangler\/package\.json','miniflare\/package\.json','workerd\/package\.json/);
 });
 
 
