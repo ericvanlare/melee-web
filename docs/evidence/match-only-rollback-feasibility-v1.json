@@ -9791,7 +9791,7 @@
       }
     },
     "wrong_prediction_browser_component_v18": {
-      "status": "reader_api_failure_before_precomparison",
+      "status": "pass_one_actual_wrong_prediction_correction_component",
       "runtime_producer": "f4ae3dc39273d105e0d38a862a60d3b0cedb709b",
       "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18",
       "scope": "Private fixed-seven-tick component. Independent clean B versus wrong A restored and corrected with B; no rolling snapshot owner, live relay or full-match claim.",
@@ -9801,6 +9801,10 @@
         {
           "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-corrected-v18-v1/result-receipt.json",
           "sha256": "ae3a9cab0672ab899e1fd3119c88577184377988d81ce656bd488de25dbbd066"
+        },
+        {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-corrected-v18-v2/result-receipt.json",
+          "sha256": "50b214596ef9e13e07d83f69cf80b5a46b9a0707893dc0456227fcad47138efc"
         }
       ],
       "source_review": {
@@ -9815,12 +9819,54 @@
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-corrected-early-cleanup-sol-review-v1.json",
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
-      "observed": "Both 300-sample prefixes agree and command32 succeeds on both instances. Collector then reads unexported wasmMemory and generated Emscripten getter aborts before PRE collection. Source/renderer shutdown completes and all owned PIDs are absent; CPU CLOSE retains incomplete-route1073.",
-      "next": "Fix collector API access and exact focused regression before one unchanged-runtime retry. Full regression/publication CI and working browser rollback remain open.",
+      "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and9producerpins unchanged.",
+      "next": "Repair integration regression failures and complete publication validation; then proof-backed confirmed checkpoint retirement/reuse in the same match. Continuous rolling/live relay/full-match/profile admission remain open.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
         "result": "Five focused host controls pass, including throwing getters and exposed invalid runtime data. Native admission unchanged; no native rebuild."
+      },
+      "harness_producer": "6a52264d6d505a63c9676e3a22bcbafb42f069b1",
+      "result_review": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-v2-independent-sol-review.json",
+        "sha256": "7c7ebd27d61abce9ba3a33586208dab5ebca793f373b57d3115a2d0a1bd5427b"
+      },
+      "regression": {
+        "result": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-full-regression-v1/result.json",
+          "sha256": "4e20a907f456d881c1320c67ed3ed9a80ccc7c83afe97543b5de033dcb1cb7c8"
+        },
+        "raw_log": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-full-regression-v1/unittest.log",
+          "sha256": "eee54f4c45ea43cef931163bcd074381bdad928875cee0e827d7929ea43286bb"
+        },
+        "tests": 3069,
+        "failures": 7,
+        "skips": 238,
+        "status": "failed; patch canonicalization and extracted-fixture repairs in progress"
+      },
+      "canonicalization": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-repair-v1/canonicalization.json",
+        "sha256": "0c0afefd41bca85c7f85c0caf1dfd54dc34dec6f90e226527befb4edb33a2454"
+      },
+      "next_retirement_contract": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/confirmed-checkpoint-retirement-sol-contract-v1.json",
+        "sha256": "f3c37add003e6eb54dcd33045caae7986092c3774f4ceb45708ec50960bc6d6b"
+      },
+      "fixture_repairs": {
+        "review": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-fixtures-sol-review-v2.json",
+          "sha256": "b51c6e01b03f5596c0eac819c881f21436c25f0c13e12bf13aab50cfd74a7e44"
+        },
+        "focused": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-repair-v1/focused-result.json",
+          "sha256": "2a55ef23e3361ae62a3e3167f47188f941179d346b672cb6db8a81b4952f6706"
+        },
+        "effect_retry": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-repair-v1/effect-helper-retry.json",
+          "sha256": "4d74ef83616fab10699136d81e788f0f050fbd82b94853191c457747aaf07e3f"
+        },
+        "scope": "All seven initially failed methods pass across the focused run (six) and one helper-name repair retry (one). Tests/patch canonicalization only; actual source tree unchanged. Whole-suite final rerun remains pending. First repair-run failure retained."
       }
     }
   }

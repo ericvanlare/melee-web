@@ -4,6 +4,7 @@
 extern "C" {
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/jobj.h>
 #include <dolphin/os/OSAlloc.h>
 }
 #include <cstdlib>
@@ -11,6 +12,10 @@ extern "C" {
 #include <cstring>
 #include <new>
 #include <emscripten.h>
+// The linked runtime's optional JObj trace compares this class-info identity;
+// this control exercises memory/class allocation and does not instantiate a
+// JObj or claim source JObj behavior.
+extern "C" { HSD_JObjInfo hsdJObj = {}; }
 static bool deny_allocation;
 void* operator new(std::size_t n){if(deny_allocation)std::abort();if(auto p=std::malloc(n?n:1))return p;throw std::bad_alloc();}
 void operator delete(void* p) noexcept{std::free(p);}void operator delete(void* p,std::size_t) noexcept{std::free(p);}

@@ -63,6 +63,9 @@ class RecordedCompletionTests(unittest.TestCase):
   s=(ROOT/'src/gameplay_match_context.c').read_text();h=(ROOT/'src/gameplay_match_context.h').read_text()
   hooktype=h[h.index('typedef int (*MeleeWebMatchRecordedPreconsume)'):h.index(';',h.index('typedef int (*MeleeWebMatchRecordedPreconsume)'))+1]
   observation=h[h.index('typedef struct MeleeWebStadiumPadQueueObservation'):h.index('} MeleeWebStadiumPadQueueObservation;')+len('} MeleeWebStadiumPadQueueObservation;')]
+  fallback=s[s.index('#else\nstatic int match_gameplay_step'):]
+  fallback=fallback[:fallback.index('#endif')]
+  match_step=body(fallback,'static int match_gameplay_step(char* error, size_t error_size)')
   alt=s[s.index('    if(!live(h,e,n))return 0;',s.index('int melee_web_match_step_inputs(')):s.index('    if(!samples)',s.index('int melee_web_match_step_inputs('))]
   code=r'''
 #include <assert.h>
@@ -97,7 +100,7 @@ static void HSD_PadRumbleInterpret(void){events[count++]=1;assert(HSD_PadLibData
 static void HSD_PadRenewMasterStatus(void){events[count++]=3;assert(HSD_PadLibData.qcount==1);HSD_PadLibData.qcount=0;}
 static void HSD_PadRenewCopyStatus(void){}static void HSD_PadRenewGameStatus(void){}
 static int melee_web_gameplay_step(char*e,size_t n){(void)e;(void)n;events[count++]=4;return 1;}
-'''+body(s,'int melee_web_match_recorded_preconsume_arm(')+'\n'+body(s,'int melee_web_match_step_raw_phased(')+'\nstatic int alternative_admission(MeleeWebMatchContext* h,char* e,size_t n){\n'+alt+'\nreturn 1; }\n'+r'''
+'''+match_step+'\n'+body(s,'int melee_web_match_recorded_preconsume_arm(')+'\n'+body(s,'int melee_web_match_step_raw_phased(')+'\nstatic int alternative_admission(MeleeWebMatchContext* h,char* e,size_t n){\n'+alt+'\nreturn 1; }\n'+r'''
 static int hook(void* context,uint64_t cursor,char*e,size_t n){
  MeleeWebMatchContext* h=context;assert(h==owner&&cursor==h->ticks&&HSD_PadLibData.qcount==1);events[count++]=2;
  if(mode==1)HSD_PadLibData.qcount=0;

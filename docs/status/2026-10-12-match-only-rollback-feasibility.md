@@ -1485,8 +1485,32 @@ capture and all nine producer files are retained. Source and renderer shutdown
 complete and all owned PIDs are absent; CPU CLOSE preserves its incomplete-route
 1073 diagnostic. The repaired reader avoids unexported runtime getters and its
 five focused controls pass, including exposed invalid runtime states and batch
-cleanup. The next step retries the unchanged native runtime. Full regression, publication-head
-CI, profile admission, full-match and working online browser rollback remain open.
+cleanup. The retry at host `6a52264d` on unchanged native producer `f4ae3dc3`
+now passes one actual wrong-prediction correction. Both instances agree at PRE;
+the predicted remote action is motion 14 versus clean reference motion 60 for
+all seven samples, and actual action-selection requests also differ. Restoring
+the predicted instance and applying seven authoritative ticks without source
+draw produces exact independent CPU_END and DRAW_END agreement across all nine
+declared domains. PRE contains 9,153 records per instance and both compared
+endpoints contain 9,157. All seven per-tick observation, PCM, PAD, RNG/profile
+and transfer lanes match, as does the final drawn pair. The actual final present
+and GPU idle complete; both CPU closes return zero, source/renderer shutdown
+succeeds and all owned PIDs are absent. Independent offline review replays the
+shipped decoder/comparator on retained bytes and verifies all nine archived
+producer files. Its first wrapper refusal and a review-only row-count assertion
+failure are retained; the final review runs from a pinned external source mirror.
+
+This is one fixed correction, not continuous rollback play. The full integration
+suite at `6a52264d` runs 3,069 tests with seven failures and 238 skips; the failed
+patch-consistency and extracted-fixture checks remain retained. Their reviewed
+repairs pass all seven affected methods across the focused run and one exact
+helper-name retry; that first repair-run failure is retained too. Canonicalizing
+the gameplay patch preserves its exact applied source tree. Final whole-suite
+validation is pending. The next runtime step is proof-backed retirement of a confirmed checkpoint
+while permanent resident action assets remain live, allowing one bounded owner
+slot to be reused. Generic destructor/retirement guards stay intact. Publication
+validation, repeated corrections, combat, frame-budget, profile admission and
+full-match/online rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

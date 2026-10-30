@@ -184,8 +184,33 @@ int main(void){char e[128]={0};reset();assert(melee_web_gameplay_step_post_sourc
     def test_only_live_raw_and_normalized_match_paths_use_current_private_hook(self):
         source = (ROOT / "src/gameplay_match_context.c").read_text(encoding="utf-8")
         self.assertEqual(source.count("if(!match_gameplay_step(e,n))return 0;"), 2)
+        self.assertIn("SLIPPI_PROFILE_ACTIVE_IDENTITY ==", source)
         self.assertIn("SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15", source)
-        self.assertIn("return slippi_profile_effect_matrices_post_step", source)
+        self.assertIn("SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18", source)
+        self.assertIn(
+            "#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && "
+            "MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE",
+            source,
+        )
+        self.assertIn(
+            "#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && "
+            "MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE",
+            source,
+        )
+        post_source = _function(source, "post_effect_matrices")
+        self.assertIn(
+            "if (!slippi_profile_effect_matrices_post_step(error, error_size)) return 0;",
+            post_source,
+        )
+        self.assertIn(
+            "return slippi_particle_source_prepare(melee_web_gameplay_generation(),\n"
+            "        melee_web_cpu_interval_token(), error, error_size);",
+            post_source,
+        )
+        self.assertLess(
+            post_source.index("slippi_profile_effect_matrices_post_step("),
+            post_source.index("slippi_particle_source_prepare("),
+        )
         bootstrap = (ROOT / "src/gameplay_bootstrap.c").read_text(encoding="utf-8")
         body = _function(bootstrap, "gameplay_step")
         self.assertLess(body.index("HSD_GObj_80390CFC();"), body.index("post_source(post_source_context"))

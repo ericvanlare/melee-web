@@ -39,13 +39,16 @@ class MenuClockCounterPhaseTests(OwnedWorkspaceTests):
         controller = controller[controller.index('struct gm_controller_map {'):
                                 controller.index('} controller_map;') + len('} controller_map;')]
         clock_globals = patch[patch.index('static struct gm_80479D58_t melee_source_clock_saved;'):
-                              patch.index('static int melee_source_clock_owned(void)')]
+                              patch.index('struct MeleeWebSourceClockSnapshot {')]
         controller_globals = patch[patch.index('static struct controller_map melee_controller_map_saved;'):
                                    patch.index('int melee_web_controller_map_begin(void)')]
         signatures = [
-            'static int melee_source_clock_owned(void)',
+            # These helpers have forward declarations before the comparator
+            # in the patch. Match their definitions so extraction does not
+            # attach the comparator body to a prototype.
+            'static int melee_source_clock_owned(void)\n{',
             'static int melee_source_clock_owner_valid(int owner)',
-            'static int melee_source_clock_state_supported(void)',
+            'static int melee_source_clock_state_supported(void)\n{',
             'int melee_web_source_clock_begin(int owner)',
             'int melee_web_source_clock_pre(void (*on_frame)(void))',
             'int melee_web_source_clock_post(void)',
