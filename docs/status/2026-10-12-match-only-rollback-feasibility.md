@@ -1698,17 +1698,41 @@ retained. Runtime and harness code are unchanged. Final local regression at
 passes at that source. Initial Linux CI exposed a truncated dependency download
 before the effects build and a missing explicit `<cstdint>` include in the
 snapshot test trace. The test-only include repair passes both focused snapshot
-controls locally. Those failures are retained; complete publication-head CI
-remains required and is tracked in PR #358. No additional browser capture is
-needed for these fixture-only changes. All runtime, harness, build, linked policy,
+controls locally. Those failures are retained. PR #358 merged as `d2122fe6`
+after all 14 publication-head CI jobs at `17f1a625` completed with 12 successes
+and two expected skips; the merged tree exactly matches the reviewed tree. No
+additional browser capture is needed for these fixture-only changes. All runtime, harness, build, linked policy,
 review, comparison, cleanup and validation hashes are in `passing_browser_v9`
 in the existing structured receipt.
 
-The next experiment routes the same input recipe through the existing own Worker
-relay, queues asynchronous arrivals and applies them at a safe native boundary.
-Its initial Node-held sockets will establish only packet-backed browser component
-evidence. Rolling history, correction across refill, combat/KO breadth, combined
-frame budget, full-match play and public profile admission remain open.
+The packet-backed successor passes at harness `88268eca`, reusing native producer
+`8f846b45`, in 104.06 seconds. All 44 remote input contributions travel through
+the existing local Worker relay and are accepted from actual A2 receive state.
+Independent review reproduces all 24 nine-domain comparisons and 260 raw lanes,
+checks each received remote PAD against the reference and selected native PAD,
+and confirms both actual wrong-prediction corrections, final draws and eight
+retirements per page. Both speculative intervals record a Node receive callback
+between the final-draw command request and its promise resolution. This is host
+operation overlap; it does not establish simultaneous native execution. The two
+A2 pre-roll frames per peer remain protocol-only and do not become native inputs.
+
+The first packet attempt, at harness `df985b8f`, stopped before the loop because
+its start agreement guessed the second initializer port. The existing source
+validator and parsed initializer now bind the observed port/controller mapping
+without changing native setup or PAD bytes. That failure, the reduced actual-report
+control and independent repair review remain retained. The passing run leaves
+44 accepted rows, zero pending inbox rows, no callback errors, and verified native,
+Chrome and Worker cleanup; all nine native producer pins remain unchanged.
+
+This is a Node-held local WebSocket component with an authored input recipe.
+The browser pages do not own sockets; network checksum traffic is not exercised.
+Strict reference comparisons are separate evidence. The existing structured
+receipt's `packet_backed_component_v1` retains exact producers, raw results,
+packet timestamps, reviews and failures. The next step measures admitted native
+command wall-time separately from evidence collection and GPU waits before
+selecting the continuous runtime loop. Rolling history, correction across refill,
+combat/KO breadth, combined frame budget, full-match play and public profile
+admission remain open.
 
 
 ## Stage decision dependencies, issue #333

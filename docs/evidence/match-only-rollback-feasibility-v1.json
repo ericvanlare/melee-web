@@ -10266,7 +10266,7 @@
         }
       },
       "reusable_owner_loop_v1": {
-        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_PASS_LOCAL_VALIDATION_COMPLETE",
+        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_MERGED",
         "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
         "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
         "attempts": [
@@ -10467,7 +10467,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Complete exact publication-head CI and integrate PR358, then route the same authoritative PAD rows through the existing own Worker relay. No unchanged browser repeat.",
+        "next": "Packet-backed browser component passes below; measure admitted browser command costs before selecting the next runtime-owned continuous loop. Rolling history and whole-match rollback remain open.",
         "limitations": [
           "Capture-only motor publication; physical haptics remain unimplemented.",
           "V9 spans eight intervals and 44 inputs with one- and two-tick wrong branches. The earlier V4 independently covers two seven-tick corrections. No rolling history, complete match or live network result.",
@@ -10798,8 +10798,144 @@
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/cstdint-focused.log",
               "sha256": "c3dd920456911eb5abb49358114ffd567ff3f3650f605aa0e698a542b574b420"
             },
-            "pull_request": "https://github.com/ericvanlare/melee-web/pull/358"
+            "pull_request": "https://github.com/ericvanlare/melee-web/pull/358",
+            "final_head": "17f1a62574348b71cea3249d7e43f69229b73243",
+            "merged_commit": "d2122fe6e0977c378cf61ea1df6f55c13489584a",
+            "reviewed_merged_trees_equal": true,
+            "final_ci": {
+              "run_id": 41073393099,
+              "jobs": 14,
+              "successes": 12,
+              "expected_skips": 2,
+              "receipt": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/final-head-ci.json",
+                "sha256": "6fd8aeec8efc4bacb8d39ce3fa9e53ca3a3aa630f1e11bf255704f2e53a16d4d"
+              }
+            },
+            "merge_verification": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/merge-verification.json",
+              "sha256": "1bb3e769487face7503f4a2e940cfdbf3b2636788483cf39f24d1771ec8cf09e"
+            }
           }
+        },
+        "packet_backed_component_v1": {
+          "status": "REVIEWED_LOCAL_WORKER_PACKET_BROWSER_COMPONENT_PASS",
+          "runtime_producer": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+          "harness_producer": "88268eca0e57e3d513544ca7efb749eafe01dbdb",
+          "base_main": "d2122fe6e0977c378cf61ea1df6f55c13489584a",
+          "elapsed_seconds": 104.05776816699654,
+          "capture": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v2/runner/evidence.json",
+            "sha256": "ed5cfe1fb8508281c8abfda1927aef3a25b17d563a2ba307a9757a89ab0f6114"
+          },
+          "launch": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v2/launch-result.json",
+            "sha256": "6c3b4f84684a2d7b9e8f2f1d52cc41649d16e6a19dd9f3931a88edf6caae6a02"
+          },
+          "command": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v2/command.json",
+            "sha256": "e336843a5e775ed1b5fdb9c46f82baa92ef40a3f8d3170feff5c2eeeeb9a2f5e"
+          },
+          "postflight": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v2/independent-postflight.json",
+            "sha256": "b3f68acdecd9b4c7877bc6997820d68b8378b05cd0b87bb99ccc8aef9d3abce9"
+          },
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v2/independent-result-review.json",
+            "sha256": "f1ffb14bc6a3aabd6d5a93290b03c6efb8a89b797d8d5c01fe73cc04935022f5"
+          },
+          "source_reviews": [
+            {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-adapter-luna-v2/independent-sol-review-v2.json",
+              "sha256": "32f4c32c50f92ccf2ef9f5c53801a57957e7dfba224944fac455ef44a9a4c9b9"
+            },
+            {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-adapter-luna-v3/independent-sol-review-v3.json",
+              "sha256": "b4c1e310d8d7fcfd214ce63d293d00845d7960856474a39967478b8185e581c4"
+            }
+          ],
+          "focused_control": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-adapter-luna-v2/candidate-receipt.json",
+            "sha256": "5099b444f96b4b3772517f09a062906f28f6a99edadca02c5de3bd11ad450427"
+          },
+          "identity_repair_control": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/packet-adapter-luna-v3/receipt.json",
+            "sha256": "8eba9bbb7a4113ffa3a750fb7411593f2c0edbf9f551afddb0f50d6a787ec512"
+          },
+          "counts": {
+            "native_samples": 44,
+            "intervals": 8,
+            "strict_endpoint_comparisons": 24,
+            "domains_per_comparison": 9,
+            "raw_lane_comparisons": 260,
+            "actual_wrong_prediction_corrections": 2,
+            "correction_spans": [
+              1,
+              2
+            ],
+            "reference_draws": 44,
+            "predicted_draws": 46,
+            "retirements_per_page": 8,
+            "maximum_live_capsules": 1,
+            "received_remote_rows": 44,
+            "pending_remote_rows_at_finish": 0,
+            "protocol_only_preroll_per_peer": 2
+          },
+          "packet_scope": {
+            "socket_owner": "Node-held existing A2 peers",
+            "transport": "own local Worker relay via room WebSockets",
+            "public_internet": false,
+            "browser_owned_sockets": false,
+            "remote_contribution": "raw controller1; exact11received bytes per sample match reference and corrected native PAD",
+            "callback_overlap": {
+              "requiredSpeculativeIntervals": 2,
+              "observedSpeculativeIntervals": 2,
+              "intervals": [
+                {
+                  "index": 0,
+                  "startSample": 300,
+                  "acceptedReceiveEvents": 1,
+                  "predictedCommand40ReceiveCallbackOverlap": true,
+                  "overlapEvidence": "at least one accepted Node receive callback entered after command40 request and before its promise resolved"
+                },
+                {
+                  "index": 7,
+                  "startSample": 342,
+                  "acceptedReceiveEvents": 2,
+                  "predictedCommand40ReceiveCallbackOverlap": true,
+                  "overlapEvidence": "at least one accepted Node receive callback entered after command40 request and before its promise resolved"
+                }
+              ],
+              "status": "passed"
+            },
+            "network_checksum_traffic": false,
+            "comparison_source": "strict local drawn-reference endpoint/raw comparisons, not network checksum traffic"
+          },
+          "hps_scope": "Natural confirmed refill still observed; corrective replay across refill not established.",
+          "cleanup": "Native CPU/snapshot/renderer close succeeds for both pages; recorded Chrome/Worker owners and groups absent; all9nativeproducerpinsunchanged.",
+          "retained_first_failure": {
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v1/runner/evidence.json",
+              "sha256": "ee1ecd567351f5f2f36cf827181af0d01f685eba98490d4d5da79905b708726e"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v1/first-failure-summary.json",
+              "sha256": "f5abe3dc440bf85b012130a6ea692f0480ebf5c8e963c860e6e16ad6c034a2b3"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-packet-loop-v1/independent-postflight.json",
+              "sha256": "6ba3a13498f75d770bcf6fa8733c0f6d3a5387b5648cf178f20e9031e4866374"
+            },
+            "harness_producer": "df985b8fe4bb594d049651524b86d43e4d4f44ea",
+            "classification": "Host identity rejected the real copied initializer before loop; guessed second initializerPort1/rawController1 was invalid. Shared validator plus parsed initializer repaired without native/PAD changes."
+          },
+          "limitations": [
+            "Fixed authored44-row recipe; no live browser input-path integration.",
+            "No rolling multi-checkpoint history, whole-match/combat breadth, combined frame-budget or public-profile admission.",
+            "Callback overlap is between Node command request and promise resolution, not proof of simultaneous native simulation execution.",
+            "No public Internet, two-machine, physical-input, audible-output or original-game equivalence acceptance."
+          ],
+          "next": "Separate native command wall-time from host evidence and GPU-quiescence waits on the existing two seven-tick correction route, then select the shortest safe continuous runtime loop."
         }
       }
     }
