@@ -47,7 +47,22 @@ void HSD_JObjSetupMatrixSub(HSD_JObj *jobj)
 
 static void test_draw_policy(void)
 {
-#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && \
+    MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    const SlippiProfileIdentity profile =
+        SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19;
+    assert(strcmp(slippi_profile_identity_name(profile),
+                  SLIPPI_PROFILE_TEV_STAGE_SCRATCH_V19_ID) == 0);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18) == NULL);
+    assert(slippi_profile_source_draw_decision(
+               SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18,
+               SLIPPI_TICK_PRESENT) == SLIPPI_SOURCE_DRAW_ERROR);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_PARTICLE_MEASUREMENT_V17) == NULL);
+    assert(slippi_profile_identity_name(
+               SLIPPI_PROFILE_IDENTITY_PARTICLE_PRESENTATION_V16) == NULL);
+#elif defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && \
     MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     const SlippiProfileIdentity profile =
         SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15;

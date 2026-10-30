@@ -30,7 +30,7 @@ const LOGICAL_FRAME_V6_PROFILE = 'slippi-render-dependencies-logical-frame-v6';
 const LOBJ_PRESENTATION_V7_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-v7';
 // The historical TObj option now identifies stateless canonical matrix presentation.
 const LOBJ_CURRENT_SET_V15_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-current-light-set-v15';
-const STABLE_ACTION_ASSETS_V18_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18';
+const TEV_STAGE_SCRATCH_V19_PROFILE = 'slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19';
 
 export function assembleCompletedCensusExecution(report, {prefixSamples, censusSample,
   captureHypothesis}) {
@@ -166,13 +166,13 @@ export function validateCpuRestoreRouteSelection(values) {
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
   const multiTick = twoTick || sevenTick;
   if (sevenTick && !particle) {
-    throw new Error('The seven-tick route requires the private v18 stable action asset profile');
+    throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
   }
   if ((corrected || correctedTwoWindow) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick route');
   if (corrected && correctedTwoWindow) throw new Error('One-window and two-window correction routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
-    throw new Error('The v18 stable action asset lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
+    throw new Error('The v19 TEV stage scratch lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
   }
   if (values['--slippi-tobj-presentation-cache'] === true &&
       (values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
@@ -195,12 +195,12 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   if (lobjPresentationCache && !multiTick) throw new Error('The v7 light owner requires two or seven ticks');
   if(tobjPresentationCache && (!lobjPresentationCache || !multiTick)) throw new Error('The v15 current light set lane requires v7 and two or seven ticks');
   if (particlePresentationCache && (!tobjPresentationCache || !lobjPresentationCache || !multiTick)) {
-    throw new Error('The v18 stable action asset lane requires v15 TObj, v7 LObj, and two or seven ticks');
+    throw new Error('The v19 TEV stage scratch lane requires v15 TObj, v7 LObj, and two or seven ticks');
   }
   if (sevenTickDrawnReference && !particlePresentationCache) {
-    throw new Error('The seven-tick route requires the private v18 stable action asset profile');
+    throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
   }
-  const expectedProfile = particlePresentationCache ? STABLE_ACTION_ASSETS_V18_PROFILE :
+  const expectedProfile = particlePresentationCache ? TEV_STAGE_SCRATCH_V19_PROFILE :
     tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
     twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE;
   if (init?.profile !== expectedProfile) throw new Error(`Unexpected profile identity: ${init?.profile}`);
@@ -211,11 +211,11 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
   }
   if (sevenTickDrawnReference && (!sevenTickExports ||
       sevenTickExports.evidence !== true || sevenTickExports.evidenceBytes !== true)) {
-    throw new Error('Seven-tick evidence exports are unavailable for the linked v18 profile');
+    throw new Error('Seven-tick evidence exports are unavailable for the linked v19 profile');
   }
   if (reuseExports !== null && (!sevenTickDrawnReference || reuseExports.enable !== true ||
       reuseExports.evidence !== true || reuseExports.evidenceBytes !== true)) {
-    throw new Error('Two-window reuse exports are unavailable for the linked v18 profile');
+    throw new Error('Two-window reuse exports are unavailable for the linked v19 profile');
   }
   return expectedProfile;
 }
@@ -844,7 +844,7 @@ async function main() {
     assertDrawDiagnosticsClear(drawDiagnostics, 'browser initialization');
     report.profile = {...report.profile, identity: init.profile, sourceIdentity: init.source,
       rngHelper: init.rngHelper, stageBridge: init.stageBridge, seed: SOURCE_SEED,
-      name: particlePresentationCache ? STABLE_ACTION_ASSETS_V18_PROFILE :
+      name: particlePresentationCache ? TEV_STAGE_SCRATCH_V19_PROFILE :
         tobjPresentationCache ? LOBJ_CURRENT_SET_V15_PROFILE : lobjPresentationCache ? LOBJ_PRESENTATION_V7_PROFILE :
         twoTickDrawnReference ? LOGICAL_FRAME_V6_PROFILE : SYNCTEST_PROFILE,
       lobjPresentationCache, tobjPresentationCache, particlePresentationCache};

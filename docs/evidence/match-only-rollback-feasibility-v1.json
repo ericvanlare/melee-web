@@ -9820,7 +9820,7 @@
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
       "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and nine producer pins unchanged.",
-      "next": "Two independently compared wrong-prediction windows in one live match using one continuing timeline and a single reusable checkpoint slot; no new browser result yet.",
+      "next": "The two-window successor's v3 capture reaches the second corrected CPU comparison and stops on changed PayloadRow bytes. Resolve the payload owner/type with a bounded source diagnosis before considering another capture. The second window's final present remains unrun; this result does not close #341 or establish continuous rollback.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
@@ -9920,6 +9920,231 @@
           "sha256": "6a0badc6244e4df5b3166c9a2b3837c68d7afa983d652ca1e8800b57e3308e55"
         },
         "failures": "Retain the ActionStore fixture stack overflow and derived destroyed-store status failure, plus the extracted coordinator short-circuit order expectation failure. Reviewed fixture-only repairs preserve production checks."
+      },
+      "successive_wrong_prediction_windows_v1": {
+        "status": "v3_second_corrected_cpu_payload_mismatch",
+        "scope": "Two wrong-input seven-tick windows on one persistent input timeline, separated by a bounded neutral bridge, with one reusable checkpoint slot. This remains a private fixed-window component.",
+        "attempts": [
+          {
+            "id": "two_window_v1_startup_order_failure",
+            "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+            "host_startup_order_repair_head": "41822a85",
+            "result": "Stopped during host startup: reuse validation tried to evaluate predictedPage before the seven-tick initialization created it. No correction window or bridge executed.",
+            "evidence": {
+              "path": "browser-two-window-v1/runner/evidence.json",
+              "sha256": "e5abcc0af9de71a266c30c0c4aca6303733cd6d8f2f5ef02a4057966646dd0e8"
+            },
+            "postflight": {
+              "path": "browser-two-window-v1/independent-postflight.json",
+              "sha256": "ea77eec50ae85b1ce8f342d2cbc3258acd2d99549c6d6e87c8e2a17b56684f3d",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v1-producer-archive/archive.json",
+              "sha256": "519daf3a0bdfee3464ac1d55a0c9ee07c80cbee69b2379ed7bb2e47d9c6d9abb",
+              "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+              "artifact_count": 9
+            },
+            "host_repair_control": {
+              "path": "two-window-init-order-repair-v1/result.json",
+              "sha256": "414aff57768a49896006e8f30dd7c2231389efe3cdfb9e83faace05c17ac37f4",
+              "focused_tests": 7,
+              "passed": 7
+            }
+          },
+          {
+            "id": "two_window_v2_particle_serial_refusal",
+            "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+            "host_source_head": "41822a85970a51a5fc107fd8841c340f6aebed0e",
+            "result": "First correction window and 35-tick neutral bridge passed; second PRE was refused by the historical raw schema-312 serial comparison.",
+            "first_window": {
+              "status": "complete",
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "raw_lane_comparison": "passed"
+            },
+            "second_pre": {
+              "status": "strict_schema312_refusal",
+              "reference_particle_anchor_serial": 2103,
+              "corrected_particle_anchor_serial": 2127,
+              "anchor_token_remained_equal": true,
+              "second_correction_started": false
+            },
+            "evidence": {
+              "path": "browser-two-window-v2/runner/evidence.json",
+              "sha256": "ccd9a0abd7f030e1c324cca29cf1bd6d427579366a0e02b2abb0dbe2889854a0"
+            },
+            "postflight": {
+              "path": "browser-two-window-v2/independent-postflight.json",
+              "sha256": "218c54672d6e15cdbfbb5963fff81923fe6a67543c7821db69984457a547667b",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v1-producer-archive/archive.json",
+              "sha256": "519daf3a0bdfee3464ac1d55a0c9ee07c80cbee69b2379ed7bb2e47d9c6d9abb",
+              "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+              "artifact_count": 9
+            }
+          },
+          {
+            "id": "two_window_v3_second_cpu_payload_mismatch",
+            "native_and_host_source_head": "05da291653afd5a764d89257481d84ecccfc5b34",
+            "result": "First correction and bridge pass; second PRE passes; second corrected CPU endpoint comparison fails before final present.",
+            "first_window": {
+              "status": "complete",
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "raw_lane_comparison": "passed"
+            },
+            "second_pre": {
+              "status": "passed",
+              "source_frame": 218,
+              "domain_count": 9,
+              "live_particle_cells": 25,
+              "captured_particle_cells": 25,
+              "incarnation_relations": 25
+            },
+            "second_corrected_cpu": {
+              "status": "failed",
+              "source_frame": 225,
+              "first_mismatch": {
+                "domain": "Payload",
+                "kind": "PayloadRow",
+                "index": 2366,
+                "byte_offset": 140
+              },
+              "additional_mismatch_row": 3303,
+              "raw_five_lanes_equal": 35,
+              "payload_identity_fields_equal": true,
+              "owner_type": "unknown"
+            },
+            "second_final_present": {
+              "ran": false,
+              "reason": "The runner stopped at the corrected CPU endpoint comparison."
+            },
+            "evidence": {
+              "path": "browser-two-window-v3/runner/evidence.json",
+              "sha256": "f6daf09c8188d1aa89f0033cd471c15d0a17b556c828e9bf80d031a6806373b3"
+            },
+            "postflight": {
+              "path": "browser-two-window-v3/independent-postflight.json",
+              "sha256": "e977c322e93fb74707ef54c0a766a05985e1c692133cd2f67a034305871b65b9",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v3-producer-archive/archive.json",
+              "sha256": "2587f7e54068dd74b92466ffdd82cc8283b74f4edb9b3fc37e19d60ecf29cef3",
+              "native_source_head": "05da291653afd5a764d89257481d84ecccfc5b34",
+              "artifact_count": 9
+            },
+            "offline_diagnosis": {
+              "path": "two-window-second-cpu-payload-luna-v1/diagnosis.json",
+              "sha256": "28ad5cf3bd0cd3db30261589590be216c71635220def1e589b04c95175c0cf37",
+              "status": "owner_type_not_proven"
+            }
+          }
+        ],
+        "host_typed_particle_endpoint_v2": {
+          "native_wire_schema312_unchanged": true,
+          "raw_comparison": "All schema-312 fields/bytes remain strict except raw ParticleAnchor.Serial is checked against the typed page-local sidecar; AnchorToken and all other fields remain cross-instance exact.",
+          "typed_provenance": "Local history and receipt serials prove local order and live-to-captured incarnation relation; numeric local serials are not compared across instances.",
+          "freeze": {
+            "path": "particle-cell-endpoint-host-v1/freeze.json",
+            "sha256": "8b4c6b78cc003ef6fdf9b7b623bddd521241860585abc8da5fecb1c77599e1ef"
+          },
+          "focused_controls": {
+            "combined_run": {
+              "path": "particle-cell-endpoint-host-v1/focused-final.log",
+              "sha256": "972b397459a252db8048754eee8abee1facd43d121a6c508097eb8955706ddf8",
+              "passed": 13,
+              "failed": 1,
+              "failure": "Negative fixture changed PRE live allocation but not captured allocation, so the stronger PRE identity refusal correctly occurred before the intended payload-join assertion."
+            },
+            "reduced_repair": {
+              "path": "particle-cell-endpoint-host-v1/sidecar-repair-control.log",
+              "sha256": "15af3949f154b6862051e2fb8b5b3f791bb879efbfc99095cb5300d68516efb4",
+              "tests": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "scope_note": "The whole 14-test combined invocation was not rerun after the negative-fixture-only repair."
+          }
+        },
+        "review_receipts": {
+          "particle_native_helper": {
+            "path": "particle-cell-endpoint-native-sol-review-v1.json",
+            "sha256": "772cacb5d51c51415ce340f39a76c142e41e90fc1be1d19777e4dbacefcb2ba4",
+            "decision": "GO_NATIVE_HELPER_CONTROL_PENDING_HOST_COMPOSITION"
+          },
+          "aggregate_reader": {
+            "path": "particle-sidecar-aggregate-root-review-v1.json",
+            "sha256": "549e8d1d9335a82ec320197a2b342c3757f689154e91c1c84ed28e391b1e7359",
+            "decision": "GO_AGGREGATE_WIRING_ONLY_PENDING_HELPER_HOST_REVIEW"
+          },
+          "composed_host": {
+            "path": "particle-cell-endpoint-host-sol-review-v1.json",
+            "sha256": "a92346d818f5571dbee2700d6ce5c25aa6a1f0fca3179bd47114c4e345fce4ae",
+            "decision": "GO_COMPOSED_AFFECTED_BUILD_PENDING_LINKED_REVIEW"
+          },
+          "two_window_native_adapter": {
+            "path": "corrected-two-window-native-sol-review-v1.json",
+            "sha256": "295152c0f48d5865816b51005167e591ea4ae02981d258642d16a90c483f0c30",
+            "decision": "GO_FOCUSED_NATIVE_HOST_COMPOSITION_CONTROLS"
+          },
+          "adapter_first_cause": {
+            "path": "adapter-and-particle-first-cause-luna-review-v1.json",
+            "sha256": "31cab6fb33b94b0be7d5b59a0e6a04365ec0858541943a20a4352baea5fe35a7",
+            "decision": "GO"
+          }
+        },
+        "validation": {
+          "successor_full_regression": "not run",
+          "successor_ci": "not run",
+          "branch_status": "unmerged",
+          "acceptance": "No #341 closure, full rollback, online match or whole-session acceptance."
+        },
+        "external_run_root_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c",
+        "tev_stage_scratch_v19_candidate": {
+          "scope": "Direct source-dependency repair tested as a changed hypothesis; exact ownership of the two prior mismatching payload nodes remains unproven. Full source payload comparison is unchanged.",
+          "source_behavior": "One byte-copied local HSD_TevDesc per actual setup iteration; resolve map then coord from current TObj, preserve SetReg, original iteration, AssignTev and SetupStage ordering. Default-off body unchanged.",
+          "review": {
+            "path": "two-window-second-payload-sol-review-v1/review-and-next-contract.json",
+            "sha256": "bfcb081263c120308c1ddc5552a740e9b753a54dfb2e23544a151841aac9111e"
+          },
+          "focused_freeze": {
+            "path": "texp-stage-scratch-sol-v1/freeze.json",
+            "sha256": "e081c84e5add5673d0c3b0fb8368566a868d0a0059646ded40a0aed44af21fd7"
+          },
+          "identity_review": {
+            "path": "profile-v19-identity-sol-review-v1.json",
+            "sha256": "935d6f1b9b6ae42efd69b244cab1bf8c8269bd2ce17dbf2f309dafaf9ba4c1bb"
+          },
+          "retained_fixture_failures": [
+            "texp-stage-scratch-v1",
+            "texp-stage-scratch-v2",
+            "texp-stage-scratch-v3",
+            "texp-stage-scratch-v4"
+          ],
+          "browser_result": "pending"
+        }
       }
     }
   }

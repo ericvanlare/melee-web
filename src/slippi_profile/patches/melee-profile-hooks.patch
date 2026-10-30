@@ -3117,3 +3117,38 @@ diff --git a/src/melee/lb/lbshadow.c b/src/melee/lb/lbshadow.c
      GXSetCurrentMtx(GX_PNMTX0);
      HSD_ClearVtxDesc();
      GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
+
+diff --git a/src/sysdolphin/baselib/texp.c b/src/sysdolphin/baselib/texp.c
+--- a/src/sysdolphin/baselib/texp.c
++++ b/src/sysdolphin/baselib/texp.c
+@@ -7,6 +7,10 @@
+ #include "tev.h"
+ #include "texpdag.h"
+ #include "tobj.h"
++
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++#include <slippi_profile/texp_stage_scratch.h>
++#endif
+ 
+ HSD_TExpType HSD_TExpGetType(HSD_TExp* texp)
+ {
+@@ -1169,12 +1173,19 @@
+ {
+     HSD_TExpSetReg(texp);
+     for (; tevdesc != NULL; tevdesc = (HSD_TExpTevDesc*) tevdesc->desc.next) {
++#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
++        HSD_TevDesc stage;
++        slippi_profile_texp_stage_scratch(&stage, tevdesc);
++        HSD_StateAssignTev();
++        HSD_SetupTevStage(&stage);
++#else
+         if (tevdesc->tobj != NULL) {
+             tevdesc->desc.map = tevdesc->tobj->id;
+             tevdesc->desc.coord = tevdesc->tobj->coord;
+         }
+         HSD_StateAssignTev();
+         HSD_SetupTevStage(&tevdesc->desc);
++#endif
+     }
+ }
+ 

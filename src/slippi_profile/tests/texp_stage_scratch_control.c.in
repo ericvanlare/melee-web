@@ -1,0 +1,259 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Actual HSD_TExpSetupTev/HSD_SetupTevStage bodies; only state/GX sinks modeled. */
+#include <assert.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include <dolphin/gx.h>
+#include <sysdolphin/baselib/tev.h>
+#include <sysdolphin/baselib/texp.h>
+#include <sysdolphin/baselib/tobj.h>
+
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include <slippi_profile/texp_stage_scratch.h>
+#endif
+
+enum {
+    EV_SET_REG = 1,
+    EV_ASSIGN,
+    EV_ORDER,
+    EV_OP,
+    EV_SWAP,
+    EV_COLOR_OP,
+    EV_COLOR_IN,
+    EV_ALPHA_OP,
+    EV_ALPHA_IN,
+    EV_KCOLOR,
+    EV_KALPHA,
+};
+
+typedef struct TevEvent {
+    uint32_t kind;
+    uint32_t count;
+    uint32_t arg[6];
+} TevEvent;
+
+static TevEvent events[128];
+static size_t event_count;
+static int assigned_stage;
+
+static void record(uint32_t kind, uint32_t count, const uint32_t* args)
+{
+    size_t i;
+    assert(event_count < sizeof(events) / sizeof(events[0]));
+    events[event_count] = (TevEvent){ 0 };
+    events[event_count].kind = kind;
+    events[event_count].count = count;
+    for (i = 0; i < count; ++i) {
+        events[event_count].arg[i] = args[i];
+    }
+    ++event_count;
+}
+
+#define RECORD1(kind, a) do { const uint32_t v[] = { (uint32_t)(a) }; record((kind), 1, v); } while (0)
+#define RECORD2(kind, a, b) do { const uint32_t v[] = { (uint32_t)(a), (uint32_t)(b) }; record((kind), 2, v); } while (0)
+#define RECORD3(kind, a, b, c) do { const uint32_t v[] = { (uint32_t)(a), (uint32_t)(b), (uint32_t)(c) }; record((kind), 3, v); } while (0)
+#define RECORD4(kind, a, b, c, d) do { const uint32_t v[] = { (uint32_t)(a), (uint32_t)(b), (uint32_t)(c), (uint32_t)(d) }; record((kind), 4, v); } while (0)
+#define RECORD6(kind, a, b, c, d, e, f) do { const uint32_t v[] = { (uint32_t)(a), (uint32_t)(b), (uint32_t)(c), (uint32_t)(d), (uint32_t)(e), (uint32_t)(f) }; record((kind), 6, v); } while (0)
+
+void HSD_TExpSetReg(HSD_TExp* texp)
+{
+    RECORD1(EV_SET_REG, (uintptr_t) texp);
+}
+
+int HSD_StateAssignTev(void)
+{
+    int stage = assigned_stage++;
+    RECORD1(EV_ASSIGN, stage);
+    return stage;
+}
+
+void GXSetTevOrder(GXTevStageID stage, GXTexCoordID coord, GXTexMapID map,
+                   GXChannelID color)
+{
+    RECORD4(EV_ORDER, stage, coord, map, color);
+}
+
+void GXSetTevOp(GXTevStageID stage, GXTevMode mode)
+{
+    RECORD2(EV_OP, stage, mode);
+}
+
+void GXSetTevSwapMode(GXTevStageID stage, GXTevSwapSel ras, GXTevSwapSel tex)
+{
+    RECORD3(EV_SWAP, stage, ras, tex);
+}
+
+void GXSetTevColorOp(GXTevStageID stage, GXTevOp op, GXTevBias bias,
+                     GXTevScale scale, GXBool clamp, GXTevRegID out_reg)
+{
+    RECORD6(EV_COLOR_OP, stage, op, bias, scale, clamp, out_reg);
+}
+
+void GXSetTevColorIn(GXTevStageID stage, GXTevColorArg a, GXTevColorArg b,
+                     GXTevColorArg c, GXTevColorArg d)
+{
+    RECORD4(EV_COLOR_IN, stage, a, b, c);
+    events[event_count - 1].arg[4] = d;
+    events[event_count - 1].count = 5;
+}
+
+void GXSetTevAlphaOp(GXTevStageID stage, GXTevOp op, GXTevBias bias,
+                     GXTevScale scale, GXBool clamp, GXTevRegID out_reg)
+{
+    RECORD6(EV_ALPHA_OP, stage, op, bias, scale, clamp, out_reg);
+}
+
+void GXSetTevAlphaIn(GXTevStageID stage, GXTevAlphaArg a, GXTevAlphaArg b,
+                     GXTevAlphaArg c, GXTevAlphaArg d)
+{
+    RECORD4(EV_ALPHA_IN, stage, a, b, c);
+    events[event_count - 1].arg[4] = d;
+    events[event_count - 1].count = 5;
+}
+
+void GXSetTevKColorSel(GXTevStageID stage, GXTevKColorSel sel)
+{
+    RECORD2(EV_KCOLOR, stage, sel);
+}
+
+void GXSetTevKAlphaSel(GXTevStageID stage, GXTevKAlphaSel sel)
+{
+    RECORD2(EV_KALPHA, stage, sel);
+}
+
+ORIGINAL_SETUP
+
+CANDIDATE_SETUP
+
+ACTUAL_SETUP_STAGE
+
+static void init_node(HSD_TExpTevDesc* node, HSD_TExpTevDesc* next,
+                      HSD_TObj* tobj, unsigned index, unsigned flags)
+{
+    memset(node, 0xA5, sizeof(*node));
+    node->desc.next = next == NULL ? NULL : &next->desc;
+    node->desc.flags = flags;
+    node->desc.stage = (GXTevStageID) (2 + index);
+    node->desc.coord = (GXTexCoordID) (20 + index);
+    node->desc.map = (GXTexMapID) (40 + index);
+    node->desc.color = (GXChannelID) (60 + index);
+    node->desc.u.tevconf.clr_op = (GXTevOp) (3 + index);
+    node->desc.u.tevconf.clr_a = (GXTevColorArg) (4 + index);
+    node->desc.u.tevconf.clr_b = (GXTevColorArg) (5 + index);
+    node->desc.u.tevconf.clr_c = (GXTevColorArg) (6 + index);
+    node->desc.u.tevconf.clr_d = (GXTevColorArg) (7 + index);
+    node->desc.u.tevconf.clr_scale = (GXTevScale) (index % 3);
+    node->desc.u.tevconf.clr_bias = (GXTevBias) (index % 2);
+    node->desc.u.tevconf.clr_clamp = (u8) (index & 1);
+    node->desc.u.tevconf.clr_out_reg = (GXTevRegID) (index % 4);
+    node->desc.u.tevconf.alpha_op = (GXTevOp) (8 + index);
+    node->desc.u.tevconf.alpha_a = (GXTevAlphaArg) (9 + index);
+    node->desc.u.tevconf.alpha_b = (GXTevAlphaArg) (10 + index);
+    node->desc.u.tevconf.alpha_c = (GXTevAlphaArg) (11 + index);
+    node->desc.u.tevconf.alpha_d = (GXTevAlphaArg) (12 + index);
+    node->desc.u.tevconf.alpha_scale = (GXTevScale) ((index + 1) % 3);
+    node->desc.u.tevconf.alpha_bias = (GXTevBias) ((index + 1) % 2);
+    node->desc.u.tevconf.alpha_clamp = (u8) ((index + 1) & 1);
+    node->desc.u.tevconf.alpha_out_reg = (GXTevRegID) ((index + 1) % 4);
+    node->desc.u.tevconf.mode = (GXTevClampMode) (index % 3);
+    node->desc.u.tevconf.ras_swap = (GXTevSwapSel) (index % 4);
+    node->desc.u.tevconf.tex_swap = (GXTevSwapSel) ((index + 1) % 4);
+    node->desc.u.tevconf.kcsel = (GXTevKColorSel) (index % 8);
+    node->desc.u.tevconf.kasel = (GXTevKAlphaSel) (index % 8);
+    node->tobj = tobj;
+}
+
+static void reset_events(void)
+{
+    memset(events, 0, sizeof(events));
+    event_count = 0;
+    assigned_stage = 0;
+}
+
+static void verify_round(HSD_TExpTevDesc* reference,
+                         HSD_TExpTevDesc* candidate)
+{
+    HSD_TevDesc candidate_before[3];
+    HSD_TevDesc candidate_expected[3];
+    HSD_TevDesc reference_expected[3];
+    TevEvent reference_events[128];
+    size_t reference_count;
+    size_t i;
+
+    for (i = 0; i < 3; ++i) {
+        memcpy(&candidate_before[i], &candidate[i].desc, sizeof(candidate_before[i]));
+        memcpy(&candidate_expected[i], &candidate_before[i], sizeof(candidate_expected[i]));
+        memcpy(&reference_expected[i], &reference[i].desc, sizeof(reference_expected[i]));
+        if (candidate[i].tobj != NULL) {
+            candidate_expected[i].map = candidate[i].tobj->id;
+            candidate_expected[i].coord = candidate[i].tobj->coord;
+        }
+        if (reference[i].tobj != NULL) {
+            reference_expected[i].map = reference[i].tobj->id;
+            reference_expected[i].coord = reference[i].tobj->coord;
+        }
+    }
+
+    reset_events();
+    reference_HSD_TExpSetupTev(reference, NULL);
+    reference_count = event_count;
+    memcpy(reference_events, events, reference_count * sizeof(TevEvent));
+    assert(reference_count > 1 && reference_events[0].kind == EV_SET_REG);
+    for (i = 0; i < 3; ++i) {
+        assert(memcmp(&reference[i].desc, &reference_expected[i], sizeof(reference_expected[i])) == 0);
+    }
+
+    reset_events();
+    candidate_HSD_TExpSetupTev(candidate, NULL);
+    assert(event_count == reference_count);
+    assert(memcmp(events, reference_events, reference_count * sizeof(TevEvent)) == 0);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    for (i = 0; i < 3; ++i) {
+        assert(memcmp(&candidate[i].desc, &candidate_before[i], sizeof(candidate_before[i])) == 0);
+    }
+#else
+    for (i = 0; i < 3; ++i) {
+        assert(memcmp(&candidate[i].desc, &candidate_expected[i], sizeof(candidate_expected[i])) == 0);
+    }
+#endif
+}
+
+int main(void)
+{
+    HSD_TObj textures[2];
+    HSD_TExpTevDesc reference[3];
+    HSD_TExpTevDesc candidate[3];
+    unsigned char candidate_initial[sizeof(candidate)];
+
+    memset(textures, 0, sizeof(textures));
+    textures[0].id = (GXTexMapID) 100;
+    textures[0].coord = (GXTexCoordID) 200;
+    textures[1].id = (GXTexMapID) 101;
+    textures[1].coord = (GXTexCoordID) 201;
+    init_node(&reference[0], &reference[1], &textures[0], 0, 0);
+    init_node(&reference[1], &reference[2], NULL, 1, 1);
+    init_node(&reference[2], NULL, &textures[1], 2, 1);
+    memcpy(candidate, reference, sizeof(reference));
+    candidate[0].desc.next = &candidate[1].desc;
+    candidate[1].desc.next = &candidate[2].desc;
+    candidate[2].desc.next = NULL;
+    memcpy(candidate_initial, candidate, sizeof(candidate));
+
+    verify_round(reference, candidate);
+    textures[0].id = (GXTexMapID) 303;
+    textures[0].coord = (GXTexCoordID) 404;
+    textures[1].id = (GXTexMapID) 505;
+    textures[1].coord = (GXTexCoordID) 606;
+    verify_round(reference, candidate);
+
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    assert(memcmp(candidate, candidate_initial, sizeof(candidate)) == 0);
+#else
+    assert(memcmp(candidate, candidate_initial, sizeof(candidate)) != 0);
+#endif
+    puts("TExp stage source control passed");
+    return 0;
+}

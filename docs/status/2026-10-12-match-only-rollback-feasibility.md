@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Browser exercised / Historical one-tick restore-replay-and-present passed. V14 moves the observed effect-joint matrix writes into simulation, with exact two-tick target-matrix and raw-sample agreement. Strict source-payload equality now fails at an eight-byte SList-pool allocation. Two-tick final present and full browser rollback remain unproven.**
+**The private seven-tick wrong-prediction component passes for one window. Its two-window successor passes window one, a 35-neutral-tick bridge, and second-window PRE, then stops at a strict CPU payload-byte mismatch. The second window's final present and full or continuous rollback remain unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1525,10 +1525,31 @@ The generic destructor/retirement guards stay intact. The controls execute the
 actual ActionStore and extracted checkpoint/session code with modeled leaves;
 they do not establish a new browser result. Fixture stack, destroyed-store status
 and short-circuit expectation failures remain retained with their reviewed repairs.
-The next experiment is two successive wrong-prediction corrections, using one
-continuing input timeline and one checkpoint slot in the same live match.
-Repeated browser correction, combat, frame-budget, profile admission and
-full-match/online rollback remain open.
+The two-window successor now has three separately retained browser attempts.
+V1 stops in host startup ordering because reuse validation dereferences
+`predictedPage` before that page is initialized; no correction window runs.
+Its native producer is `4a13106d`, and the host repair is recorded at
+`41822a85`. V2 reuses that native producer with the repaired host: its
+first seven-tick correction and the following 35-neutral-tick bridge complete,
+but the second PRE comparison refuses because raw `ParticleAnchor.Serial`
+is 2103 versus 2127. The historical schema-312 comparator remains strict at
+that boundary.
+
+V3 adds a typed, local particle-cell receipt sidecar while keeping the original
+schema-312 rows and all unrelated comparisons strict. Its first correction,
+bridge and second PRE all pass; PRE agrees across nine domains and 25 live and
+captured particle cells. The second corrected CPU comparison then finds changed
+bytes in PayloadRow 2366 at offset 140 and PayloadRow 3303. Offline comparison
+finds all 35 raw per-tick lanes equal, but cannot identify the changed payload
+owner or type. The run stops before the second final present. Independent
+postflight confirms all recorded process IDs absent, and all nine v3 producer
+artifacts are archived. Component-control reporting is scoped in the structured
+receipt: the combined host run had 13 passes and one negative-fixture failure,
+then the repaired sidecar test passed alone; this is not a single 14/14 run.
+Native helper, aggregate and adapter review receipts are retained there as well.
+The successor branch remains unmerged, with no successor full regression or CI.
+Repeated correction, combat, frame-budget, profile admission and full-match or
+online rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

@@ -414,7 +414,7 @@ uint32_t cpu_execute_seven(uint32_t command){
     if(command==14)cpu_restore.seven_active=true;
 #if !defined(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK) || !MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK || \
     !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-    return cpu_fail(0x4d0u,"seven-tick route requires the private v18 stable action asset profile");
+    return cpu_fail(0x4d0u,"seven-tick route requires the private v19 TEV stage scratch profile");
 #else
     if(command==14){
         if(cpu_restore.state!=C::Configured||!cpu_restore.configured_statics)
