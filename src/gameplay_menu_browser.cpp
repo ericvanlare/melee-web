@@ -1,5 +1,27 @@
 #include "gameplay_menu_browser_state.hpp"
 #include <emscripten/em_macros.h>
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+#include "slippi_profile/runtime_match_history.hpp"
+#include "slippi_profile/runtime_match_identity.hpp"
+#include "gameplay_audio_bank_transport.h"
+#include "gameplay_source_memory_runtime.h"
+#include <dolphin/dvd.h>
+#include <emscripten/html5.h>
+#include <emscripten/threading.h>
+#include <cstring>
+#include <limits>
+extern "C" int melee_web_audio_stream_source_loading(void);
+EM_JS_DEPS(match_history_asyncify_support,"$Asyncify");
+EM_JS(int,match_history_asyncify_idle,(),{
+ try {
+  return typeof Asyncify==='object'&&Asyncify!==null&&
+   typeof Asyncify.State==='object'&&Asyncify.State!==null&&
+   typeof Asyncify.State.Normal==='number'&&Asyncify.state===Asyncify.State.Normal&&
+   Asyncify.currData===null?1:0;
+ }catch(_){return 0;}
+});
+#endif
+
 extern "C" uint32_t gm_801A4BA8(void);
 extern "C" int melee_web_native_menu_running();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
@@ -52,6 +74,18 @@ extern "C" int melee_web_net_publish_local_input(
 extern "C" void melee_web_native_menu_pause(int paused);
 #endif
 namespace melee_web_menu_browser {
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+bool match_history_terminal=false,match_history_in_tick=false;
+unsigned match_history_renderer_errors=0,match_history_pcm_frames=0;
+void match_history_before_close() noexcept;
+void match_history_after_match_close();
+struct MatchHistoryOrdinaryCallback {
+ bool owned=!match_history_in_tick;
+ MatchHistoryOrdinaryCallback(){if(owned)match_history_in_tick=true;}
+ ~MatchHistoryOrdinaryCallback(){if(owned)match_history_in_tick=false;}
+};
+#endif
+
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 std::string matched_setup_cf_pad_queue_observation_json(
     const MeleeWebStadiumPadQueueObservation& observation,const StartMeleeData& setup)
@@ -2304,6 +2338,9 @@ std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
 void stadium_recreation_match_retired();
 #endif
 void close(){
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ match_history_before_close();
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  FirstSssTextTailCloseGuard text_tail_close{first_sss_text_tail_probe.opted_in};
 #endif
@@ -2319,7 +2356,11 @@ void close(){
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
  if(match){
   const bool opening_demo=match->opening_demo();
-  match->close();match.reset();
+  match->close();
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  match_history_after_match_close();
+#endif
+  match.reset();
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   stadium_recreation_match_retired();
 #endif
@@ -3523,17 +3564,28 @@ void begin_transition_construction(double& preparation_ms,int& suppress_draw){
 }
 
 void log_message(AuroraLogLevel level,const char* module,const char* text,unsigned length){
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ if(level>=LOG_ERROR&&match_history_renderer_errors!=UINT32_MAX)++match_history_renderer_errors;
+#endif
  std::fprintf(level>=LOG_ERROR?stderr:stdout,"[%s] %.*s\n",module,int(length),text);
  if(level==LOG_FATAL)std::abort();
 }
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ if(match_history_terminal)match_history_pcm_frames=count;
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  ++diagnostic_audio_render_calls;
  diagnostic_audio_render_frames+=count;
 #endif
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ // Terminal speculative PCM is evolved normally and retained by the typed
+ // audio owner, but this diagnostic does not publish speculative speakers.
+ if(!match_history_terminal)
+#endif
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 #endif
 }
@@ -6406,7 +6458,13 @@ int current_sss_prepared_setup_begin(){
 }
 #endif
 
+#include "slippi_profile/runtime_match_history_menu.inc"
+
 void tick(){
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ MatchHistoryOrdinaryCallback match_history_callback;
+ if(match_history_terminal||!match_history_callback.owned)return;
+#endif
 #if defined(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC)
  if(match_draw_discard_terminal)return;
 #endif

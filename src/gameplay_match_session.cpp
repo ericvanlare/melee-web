@@ -690,6 +690,12 @@ const StartMeleeData& GameplayMatchSession::start_data()const{
     check(storage_&&storage_->match,"Match session is closed");
     return storage_->selected.start;
 }
+const MeleeWebMenuMatchSelection& GameplayMatchSession::start_selection()const{
+    check(storage_&&storage_->world&&storage_->match&&storage_->flow&&
+          construction_complete(),
+          "Match selection requires a live, fully constructed source match");
+    return storage_->selected;
+}
 const StartMeleeData* GameplayMatchSession::diagnostic_start_data()const noexcept{
     return storage_?&storage_->selected.start:nullptr;
 }
