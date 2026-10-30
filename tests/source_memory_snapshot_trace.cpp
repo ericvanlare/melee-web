@@ -5,6 +5,15 @@
 #include <cstring>
 #include <limits>
 #include <new>
+#include <vector>
+
+extern "C" int melee_web_source_memory_test_payload_index_benchmark(
+    const MeleeWebSourceMemoryPayloadSnapshot*, uint64_t*, uint64_t*);
+extern "C" int melee_web_source_memory_test_payload_index_range_case(
+    const MeleeWebSourceMemoryPayloadSnapshot*, uint32_t);
+extern "C" int melee_web_source_memory_test_payload_index_tamper(
+    MeleeWebSourceMemoryPayloadSnapshot*, uint32_t, uint32_t*, uint32_t*);
+extern "C" uint32_t melee_web_source_memory_test_capture_source_overlap(void);
 
 namespace {
 long allocation_budget = -1;
@@ -749,11 +758,111 @@ void source_memory_payload_controls() {
     melee_web_source_memory_payload_snapshot_destroy(unhealthy_snapshot.snapshot);
     check(!melee_web_source_memory_end(702), "unhealthy payload owner teardown");
 }
+
+void source_memory_payload_index_controls() {
+    constexpr size_t first_rows = 3467;
+    constexpr size_t second_rows = 3471;
+    constexpr size_t first_payload_bytes = 1317494;
+    constexpr size_t second_payload_bytes = 1317542;
+    std::vector<unsigned char> host_rows(second_payload_bytes, 0);
+    check(melee_web_source_memory_begin(1101, 6), "indexed payload owner begin");
+    size_t host_offset = 0;
+    for (size_t i = 0; i < first_rows; ++i) {
+        const size_t bytes = i < 34 ? 381 : 380;
+        check(melee_web_source_memory_alloc(6, &host_rows[host_offset],
+                                            static_cast<uint32_t>(bytes)),
+              "populate observed first payload row count");
+        host_offset += bytes;
+    }
+    check(host_offset == first_payload_bytes,
+          "first modeled payload byte sum matches observed endpoint");
+    auto first = melee_web_source_memory_payload_snapshot_capture();
+    check(first.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          first.snapshot, "capture observed 3467-row payload endpoint");
+    const auto first_header =
+        melee_web_source_memory_payload_endpoint_header(first.snapshot);
+    check(first_header.row_count == first_rows &&
+          first_header.payload_bytes == first_payload_bytes,
+          "first endpoint retains observed 3467-row and payload-byte counts");
+    uint64_t old_ns = 0, indexed_ns = 0;
+    check(melee_web_source_memory_test_payload_index_benchmark(
+              first.snapshot, &old_ns, &indexed_ns),
+          "all-pairs and indexed validators agree for actual 3467-row ledger");
+    std::printf("payload-index benchmark n=%zu all_pairs_ns=%llu indexed_ns=%llu\n",
+                first_rows, static_cast<unsigned long long>(old_ns),
+                static_cast<unsigned long long>(indexed_ns));
+
+    check(melee_web_source_memory_test_capture_source_overlap() ==
+              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE &&
+          host_rows[0] == 0,
+          "successful capture allocation detects source overlap before payload reads");
+    allocation_budget = 0;
+    const auto oom_overlap = melee_web_source_memory_test_capture_source_overlap();
+    allocation_budget = -1;
+    check(oom_overlap == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE &&
+          host_rows[0] == 0,
+          "capture OOM retains invalid-state precedence for overlapping ledger");
+
+    const int accepted[12] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    for (uint32_t scenario = 0; scenario < 12; ++scenario)
+        check(melee_web_source_memory_test_payload_index_range_case(
+                  first.snapshot, scenario) == accepted[scenario],
+              "indexed range validator accepts only valid adjacent intervals and indices");
+
+    host_rows[0] = 0xa5;
+    for (uint32_t scenario = 0; scenario < 7; ++scenario) {
+        uint32_t admit_status = 0, restore_status = 0;
+        check(melee_web_source_memory_test_payload_index_tamper(
+                  first.snapshot, scenario, &admit_status, &restore_status),
+              "run saved-index tamper control");
+        const auto expected_status = scenario < 6
+            ? MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE
+            : MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+        check(admit_status == expected_status &&
+              restore_status == expected_status &&
+              host_rows[0] == 0xa5,
+              "saved-index or row-identity tamper refuses before payload writes");
+    }
+    allocation_budget = 0;
+    const auto restored =
+        melee_web_source_memory_payload_snapshot_restore(first.snapshot);
+    allocation_budget = -1;
+    check(restored == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          host_rows[0] == 0,
+          "indexed restore remains allocation-free and restores exact payload");
+
+    for (size_t i = first_rows; i < second_rows; ++i) {
+        check(melee_web_source_memory_alloc(6, &host_rows[host_offset], 12),
+              "extend to observed second payload row count");
+        host_offset += 12;
+    }
+    check(host_offset == second_payload_bytes,
+          "second modeled payload byte sum matches observed endpoint");
+    auto second = melee_web_source_memory_payload_snapshot_capture();
+    check(second.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+          second.snapshot, "capture observed 3471-row payload endpoint");
+    const auto second_header =
+        melee_web_source_memory_payload_endpoint_header(second.snapshot);
+    check(second_header.row_count == second_rows &&
+          second_header.payload_bytes == second_payload_bytes,
+          "second endpoint retains observed 3471-row and payload-byte counts");
+    check(melee_web_source_memory_test_payload_index_benchmark(
+              second.snapshot, &old_ns, &indexed_ns),
+          "all-pairs and indexed validators agree for actual 3471-row ledger");
+    std::printf("payload-index benchmark n=%zu all_pairs_ns=%llu indexed_ns=%llu\n",
+                second_rows, static_cast<unsigned long long>(old_ns),
+                static_cast<unsigned long long>(indexed_ns));
+
+    melee_web_source_memory_payload_snapshot_destroy(first.snapshot);
+    melee_web_source_memory_payload_snapshot_destroy(second.snapshot);
+    check(melee_web_source_memory_end(1101), "indexed payload owner end");
+}
 }
 int main() {
     using Snapshot = MeleeWebSourceMemorySnapshot;
     source_memory_witness_controls();
     source_memory_payload_controls();
+    source_memory_payload_index_controls();
     const auto inactive_payload =
         melee_web_source_memory_payload_snapshot_capture();
     check(inactive_payload.status ==
