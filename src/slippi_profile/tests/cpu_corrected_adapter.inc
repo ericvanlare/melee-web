@@ -23,15 +23,15 @@ struct CpuCorrectedControl {
 struct CpuCorrectedReuseEvidence {
     uint32_t schema=1,bytes=sizeof(CpuCorrectedReuseEvidence);
     uint32_t windows_captured=0,windows_retired=0,active_capsules=0,max_active_capsules=0;
-    uint32_t window_first_sample=0,window_pre_frame=0,window_post_frame=0,reserved=0;
+    uint32_t window_first_sample=0,window_pre_frame=0,window_post_frame=0,window_span=0;
 };
 static_assert(sizeof(CpuCorrectedReuseEvidence)==40);
 using CpuCorrectedOwnerTuple=decltype(match->diagnostic_cpu_owners());
 struct CpuCorrectedReuseControl {
-    bool enabled=false,origin_set=false;
+    bool enabled=false,origin_set=false,loop_mode=false,span_selected=false;
     const melee_web::GameplayMatchSession* session=nullptr;
     CpuCorrectedOwnerTuple owners{};
-    uint32_t first_capture_frame=0,previous_post_frame=0;
+    uint32_t first_capture_frame=0,previous_post_frame=0,selected_span=0;
     HSD_GObj* profile_owner=nullptr;
     uint32_t configured_seed=0;
     bool initializer=false,profile=false;
@@ -51,9 +51,31 @@ bool cpu_corrected_same_owner(const CpuCorrectedOwnerTuple& a,
     return a.storage==b.storage&&a.context==b.context&&a.flow==b.flow&&
         a.audio==b.audio&&a.world==b.world&&a.context_epoch==b.context_epoch;
 }
+bool cpu_corrected_loop_interactive_safe(uint32_t expected_frame){
+#if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
+    if(!melee_web_snapshot_actual_stage_is_final_destination())return false;
+#endif
+    if(!match||match->source_frames()!=expected_frame||observation.frame!=expected_frame||
+       !observation.ready||observation.ending||observation.complete||observation.paused||
+       observation.stocks[0]!=4||observation.stocks[1]!=4||
+       match.get()!=cpu_corrected_reuse.session)return false;
+    const auto owners=match->diagnostic_cpu_owners();
+    if(!cpu_corrected_same_owner(owners,cpu_corrected_reuse.owners)||owners.frame!=expected_frame||
+       rng_profile_gobj!=cpu_corrected_reuse.profile_owner||
+       configured_source_seed!=cpu_corrected_reuse.configured_seed||
+       native_initializer_enabled!=cpu_corrected_reuse.initializer||
+       rng_profile_enabled!=cpu_corrected_reuse.profile)return false;
+    for(unsigned i=0;i<2;++i)
+        if(melee_web_synctest_motion_boundary(observation.motion[i])!=0||
+           !melee_web_synctest_is_mario_kind(observation.players[i].fighter_kind))return false;
+    return true;
+}
 bool cpu_corrected_reuse_metadata_header_valid(){
     const auto& metadata=cpu_corrected_reuse_evidence;
-    return metadata.schema==1&&metadata.bytes==sizeof(metadata)&&metadata.reserved==0;
+    return metadata.bytes==sizeof(metadata)&&
+        (cpu_corrected_reuse.loop_mode?
+            metadata.schema==3&&metadata.window_span<=7u:
+            metadata.schema==1&&metadata.window_span==0u);
 }
 bool cpu_corrected_reuse_live(uint32_t expected_frame){
     if(!cpu_corrected_reuse.enabled)return true;
@@ -79,7 +101,11 @@ bool cpu_corrected_reuse_prepare_capture(uint32_t frame,uint32_t& sample,
     auto& evidence=cpu_corrected_reuse_evidence;
     if(!cpu_corrected_reuse_metadata_header_valid()||
        !match||frame!=observation.frame||frame!=match->source_frames()||
-       evidence.windows_captured>=2u||
+       (cpu_corrected_reuse.loop_mode&&(!cpu_corrected_reuse.span_selected||
+          cpu_corrected_reuse.selected_span<1u||cpu_corrected_reuse.selected_span>7u||
+          evidence.window_span!=cpu_corrected_reuse.selected_span||
+          evidence.windows_captured==UINT32_MAX))||
+       (!cpu_corrected_reuse.loop_mode&&evidence.windows_captured>=2u)||
        evidence.active_capsules!=0||evidence.windows_retired!=evidence.windows_captured)
         return false;
     owners=match->diagnostic_cpu_owners();
@@ -89,18 +115,25 @@ bool cpu_corrected_reuse_prepare_capture(uint32_t frame,uint32_t& sample,
     if(cpu_corrected_reuse.origin_set){
         if(match.get()!=cpu_corrected_reuse.session||
            !cpu_corrected_same_owner(owners,cpu_corrected_reuse.owners)||
-           frame<cpu_corrected_reuse.previous_post_frame||
+           (cpu_corrected_reuse.loop_mode?frame!=cpu_corrected_reuse.previous_post_frame:
+             frame<cpu_corrected_reuse.previous_post_frame)||
            rng_profile_gobj!=cpu_corrected_reuse.profile_owner||
            configured_source_seed!=cpu_corrected_reuse.configured_seed||
            native_initializer_enabled!=cpu_corrected_reuse.initializer||
            rng_profile_enabled!=cpu_corrected_reuse.profile)return false;
     }else if(evidence.windows_captured||evidence.windows_retired||evidence.max_active_capsules||
-             cpu_restore.first_failure||cpu_restore.state!=CpuRestoreControl::Configured){
+             cpu_restore.first_failure||cpu_restore.state!=CpuRestoreControl::Configured||
+             (cpu_corrected_reuse.loop_mode&&
+              (rng_profile_gobj!=cpu_corrected_reuse.profile_owner||
+               configured_source_seed!=cpu_corrected_reuse.configured_seed||
+               native_initializer_enabled!=cpu_corrected_reuse.initializer||
+               rng_profile_enabled!=cpu_corrected_reuse.profile))){
         return false;
     }
     const uint32_t origin=cpu_corrected_reuse.origin_set?
         cpu_corrected_reuse.first_capture_frame:frame;
-    if(frame<origin||frame-origin>UINT32_MAX-300u)return false;
+    if(frame<origin||frame-origin>UINT32_MAX-300u||
+       frame>UINT32_MAX-(cpu_corrected_reuse.loop_mode?cpu_corrected_reuse.selected_span:7u))return false;
     sample=300u+(frame-origin);
     return true;
 }
@@ -109,9 +142,14 @@ bool cpu_corrected_reuse_publish_capture(uint32_t sample,uint32_t pre_frame,
                                          const CpuCorrectedOwnerTuple& owners){
     if(!cpu_corrected_reuse.enabled)return true;
     auto& reuse=cpu_corrected_reuse;auto& evidence=cpu_corrected_reuse_evidence;
-    if(!cpu_corrected_reuse_metadata_header_valid()||evidence.windows_captured>=2u||evidence.active_capsules!=0||
+    const uint32_t span=reuse.loop_mode?reuse.selected_span:7u;
+    if(!cpu_corrected_reuse_metadata_header_valid()||
+       (reuse.loop_mode?(!reuse.span_selected||span<1u||span>7u||evidence.window_span!=span||
+                         evidence.windows_captured==UINT32_MAX):evidence.windows_captured>=2u)||
+       evidence.active_capsules!=0||
        evidence.windows_captured!=evidence.windows_retired||
-       post_frame<pre_frame||post_frame-pre_frame!=7u)return false;
+       post_frame<pre_frame||post_frame-pre_frame!=span||
+       (reuse.loop_mode&&reuse.origin_set&&pre_frame!=reuse.previous_post_frame))return false;
     if(!reuse.origin_set){
         reuse.origin_set=true;reuse.session=match.get();reuse.owners=owners;
         reuse.first_capture_frame=pre_frame;reuse.profile_owner=rng_profile_gobj;
@@ -123,7 +161,9 @@ bool cpu_corrected_reuse_publish_capture(uint32_t sample,uint32_t pre_frame,
     if(evidence.max_active_capsules<evidence.active_capsules)
         evidence.max_active_capsules=evidence.active_capsules;
     evidence.window_first_sample=sample;evidence.window_pre_frame=pre_frame;
-    evidence.window_post_frame=post_frame;return true;
+    evidence.window_post_frame=post_frame;
+    if(reuse.loop_mode)evidence.window_span=span;
+    return true;
 }
 bool cpu_corrected_diag(unsigned index){
     auto& e=cpu_corrected.evidence;
@@ -140,9 +180,12 @@ uint32_t cpu_corrected_draw(uint32_t command,bool corrected){
     auto& c=cpu_corrected;auto& e=c.evidence;
     if(cpu_boundary()||!cpu_seven_safe(e.post_frame))
         return cpu_corrected_error(0x530u,"corrected-route final draw boundary refused");
-    uint32_t sample=306u;
+    if(e.mode<1u||e.mode>7u||e.post_frame<e.mode)
+        return cpu_corrected_error(0x53du,"corrected-route final draw span refused");
+    const uint32_t last_frame=e.post_frame-1u;
+    uint32_t sample=cpu_corrected_reuse.loop_mode?300u+(e.mode-1u):306u;
     if(cpu_corrected_reuse.enabled&&
-       !cpu_corrected_reuse_sample(e.pre_frame+6u,e.post_frame,sample))
+       !cpu_corrected_reuse_sample(last_frame,e.post_frame,sample))
         return cpu_corrected_error(0x53du,"corrected-route final draw reuse cursor refused");
     int result=0;error[0]='\0';{
         CpuClassPieceTraceScope trace(command,MELEE_WEB_CLASS_PIECE_TRACE_DRAW,e.post_frame,sample);
@@ -163,6 +206,7 @@ uint32_t cpu_corrected_draw(uint32_t command,bool corrected){
  * No command accepts an incoming reference, equality bit, address or size. */
 uint32_t cpu_corrected_execute(uint32_t command){
     using C=CpuCorrectedControl;auto& c=cpu_corrected;auto& e=c.evidence;
+    const uint32_t span=cpu_corrected_reuse.loop_mode?cpu_corrected_reuse.selected_span:7u;
 #if !defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) || !MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
     return cpu_corrected_error(0x510u,"corrected route requires the private v19 TEV stage scratch profile");
 #else
@@ -178,13 +222,35 @@ uint32_t cpu_corrected_execute(uint32_t command){
         if(cpu_corrected_reuse.enabled&&
            !cpu_corrected_reuse_prepare_capture(capture_frame,first_sample,reuse_owners))
             return cpu_corrected_error(0x512u,"corrected reuse capture owner/cursor refused");
-        c.active=true;e.schema=2;e.mode=7;
+        const uint32_t capture_span=cpu_corrected_reuse.loop_mode?span:7u;
+        if(capture_span<1u||capture_span>7u||capture_frame!=observation.frame||
+           capture_frame>UINT32_MAX-capture_span||
+           (cpu_corrected_reuse.loop_mode&&
+            !cpu_corrected_loop_interactive_safe(capture_frame)))
+            return cpu_corrected_error(0x512u,"corrected capture source/frame boundary refused");
+        if(cpu_corrected_reuse.loop_mode&&!cpu_corrected_reuse.span_selected)
+            return cpu_corrected_error(0x512u,"corrected loop span was not selected");
+        /* Schema3 has canonical zero unused rows/slabs. Do this only after all
+         * source/owner/runtime admission above has succeeded. */
+        if(cpu_corrected_reuse.loop_mode){
+            std::memset(&e,0,sizeof(e));e.schema=3;e.bytes=sizeof(e);
+            e.mode=capture_span;e.commit_result=UINT32_MAX;
+            e.drawn_pair.schema=1;e.drawn_pair.bytes=sizeof(e.drawn_pair);
+            e.drawn_pair.commit_result=UINT32_MAX;
+            for(unsigned i=0;i<capture_span;++i){
+                e.tick_pairs[i].schema=1;e.tick_pairs[i].bytes=sizeof(e.tick_pairs[i]);
+                e.tick_pairs[i].commit_result=UINT32_MAX;
+            }
+        }else{e.schema=2;e.mode=7;}
+        c.active=true;
         cpu_restore.profile_owner=rng_profile_gobj;cpu_restore.profile=rng_profile_enabled;
         cpu_restore.configured_seed=configured_source_seed;cpu_restore.initializer=native_initializer_enabled;
-        e.pre_frame=observation.frame;
-        if(e.pre_frame>UINT32_MAX-7u||!cpu_seven_safe(e.pre_frame))
+        // This legacy predicate authenticates the freshly captured tuple;
+        // evaluating it before the tuple stores rejects a clean first capture.
+        if(!cpu_seven_safe(capture_frame))
             return cpu_corrected_error(0x512u,"corrected capture source/frame boundary refused");
-        e.post_frame=e.pre_frame+7u;
+        e.pre_frame=observation.frame;
+        e.post_frame=e.pre_frame+capture_span;
         if(e.pre_frame!=capture_frame)
             return cpu_corrected_error(0x512u,"corrected capture source cursor changed");
         std::memcpy(&c.pre_observation,&observation,sizeof(observation));
@@ -194,8 +260,12 @@ uint32_t cpu_corrected_execute(uint32_t command){
         payload_admission_capture_end_frame=last_completed_frame_id;
         if(!cpu_corrected_diag(0))return cpu_corrected_error(0x513u,"corrected capture diagnostics missing");
         melee_web::CpuCaptureDiagnostic diagnostic{};
-        cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture(*match,
-            std::move(cpu_restore.configured_statics),diagnostic,melee_web::CpuCheckpointSpan::SevenTicks);
+        if(cpu_corrected_reuse.loop_mode)
+            cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture_span(*match,
+                std::move(cpu_restore.configured_statics),diagnostic,capture_span);
+        else
+            cpu_restore.capsule=melee_web::GameplayCpuCheckpoint::capture(*match,
+                std::move(cpu_restore.configured_statics),diagnostic,melee_web::CpuCheckpointSpan::SevenTicks);
         if(!cpu_restore.capsule){e.tick_pairs[0].comparison=diagnostic.comparison;
             return cpu_corrected_error(0x514u,diagnostic.message.data());}
         if(!cpu_corrected_reuse_publish_capture(first_sample,e.pre_frame,e.post_frame,reuse_owners))
@@ -203,13 +273,14 @@ uint32_t cpu_corrected_execute(uint32_t command){
         if(!cpu_restore.capsule->begin_record(*match)||!cpu_corrected_interval()||
            cpu_boundary()||!cpu_seven_live_equals(e.diagnostics[0]))
             return cpu_corrected_error(0x515u,"corrected capture/record boundary refused");
-        for(unsigned i=0;i<7;++i){e.tick_pairs[i].pre_frame=e.pre_frame+i;
+        for(unsigned i=0;i<capture_span;++i){e.tick_pairs[i].pre_frame=e.pre_frame+i;
             e.tick_pairs[i].post_frame=e.pre_frame+i+1u;}
         cpu_restore.state=CpuRestoreControl::CapturedSeven;c.phase=C::Recording;return 0;
     }
     if(!c.active||!cpu_restore.capsule)return cpu_corrected_error(0x516u,"corrected command has no capsule");
     if(command>=33&&command<=39){
         const unsigned index=command-33u;
+        if(index>=span)return cpu_corrected_error(0x517u,"corrected baseline command exceeds selected span");
         if(index!=c.baseline_steps||(index==0?c.phase!=C::Recording:c.phase!=C::BaselineDrawSubmitted))
             return cpu_corrected_error(0x517u,"corrected baseline command is out of order");
         if(index&&(payload_admission_boundary(true)!=0||!cpu_corrected_diag(index)))
@@ -232,7 +303,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
            !cpu_corrected_interval()||!cpu_seven_live_equals(e.diagnostics[index]))
             return cpu_corrected_error(0x51bu,"corrected baseline source/draw boundary refused");
         e.baseline_step_no_draw_mask|=1u<<index;++c.baseline_steps;
-        if(index==6){
+        if(index+1u==span){
             if(!cpu_restore.capsule->seal_post(*match)){
                 e.tick_pairs[index].comparison=cpu_restore.capsule->comparison();
                 return cpu_corrected_error(0x51cu,"corrected baseline CPU seal refused");}
@@ -281,6 +352,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
     }
     if(command>=43&&command<=49){
         const unsigned index=command-43u;
+        if(index>=span)return cpu_corrected_error(0x524u,"correction command exceeds selected span");
         if(c.phase!=C::Correcting||index!=c.corrected_steps||cpu_boundary()||
            !cpu_seven_safe(e.pre_frame+index)||!cpu_corrected_reuse_live(e.pre_frame+index)||
            !cpu_corrected_interval())
@@ -301,7 +373,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
            !cpu_corrected_interval()||!cpu_seven_live_equals(e.diagnostics[7])||!cpu_corrected_diag(8u+index))
             return cpu_corrected_error(0x526u,"corrected no-draw source boundary refused");
         e.replay_step_no_draw_mask|=1u<<index;++c.corrected_steps;
-        if(index==6){
+        if(index+1u==span){
             if(!cpu_restore.capsule->finish_corrected(*match)){
                 pair.comparison=cpu_restore.capsule->comparison();
                 return cpu_corrected_error(0x527u,"corrected local endpoint seal refused");}
@@ -349,6 +421,10 @@ uint32_t cpu_corrected_execute(uint32_t command){
         reuse_evidence.active_capsules=0;
         ++reuse_evidence.windows_retired;
         cpu_corrected_reuse.previous_post_frame=post_frame;
+        if(cpu_corrected_reuse.loop_mode){
+            cpu_corrected_reuse.span_selected=false;
+            cpu_corrected_reuse.selected_span=0;
+        }
         c.~CpuCorrectedControl();::new(static_cast<void*>(&c)) CpuCorrectedControl{};
         cpu_restore.configured_statics.reset();
         cpu_restore.state=CpuRestoreControl::Idle;
@@ -413,7 +489,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_reuse_
     const auto& metadata=cpu_corrected_reuse_evidence;
     if(!cpu_corrected_reuse_metadata_header_valid()||metadata.windows_captured||metadata.windows_retired||metadata.active_capsules||
        metadata.max_active_capsules||metadata.window_first_sample||metadata.window_pre_frame||
-       metadata.window_post_frame||metadata.reserved)
+       metadata.window_post_frame||metadata.window_span)
         return 0x542u;
     cpu_corrected_reuse.enabled=true;
     cpu_corrected_reuse.session=match.get();
@@ -425,6 +501,52 @@ extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_reu
     return &cpu_corrected_reuse_evidence;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_reuse_evidence_bytes(){
+    return sizeof(cpu_corrected_reuse_evidence);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_enable(uint32_t schema){
+    if(schema!=3u)return 0x543u;
+    const uint32_t result=melee_web_synctest_cpu_corrected_reuse_enable();
+    if(result)return result;
+    cpu_corrected_reuse.loop_mode=true;
+    cpu_corrected_reuse.profile_owner=rng_profile_gobj;
+    cpu_corrected_reuse.configured_seed=configured_source_seed;
+    cpu_corrected_reuse.initializer=native_initializer_enabled;
+    cpu_corrected_reuse.profile=rng_profile_enabled;
+    cpu_corrected_reuse_evidence.schema=3;
+    return 0;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_select_span(uint32_t span){
+    auto& reuse=cpu_corrected_reuse;
+    if(span<1u||span>7u||!reuse.enabled||!reuse.loop_mode||reuse.span_selected||
+       cpu_corrected.phase!=CpuCorrectedControl::Idle||cpu_corrected.active||
+       cpu_corrected.reader.active()||cpu_restore.inflight||
+       cpu_restore.state!=CpuRestoreControl::Configured||!cpu_restore.configured_statics||
+       cpu_restore.first_failure||cpu_restore.capsule||cpu_restore.two_active||cpu_restore.seven_active||
+       cpu_restore.close_requested||payload_admission_close_requested||payload_admission_shutdown_requested||
+       payload_admission_runtime_boundary()!=0||payload_admission_boundary(false)!=0||
+       payload_admission_boundary(true)!=0||!cpu_corrected_reuse_metadata_header_valid())
+        return 0x544u;
+    const uint32_t frame=match?match->source_frames():UINT32_MAX;
+    if(!match||frame!=observation.frame||frame>UINT32_MAX-span||
+       !cpu_corrected_loop_interactive_safe(frame))return 0x545u;
+    const auto owners=match->diagnostic_cpu_owners();
+    if(match.get()!=reuse.session||!cpu_corrected_same_owner(owners,reuse.owners)||
+       owners.frame!=frame||rng_profile_gobj!=reuse.profile_owner||
+       configured_source_seed!=reuse.configured_seed||
+       native_initializer_enabled!=reuse.initializer||rng_profile_enabled!=reuse.profile||
+       (reuse.origin_set&&(frame!=reuse.previous_post_frame||!cpu_corrected_reuse_live(frame)))||
+       (!reuse.origin_set&&(cpu_corrected_reuse_evidence.windows_captured||
+          cpu_corrected_reuse_evidence.windows_retired||cpu_corrected_reuse_evidence.active_capsules||
+          cpu_corrected_reuse_evidence.max_active_capsules)))
+        return 0x545u;
+    reuse.selected_span=span;reuse.span_selected=true;
+    cpu_corrected_reuse_evidence.window_span=span;
+    return 0;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loop_evidence(){
+    return &cpu_corrected_reuse_evidence;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_evidence_bytes(){
     return sizeof(cpu_corrected_reuse_evidence);
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_evidence(){

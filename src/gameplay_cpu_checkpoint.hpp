@@ -31,6 +31,11 @@ public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+    /* Private reusable-loop entry point. The legacy enum API above retains its
+     * historical 1/2/7 whitelist; this checked path admits actual spans 1..7. */
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_span(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&,std::uint32_t span) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
@@ -64,8 +69,13 @@ private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
                        Finished, Failed, ConfirmedDetached, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
-    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
-    const CpuCheckpointSpan span_;
+    explicit GameplayCpuCheckpoint(std::uint32_t span):span_(span){}
+    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span)
+        :GameplayCpuCheckpoint(static_cast<std::uint32_t>(span)){}
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable) noexcept;
+    const std::uint32_t span_;
     bool same_owner(const GameplayMatchSession&) const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);

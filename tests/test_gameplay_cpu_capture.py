@@ -48,6 +48,9 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         diag=header[header.index('enum class CpuCaptureRefusal'):header.index('class GameplayCpuCheckpoint final')]
         generated=source('tests/cpu_capture_refusal_control.cpp.in')
         capture=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(')
+        capture_span=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(')
+        capture_checked=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(')
+        capture='\n'.join((capture,capture_span,capture_checked))
         capture=capture.replace('slippi_particle_presentation_anchor_capture','fixture_particle_anchor_capture')
         capture=capture.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
         restore=function(src,'GameplayCpuCommitResult GameplayCpuCheckpoint::restore(')

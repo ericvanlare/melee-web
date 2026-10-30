@@ -929,7 +929,7 @@ function compareParticleRows(leftRows,rightRows,label,{includeReceiptSerial=fals
   }
 }
 
-function compareEndpointWithLocalParticleSerial(left,right) {
+function compareEndpointWithLocalParticleSerial(left,right,{allowReferenceReference=false}={}) {
   const a=rawParticleEndpoint(left),b=rawParticleEndpoint(right);
   validateCpuEndpointEnvelope(a);validateCpuEndpointEnvelope(b);
   if(a.view!==b.view)fail('comparison views differ');
@@ -937,8 +937,12 @@ function compareEndpointWithLocalParticleSerial(left,right) {
     if(a.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre||b.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre)
       fail('PRE comparison requires SharedPre on both instances');
   }else if(a.view===CPU_ENDPOINT_VIEW.cpuEnd||a.view===CPU_ENDPOINT_VIEW.drawEnd){
-    if(a.provenance!==CPU_ENDPOINT_PROVENANCE.reference||b.provenance!==CPU_ENDPOINT_PROVENANCE.corrected)
-      fail('CPU/DRAW comparison requires Reference then Corrected');
+    const correctedPair=a.provenance===CPU_ENDPOINT_PROVENANCE.reference&&b.provenance===CPU_ENDPOINT_PROVENANCE.corrected;
+    const referencePair=allowReferenceReference&&a.provenance===CPU_ENDPOINT_PROVENANCE.reference&&
+      b.provenance===CPU_ENDPOINT_PROVENANCE.reference;
+    if(!correctedPair&&!referencePair)
+      fail(allowReferenceReference?'CPU/DRAW comparison requires Reference/Reference or Reference/Corrected':
+        'CPU/DRAW comparison requires Reference then Corrected');
   }else fail(`unknown comparison view ${a.view}`);
   if(a.sourceFrame!==b.sourceFrame)fail('source-frame stamps differ');
   for(let di=0;di<9;di++){
@@ -992,9 +996,10 @@ export function validateCpuParticleEndpointAgainstPre(current,pre) {
 }
 
 /** Two-page v2 comparison; local receipt counters authenticate membership but are not identity keys. */
-export function compareCpuParticleEndpoints(left,right,{preLeft=null,preRight=null}={}) {
+function compareCpuParticleEndpointsInternal(left,right,{preLeft=null,preRight=null,
+  allowReferenceReference=false}={}) {
   decodeCpuParticleEndpointResult(left);decodeCpuParticleEndpointResult(right);
-  compareEndpointWithLocalParticleSerial(left,right);
+  compareEndpointWithLocalParticleSerial(left,right,{allowReferenceReference});
   const a=left.particleCells,b=right.particleCells;
   const localA=validateParticleRows(left,particleAnchorFields(readParticleAnchor(rawParticleEndpoint(left))));
   const localB=validateParticleRows(right,particleAnchorFields(readParticleAnchor(rawParticleEndpoint(right))));
@@ -1023,4 +1028,21 @@ export function compareCpuParticleEndpoints(left,right,{preLeft=null,preRight=nu
   }
   return {equal:true,view:left.view,sourceFrame:left.sourceFrame,domains:9,
     particleCells:{live:a.liveCount,captured:a.capturedCount,incarnationRelations:particleIdentityRelation(left).length}};
+}
+
+export function compareCpuParticleEndpoints(left,right,{preLeft=null,preRight=null}={}) {
+  return compareCpuParticleEndpointsInternal(left,right,{preLeft,preRight});
+}
+
+/** Strict independent-page comparison for two confirmed reference endpoints. */
+export function compareCpuReferenceParticleEndpoints(left,right,{preLeft=null,preRight=null}={}) {
+  decodeCpuParticleEndpointResult(left);decodeCpuParticleEndpointResult(right);
+  if(left.view===CPU_ENDPOINT_VIEW.pre){
+    if(left.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre||
+       right.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre)
+      fail('confirmed PRE comparison requires SharedPre on both instances');
+  }else if(left.provenance!==CPU_ENDPOINT_PROVENANCE.reference||
+           right.provenance!==CPU_ENDPOINT_PROVENANCE.reference)
+    fail('confirmed CPU/DRAW comparison requires Reference on both instances');
+  return compareCpuParticleEndpointsInternal(left,right,{preLeft,preRight,allowReferenceReference:true});
 }

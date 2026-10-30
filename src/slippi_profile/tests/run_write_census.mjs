@@ -7,6 +7,7 @@ import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_ti
 import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_SAMPLES} from './cpu_seven_tick_runner.mjs';
 import {runBrowserCpuCorrectedSeven} from './cpu_corrected_runner.mjs';
 import {runBrowserCpuCorrectedTwoWindow} from './cpu_corrected_two_window_runner.mjs';
+import {runBrowserCpuCorrectedLoop} from './cpu_corrected_loop_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -161,6 +162,7 @@ export function validateCpuRestoreRouteSelection(values) {
   const sevenTick = values['--aggregate-cpu-drawn-reference-seven-tick'] === true;
   const corrected = values['--correct-predicted-branch'] === true;
   const correctedTwoWindow = values['--correct-predicted-branch-two-window'] === true;
+  const correctedLoop = values['--correct-predicted-branch-loop'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
   const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
@@ -168,8 +170,8 @@ export function validateCpuRestoreRouteSelection(values) {
   if (sevenTick && !particle) {
     throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
   }
-  if ((corrected || correctedTwoWindow) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick route');
-  if (corrected && correctedTwoWindow) throw new Error('One-window and two-window correction routes are mutually exclusive');
+  if ((corrected || correctedTwoWindow || correctedLoop) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick-capable preparation route');
+  if (Number(corrected)+Number(correctedTwoWindow)+Number(correctedLoop)>1) throw new Error('One-window, two-window and reusable-loop correction routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
     throw new Error('The v19 TEV stage scratch lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
@@ -184,7 +186,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return correctedLoop ? 'independent-browser-correction-loop-v1' : correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
@@ -227,7 +229,7 @@ export function parseArgs(argv) {
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
     '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
     '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch',
-    '--correct-predicted-branch-two-window']);
+    '--correct-predicted-branch-two-window','--correct-predicted-branch-loop']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -238,7 +240,7 @@ export function parseArgs(argv) {
     }
     const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--correct-predicted-branch | --correct-predicted-branch-two-window] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--correct-predicted-branch | --correct-predicted-branch-two-window | --correct-predicted-branch-loop] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
     }
     values[key] = value;
     i += 2;
@@ -272,6 +274,41 @@ export function parseArgs(argv) {
 
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const fileSha = file => sha256(fs.readFileSync(file));
+
+// Each interval is copied once, before native retirement. A partial file is
+// retained on failure; the final name becomes visible only after a complete
+// write. Exclusive linking refuses to replace prior evidence at that index.
+export function createCpuIntervalEvidenceSink(outputDirectory) {
+  const directory=path.join(outputDirectory,'intervals');
+  fs.mkdirSync(directory);
+  return async (index,interval) => {
+    if(!Number.isSafeInteger(index)||index<0||index>0xffff_ffff)
+      throw new Error('CPU interval evidence index is invalid');
+    const name=`${String(index).padStart(4,'0')}-evidence.json`;
+    const final=path.join(directory,name),partial=`${final}.partial`;
+    const bytes=Buffer.from(`${JSON.stringify(interval)}\n`);
+    const fd=fs.openSync(partial,'wx');
+    try { fs.writeFileSync(fd,bytes);fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    fs.linkSync(partial,final);
+    fs.unlinkSync(partial);
+    return {path:`intervals/${name}`,sha256:sha256(bytes),bytes:bytes.length};
+  };
+}
+
+export function validateCpuLoopExports(value) {
+  if(!value||value.enable!==true||value.selectSpan!==true||
+     value.evidence!==true||value.evidenceBytes!==true)
+    throw new Error('Reusable-loop exports are unavailable for the linked private profile');
+  return value;
+}
+
+function readCpuLoopExportsInPage() {
+  const {module}=window.__slippiSynctest;
+  return {enable:typeof module._melee_web_synctest_cpu_corrected_loop_enable==='function',
+    selectSpan:typeof module._melee_web_synctest_cpu_corrected_loop_select_span==='function',
+    evidence:typeof module._melee_web_synctest_cpu_corrected_loop_evidence==='function',
+    evidenceBytes:typeof module._melee_web_synctest_cpu_corrected_loop_evidence_bytes==='function'};
+}
 function addPrefixSignature(hash, sample, result) {
   const index=Buffer.alloc(4);index.writeUInt32LE(sample,0);hash.update(index);
   for(const key of ['observation','pcm','pad','drawDiagnostics']){
@@ -322,6 +359,8 @@ function sourceHashes() {
     'src/slippi_profile/tests/cpu_corrected_adapter.inc',
     'src/slippi_profile/tests/cpu_corrected_runner.mjs',
     'src/slippi_profile/tests/cpu_corrected_two_window_runner.mjs',
+    'src/slippi_profile/tests/cpu_corrected_loop_runner.mjs',
+    'src/slippi_profile/tests/test_cpu_loop_census.mjs',
     'src/slippi_profile/tests/test_cpu_corrected_two_window_runner.mjs',
     'src/slippi_profile/tests/cpu_endpoint.mjs',
     'src/slippi_profile/tests/test_cpu_endpoint.mjs',
@@ -447,6 +486,7 @@ export function recordCpuRestoreFailure(report,error) {
   if(error.cpuSevenTickPredictedPartialReadError)report.execution.predictedInstanceProgressReadError=error.cpuSevenTickPredictedPartialReadError;
   if(error.cpuCorrectedPartial)report.execution.cpuCorrected=error.cpuCorrectedPartial;
   if(error.cpuCorrectedTwoWindowPartial)report.execution.correctedTwoWindow=error.cpuCorrectedTwoWindowPartial;
+  if(error.cpuCorrectedLoopPartial)report.execution.correctedLoop=error.cpuCorrectedLoopPartial;
   if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
   report.execution.cpuOuterValidation='failed';
   return report;
@@ -626,7 +666,8 @@ async function main() {
   const sevenTickDrawnReference=options['--aggregate-cpu-drawn-reference-seven-tick']===true;
   const correctedPrediction=options['--correct-predicted-branch']===true;
   const correctedTwoWindow=options['--correct-predicted-branch-two-window']===true;
-  const correctedRoute=correctedPrediction||correctedTwoWindow;
+  const correctedLoop=options['--correct-predicted-branch-loop']===true;
+  const correctedRoute=correctedPrediction||correctedTwoWindow||correctedLoop;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const particlePresentationCache=options['--slippi-particle-presentation-cache']===true;
@@ -766,7 +807,23 @@ async function main() {
         'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
     }
   }
+  if(correctedLoop){
+    report.schema='melee-web-independent-browser-correction-loop-component-v1';
+    report.statement='One continuing private match/input timeline uses confirmed and speculative intervals of one through seven ticks. Each interval compares all declared PRE/CPU/DRAW domains and raw lanes against an independent drawn instance; exact interval evidence is saved before confirmed retirement. This is bounded reusable ownership, not asynchronous rolling netcode or public-profile admission.';
+    report.execution={status:'incomplete',prefixSamples:300,correctedLoop:{status:'not-started'},
+      intervalEvidence:[],restorePerformed:'not-yet-observed'};
+    report.exclusions=['No #341 milestone closure','No asynchronous live packet delivery or relay match',
+      'No multiple simultaneous checkpoints or repeated restoration within one capsule',
+      'No whole-profile, vanilla, H1 or whole-session acceptance','No renderer/host allocator rewind',
+      'No #339 nonzero-history/drop workaround'];
+  }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
+  const intervalSink=correctedLoop?createCpuIntervalEvidenceSink(options['--out']):null;
+  const onIntervalEvidence=correctedLoop?async(index,interval)=>{
+    const receipt=await intervalSink(index,interval);
+    report.execution.intervalEvidence.push({index,...receipt});
+    writeReport();return receipt;
+  }:null;
   writeReport();
 
   let server = null, browserServer = null, browserProcess = null;
@@ -928,6 +985,11 @@ async function main() {
         sevenTickDrawnReference,sevenTickExports,predictedReuseExports);
       report.profile.correctedReuseExports={reference:correctedReuseExports,predicted:predictedReuseExports};
     }
+    if(correctedLoop){
+      report.profile.correctedLoopExports={
+        reference:validateCpuLoopExports(await page.evaluate(readCpuLoopExportsInPage)),
+        predicted:validateCpuLoopExports(await predictedPage.evaluate(readCpuLoopExportsInPage))};
+    }
     report.initialization = {
       exactProfileSeedAndInitializer: true,
       initializer,
@@ -1008,6 +1070,18 @@ async function main() {
         decodeDrawSource:decodeDrawDiagnostics.toString()};
       if(sevenTickDrawnReference){
         if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
+        if(correctedLoop){
+          const result=await runBrowserCpuCorrectedLoop(predictedPage,page,cpuWire,checkpoint,
+            expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,onIntervalEvidence);
+          report.execution={...report.execution,status:'completed',correctedLoop:result,restorePerformed:true,
+            scope:'bounded variable-span confirmed/speculative ownership with one capsule and a persistent timeline'};
+          report.cpuResult={referenceScreenshot:await screenshotRecord(page,options['--out'],'reference-final.png'),
+            correctedScreenshot:await screenshotRecord(predictedPage,options['--out'],'corrected-final.png')};
+          report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,
+            sourceStateManifestComplete:false,wasmAndMapBound:true,staticRows:cpuWire.length};
+          if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+          report.result='passed';writeReport();return;
+        }
         if(correctedTwoWindow){
           const result=await runBrowserCpuCorrectedTwoWindow(predictedPage,page,cpuWire,checkpoint,
             expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics);

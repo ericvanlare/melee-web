@@ -213,6 +213,7 @@ class GameplayCpuCheckpoint{public:
  static void* operator new(std::size_t n,const std::nothrow_t&) noexcept {if(capsule_alloc_failure)return nullptr;void* p=std::malloc(n);if(p){++live_capsules;max_live_capsules=std::max(max_live_capsules,live_capsules);}return p;}
  static void operator delete(void* p) noexcept {if(p){assert(live_capsules>0);--live_capsules;}std::free(p);}
  static std::unique_ptr<GameplayCpuCheckpoint> capture(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+ static std::unique_ptr<GameplayCpuCheckpoint> capture_span(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t) noexcept;
  ~GameplayCpuCheckpoint();
  const CpuComparison& comparison()const{return comparison_;}
  bool interval_boundary(const GameplayMatchSession&) noexcept;
@@ -246,8 +247,10 @@ class GameplayCpuCheckpoint{public:
  void disarm() noexcept;
  void release() noexcept;
 private:
- explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
- const CpuCheckpointSpan span_;
+ explicit GameplayCpuCheckpoint(std::uint32_t span):span_(span){}
+ explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):GameplayCpuCheckpoint(static_cast<std::uint32_t>(span)){}
+ static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool) noexcept;
+ const std::uint32_t span_;
  enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed,ConfirmedDetached,Retired};Phase phase_=Phase::Captured;
  bool same_owner(const GameplayMatchSession&)const{return !owner_missing&&fixture_particle_anchor_admit(commit_.particle_anchor);}
  using AudioRanges=std::array<int,16>;
@@ -437,6 +440,33 @@ int main(){
    }
    unchanged();
  }
+ for(std::uint32_t span=0;span<=8;++span){
+   if(span>=1u&&span<=7u)continue;
+   reset();CpuCaptureDiagnostic rejected;
+   assert(!GameplayCpuCheckpoint::capture_span(
+       session,std::make_unique<GameplayCpuStatics>(),rejected,span));
+   assert(rejected.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::InvalidSpan)&&count==0);
+   unchanged();
+ }
+ for(std::uint32_t span=1;span<=7;++span){
+   reset();CpuCaptureDiagnostic variable;
+   auto interval=GameplayCpuCheckpoint::capture_span(
+       session,std::make_unique<GameplayCpuStatics>(),variable,span);
+   assert(interval&&variable.comparison.status==0&&count==8&&created==6&&destroyed==0);
+   interval->fixture_recording();
+   assert(interval->interval_boundary(session));
+   live_frame+=span;
+   assert(interval->interval_boundary(session));
+   interval.reset();assert(created==destroyed&&static_destroys==1);
+ }
+ reset();live_frame=UINT32_MAX;CpuCaptureDiagnostic variable_wrap;
+ assert(!GameplayCpuCheckpoint::capture_span(
+     session,std::make_unique<GameplayCpuStatics>(),variable_wrap,1));
+ assert(variable_wrap.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::SourceFrameWrap)&&count==0);unchanged();
+ reset();live_frame=UINT32_MAX-7u;CpuCaptureDiagnostic variable_exact;
+ auto exact_loop_span=GameplayCpuCheckpoint::capture_span(
+     session,std::make_unique<GameplayCpuStatics>(),variable_exact,7);
+ assert(exact_loop_span&&variable_exact.comparison.status==0);exact_loop_span.reset();
  // Exercise the extracted restore body with counted commit/reset leaves. A
  // failed reset follows committed source writes, so the fixture must stay
  // terminal; it cannot undo or model the engine-side state transition.

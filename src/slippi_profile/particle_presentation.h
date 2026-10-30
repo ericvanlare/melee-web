@@ -135,11 +135,31 @@ static inline int slippi_particle_presentation_anchor_admit(
 static inline int slippi_particle_presentation_cell_endpoint_header(
     SlippiParticlePresentationAnchor anchor,
     SlippiParticleCellEndpointHeader* out)
-{ (void) anchor; if (out) *out = (SlippiParticleCellEndpointHeader){0}; return 0; }
+{
+    (void) anchor;
+    if (out) {
+#ifdef __cplusplus
+        *out = SlippiParticleCellEndpointHeader{};
+#else
+        *out = (SlippiParticleCellEndpointHeader){0};
+#endif
+    }
+    return 0;
+}
 static inline int slippi_particle_presentation_cell_endpoint_row(
     SlippiParticlePresentationAnchor anchor, uint32_t row_kind,
     uint32_t index, SlippiParticleCellEndpointRow* out)
-{ (void) anchor; (void) row_kind; (void) index; if (out) *out = (SlippiParticleCellEndpointRow){0}; return 0; }
+{
+    (void) anchor; (void) row_kind; (void) index;
+    if (out) {
+#ifdef __cplusplus
+        *out = SlippiParticleCellEndpointRow{};
+#else
+        *out = (SlippiParticleCellEndpointRow){0};
+#endif
+    }
+    return 0;
+}
 static inline void slippi_particle_presentation_anchor_disarm(
     SlippiParticlePresentationAnchor anchor)
 { (void) anchor; }

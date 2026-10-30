@@ -72,7 +72,7 @@ class GameplayCpuCorrectedReuseAdapterTests(OwnedWorkspaceTests):
         base=base.replace(idle_fixture,
             'if(pending_submission)return 1; if(require_idle)++idle_boundary_calls;')
         self.assertEqual(base.count('std::array<unsigned,16> tick_samples{}'),1)
-        base=base.replace('std::array<unsigned,16> tick_samples{}','std::array<unsigned,32> tick_samples{}')
+        base=base.replace('std::array<unsigned,16> tick_samples{}','std::array<unsigned,64> tick_samples{}')
         base=base.replace('command>31u','command>53u')
         split=base.index('extern "C" int melee_web_snapshot_step(unsigned sample) {')
         providers=base[split:]
@@ -97,7 +97,7 @@ class GameplayCpuCorrectedReuseAdapterTests(OwnedWorkspaceTests):
 '''
         providers=providers[:raw_start]+raw_step+providers[raw_end:]
         self.assertEqual(providers.count('cpu_corrected_active())?8u:'),1)
-        providers=providers.replace('cpu_corrected_active())?8u:', 'cpu_corrected_active())?24u:')
+        providers=providers.replace('cpu_corrected_active())?8u:', 'cpu_corrected_active())?46u:')
         base=base[:split]+providers
         template=REPO_ROOT/'tests/cpu_corrected_reuse_adapter_control.cpp.in'
         generated=template.read_text().replace('@BASE_CONTROL@',base)

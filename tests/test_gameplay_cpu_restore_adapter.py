@@ -49,6 +49,8 @@ class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_span(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool interval_boundary(const GameplayMatchSession&) noexcept;
@@ -70,8 +72,11 @@ public:
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
 private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Finished, Failed, Retired };
-    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span) {}
-    const CpuCheckpointSpan span_;
+    explicit GameplayCpuCheckpoint(std::uint32_t span):span_(span) {}
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_range(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,
+        std::uint32_t,bool) noexcept;
+    const std::uint32_t span_;
     std::unique_ptr<GameplayCpuStatics> statics_;
     GameplayCpuCommitOwners commit_{};
     MeleeWebActionInterval* actions_{};

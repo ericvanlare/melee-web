@@ -234,7 +234,23 @@ GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,
     std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
+    return capture_range(session,std::move(statics),diagnostic,static_cast<std::uint32_t>(span),false);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(
+    const GameplayMatchSession& session,
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,std::uint32_t span) noexcept {
+    return capture_range(session,std::move(statics),diagnostic,span,true);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_range(
+    const GameplayMatchSession& session,
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool variable) noexcept {
     diagnostic={};
+    if((variable&&(span<1u||span>7u))||
+       (!variable&&span!=1u&&span!=2u&&span!=7u)){
+        diagnostic.comparison={1,1,UINT32_MAX,UINT32_MAX,0,0,0,0,10u};
+        std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture CPU span refused");
+        return {};
+    }
     if(fail_capture){diagnostic.comparison={7,1,UINT32_MAX,UINT32_MAX,0,0,0,0,5};
         std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture bootstrap capture refusal");return {};}
     if(!statics||!statics->capture()) return {};

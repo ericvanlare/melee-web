@@ -130,7 +130,7 @@ export function planCpuSevenTickCorrection(timeline, baselineRows, localPort, re
     remoteContiguousThrough: state.remote_contiguous_through, replay, frames, remoteRows};
 }
 
-export function decodeCpuSevenTickEvidence(bytes, expectedSchema = 1) {
+export function decodeCpuSevenTickEvidence(bytes, expectedSchema = 1, expectedMode = 7) {
   const size = CPU_SEVEN_TICK_EVIDENCE_BYTES, pairSize = CPU_SEVEN_TICK_PAIR_BYTES;
   const diagnosticStride = CPU_SEVEN_TICK_DIAGNOSTIC_BYTES;
   const diagnosticOffset = 91400;
@@ -138,11 +138,18 @@ export function decodeCpuSevenTickEvidence(bytes, expectedSchema = 1) {
     throw new Error('Seven-tick evidence extent');
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u32 = offset => view.getUint32(offset, true);
-  if (![1,2].includes(expectedSchema) || u32(0) !== expectedSchema || u32(4) !== size || u32(8) !== 7)
+  const modeValid = expectedSchema === 3 ? Number.isInteger(expectedMode) && expectedMode >= 1 && expectedMode <= 7 : expectedMode === 7;
+  if (![1,2,3].includes(expectedSchema) || !modeValid || u32(0) !== expectedSchema ||
+      u32(4) !== size || u32(8) !== expectedMode)
     throw new Error('Seven-tick evidence schema/mode');
   const b64 = value => encode(value);
-  const decodePair = offset => {
+  const decodePair = (offset,index,drawn=false) => {
     const raw = bytes.slice(offset, offset + pairSize), row = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
+    if(expectedSchema===3&&!drawn&&index>=expectedMode){
+      if(!raw.every(value=>value===0))
+        throw new Error(`Corrected loop unused raw-pair slot ${index} is not reset`);
+      return {bytes:pairSize,schema:0,declaredBytes:0,unused:true,base64:b64(raw)};
+    }
     if (row.getUint32(0, true) !== 1 || row.getUint32(4, true) !== pairSize)
       throw new Error('Seven-tick raw-pair schema/bytes');
     const read = (start, count) => b64(raw.slice(start, start + count));
@@ -166,17 +173,26 @@ export function decodeCpuSevenTickEvidence(bytes, expectedSchema = 1) {
   const diagnosticMask = u32(56);
   if ((diagnosticMask & ~0xffff) !== 0) throw new Error('Seven-tick diagnostic mask contains unknown slots');
   const diagnostics = Array.from({length:16}, (_, index) => {
-    if (!(diagnosticMask & (1 << index))) return null;
     const raw = bytes.slice(diagnosticOffset + index * diagnosticStride,
       diagnosticOffset + (index + 1) * diagnosticStride);
+    if (!(diagnosticMask & (1 << index))) {
+      if(expectedSchema===3&&!raw.every(value=>value===0))
+        throw new Error(`Corrected loop unused diagnostic slot ${index} is not reset`);
+      return null;
+    }
     return {index, bytes: diagnosticStride, base64: b64(raw)};
   });
   return {schema:u32(0), bytes:u32(4), mode:u32(8), state:u32(12), firstFailure:u32(16),
     preFrame:u32(20), postFrame:u32(24), commitResult:u32(28), cpuEquality:u32(32), drawnEquality:u32(36),
     checkedCpu:u32(40), matchedCpu:u32(44), checkedDrawn:u32(48), matchedDrawn:u32(52), diagnosticMask,
     lastCommand:u32(60), baselineStepNoDrawMask:u32(64), replayStepNoDrawMask:u32(68),
-    tickPairs:Array.from({length:7}, (_, index) => decodePair(72 + index * pairSize)),
-    drawnPair:decodePair(79984), diagnostics, base64:b64(bytes)};
+    tickPairs:Array.from({length:7}, (_, index) => decodePair(72 + index * pairSize,index)),
+    drawnPair:decodePair(79984,7,true), diagnostics, base64:b64(bytes)};
+}
+
+export function decodeCpuCorrectedLoopEvidence(bytes,span){
+  if(!Number.isInteger(span)||span<1||span>7)throw new Error('Corrected loop span must be 1..7');
+  return decodeCpuSevenTickEvidence(bytes,3,span);
 }
 
 export function validateCpuSevenTickFinalEvidence(evidence, checkpointSourceFrame) {

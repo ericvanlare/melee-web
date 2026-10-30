@@ -8,7 +8,7 @@ import {
   CPU_ENDPOINT_LAYOUT, CPU_ENDPOINT_PROVENANCE,
   CPU_ENDPOINT_RECORD_BYTES, CPU_ENDPOINT_STATUS, CPU_ENDPOINT_VIEW,
   collectCpuEndpointInPage, compareCpuEndpoints, decodeCpuEndpointResult,
-  decodeCpuParticleEndpointResult, compareCpuParticleEndpoints,
+  decodeCpuParticleEndpointResult, compareCpuParticleEndpoints, compareCpuReferenceParticleEndpoints,
   validateCpuParticleEndpointAgainstPre,
 } from './cpu_endpoint.mjs';
 
@@ -425,4 +425,27 @@ test('particle sidecar is synchronous, exact, joined to payload generations, and
   const refusedRow=makeFixture();installParticleSidecar(refusedRow,{rowStatuses:new Map([['1/0',5]])});
   await assert.rejects(()=>collectParticle(refusedRow),/particle row 1\[0\] refused with status 5/);
   assert.equal(refusedRow.calls.at(-1)[0],'end');
+});
+
+
+test('confirmed reference/reference comparison is explicit and preserves strict nine-domain typed proof',async()=>{
+  const make=async(view,provenance)=>{
+    const fixture=makeFixture({view,provenance});installParticleSidecar(fixture);
+    return collectParticle(fixture,view,provenance);
+  };
+  const preLeft=await make(1,1),preRight=await make(1,1);
+  for(const view of [2,3]){
+    const left=await make(view,2),right=await make(view,2);
+    assert.throws(()=>compareCpuParticleEndpoints(left,right,{preLeft,preRight}),/Reference then Corrected/);
+    assert.throws(()=>compareCpuParticleEndpoints(left,right,{preLeft,preRight,allowReferenceReference:true}),
+      /Reference then Corrected/);
+    assert.equal(compareCpuReferenceParticleEndpoints(left,right,{preLeft,preRight}).domains,9);
+    assert.throws(()=>compareCpuReferenceParticleEndpoints(left,right),/requires both captured PRE/);
+    const changed=structuredClone(right);
+    changed.domains[0].records[0].fields[0]='123';
+    assert.throws(()=>compareCpuReferenceParticleEndpoints(left,changed,{preLeft,preRight}));
+    const corrected=await make(view,3);
+    assert.throws(()=>compareCpuReferenceParticleEndpoints(left,corrected,{preLeft,preRight}),/Reference/);
+    assert.equal(compareCpuParticleEndpoints(left,corrected,{preLeft,preRight}).domains,9);
+  }
 });

@@ -100,6 +100,13 @@ export async function operateCorrectedInPage(plan){
       throw new Error('Corrected reuse evidence size drift');
     return encode(read(module._melee_web_synctest_cpu_corrected_reuse_evidence(),40));
   };
+  const readLoopEvidence=()=>{
+    if(typeof module._melee_web_synctest_cpu_corrected_loop_evidence_bytes!=='function'||
+       typeof module._melee_web_synctest_cpu_corrected_loop_evidence!=='function'||
+       module._melee_web_synctest_cpu_corrected_loop_evidence_bytes()!==40)
+      throw new Error('Corrected loop evidence size drift');
+    return encode(read(module._melee_web_synctest_cpu_corrected_loop_evidence(),40));
+  };
   try{
     if(typeof SharedArrayBuffer!=='undefined'&&module.HEAPU8.buffer instanceof SharedArrayBuffer)
       throw new Error('Corrected route refuses shared Wasm memory');
@@ -108,6 +115,13 @@ export async function operateCorrectedInPage(plan){
         throw new Error('Corrected reuse enable export is unavailable');
       const result=module._melee_web_synctest_cpu_corrected_reuse_enable();
       progress.reuseEnableResult=result;if(result!==0)throw new Error(`Corrected reuse enable refused ${result}`);
+    }
+    if(plan.loopEnableSchema!==undefined){
+      if(typeof module._melee_web_synctest_cpu_corrected_loop_enable!=='function')
+        throw new Error('Corrected loop enable export is unavailable');
+      const result=module._melee_web_synctest_cpu_corrected_loop_enable(plan.loopEnableSchema);
+      progress.loopEnableResult=result;
+      if(result!==0)throw new Error(`Corrected loop enable refused ${result}`);
     }
     if(plan.wire){
       const wire=new Uint8Array(plan.wire.length*16),view=new DataView(wire.buffer);
@@ -118,6 +132,13 @@ export async function operateCorrectedInPage(plan){
         const result=module._melee_web_synctest_cpu_restore_configure(pointer,plan.wire.length);
         progress.configurationResult=result;if(result!==0)throw new Error(`CPU configuration refused ${result}`);
       }finally{module._free(pointer);}
+    }
+    if(plan.selectSpan!==undefined){
+      if(typeof module._melee_web_synctest_cpu_corrected_loop_select_span!=='function')
+        throw new Error('Corrected loop span export is unavailable');
+      const result=module._melee_web_synctest_cpu_corrected_loop_select_span(plan.selectSpan);
+      progress.spanResult=result;
+      if(result!==0)throw new Error(`Corrected loop span ${plan.selectSpan} refused ${result}`);
     }
     if(plan.pad!==undefined){
       const pad=Uint8Array.from(atob(plan.pad),value=>value.charCodeAt(0));
@@ -131,6 +152,11 @@ export async function operateCorrectedInPage(plan){
     if(entry.result!==0)throw new Error(`Corrected command ${plan.command} refused ${entry.result}: `+
       module.UTF8ToString(module._melee_web_snapshot_error()));
     if(plan.command===53){
+      if(plan.readLoopEvidence){
+        entry.loopEvidenceBase64=readLoopEvidence();
+        progress.loopEvidenceBase64=entry.loopEvidenceBase64;
+        return {loopEvidenceBase64:entry.loopEvidenceBase64};
+      }
       entry.reuseEvidenceBase64=readReuseEvidence();
       progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
       return {reuseEvidenceBase64:entry.reuseEvidenceBase64};
@@ -139,6 +165,10 @@ export async function operateCorrectedInPage(plan){
     if(plan.readReuseEvidence){
       entry.reuseEvidenceBase64=readReuseEvidence();
       progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
+    }
+    if(plan.readLoopEvidence){
+      entry.loopEvidenceBase64=readLoopEvidence();
+      progress.loopEvidenceBase64=entry.loopEvidenceBase64;
     }
     let status=null;
     if(plan.draw){
@@ -155,7 +185,8 @@ export async function operateCorrectedInPage(plan){
       slotCount:decodeDraw(draw).slotCount,expectedInputMapping:plan.mapping,expectedStocks:plan.stocks});
     if(!boundary.interactive)throw new Error(`Corrected route lost interactive boundary: ${JSON.stringify(boundary.refusalReasons)}`);
     return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64:encode(draw),boundary,status,
-      reuseEvidenceBase64:entry.reuseEvidenceBase64??null};
+      reuseEvidenceBase64:entry.reuseEvidenceBase64??null,
+      loopEvidenceBase64:entry.loopEvidenceBase64??null};
   }catch(error){
     entry.error=String(error);progress.status='failed';
     try{progress.nativeEvidenceBase64=readEvidence();}catch(readError){progress.readError=String(readError);}

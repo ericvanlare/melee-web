@@ -37,6 +37,8 @@ bool GameplayCpuEndpointReader::revalidate() noexcept {bool prior=active_;active
 }
 
 namespace {
+void retire_success(unsigned expected_windows,unsigned destroys_before);
+void close_retained_capsule();
 void new_page(){
     cpu_corrected.~CpuCorrectedControl();
     ::new(static_cast<void*>(&cpu_corrected)) CpuCorrectedControl{};
@@ -52,6 +54,19 @@ void enable_reuse(){
     check(melee_web_synctest_cpu_corrected_reuse_evidence_bytes()==40,"Reuse evidence ABI changed");
     check(melee_web_synctest_cpu_corrected_reuse_enable()!=0&&cpu_corrected_reuse.enabled,
           "Reuse enable was accepted more than once");
+}
+void enable_loop(){
+    check(melee_web_synctest_cpu_corrected_loop_enable(3)==0,
+          "Corrected loop schema3 enable refused on a clean page");
+    check(cpu_corrected_reuse.enabled&&cpu_corrected_reuse.loop_mode&&cpu_corrected_active()&&
+          melee_web_synctest_cpu_corrected_loop_evidence_bytes()==40,
+          "Loop route did not use the versioned 40-byte reuse counter ABI");
+    const auto* metadata=static_cast<const CpuCorrectedReuseEvidence*>(
+        melee_web_synctest_cpu_corrected_loop_evidence());
+    check(metadata&&metadata->schema==3&&metadata->bytes==40&&metadata->window_span==0,
+          "Loop metadata did not start as schema3 with no selected span");
+    check(melee_web_synctest_cpu_corrected_loop_enable(3)!=0,
+          "Corrected loop enable was accepted twice");
 }
 void configure_and_capture(uint32_t expected_sample,uint32_t expected_pre,unsigned expected_captures=1){
     check(configure_valid(),"Corrected reuse configuration refused");
@@ -105,6 +120,205 @@ void final_corrected_present(unsigned draw_count){
     check(melee_web_synctest_cpu_corrected_command(51)==0&&
           cpu_corrected.phase==CpuCorrectedControl::CorrectedReady,
           "Corrected final draw idle was refused");
+}
+template<class T> bool bytes_all_zero(const T& value){
+    const auto* p=reinterpret_cast<const unsigned char*>(&value);
+    for(std::size_t i=0;i<sizeof(T);++i)if(p[i])return false;
+    return true;
+}
+void loop_configure_capture(unsigned span,uint32_t expected_sample,uint32_t expected_pre,
+                            unsigned expected_captures,unsigned expected_retired){
+    check(configure_valid(),"Corrected loop configuration refused");
+    check(melee_web_synctest_cpu_corrected_loop_select_span(span)==0,
+          "Corrected loop span selection refused after wire configuration");
+    const auto* metadata=static_cast<const CpuCorrectedReuseEvidence*>(
+        melee_web_synctest_cpu_corrected_loop_evidence());
+    check(metadata&&metadata->schema==3&&metadata->bytes==40&&metadata->window_span==span,
+          "Selected variable span was not explicit in loop metadata");
+    check(melee_web_synctest_cpu_corrected_command(32)==0,
+          "Corrected variable-span capture refused");
+    const auto& evidence=cpu_corrected.evidence;
+    check(evidence.schema==3&&evidence.bytes==93512&&evidence.mode==span&&
+          evidence.pre_frame==expected_pre&&evidence.post_frame==expected_pre+span,
+          "Schema3 evidence did not describe the selected span");
+    check(metadata->windows_captured==expected_captures&&metadata->windows_retired==expected_retired&&
+          metadata->active_capsules==1&&metadata->max_active_capsules==1&&
+          metadata->window_first_sample==expected_sample&&metadata->window_pre_frame==expected_pre&&
+          metadata->window_post_frame==expected_pre+span&&metadata->window_span==span,
+          "Loop capture counters/cursor/span were not published exactly");
+    check(evidence.diagnostic_mask==1u,
+          "Loop capture did not expose only the capture diagnostic slot");
+    for(unsigned i=1;i<16;++i)
+        check(bytes_all_zero(evidence.diagnostics[i]),
+              "Unused loop capture diagnostic slot was not zero");
+    for(unsigned i=span;i<7;++i)
+        check(bytes_all_zero(evidence.tick_pairs[i]),"Unused schema3 tick row was not zero");
+    for(unsigned i=0;i<span;++i)
+        check(evidence.tick_pairs[i].pre_frame==expected_pre+i&&
+              evidence.tick_pairs[i].post_frame==expected_pre+i+1u,
+              "Active schema3 tick row did not map one literal source tick");
+}
+void loop_baseline(unsigned span,unsigned tick_start,unsigned draw_start){
+    const uint32_t pre=cpu_corrected.evidence.pre_frame;
+    for(unsigned i=0;i<span;++i){
+        pending_submission=false;
+        const unsigned expected_draws=draw_start+std::min(i+1u,span-1u);
+        check(melee_web_synctest_cpu_corrected_command(33+i)==0&&
+              tick_calls==tick_start+i+1&&draw_calls==expected_draws&&
+              match->source_frames()==pre+i+1,
+              "Variable-span baseline step/draw order changed");
+    }
+    check(cpu_corrected.phase==CpuCorrectedControl::BaselineCpuEnd&&
+          draw_calls==draw_start+span-1u&&!pending_submission&&
+          cpu_corrected.evidence.baseline_step_no_draw_mask==((1u<<span)-1u),
+          "Variable-span baseline did not seal at the selected endpoint");
+}
+void loop_baseline_present(unsigned draw_start){
+    check(melee_web_synctest_cpu_corrected_command(40)==0&&pending_submission&&
+          draw_calls==draw_start+1,"Variable-span final baseline draw was not submitted");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_corrected_command(41)==0&&
+          cpu_corrected.phase==CpuCorrectedControl::BaselineReady&&
+          (cpu_corrected.evidence.diagnostic_mask&(1u<<7)),
+          "Variable-span final baseline draw did not become idle");
+}
+void loop_correct(unsigned span,unsigned tick_start,unsigned draw_count){
+    const uint32_t pre=cpu_corrected.evidence.pre_frame;
+    check(melee_web_synctest_cpu_corrected_command(42)==0&&match->source_frames()==pre,
+          "Variable-span corrective restore lost its source cursor");
+    for(unsigned i=0;i<span;++i)
+        check(melee_web_synctest_cpu_corrected_command(43+i)==0&&
+              tick_calls==tick_start+i+1&&draw_calls==draw_count&&
+              match->source_frames()==pre+i+1&&!pending_submission,
+              "Variable-span corrective step drew or advanced incorrectly");
+    const uint32_t expected_mask=(1u<<span)-1u;
+    check(cpu_corrected.phase==CpuCorrectedControl::CorrectedCpuEnd&&
+          cpu_corrected.evidence.replay_step_no_draw_mask==expected_mask&&
+          !cpu_corrected.evidence.cpu_equality&&!cpu_corrected.evidence.drawn_equality,
+          "Variable-span correction asserted equality or used the wrong active slots");
+    for(unsigned i=span;i<7;++i)
+        check(bytes_all_zero(cpu_corrected.evidence.tick_pairs[i]),
+              "Unused corrected schema3 tick row was not zero");
+}
+void loop_corrected_present(unsigned draw_count){
+    check(melee_web_synctest_cpu_corrected_command(50)==0&&pending_submission&&
+          draw_calls==draw_count+1,"Corrected loop final present was not submitted");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_corrected_command(51)==0&&
+          cpu_corrected.phase==CpuCorrectedControl::CorrectedReady&&
+          (cpu_corrected.evidence.diagnostic_mask&(1u<<15)),
+          "Corrected loop final present did not become idle");
+}
+void loop_retire(unsigned expected_windows,unsigned expected_post){
+    check(melee_web_synctest_cpu_corrected_command(53)==0&&
+          !cpu_restore.capsule&&cpu_restore.state==CpuRestoreControl::Idle&&
+          cpu_corrected.phase==CpuCorrectedControl::Idle&&!cpu_corrected.active&&
+          match->source_frames()==expected_post,"Loop retirement did not release exactly one capsule");
+    const auto* metadata=static_cast<const CpuCorrectedReuseEvidence*>(
+        melee_web_synctest_cpu_corrected_loop_evidence());
+    check(metadata&&metadata->windows_captured==expected_windows&&
+          metadata->windows_retired==expected_windows&&metadata->active_capsules==0&&
+          metadata->max_active_capsules==1&&!cpu_corrected_reuse.span_selected&&
+          cpu_corrected_reuse.selected_span==0,
+          "Loop retirement counters/current-slot bound changed");
+}
+void verify_loop_variable_spans_and_repeated_recipe(){
+    new_page();enable_loop();
+    // Exercise all admitted spans in one continuing source owner.
+    uint32_t expected_frame=176,expected_sample=300;unsigned tick=0,draw=0;
+    for(unsigned span=1;span<=7;++span){
+        loop_configure_capture(span,expected_sample,expected_frame,span,span-1);
+        loop_baseline(span,tick,draw);tick+=span;draw+=span-1;
+        loop_baseline_present(draw);++draw;
+        loop_retire(span,expected_frame+span);
+        expected_frame+=span;expected_sample+=span;
+    }
+    check(tick_calls==28&&match->source_frames()==204&&tick_samples[0]==300&&
+          tick_samples[27]==327,"Span1..7 loop did not cover its 28 contiguous literal inputs");
+
+    // The browser recipe is eight consecutive owned capsules over samples300..343:
+    // corrected1, confirmed6, five confirmed7, corrected2.
+    new_page();enable_loop();tick=draw=0;expected_frame=176;expected_sample=300;
+    loop_configure_capture(1,expected_sample,expected_frame,1,0);
+    loop_baseline(1,tick,draw);++tick;loop_baseline_present(draw);++draw;
+    loop_correct(1,tick,draw);++tick;loop_corrected_present(draw);++draw;
+    loop_retire(1,177);expected_frame=177;++expected_sample;
+    loop_configure_capture(6,expected_sample,expected_frame,2,1);
+    loop_baseline(6,tick,draw);tick+=6;draw+=5;loop_baseline_present(draw);++draw;
+    loop_retire(2,expected_frame+6);expected_frame+=6;expected_sample+=6;
+    for(unsigned i=0;i<5;++i){
+        loop_configure_capture(7,expected_sample,expected_frame,3+i,2+i);
+        loop_baseline(7,tick,draw);tick+=7;draw+=6;
+        loop_baseline_present(draw);++draw;
+        loop_retire(3+i,expected_frame+7);expected_frame+=7;expected_sample+=7;
+    }
+    loop_configure_capture(2,expected_sample,expected_frame,8,7);
+    loop_baseline(2,tick,draw);tick+=2;draw+=1;loop_baseline_present(draw);++draw;
+    loop_correct(2,tick,draw);tick+=2;loop_corrected_present(draw);++draw;
+    loop_retire(8,expected_frame+2);expected_frame+=2;expected_sample+=2;
+    check(expected_frame==220&&expected_sample==344&&match->source_frames()==220&&
+          tick_calls==47&&draw_calls==46,
+          "Eight-capsule recipe did not retain 44 source ticks plus exactly three correction steps");
+    check(tick_samples[0]==300&&tick_samples[1]==300,
+          "First correction did not replay its literal source sample");
+    for(unsigned i=0;i<43;++i)check(tick_samples[2+i]==301+i,
+          "Eight-capsule recipe lost a contiguous authored sample");
+    check(tick_samples[45]==342&&tick_samples[46]==343,
+          "Final correction did not replay its exact two source samples");
+}
+void verify_loop_refusals_and_legacy_cap(){
+    new_page();enable_loop();check(configure_valid(),"Loop refusal configuration failed");
+    check(melee_web_synctest_cpu_corrected_loop_select_span(0)!=0&&
+          melee_web_synctest_cpu_corrected_loop_select_span(8)!=0&&
+          !cpu_corrected_reuse.span_selected&&cpu_corrected_reuse_evidence.window_span==0,
+          "Invalid loop span mutated the current slot");
+    check(melee_web_synctest_cpu_corrected_loop_select_span(1)==0&&
+          melee_web_synctest_cpu_corrected_loop_select_span(2)!=0&&
+          cpu_corrected_reuse_evidence.window_span==1,
+          "Span could be changed twice before capture");
+    check(melee_web_synctest_cpu_corrected_command(32)==0&&
+          melee_web_synctest_cpu_corrected_loop_select_span(2)!=0&&
+          cpu_corrected_reuse_evidence.window_span==1,
+          "Active capsule admitted a new span selection");
+    const unsigned before=tick_calls;
+    check(melee_web_synctest_cpu_corrected_command(33)==0&&tick_calls==before+1,
+          "One-tick baseline refused before selected-span guard");
+    const auto post=match->source_frames();
+    check(melee_web_synctest_cpu_corrected_command(34)!=0&&tick_calls==before+1&&
+          match->source_frames()==post,"Out-of-span command performed source work");
+    close_retained_capsule();
+
+    new_page();enable_loop();check(configure_valid(),"Loop wrap configuration failed");
+    match->set_source_frames(UINT32_MAX);observation.frame=UINT32_MAX;
+    check(melee_web_synctest_cpu_corrected_loop_select_span(1)!=0&&
+          !cpu_corrected_reuse.span_selected&&cpu_corrected_reuse_evidence.window_span==0,
+          "Loop selected a span that wraps the source frame");
+
+    new_page();enable_loop();
+    // Exercise the checked sample subtraction at its exact u32 limit using a
+    // synthetic cursor; this does not execute a source step or claim a match trace.
+    check(configure_valid(),"Loop sample-overflow configuration failed");
+    check(melee_web_synctest_cpu_corrected_loop_select_span(1)==0,
+          "Loop sample-overflow setup span refused");
+    check(melee_web_synctest_cpu_corrected_command(32)==0,"Loop sample-overflow setup capture refused");
+    loop_baseline(1,0,0);loop_baseline_present(0);loop_retire(1,177);
+    match->set_source_frames(UINT32_MAX);observation.frame=UINT32_MAX;
+    cpu_corrected_reuse.previous_post_frame=UINT32_MAX;
+    uint32_t sample=0;
+    check(!cpu_corrected_reuse_sample(UINT32_MAX,UINT32_MAX,sample)&&sample==0,
+          "Source-origin sample arithmetic accepted a u32 overflow");
+
+    // The historical schema1 route retains its two-capture ceiling.
+    new_page();enable_reuse();
+    configure_and_capture(300,176);baseline_steps(0,0);baseline_present(0);retire_success(1,0);
+    configure_and_capture(307,183,2);baseline_steps(7,7);baseline_present(7);retire_success(2,1);
+    check(configure_valid(),"Legacy two-capture limit configuration failed");
+    check(melee_web_synctest_cpu_corrected_command(32)!=0&&
+          cpu_corrected_reuse_evidence.windows_captured==2&&
+          cpu_corrected_reuse_evidence.windows_retired==2&&
+          cpu_corrected_reuse_evidence.active_capsules==0&&!cpu_restore.capsule,
+          "Historical two-capture reuse limit was removed");
+    close_retained_capsule();
 }
 void endpoint_batch(uint32_t view,uint32_t provenance){
     check(melee_web_synctest_cpu_endpoint_begin(view,provenance)==0&&cpu_restore.inflight,
@@ -222,6 +436,13 @@ void verify_two_windows_and_sample_trace(){
         }
         check(steps==1&&draws==1,"First-window trace lost a literal source/draw sample");
     }
+    bool final_draw_frame=false;
+    for(unsigned i=0;i<class_piece_trace_context_count;++i){
+        const auto& row=class_piece_trace_contexts[i];
+        final_draw_frame|=row.scope==MELEE_WEB_CLASS_PIECE_TRACE_DRAW&&row.command==40&&
+            row.sample==306&&row.frame==183;
+    }
+    check(final_draw_frame,"Legacy reuse final draw changed sample306 or its post-frame cursor");
     for(unsigned sample=311;sample<=317;++sample){
         unsigned steps=0,draws=0;
         for(unsigned i=0;i<class_piece_trace_context_count;++i){
@@ -270,7 +491,9 @@ int main(){try{
     verify_reader_idle_and_retirement_refusals();
     verify_two_windows_and_sample_trace();
     verify_same_session_and_backward_cursor_refusal();
-    std::puts("Corrected reuse adapter PASS: one retained capsule slot, checked retirement, same-page owner/cursor and source-derived traces; modeled checkpoint/source/idle leaves.");
+    verify_loop_variable_spans_and_repeated_recipe();
+    verify_loop_refusals_and_legacy_cap();
+    std::puts("Corrected reuse adapter PASS: legacy cap preserved; schema3 spans1..7, eight contiguous owned capsules, confirmed/corrected phases, checked overflow/selection and single-slot retirement; modeled checkpoint/source/idle leaves.");
     return 0;
 }catch(const std::exception& e){
     std::fprintf(stderr,"Corrected reuse adapter control: %s\n",e.what());return 1;
