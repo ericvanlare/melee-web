@@ -8,6 +8,7 @@
 #include "source_game_heap_context.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -580,6 +581,8 @@ struct MeleeWebSourceMemoryPayloadSnapshot {
     size_t allocated_count;
     size_t payload_bytes;
     size_t rows_offset;
+    size_t host_index_offset;
+    size_t source_index_offset;
     size_t free_offset;
     size_t allocated_offset;
     size_t payload_offset;
@@ -599,6 +602,8 @@ constexpr uint64_t kPayloadSnapshotMagic = UINT64_C(0x4d57535041594c44);
 
 struct PayloadSnapshotLayout {
     size_t rows_offset;
+    size_t host_index_offset;
+    size_t source_index_offset;
     size_t free_offset;
     size_t allocated_offset;
     size_t payload_offset;
@@ -636,6 +641,10 @@ bool payload_layout(size_t rows, size_t free_cells, size_t allocated_cells,
     PayloadSnapshotLayout value{};
     if (!append_aligned(rows, sizeof(HostAllocation), alignof(HostAllocation),
                         &cursor, &value.rows_offset) ||
+        !append_aligned(rows, sizeof(size_t), alignof(size_t),
+                        &cursor, &value.host_index_offset) ||
+        !append_aligned(rows, sizeof(size_t), alignof(size_t),
+                        &cursor, &value.source_index_offset) ||
         !append_aligned(free_cells, sizeof(melee_web::source::Cell),
                         alignof(melee_web::source::Cell), &cursor,
                         &value.free_offset) ||
@@ -672,6 +681,20 @@ bool overlaps(uintptr_t a_begin, uintptr_t a_end,
     return a_begin < b_end && b_begin < a_end;
 }
 
+bool validate_allocation_extents(const std::vector<HostAllocation>& rows)
+{
+    for (const auto& row : rows) {
+        uintptr_t host_end = 0;
+        uint64_t source_end = 0;
+        if (!host_interval(row.host, row.requested, &host_end) ||
+            !source_interval(row.source.value(), row.requested,
+                             &source_end) ||
+            !row.generation)
+            return false;
+    }
+    return true;
+}
+
 bool validate_live_allocations(const std::vector<HostAllocation>& rows)
 {
     for (size_t i = 0; i < rows.size(); ++i) {
@@ -700,6 +723,53 @@ bool validate_live_allocations(const std::vector<HostAllocation>& rows)
     return true;
 }
 
+bool validate_indexed_ranges(const HostAllocation* rows, size_t count,
+                             const size_t* host_indices,
+                             const size_t* source_indices)
+{
+    if (count && (!rows || !host_indices || !source_indices)) return false;
+    for (size_t i = 0; i < count; ++i) {
+        uintptr_t host_end = 0;
+        uint64_t source_end = 0;
+        if (!host_interval(rows[i].host, rows[i].requested, &host_end) ||
+            !source_interval(rows[i].source.value(), rows[i].requested,
+                             &source_end) ||
+            !rows[i].generation)
+            return false;
+    }
+    // Each index vector has exactly count slots. Bounds plus sorted positive
+    // non-overlapping intervals also reject duplicates and prove a permutation.
+    uintptr_t previous_host_end = 0;
+    uintptr_t previous_host_begin = 0;
+    for (size_t i = 0; i < count; ++i) {
+        const size_t index = host_indices[i];
+        if (index >= count) return false;
+        uintptr_t end = 0;
+        if (!host_interval(rows[index].host, rows[index].requested, &end))
+            return false;
+        if (i && (rows[index].host < previous_host_begin ||
+                  rows[index].host < previous_host_end))
+            return false;
+        previous_host_begin = rows[index].host;
+        previous_host_end = end;
+    }
+    uint64_t previous_source_end = 0;
+    uint32_t previous_source_begin = 0;
+    for (size_t i = 0; i < count; ++i) {
+        const size_t index = source_indices[i];
+        if (index >= count) return false;
+        uint64_t end = 0;
+        const uint32_t begin = rows[index].source.value();
+        if (!source_interval(begin, rows[index].requested, &end)) return false;
+        if (i && (begin < previous_source_begin ||
+                  uint64_t(begin) < previous_source_end))
+            return false;
+        previous_source_begin = begin;
+        previous_source_end = end;
+    }
+    return true;
+}
+
 bool host_ranges_overlap_allocations(uintptr_t begin, uintptr_t end,
                                      const std::vector<HostAllocation>& rows)
 {
@@ -718,6 +788,69 @@ const HostAllocation* payload_rows(
     return reinterpret_cast<const HostAllocation*>(
         reinterpret_cast<const unsigned char*>(snapshot) + snapshot->rows_offset);
 }
+
+const size_t* payload_host_indices(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return reinterpret_cast<const size_t*>(
+        reinterpret_cast<const unsigned char*>(snapshot) +
+        snapshot->host_index_offset);
+}
+
+const size_t* payload_source_indices(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return reinterpret_cast<const size_t*>(
+        reinterpret_cast<const unsigned char*>(snapshot) +
+        snapshot->source_index_offset);
+}
+
+#if defined(MELEE_WEB_SOURCE_MEMORY_TESTING)
+size_t* payload_host_indices(MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return reinterpret_cast<size_t*>(
+        reinterpret_cast<unsigned char*>(snapshot) + snapshot->host_index_offset);
+}
+
+size_t* payload_source_indices(MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return reinterpret_cast<size_t*>(
+        reinterpret_cast<unsigned char*>(snapshot) + snapshot->source_index_offset);
+}
+#endif
+
+bool payload_rows_match(const HostAllocation* saved_rows, size_t saved_count,
+                        const std::vector<HostAllocation>& current_rows)
+{
+    if (saved_count != current_rows.size()) return false;
+    for (size_t i = 0; i < saved_count; ++i) {
+        const auto& current = current_rows[i];
+        const auto& saved = saved_rows[i];
+        if (current.host != saved.host || current.requested != saved.requested ||
+            current.source != saved.source || current.generation != saved.generation)
+            return false;
+    }
+    return true;
+}
+
+bool validate_indexed_payload_ranges(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
+{
+    return validate_indexed_ranges(payload_rows(snapshot), snapshot->row_count,
+                                   payload_host_indices(snapshot),
+                                   payload_source_indices(snapshot));
+}
+
+#if defined(MELEE_WEB_SOURCE_MEMORY_TESTING)
+bool validate_indexed_payload_rows(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
+    const std::vector<HostAllocation>& current_rows)
+{
+    return payload_rows_match(payload_rows(snapshot), snapshot->row_count,
+                              current_rows) &&
+           validate_indexed_payload_ranges(snapshot);
+}
+#endif
 
 const melee_web::source::Cell* payload_free_cells(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot)
@@ -777,6 +910,8 @@ bool snapshot_layout_valid(
                         &expected))
         return false;
     if (snapshot->rows_offset != expected.rows_offset ||
+        snapshot->host_index_offset != expected.host_index_offset ||
+        snapshot->source_index_offset != expected.source_index_offset ||
         snapshot->free_offset != expected.free_offset ||
         snapshot->allocated_offset != expected.allocated_offset ||
         snapshot->payload_offset != expected.payload_offset ||
@@ -808,7 +943,10 @@ MeleeWebSourceMemoryPayloadSnapshotStatus payload_snapshot_check(
     const uintptr_t block_begin = reinterpret_cast<uintptr_t>(snapshot);
     if (!host_interval(block_begin, snapshot->block_bytes, &block_end))
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
-    if (!validate_live_allocations(allocations))
+    const bool rows_match = payload_rows_match(payload_rows(snapshot),
+                                               snapshot->row_count, allocations);
+    if (!(rows_match ? validate_indexed_payload_ranges(snapshot)
+              : validate_live_allocations(allocations)))
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
     if (host_ranges_overlap_allocations(block_begin, block_end, allocations))
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE;
@@ -816,14 +954,11 @@ MeleeWebSourceMemoryPayloadSnapshotStatus payload_snapshot_check(
         snapshot->watermark != next_generation ||
         snapshot->row_count != allocations.size())
         return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+    if (!rows_match)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
     size_t total = 0;
-    const auto* saved_rows = payload_rows(snapshot);
     for (size_t i = 0; i < allocations.size(); ++i) {
         const auto& current = allocations[i];
-        const auto& saved = saved_rows[i];
-        if (current.host != saved.host || current.requested != saved.requested ||
-            current.source != saved.source || current.generation != saved.generation)
-            return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
         if (current.requested > std::numeric_limits<size_t>::max() - total)
             return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
         total += current.requested;
@@ -1080,7 +1215,7 @@ melee_web_source_memory_payload_snapshot_capture(void)
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INACTIVE, nullptr};
     if (!healthy)
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_UNHEALTHY, nullptr};
-    if (!validate_live_allocations(allocations))
+    if (!validate_allocation_extents(allocations))
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE, nullptr};
 
     const auto& heap = source_address_heap->state();
@@ -1101,12 +1236,19 @@ melee_web_source_memory_payload_snapshot_capture(void)
     try {
         storage = ::operator new(layout.block_bytes);
     } catch (const std::bad_alloc&) {
+        if (!validate_live_allocations(allocations))
+            return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE,
+                    nullptr};
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED,
                 nullptr};
     }
-    if (!storage)
+    if (!storage) {
+        if (!validate_live_allocations(allocations))
+            return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE,
+                    nullptr};
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_ALLOCATION_FAILED,
                 nullptr};
+    }
     uintptr_t storage_end = 0;
     const uintptr_t storage_begin = reinterpret_cast<uintptr_t>(storage);
     if (!host_interval(storage_begin, layout.block_bytes, &storage_end)) {
@@ -1114,6 +1256,9 @@ melee_web_source_memory_payload_snapshot_capture(void)
         return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE, nullptr};
     }
     if (host_ranges_overlap_allocations(storage_begin, storage_end, allocations)) {
+        if (!validate_live_allocations(allocations))
+            return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE,
+                    nullptr};
         // A conforming operator new cannot overlap a live allocation. If an
         // allocator violates that contract, do not delete this possibly aliased
         // address: deletion could free or corrupt the live owner.
@@ -1137,6 +1282,8 @@ melee_web_source_memory_payload_snapshot_capture(void)
     snapshot->allocated_count = heap.allocated.size();
     snapshot->payload_bytes = payload_size;
     snapshot->rows_offset = layout.rows_offset;
+    snapshot->host_index_offset = layout.host_index_offset;
+    snapshot->source_index_offset = layout.source_index_offset;
     snapshot->free_offset = layout.free_offset;
     snapshot->allocated_offset = layout.allocated_offset;
     snapshot->payload_offset = layout.payload_offset;
@@ -1145,6 +1292,29 @@ melee_web_source_memory_payload_snapshot_capture(void)
     auto* rows = reinterpret_cast<HostAllocation*>(bytes + layout.rows_offset);
     for (size_t i = 0; i < allocations.size(); ++i)
         new (&rows[i]) HostAllocation(allocations[i]);
+    auto* host_indices = reinterpret_cast<size_t*>(bytes + layout.host_index_offset);
+    auto* source_indices = reinterpret_cast<size_t*>(bytes + layout.source_index_offset);
+    for (size_t i = 0; i < allocations.size(); ++i) {
+        new (&host_indices[i]) size_t(i);
+        new (&source_indices[i]) size_t(i);
+    }
+    std::sort(host_indices, host_indices + allocations.size(),
+        [rows](size_t a, size_t b) {
+            return rows[a].host != rows[b].host ? rows[a].host < rows[b].host
+                                                : a < b;
+        });
+    std::sort(source_indices, source_indices + allocations.size(),
+        [rows](size_t a, size_t b) {
+            return rows[a].source.value() != rows[b].source.value()
+                ? rows[a].source.value() < rows[b].source.value() : a < b;
+        });
+    if (!validate_indexed_ranges(rows, allocations.size(), host_indices,
+                                 source_indices)) {
+        for (size_t i = 0; i < allocations.size(); ++i) rows[i].~HostAllocation();
+        snapshot->~MeleeWebSourceMemoryPayloadSnapshot();
+        ::operator delete(storage);
+        return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE, nullptr};
+    }
     auto* free_cells = reinterpret_cast<melee_web::source::Cell*>(
         bytes + layout.free_offset);
     for (size_t i = 0; i < heap.free.size(); ++i)
@@ -1170,6 +1340,119 @@ melee_web_source_memory_payload_snapshot_admit(
 {
     return payload_snapshot_check(snapshot);
 }
+
+#if defined(MELEE_WEB_SOURCE_MEMORY_TESTING)
+extern "C" int melee_web_source_memory_test_payload_index_benchmark(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
+    uint64_t* all_pairs_ns, uint64_t* indexed_ns)
+{
+    if (!snapshot || !all_pairs_ns || !indexed_ns ||
+        snapshot->row_count != allocations.size() ||
+        !payload_rows_match(payload_rows(snapshot), snapshot->row_count,
+                            allocations))
+        return 0;
+    const auto before_all_pairs = std::chrono::steady_clock::now();
+    const bool all_pairs_valid = validate_live_allocations(allocations);
+    const auto after_all_pairs = std::chrono::steady_clock::now();
+    const bool indexed_valid = validate_indexed_payload_rows(snapshot, allocations);
+    const auto after_indexed = std::chrono::steady_clock::now();
+    *all_pairs_ns = static_cast<uint64_t>(std::chrono::duration_cast<
+        std::chrono::nanoseconds>(after_all_pairs - before_all_pairs).count());
+    *indexed_ns = static_cast<uint64_t>(std::chrono::duration_cast<
+        std::chrono::nanoseconds>(after_indexed - after_all_pairs).count());
+    return all_pairs_valid == indexed_valid && indexed_valid;
+}
+
+extern "C" int melee_web_source_memory_test_payload_index_range_case(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint32_t scenario)
+{
+    if (!snapshot || snapshot->row_count < 2) return 0;
+    HostAllocation rows[2] = {payload_rows(snapshot)[0], payload_rows(snapshot)[1]};
+    size_t host_indices[2] = {0, 1};
+    size_t source_indices[2] = {0, 1};
+    switch (scenario) {
+    case 0: { // Adjacent host/source ranges are accepted.
+        uint64_t source_end = 0;
+        if (rows[0].host > std::numeric_limits<uintptr_t>::max() -
+                               rows[0].requested ||
+            rows[0].host + rows[0].requested != rows[1].host ||
+            !source_interval(rows[0].source.value(), rows[0].requested,
+                             &source_end) || source_end >= (UINT64_C(1) << 32))
+            return 0;
+        rows[1].source = Address(static_cast<uint32_t>(source_end));
+        break;
+    }
+    case 1: rows[1].host = rows[0].host; break; // host-only overlap
+    case 2: rows[1].source = rows[0].source; break; // source-only overlap
+    case 3:
+        rows[0].host = std::numeric_limits<uintptr_t>::max() - 1u;
+        rows[0].requested = 2;
+        break;
+    case 4:
+        rows[0].source = Address(UINT32_C(0xffffffff));
+        rows[0].requested = 2;
+        break;
+    case 5: rows[0].generation = 0; break;
+    case 6: host_indices[0] = 2; break;
+    case 7: host_indices[1] = host_indices[0]; break;
+    case 8: std::swap(host_indices[0], host_indices[1]); break;
+    case 9: source_indices[0] = 2; break;
+    case 10: source_indices[1] = source_indices[0]; break;
+    case 11: std::swap(source_indices[0], source_indices[1]); break;
+    default: return 0;
+    }
+    return validate_indexed_ranges(rows, 2, host_indices, source_indices) ? 1 : 0;
+}
+
+extern "C" int melee_web_source_memory_test_payload_index_tamper(
+    MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint32_t scenario,
+    uint32_t* admit_status, uint32_t* restore_status)
+{
+    if (!snapshot || snapshot->row_count < 2 || !admit_status || !restore_status)
+        return 0;
+    size_t* indices = nullptr;
+    size_t saved0 = 0, saved1 = 0;
+    HostAllocation* saved_rows = nullptr;
+    uint64_t saved_generation = 0;
+    if (scenario < 6) {
+        indices = scenario < 3 ? payload_host_indices(snapshot)
+                               : payload_source_indices(snapshot);
+        const uint32_t operation = scenario % 3;
+        saved0 = indices[0];
+        saved1 = indices[1];
+        if (operation == 0) indices[0] = snapshot->row_count;
+        else if (operation == 1) indices[1] = indices[0];
+        else std::swap(indices[0], indices[1]);
+    } else if (scenario == 6) {
+        saved_rows = const_cast<HostAllocation*>(payload_rows(snapshot));
+        saved_generation = saved_rows[0].generation;
+        saved_rows[0].generation ^= UINT64_C(1);
+    } else {
+        return 0;
+    }
+    *admit_status = static_cast<uint32_t>(payload_snapshot_check(snapshot));
+    *restore_status = static_cast<uint32_t>(
+        melee_web_source_memory_payload_snapshot_restore(snapshot));
+    if (indices) {
+        indices[0] = saved0;
+        indices[1] = saved1;
+    }
+    if (saved_rows) saved_rows[0].generation = saved_generation;
+    return 1;
+}
+
+extern "C" uint32_t melee_web_source_memory_test_capture_source_overlap(void)
+{
+    if (allocations.size() < 2) return UINT32_MAX;
+    const auto saved = allocations[1].source;
+    allocations[1].source = allocations[0].source;
+    const auto captured = melee_web_source_memory_payload_snapshot_capture();
+    allocations[1].source = saved;
+    if (captured.snapshot)
+        melee_web_source_memory_payload_snapshot_destroy(captured.snapshot);
+    return static_cast<uint32_t>(captured.status);
+}
+#endif
 
 extern "C" MeleeWebSourcePayloadEndpointHeader
 melee_web_source_memory_payload_endpoint_header(
@@ -1294,7 +1577,11 @@ melee_web_source_memory_payload_current_endpoint_header(
     result.status = payload_snapshot_owner_check(owner_snapshot);
     if (result.status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return result;
-    if (!validate_live_allocations(allocations)) {
+    const bool rows_match = payload_rows_match(payload_rows(owner_snapshot),
+                                               owner_snapshot->row_count,
+                                               allocations);
+    if (!(rows_match ? validate_indexed_payload_ranges(owner_snapshot)
+              : validate_live_allocations(allocations))) {
         result.status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
         return result;
     }

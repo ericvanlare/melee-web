@@ -77,6 +77,7 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
                    "src/gameplay_source_memory_runtime.cpp",
                    "src/source_address_context.cpp", "src/source_game_heap_context.cpp"]
         built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                                "-DMELEE_WEB_SOURCE_MEMORY_TESTING=1",
                                 "-I" + str(ROOT / ".deps/aurora/include"),
                                 "-I", str(ROOT / "src"),
                                 *[str(ROOT / path) for path in sources], "-o", str(binary)],
