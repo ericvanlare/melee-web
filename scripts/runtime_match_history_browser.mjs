@@ -1,0 +1,532 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
+/* One-page ordinary-runtime admission experiment for the private retained
+ * history owner. The page uses the real runtime, local disc loader and source
+ * keyboard path. Only the two private diagnostic ESM modules are supplied
+ * from this checkout; no source input, network or replay service is mocked. */
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {createReadStream} from 'node:fs';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {parseArgs} from 'node:util';
+import {createBrowserDriver} from './browser_driver.mjs';
+import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
+
+const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const WASM_REL='gameplay_menu_browser.wasm';
+const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
+const CARD_BYTES=0x1790+7*0x1f2c;
+const options=Object.fromEntries(['url','disc','out','playwright','runtime-wasm-sha256']
+  .map(name=>[name,{type:'string'}]));
+const {values}=parseArgs({options,strict:true});
+for(const name of ['url','disc','out','runtime-wasm-sha256'])
+  if(!values[name])throw Error(`--${name} is required`);
+assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,
+  'The ordinary runtime Wasm requires its exact reviewed SHA-256');
+const baseUrl=new URL(values.url);
+assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
+assert(['127.0.0.1','localhost','[::1]'].includes(baseUrl.hostname),
+  'The runtime server must be local');
+const discPath=path.resolve(values.disc),out=path.resolve(values.out);
+await fs.access(discPath);
+try{await fs.access(out);throw Error(`Refusing to overwrite evidence directory ${out}`);}
+catch(error){if(error.code!=='ENOENT')throw error;}
+await fs.mkdir(out,{recursive:true});
+
+const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
+const hashFile=async file=>{
+  const digest=createHash('sha256');
+  for await(const chunk of createReadStream(file))digest.update(chunk);
+  return digest.digest('hex');
+};
+const controllerPath=path.join(ROOT,'src/slippi_profile/runtime_match_history_controller.mjs');
+const endpointPath=path.join(ROOT,'src/slippi_profile/tests/cpu_endpoint.mjs');
+const profilePath=path.join(ROOT,'src/slippi_profile/profile.h');
+const controllerBytes=await fs.readFile(controllerPath),endpointBytes=await fs.readFile(endpointPath);
+const profileSource=await fs.readFile(profilePath,'utf8');
+assert(profileSource.includes(`"${PROFILE}"`),'Source profile header no longer pins V20');
+const discImageHash=await hashFile(discPath);
+const wasmPath=path.join(ROOT,'build/browser-match-history-release',WASM_REL);
+const actualWasmHash=await hashFile(wasmPath);
+assert.equal(actualWasmHash,values['runtime-wasm-sha256'],
+  'Built ordinary runtime differs from the reviewed Wasm identity');
+
+const report={schema:'melee-web-runtime-match-history-admission-v1',
+  scope:'one headless ordinary-runtime page; original CSS/SSS keyboard route; terminal match takeover only; no capture, network session, replay or rollback command',
+  result:'RUNNING',started_at:new Date().toISOString(),
+  runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
+  disc:{image_sha256:discImageHash,validated_identity:null},
+  diagnostic_module_bindings:[
+    {url:new URL('/__melee_diag__/runtime_match_history_controller.mjs',baseUrl).href,
+      checkout_path:path.relative(ROOT,controllerPath),sha256:sha256(controllerBytes)},
+    {url:new URL('/__melee_diag__/tests/cpu_endpoint.mjs',baseUrl).href,
+      checkout_path:path.relative(ROOT,endpointPath),sha256:sha256(endpointBytes)},
+  ],
+  route:{controls:null,css_before:null,css_after:null,stage:null,match:null,
+    takeover:null,identity:null,cleanup:null},
+  checks:[],browser_errors:[],websockets:[],screenshots:[],
+  cleanup:{native_owner:'not_started',browser:'not_started',server:'externally_owned_by_capture_owner_deadline'},
+};
+const pageErrors=[];
+let browser,context,page,driver,controllerInstalled=false,takenOver=false;
+let nativeCleanupSucceeded=false,browserCdp=null;
+let resultError=null;
+let hostAgreement=null,profileSnapshot=null,discIdentity=null;
+
+function addCheck(name,details=null){report.checks.push({name,details});}
+function noteFailure(stage,error){
+  const message=`${stage}: ${String(error?.message||error)}`;
+  (report.cleanup_failures??=[]).push(message);
+  // Keep the original first boundary cause when cleanup also has problems.
+  if(report.result!=='FAIL'){
+    report.result='FAIL';
+    report.failure={name:error?.name||'CleanupError',message,stack:error?.stack||null};
+    resultError=message;
+  }
+}
+async function observePageHealth(label,{requireRunning=false}={}){
+  const state=await page.evaluate(()=>{
+    const m=globalThis.Module;
+    const text=()=>{
+      try{return typeof m?._melee_web_native_menu_message==='function'
+        ?m.UTF8ToString(m._melee_web_native_menu_message()):null;}catch{return null;}
+    };
+    const timing=text();
+    const error=document.querySelector('#status')?.dataset.runtimeError||
+      document.querySelector('#error-dialog[open]')&&
+        (document.querySelector('#error')?.textContent||'Application error');
+    const running=typeof m?._melee_web_native_menu_running==='function'
+      ?m._melee_web_native_menu_running():null;
+    return {timing_message:timing,runtime_error:error||null,running,
+      phase:typeof m?._melee_web_native_menu_phase==='function'?m._melee_web_native_menu_phase():null,
+      replayActive:!!globalThis.meleeNetRuntimeLockstepSnapshot?.(),
+      diagnosticStatus:document.querySelector('#status')?.textContent?.slice(0,600)||null};
+  });
+  if(state.runtime_error)throw Error(`${label}: ${state.runtime_error}`);
+  if(/^Paused after a timing disruption/i.test(state.timing_message||''))
+    throw Error(`${label}: timing pause observed; automatic recovery is forbidden`);
+  if(requireRunning&&state.running!==1)throw Error(`${label}: source runtime stopped (${state.timing_message||'no native message'})`);
+  if(state.replayActive)throw Error(`${label}: a network/replay runtime owner is active`);
+  if(pageErrors.length)throw Error(`${label}: browser error ${pageErrors[0]}`);
+  return state;
+}
+
+async function observeCss(){
+  const value=await page.evaluate(()=>window.menuObserveCssSetup?.()??null);
+  assert(value&&value.cursors?.length===16&&value.doors?.length===40&&value.geometry?.length===48,
+    'Read-only original CSS source observer is unavailable');
+  return value;
+}
+const door=(setup,port)=>({kind:setup.doors[port*10],slotType:setup.doors[port*10+4],
+  character:setup.doors[port*10+3],slot:setup.doors[port*10+6]});
+
+async function waitForCssDoor(port,predicate,label,timeoutMs=10000){
+  const deadline=Date.now()+timeoutMs;
+  let last=null;
+  while(Date.now()<deadline){
+    await observePageHealth(label,{requireRunning:true});
+    last=await observeCss();
+    if(predicate(door(last,port)))return last;
+    await page.waitForTimeout(25);
+  }
+  throw Error(`${label}: expected CSS door state not reached: ${JSON.stringify(door(last,port))}`);
+}
+
+async function waitNativePhase(phase,label,{timeoutMs=30000}={}){
+  const deadline=Date.now()+timeoutMs;
+  let last=null;
+  while(Date.now()<deadline){
+    last=await observePageHealth(label);
+    const current=await page.evaluate(()=>({
+      phase:Module._melee_web_native_menu_phase(),
+      running:Module._melee_web_native_menu_running()}));
+    // CSS/SSS scene changes may legitimately pause the regular loop while
+    // original source assets are prepared. Continue only to the requested
+    // phase with active callbacks; observePageHealth still rejects errors and
+    // timing faults on every poll, with no recovery path.
+    if(current.phase===phase&&current.running===1)return {...last,...current};
+    await page.waitForTimeout(20);
+  }
+  throw Error(`${label}: native phase ${phase} not reached: ${JSON.stringify(last)}`);
+}
+
+async function moveCursorToP2Toggle(){
+  for(let attempt=0;attempt<120;attempt++){
+    const setup=await observeCss();
+    const [x,y]=setup.geometry;
+    const bounds=setup.geometry.slice(12,24);
+    const left=bounds[4],right=bounds[5],targetX=(left+right)/2,targetY=-2.2;
+    if(Number.isFinite(x)&&Number.isFinite(y)&&right>left&&
+      x>left+0.2&&x<right-0.2&&y>-4.4&&y<0)return setup;
+    const keys=[];
+    if(x<targetX-0.25)keys.push('d');else if(x>targetX+0.25)keys.push('a');
+    if(y<targetY-0.35)keys.push('w');else if(y>targetY+0.35)keys.push('s');
+    if(!keys.length)keys.push(x<targetX?'d':'a');
+    await driver.pressChord(keys,{holdMs:24,releaseMs:24});
+    await observePageHealth(`CSS P2 cursor movement ${attempt+1}`,{requireRunning:true});
+  }
+  const setup=await observeCss();
+  throw Error(`Original CSS cursor did not reach P2 source-toggle bounds: ${JSON.stringify({
+    cursor:setup.geometry.slice(0,2),door1:setup.geometry.slice(12,24)})}`);
+}
+
+async function configureControls(){
+  await page.locator('#controls-open').click();
+  await page.locator('#controls-dialog[open]').waitFor();
+  await page.locator('#keyboard-layout').selectOption('two');
+  await page.locator('#player-one-source').selectOption('keyboard');
+  await page.locator('#player-two-source').selectOption('keyboard');
+  await page.waitForFunction(()=>document.querySelector('#keyboard-layout')?.value==='two'&&
+    document.querySelector('#player-one-source')?.value==='keyboard'&&
+    document.querySelector('#player-two-source')?.value==='keyboard'&&
+    document.querySelector('#player-one-source-status')?.textContent?.trim()==='Keyboard'&&
+    document.querySelector('#player-two-source-status')?.textContent?.trim()==='Keyboard');
+  report.route.controls=await page.evaluate(()=>({layout:document.querySelector('#keyboard-layout').value,
+    playerOne:document.querySelector('#player-one-source').value,
+    playerTwo:document.querySelector('#player-two-source').value,
+    statusOne:document.querySelector('#player-one-source-status').textContent.trim(),
+    statusTwo:document.querySelector('#player-two-source-status').textContent.trim()}));
+  assert.deepEqual(report.route.controls,{layout:'two',playerOne:'keyboard',playerTwo:'keyboard',
+    statusOne:'Keyboard',statusTwo:'Keyboard'});
+  await page.locator('#controls-close').click();
+  await page.locator('#controls-dialog').waitFor({state:'hidden'});
+  addCheck('real controls select two-player keyboard for both ports',report.route.controls);
+}
+
+async function joinSecondHuman(){
+  let setup=await observeCss();
+  report.route.css_before=[0,1,2,3].map(port=>door(setup,port));
+  assert.deepEqual(report.route.css_before.map(row=>[row.kind,row.slotType]),
+    [[0,0],[1,1],[3,3],[3,3]],'Original CSS did not present the expected P1 Human/P2 CPU pair');
+  assert.deepEqual(report.route.css_before.slice(0,2).map(row=>row.character),[8,8],
+    'Original CSS did not present Mario on both active doors');
+  setup=await moveCursorToP2Toggle();
+  for(const expected of [{kind:3,slotType:3},{kind:0,slotType:0}]){
+    await driver.pressChord(['j'],{holdMs:60,releaseMs:80});
+    setup=await waitForCssDoor(1,row=>row.kind===expected.kind&&row.slotType===expected.slotType,
+      'Original CSS P2 CPU-to-empty-to-Human source transition');
+  }
+  report.route.css_after=[0,1,2,3].map(port=>door(setup,port));
+  assert.deepEqual(report.route.css_after.map(row=>[row.kind,row.slotType]),
+    [[0,0],[0,0],[3,3],[3,3]]);
+  assert.deepEqual(report.route.css_after.slice(0,2).map(row=>row.character),[8,8]);
+  addCheck('P2 joins through two original CSS A key presses',report.route.css_after);
+}
+
+async function chooseFinalDestination(){
+  await driver.pressChord(['Enter'],{holdMs:80,releaseMs:100});
+  const stageDeadline=Date.now()+30000;
+  let stageAvailable=false;
+  while(Date.now()<stageDeadline){
+    await observePageHealth('waiting for original SSS observer');
+    stageAvailable=await page.evaluate(()=>typeof window.menuObserveStage==='function'&&!!window.menuObserveStage(32));
+    if(stageAvailable)break;
+    await page.waitForTimeout(20);
+  }
+  assert(stageAvailable,'Original SSS source observer did not become available');
+  await waitNativePhase(3,'original SSS callbacks',{timeoutMs:30000});
+  let stage=null;
+  for(let attempt=0;attempt<240;attempt++){
+    stage=await page.evaluate(()=>window.menuObserveStage(32));
+    assert(stage?.ids?.length===4&&stage.geometry?.length===6,'Source SSS observer extent changed');
+    if(stage.ids[1]===32)break;
+    const [x,y,tx,ty]=stage.geometry,keys=[];
+    if(Math.abs(tx-x)>1.2)keys.push(tx>x?'d':'a');
+    if(Math.abs(ty-y)>1.2)keys.push(ty>y?'w':'s');
+    if(!keys.length)keys.push(tx>=x?'d':'a');
+    await driver.pressChord(keys,{holdMs:24,releaseMs:24});
+    await observePageHealth(`SSS source cursor movement ${attempt+1}`,{requireRunning:true});
+  }
+  stage=await page.evaluate(()=>window.menuObserveStage(32));
+  assert.equal(stage.ids[1],32,'Original SSS did not highlight Final Destination');
+  report.route.stage=stage;
+  await driver.pressChord(['j'],{holdMs:80,releaseMs:100});
+  const deadline=Date.now()+90000;
+  let state=null;
+  while(Date.now()<deadline){
+    // CSS->SSS includes legitimate source/audio/asset preparation, which can
+    // stop the ordinary loop temporarily. Timing faults and runtime errors
+    // still abort immediately; this route never resumes a stopped match.
+    state=await observePageHealth('waiting for original Mario/FD match');
+    const phase=await page.evaluate(()=>Module._melee_web_native_menu_phase());
+    if(phase===7){
+      const observed=await page.evaluate(()=>JSON.parse(
+        Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
+      if(observed.ready){report.route.match=observed;break;}
+    }
+    await page.waitForTimeout(25);
+  }
+  assert(report.route.match?.ready===true,
+    `Original match did not construct: ${JSON.stringify({state,match:report.route.match})}`);
+  addCheck('original SSS keyboard selection constructs the supported live match',{
+    frame:report.route.match.frame,stage:report.route.match.rules.stage,
+    sourceCharacters:report.route.match.rules.player_source_characters,
+    stocks:report.route.match.rules.player_stocks});
+}
+
+async function hashProfileSnapshot(){
+  return page.evaluate(()=>{
+    const m=globalThis.Module,length=0x1790+7*0x1f2c;
+    if(typeof m?._melee_web_native_menu_snapshot_save_profile!=='function')
+      throw Error('Real source save-profile snapshot export is unavailable');
+    const ptr=m._malloc(length);
+    if(!ptr)throw Error('Unable to allocate save-profile identity buffer');
+    try{
+      if(m._melee_web_native_menu_snapshot_save_profile(ptr,length,0)!==1)
+        throw Error(`Source save-profile export refused: ${m.UTF8ToString(m._melee_web_native_menu_message())}`);
+      const copy=m.HEAPU8.slice(ptr,ptr+length);
+      return crypto.subtle.digest('SHA-256',copy).then(value=>({bytes:length,
+        sha256:Array.from(new Uint8Array(value),byte=>byte.toString(16).padStart(2,'0')).join('')}));
+    }finally{m._free(ptr);}
+  });
+}
+
+async function admitTerminalTakeover(){
+  assert(hostAgreement&&profileSnapshot&&discIdentity,'Pre-match source identities were not collected');
+  assert.equal(report.websockets.length,0,'A WebSocket session was opened before terminal admission');
+  assert.equal(report.route.lockstep_snapshot,null,'A lockstep/replay owner was active before admission');
+  if(pageErrors.length)throw Error(`Browser error before terminal admission: ${pageErrors[0]}`);
+  const host=hostAgreement,disc=discIdentity,profile=profileSnapshot;
+  report.disc.validated_identity={algorithm:disc.algorithm,dol:disc.dol,fst:disc.fst,
+    dol_size:disc.dolSize,fst_size:disc.fstSize,
+    canonical_identity_sha256:host.asset_identity_sha256};
+  report.save_profile={bytes:profile.bytes,sha256:profile.sha256,
+    provenance:'actual active source-host card snapshot through _melee_web_native_menu_snapshot_save_profile'};
+  report.host_identity=host;
+
+  await page.screenshot({path:path.join(out,'ordinary-match-before-takeover.png'),fullPage:false});
+  report.screenshots.push('ordinary-match-before-takeover.png');
+  const transfer=await page.evaluate(async ({host})=>{
+    const module=globalThis.Module,controller=globalThis.__meleeRuntimeMatchHistory;
+    if(!controller)throw Error('Private history controller module was not installed');
+    // Only readiness observations repeat. The native takeover itself is tried
+    // once, immediately after its source-frame observation in the same task.
+    const idleDeadline=performance.now()+5000;
+    let status=controller.status();
+    while(status.gpuPending!==0){
+      const message=module.UTF8ToString(module._melee_web_native_menu_message());
+      if(status.firstFailure||status.metadata.firstFailure||status.rendererErrors||
+        /^Paused after a timing disruption/i.test(message))
+        throw Error(`Fault before takeover: ${message} (${JSON.stringify(status)})`);
+      if(performance.now()>=idleDeadline)
+        throw Error(`GPU/source admission did not become idle: ${JSON.stringify(status)}`);
+      await new Promise(resolve=>setTimeout(resolve,5));
+      status=controller.status();
+    }
+    const asyncifyState=module.Asyncify&&Number.isInteger(module.Asyncify.state)
+      ?module.Asyncify.state:null;
+    if(status.firstFailure||status.metadata.firstFailure||status.rendererErrors)
+      throw Error(`History/status reports a preexisting failure: ${JSON.stringify(status)}`);
+    if(document.querySelector('#status')?.dataset.runtimeError)
+      throw Error(document.querySelector('#status').dataset.runtimeError);
+    if(window.meleeNetRuntimeLockstepSnapshot?.()!=null)
+      throw Error('A network/replay runtime owner became active before terminal takeover');
+    const message=module.UTF8ToString(module._melee_web_native_menu_message());
+    if(/^Paused after a timing disruption/i.test(message)||module._melee_web_native_menu_running()!==1)
+      throw Error(`Source was not running cleanly at admission: ${message}`);
+    if(asyncifyState!==null&&asyncifyState!==0)
+      throw Error(`Asyncify is not idle at admission (state ${asyncifyState})`);
+    const match=JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe()));
+    if(!match.ready||match.paused||match.ending||match.complete||match.rules?.stage!==32||
+      match.rules?.match_kind!==1||match.rules?.is_stock!==1||match.rules?.is_vs!==1||
+      match.rules?.is_teams!==0||JSON.stringify(match.rules?.player_stocks)!=='[4,4]'||
+      JSON.stringify(match.rules?.player_source_characters)!=='[8,8]'||
+      JSON.stringify(match.observed_player_source_slots)!=='[0,1]'||
+      JSON.stringify(match.rules?.resolved_controller_ports)!=='[0,1]'||
+      !Array.isArray(match.players)||match.players.length!==2||match.players.some(player=>!player.human||player.fighter!==0))
+      throw Error(`Original source match did not satisfy exact takeover identity: ${JSON.stringify(match)}`);
+    // This is deliberately one synchronous browser task: the fresh source
+    // observation immediately authenticates the one terminal owner handoff.
+    const sourceFrame=match.frame;
+    const takeover=controller.takeOver({sourceFrame,localPort:0,remotePort:1});
+    return {sourceFrame,match,statusBefore:status,statusAfter:takeover,asyncifyState,
+      nativeMessage:module.UTF8ToString(module._melee_web_native_menu_message()),
+      callbackTiming:window.meleeNetRuntimeCallbackTimingSnapshot?.()??null,
+      pageStatus:document.querySelector('#status')?.textContent?.slice(0,600)||null};
+  },{host});
+  takenOver=true;
+  report.route.takeover=transfer;
+  assert.equal(transfer.statusAfter.ownerState,1);
+  assert.equal(transfer.statusAfter.expectedFrame,transfer.sourceFrame);
+  assert.equal(transfer.statusAfter.gpuPending,0);
+  addCheck('same-turn read-only match/source-frame admission and terminal takeover',{
+    source_frame:transfer.sourceFrame,gpu_pending:transfer.statusAfter.gpuPending,
+    asyncify_state:transfer.asyncifyState,first_failure:transfer.statusAfter.firstFailure,
+    renderer_errors:transfer.statusAfter.rendererErrors});
+
+  const sourceIdentity=await page.evaluate(({host})=>{
+    const identity=globalThis.__meleeRuntimeMatchHistory.identity(host);
+    const status=globalThis.__meleeRuntimeMatchHistory.status();
+    return {identity,status};
+  },{host});
+  const parsed=JSON.parse(sourceIdentity.identity);
+  assert.equal(parsed.source_frame,transfer.sourceFrame);
+  assert.equal(parsed.runtime_sha256,host.runtime_sha256);
+  assert.equal(parsed.asset_identity_sha256,host.asset_identity_sha256);
+  assert.equal(parsed.save_profile_sha256,host.save_profile_sha256);
+  report.route.identity={source_json:sourceIdentity.identity,status:sourceIdentity.status};
+  addCheck('source-serialized identity binds the actual runtime, disc, save and frame',{
+    source_frame:parsed.source_frame,asset_identity_sha256:parsed.asset_identity_sha256,
+    save_profile_sha256:parsed.save_profile_sha256});
+
+  await page.screenshot({path:path.join(out,'terminal-owner-admitted.png'),fullPage:false});
+  report.screenshots.push('terminal-owner-admitted.png');
+  const clean=await page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.command('cleanup'));
+  report.route.cleanup=clean;
+  nativeCleanupSucceeded=clean.ownerState===2&&clean.gpuPending===0;
+  assert(nativeCleanupSucceeded,'Native terminal cleanup did not close the ordinary source owners');
+  addCheck('native terminal command retires match and renderer owners',{
+    owner_state:clean.ownerState,gpu_pending:clean.gpuPending});
+  report.cleanup.native_owner='retired';
+}
+
+try{
+  const {chromium,browser:browserConfig,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
+  browser=await chromium.launch(browserLaunchOptions(browserConfig,{headed:false,timeout:60000}));
+  report.browser={version:browser.version(),executable:path.basename(browserPath),playwright:playwrightPath,
+    mode:'headless',speaker_output:'muted; Web Audio/source processing left enabled'};
+  context=await browser.newContext({viewport:{width:1280,height:960},deviceScaleFactor:1});
+  page=await context.newPage();
+  page.setDefaultTimeout(90000);page.setDefaultNavigationTimeout(90000);
+  page.on('pageerror',error=>pageErrors.push(error.stack||error.message));
+  page.on('console',message=>{if(message.type()==='error')pageErrors.push(message.text());});
+  page.on('websocket',socket=>report.websockets.push(socket.url()));
+  page.on('request',request=>{
+    const url=new URL(request.url());
+    if(!['127.0.0.1','localhost','[::1]'].includes(url.hostname)&&
+      url.protocol!=='data:'&&url.protocol!=='blob:')
+      report.external_requests??=[],report.external_requests.push({url:url.origin,resource:request.resourceType()});
+  });
+  const diagBase=new URL('/__melee_diag__/',baseUrl).href;
+  await page.route('**/__melee_diag__/runtime_match_history_controller.mjs',route=>route.fulfill({
+    status:200,contentType:'text/javascript; charset=utf-8',body:controllerBytes}));
+  await page.route('**/__melee_diag__/tests/cpu_endpoint.mjs',route=>route.fulfill({
+    status:200,contentType:'text/javascript; charset=utf-8',body:endpointBytes}));
+  driver=createBrowserDriver(page,{surface:'development',timeoutMs:90000});
+  const response=await page.goto(baseUrl.href,{waitUntil:'domcontentloaded'});
+  assert.equal(response.status(),200);
+  await driver.waitForImport();
+  await page.waitForFunction(()=>globalThis.Module&&typeof Module._melee_web_native_menu_match_history_take_over==='function'&&
+    typeof Module._melee_web_native_menu_match_observe==='function',null,{timeout:90000});
+  await page.evaluate(async url=>{
+    const {createRuntimeMatchHistoryController}=await import(url);
+    globalThis.__meleeRuntimeMatchHistory=createRuntimeMatchHistoryController(globalThis.Module);
+  },new URL('runtime_match_history_controller.mjs',diagBase).href);
+  controllerInstalled=true;
+  const preRouteOwners=await page.evaluate(()=>({lockstep:window.meleeNetRuntimeLockstepSnapshot?.()??null,
+    replay:!!document.querySelector('#retail-replay-file')?.files?.length}));
+  assert.deepEqual(preRouteOwners,{lockstep:null,replay:false});
+  report.route.lockstep_snapshot=preRouteOwners.lockstep;
+  report.route.replay_file_selected=preRouteOwners.replay;
+  await configureControls();
+  await driver.selectDisc(discPath);
+  await driver.waitForStart();
+  await page.waitForFunction(()=>Module._melee_web_native_menu_cache_idle()===1,null,{timeout:90000});
+  profileSnapshot=await hashProfileSnapshot();
+  assert.equal(profileSnapshot.bytes,CARD_BYTES);
+  const loadedIdentity=await page.evaluate(()=>window.meleeNetPeerIdentity());
+  assert.equal(loadedIdentity.algorithm,'sha256');
+  assert.equal(loadedIdentity.wasm,actualWasmHash);
+  discIdentity=loadedIdentity.disc;
+  assert(discIdentity&&discIdentity.algorithm==='sha256'&&/^[0-9a-f]{64}$/.test(discIdentity.dol)&&
+    /^[0-9a-f]{64}$/.test(discIdentity.fst)&&Number.isSafeInteger(discIdentity.dolSize)&&
+    Number.isSafeInteger(discIdentity.fstSize),
+    'Normal runtime loader returned an invalid validated disc identity');
+  const assetIdentity=JSON.stringify({algorithm:discIdentity.algorithm,dol:discIdentity.dol,
+    fst:discIdentity.fst,dolSize:discIdentity.dolSize,fstSize:discIdentity.fstSize});
+  hostAgreement={runtime_sha256:loadedIdentity.wasm,
+    asset_identity_sha256:sha256(Buffer.from(assetIdentity)),
+    save_profile_sha256:profileSnapshot.sha256,profile_identity:PROFILE};
+  report.save_profile={bytes:profileSnapshot.bytes,sha256:profileSnapshot.sha256,
+    provenance:'actual active source-host card snapshot through _melee_web_native_menu_snapshot_save_profile'};
+  report.disc.validated_identity={algorithm:discIdentity.algorithm,dol:discIdentity.dol,
+    fst:discIdentity.fst,dol_size:discIdentity.dolSize,fst_size:discIdentity.fstSize,
+    canonical_identity_sha256:hostAgreement.asset_identity_sha256};
+  report.host_identity=hostAgreement;
+  await page.locator('#launch').click();
+  await waitNativePhase(1,'original CSS entry',{timeoutMs:90000});
+  await joinSecondHuman();
+  await chooseFinalDestination();
+  await admitTerminalTakeover();
+  report.result='PASS';
+}catch(error){
+  resultError=error;
+  report.result='FAIL';
+  report.failure={name:error?.name||'Error',message:String(error?.message||error),stack:error?.stack||null};
+}finally{
+  if(resultError&&page){
+    try{report.failure_diagnostics=await driver?.diagnostics?.()??{unavailable:'browser driver unavailable'};}
+    catch(error){report.failure_diagnostics={unavailable:String(error?.message||error)};}
+    try{
+      const failureShot='failure-boundary.png';
+      await page.screenshot({path:path.join(out,failureShot),fullPage:false,timeout:4000});
+      report.screenshots.push(failureShot);
+    }catch(error){report.failure_screenshot_error=String(error?.message||error);}
+  }
+  if(!nativeCleanupSucceeded&&page){
+    try{
+      const owner=await page.evaluate(()=>{
+        const controller=globalThis.__meleeRuntimeMatchHistory;
+        const module=globalThis.Module;
+        let status=null;
+        try{status=controller?.status?.()??null;}catch{}
+        return {state:status?.ownerState??null,gpuPending:status?.gpuPending??null,
+          runtimePresent:!!module&&typeof module._melee_web_native_menu_phase==='function'&&
+            typeof module._melee_web_native_menu_running==='function',
+          running:module?._melee_web_native_menu_running?.()??null};
+      });
+      if((controllerInstalled||takenOver)&&(takenOver||owner.state===1)){
+        const clean=await page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.command('cleanup'));
+        report.route.cleanup=clean;nativeCleanupSucceeded=clean.ownerState===2&&clean.gpuPending===0;
+        if(!nativeCleanupSucceeded)noteFailure('native terminal cleanup refused',JSON.stringify(clean));
+      }else if(owner.runtimePresent&&driver){
+        // An ordinary runtime may own prepared source state even while its
+        // callback loop is stopped. Use its real unload path without resuming.
+        await driver.unload();report.cleanup.native_owner='ordinary-unload-before-takeover';
+      }
+      if(nativeCleanupSucceeded)report.cleanup.native_owner='retired-after-failure-path';
+    }catch(error){report.cleanup.native_owner=`failed: ${String(error?.message||error)}`;
+      noteFailure('native/source cleanup failed',error);}
+  }
+  if(browser){
+    try{
+      browserCdp=await browser.newBrowserCDPSession();
+      const processInfo=await browserCdp.send('SystemInfo.getProcessInfo');
+      assert(Array.isArray(processInfo?.processInfo)&&processInfo.processInfo.length>0,
+        'Chrome CDP returned no browser process inventory');
+      assert(processInfo.processInfo.every(row=>row&&Number.isInteger(row.id)&&row.id>0&&
+        typeof row.type==='string'&&row.type.length>0),'Chrome CDP process inventory is malformed');
+      report.browser_process_info=processInfo.processInfo;
+      report.cleanup.browser_cdp='process inventory captured';
+    }catch(error){report.browser_process_info=[];
+      report.cleanup.browser_cdp=`failed: ${String(error?.message||error)}`;
+      noteFailure('Chrome CDP process attribution failed',error);}
+    finally{
+      if(browserCdp){
+        try{await browserCdp.detach();report.cleanup.browser_cdp+='; detached';}
+        catch(error){report.cleanup.browser_cdp+='; detach failed';
+          noteFailure('Chrome CDP detach failed',error);}
+        browserCdp=null;
+      }
+    }
+  }
+  if(context){
+    try{await context.close();report.cleanup.browser='context-closed';}
+    catch(error){report.cleanup.browser=`context-close-failed: ${String(error?.message||error)}`;
+      noteFailure('browser context cleanup failed',error);}
+  }
+  if(browser){
+    try{await browser.close();report.cleanup.browser+='; browser-closed';}
+    catch(error){report.cleanup.browser+='; browser-close-failed';
+      noteFailure('browser process cleanup failed',error);}
+  }
+  report.browser_errors=pageErrors;
+  report.finished_at=new Date().toISOString();
+  report.resultError=resultError?String(resultError.message||resultError):null;
+  await fs.writeFile(path.join(out,'result.json'),JSON.stringify(report,null,2)+'\n');
+}
+console.log(JSON.stringify({result:report.result,checks:report.checks.map(row=>row.name),
+  failure:report.resultError,report:path.join(out,'result.json')}));
+if(report.result!=='PASS')process.exitCode=1;
