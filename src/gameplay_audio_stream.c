@@ -35,6 +35,12 @@ struct MeleeWebAudioStream {
 };
 static MeleeWebAudioStream* active;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
+static int hps_interval_guard(const char* site){
+ int first=melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_NONE;
+ if(melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return 1;
+ if(first)fprintf(stderr,"HPS_INTERVAL_FIRST_REFUSAL site=%s\n",site);
+ return 0;
+}
 static void stop(const char* why){fprintf(stderr,"Original HPS transport: %s\n",why);abort();}
 static void split(u32 v,u16* hi,u16* lo){*hi=v>>16;*lo=v;}
 static const StreamFile* file_at(unsigned file){
@@ -135,7 +141,7 @@ s32 DVDConvertPathToEntrynum(const char* path){
  int entry=melee_web_audio_bank_transport_path(path);if(entry>=0)return entry;
  entry=melee_web_source_file_entry(path);if(entry>=0)return entry;
  if(!active)stop("DVD path requested without an owned file registry");
- if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return -1;
+ if(!hps_interval_guard("dvd-path"))return -1;
  if(!melee_web_audio_stream_pump_for(active->audio,NULL,0))stop("pending HPS transfer failed before file selection");
  const StreamFile* file=file_for_path(path);if(file){active->selected_file=(unsigned)(file-active->files)+1;return (s32)active->selected_file;}
  fprintf(stderr,"Original HPS path is not owned: %s\n",path?path:"(null)");
@@ -152,7 +158,7 @@ int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type
   }
   return request;
  }
- if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return -1;
+ if(!hps_interval_guard("devcom-request"))return -1;
  const StreamFile* selected=active?file_at((unsigned)file):NULL;
  if(!active||!selected||priority<0||priority>2||src%32||size%32||!size||!callback){
   fprintf(stderr,"DevCom file=%d src=%lu dest=%lu size=%lu type=%d priority=%d callback=%p stream=%p bank=%d\n",
@@ -174,7 +180,7 @@ int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type
  Request** tail=&active->requests;while(*tail)tail=&(*tail)->next;*tail=r;return r->id;
 }
 int HSD_DevComCancelEx(int id,u32 flags,HSD_DevComCallback callback,void* args){
-    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return -1;
+    if(!hps_interval_guard("devcom-cancel"))return -1;
 
  if(melee_web_audio_bank_transport_cancel(id,flags,callback,args))return 0;
  if(melee_web_source_file_cancel(id,flags,callback,args))return 0;
@@ -182,7 +188,7 @@ int HSD_DevComCancelEx(int id,u32 flags,HSD_DevComCallback callback,void* args){
  for(Request* r=active->requests;r;r=r->next)if(r->id==id){if(flags&1)r->callback=callback;if(flags&2)r->args=(uintptr_t)args;r->cancelled=1;break;}return 0;
 }
 int melee_web_audio_stream_pump_for(MeleeWebAudio* audio,char* e,size_t n){
-    if(active&&active->audio==audio&&active->requests&&!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return fail(e,n,"CPU interval forbids queued HPS work");
+    if(active&&active->audio==audio&&active->requests&&!hps_interval_guard("queued-pump"))return fail(e,n,"CPU interval forbids queued HPS work");
 
  if(!active||active->audio!=audio)return 1;if(active->pumping)return fail(e,n,"Reentrant HPS transport pump");active->pumping=1;
  unsigned budget=64;
@@ -215,7 +221,7 @@ int melee_web_audio_stream_progress(MeleeWebAudio* a,uint32_t* completed,uint32_
 const char* melee_web_audio_stream_path(MeleeWebAudio* a){if(!active||active->audio!=a||!active->selected_file)return NULL;return active->files[active->selected_file-1].input->path;}
 int melee_web_audio_stream_owned(MeleeWebAudio* a){return active&&active->audio==a;}
 int melee_web_audio_stream_end(MeleeWebAudioStream* s,char* e,size_t n){
-    if(!melee_web_cpu_interval_attempt(MELEE_WEB_CPU_EFFECT_HPS))return fail(e,n,"CPU interval forbids HPS scope retirement");
+    if(!hps_interval_guard("stream-retire"))return fail(e,n,"CPU interval forbids HPS scope retirement");
 
  if(!s||active!=s||s->pumping)return fail(e,n,"HPS scope is not active or is pumping");
  if(!melee_web_audio_stream_pump_for(s->audio,e,n))return 0;

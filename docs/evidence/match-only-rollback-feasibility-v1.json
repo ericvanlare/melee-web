@@ -10266,7 +10266,7 @@
         }
       },
       "reusable_owner_loop_v1": {
-        "status": "MOTOR_CLEARED_END_PAYLOAD_VIEW_REPAIR_IN_PROGRESS",
+        "status": "FOUR_INTERVALS_COMPARE_AND_RETIRE_NEXT_HPS_EFFECT_REFUSED",
         "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
         "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
         "attempts": [
@@ -10357,6 +10357,43 @@
               "sha256": "6e0b5e7ae2e55b6e0970d874ec48789f0dc4ddfae0be304ef96b1addf5376701"
             },
             "result": "Failure-only attribution identifies payload-header TOPOLOGY_CHANGED (5) at reference CPU_END source frame190. Both pages consumed the third capsule with raw-five and motor agreement. The reader incorrectly checks PRE topology for END evidence. Native capsule cleanup still refuses; snapshot/renderer cleanup and recorded-process absence pass."
+          },
+          {
+            "runtime_producer": "3644999fe945fa74c69c480777191f9b66756165",
+            "harness_producer": "3644999fe945fa74c69c480777191f9b66756165",
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/runner/evidence.json",
+              "sha256": "255bc34f7737bd5d9441647887cf0f338a4c73d4dd9351c0720ac374da31477d"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/first-hps-summary.json",
+              "sha256": "9397871b6d8d2b14733d3cfd0008c8e345891d2b4a0cfc746619b848053c3f72"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/independent-prefix-review-v1.json",
+              "sha256": "e29b8759509e98a5b06272e4d180cdae231748922a296fa57dd970b1eec5b138"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/independent-postflight.json",
+              "sha256": "bd6374b836623b4c3694005b3bd45dd7b1b1e39a145b0e27643a7706ae1ab654"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v5-producer-archive/archive.json",
+              "sha256": "1f40899d64941a79e3fdcc430491a7e55130d7bf667608e756baa376c55b7ffe"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v4/artifact-inventory.json",
+              "sha256": "57642e2d38c9957136b4783e6c1936a2333af30a9398975b367103f06e12ccf3"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v4/final-linked-configuration-v1.json",
+              "sha256": "582ed91e747d2dd57940fafaa96289aa809514ca7def5cb0dc62a33b71c79f75"
+            },
+            "linked_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v4/row-review.json",
+              "sha256": "2795af8928eabb00b2d2e588bf8c6520e4bfd486cd66a31885f4b1355ce40412"
+            },
+            "result": "Four contiguous intervals compare and retire on both pages; complete current payload topology grows3467->3471 rows in interval2. Independent strict9domain/raw-five/motor/retirement replay passes. Fifth interval reference command34/sample322 reaches sourceframe199 then refuses HPS effect3 epoch5; exact operation not yet attributed. 12 ownedPIDs absent/9producerpins unchanged; native teardown failed and reference snapshot close abort is retained."
           }
         ],
         "observed": {
@@ -10397,7 +10434,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Finish and independently review the current END read-view repair; then affected build, strict relink and one bounded eight-capsule retry. Two endpoint experiments are retained; the smaller actual-source allocator control now passes.",
+        "next": "Failure-only attribution at existing HPS guard sites, then reduce the actual host operation before any policy repair. Keep true HPS refill ownership and possible cancellation classification distinct; no speculative allowance inferred.",
         "limitations": [
           "Candidate motor output is explicitly capture-only/unpublished; physical haptic output is not implemented or accepted.",
           "No reusable-loop pass yet; no continuous live packet delivery or full-match rollback.",
@@ -10449,7 +10486,7 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-payload-end-view-sol-contract-v1.json",
             "sha256": "ea4a550867657cca318b569f230d2c967d48d6e535cc5e96854e78a94c8a754e"
           },
-          "state": "FOCUSED_AND_INDEPENDENT_SOURCE_REVIEW_PASS_BROWSER_PENDING",
+          "state": "BROWSER_GROWTH_BOUNDARY_AND_INDEPENDENT_RAW_REVIEW_PASS",
           "scope": "Current END read-only enumeration for both reference and corrected provenance; PRE snapshot admission and restoration remain strict. This does not implement restoring a speculative allocation topology change.",
           "leaf_freeze": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/source-memory-current-end-view-freeze-v1.json",
@@ -10465,6 +10502,18 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-payload-end-independent-host-review-v1.json",
             "sha256": "1666acd75fab6d029a3d3e3acfb27310c528e180dd5be42fc6a272028b06933a"
           }
+        },
+        "hps_failure_attribution": {
+          "state": "FOCUSED_PASS_REVIEW_PENDING",
+          "freeze": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-site-attribution-freeze-v1.json",
+            "sha256": "e27e5419e0422756a81544e0505c56383999a8367b54fa52443f44808786b38c"
+          },
+          "architecture_assessment": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-architecture-sol-v1.json",
+            "sha256": "b808edb8f951742fd50d79f6552711efbddc42e77afa06b42060c39a3a46655d"
+          },
+          "scope": "Constant first-refusal site tag at existing five HPS guards. No request, PCM, source order, admission, cleanup or comparison change. Actual DevCom request guard control passes; exact V5 caller remains unknown."
         }
       }
     }

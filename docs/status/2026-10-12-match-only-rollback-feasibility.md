@@ -1597,11 +1597,22 @@ successful fresh-POST enumeration. The repair adds allocation-free current-END
 reads for both reference and corrected execution; PRE restore admission stays
 strict. The actual-source leaf control and all three endpoint controls pass;
 the initial fixture watermark expectation failure remains retained. Independent
-source and focused-result review passes; the next gate is the rebuilt browser
-loop with unchanged comparison rules. This does not implement restoring a speculative topology change. No
-third-capsule CPU/DRAW agreement or retirement is claimed yet. Native capsule
-cleanup still refuses, while snapshot/renderer cleanup and owned-process absence
-pass. Focused fixture and browser failures remain retained. General rolling
+source and focused-result review passes. V5 (`3644999f`) now compares and retires
+four contiguous intervals on both pages, including the third interval's complete
+payload growth from 3,467 to 3,471 rows. Independent review replays all declared
+nine-domain endpoints, 21 per-tick raw-five pairs, four final draws, motor records
+and exact native retirement metadata. This does not implement restoring a
+speculative topology change.
+
+The fifth interval stops at sample 322, reference command 34/source frame 199,
+with HPS effect 3 in epoch 5. The exact music-transport operation is not yet
+identified. Failure-only site attribution is the next experiment; cancellation
+dispatch classification and actual stream refill remain separate hypotheses.
+The mixer snapshot does not own the HPS stream queue or slot buffers, so this
+failure cannot be repaired by simply allowing speculative HPS mutations. Native capsule
+cleanup still refuses; in V5 the reference snapshot close also aborts and renderer
+shutdown fails. Owned-process absence and all nine producer pins pass. Focused
+fixture and browser failures remain retained. General rolling
 correction, combat, frame-budget, profile admission and full-match or online
 rollback remain open.
 

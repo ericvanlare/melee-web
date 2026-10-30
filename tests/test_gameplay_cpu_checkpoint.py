@@ -145,9 +145,11 @@ int main(void){
             return text[start:end]+'\n'
         text=(SOURCE/'src/gameplay_audio_stream.c').read_text()
         stream=text[:text.index('static int fail(')]
-        for name in ['static void stop(', 'static const StreamFile* file_at(',
+        for name in ['static int fail(', 'static int hps_interval_guard(',
+                     'static void stop(', 'static const StreamFile* file_at(',
                      'static const MeleeWebAudioStreamBlock* block_at(', 'int HSD_DevComRequest(']:
             stream+=function(text,name)
+        stream+='int fixture_hps_interval_site(const char* site){return hps_interval_guard(site);}\n'
         stream+='int melee_web_audio_bank_transport_file(int f){return 0;}\nint melee_web_audio_bank_transport_active(void){return 0;}\n'
         stream_file=self.work/'effect-stream.c';stream_file.write_text(stream)
         text=(SOURCE/'src/gameplay_audio_bank_transport.c').read_text()
@@ -170,6 +172,9 @@ void fixture_bank_barrier(void){
             stream_file,bank_file,SOURCE/'tests/cpu_interval_effect_control.c'],
             ['-include',str(ROOT/'src/gameplay_compat.h')],cpp=False)
         self.assertIn('inactive continuation passed',output)
+        run_log=(self.work/'effects/run.log').read_text()
+        self.assertEqual(run_log.count('HPS_INTERVAL_FIRST_REFUSAL site=devcom-request'),1,run_log)
+        self.assertNotIn('HPS_INTERVAL_FIRST_REFUSAL site=later-site',run_log)
         failed=subprocess.run([str(node_runtime()),str(self.work/'effects/control.js'),'invalid'],cwd=ROOT,
             capture_output=True,text=True,timeout=30)
         (self.work/'effects/ended-invalid-request.log').write_text(failed.stdout+failed.stderr)
