@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {createCpuIntervalEvidenceSink,validateCpuLoopExports,
-  validateCpuRestoreRouteSelection,recordCpuRestoreFailure} from './run_write_census.mjs';
+  validateCpuRestoreRouteSelection,recordCpuRestoreFailure,selectCpuIntervalFailureStatics,
+  recordCpuIntervalFailureStatics} from './run_write_census.mjs';
 
 test('interval evidence is complete and independently hash-bound before its receipt resolves',async()=>{
   const out=fs.mkdtempSync(path.join(os.tmpdir(),'cpu-loop-sink-'));
@@ -60,4 +61,29 @@ test('outer failure retains interval receipts and first native failure without i
   assert.equal(report.execution.intervalEvidence.length,1);
   assert.equal(report.execution.cpuOuterValidation,'failed');
   assert.match(report.execution.restorePerformed,/unknown-on-failure/);
+});
+
+test('first interval effect diagnostics require exact producer rows and only copy raw failure bytes',async()=>{
+  const rows=[['failure',4,16],['epoch',8,24]].map(([name,size,address])=>({
+    source:'src/gameplay_cpu_interval.c',input_object:'libgameplay_runtime.a(gameplay_cpu_interval.c.o)',
+    input_section:`.bss.${name}`,size,address}));
+  const manifest={mutable_input_sections:rows};
+  const selected=selectCpuIntervalFailureStatics(manifest);
+  for(const bad of [rows.slice(1),[...rows,rows[0]],rows.map((r,i)=>i? r:{...r,size:8}),
+    rows.map((r,i)=>i?r:{...r,input_object:'other.a(gameplay_cpu_interval.c.o)'}),
+    rows.map((r,i)=>i?r:{...r,address:0xffffffff})])
+    assert.throws(()=>selectCpuIntervalFailureStatics({mutable_input_sections:bad}),/manifest row refused/);
+  const heap=new Uint8Array(64);heap[16]=3;heap[24]=7;
+  const before=heap.slice(),report={};
+  const previous=globalThis.window;
+  try{
+    globalThis.window={__slippiSynctest:{module:{HEAPU8:heap}}};
+    const page={evaluate:async(fn,arg)=>fn(arg)};
+    await recordCpuIntervalFailureStatics(report,page,selected,'reference');
+    assert.deepEqual(report.cpuIntervalFailureStatics.reference.map(r=>r.bytes),[[3,0,0,0],[7,0,0,0,0,0,0,0]]);
+    assert.deepEqual(heap,before);
+    await recordCpuIntervalFailureStatics(report,page,[{name:'outside',address:63,size:4}],'predicted');
+    assert.match(report.cpuIntervalFailureStatics.predicted.error,/outside current Wasm memory/);
+    assert.deepEqual(report.cpuIntervalFailureStatics.reference[0].bytes,[3,0,0,0]);
+  }finally{if(previous===undefined)delete globalThis.window;else globalThis.window=previous;}
 });

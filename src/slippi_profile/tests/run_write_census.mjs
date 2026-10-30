@@ -156,6 +156,38 @@ export async function recordTobjFailureStatics(report, page, rows) {
   }
 }
 
+// Read the first refused effect before teardown changes the interval owner.
+// This is diagnostic only: no native operation or memory mutation is performed.
+export function selectCpuIntervalFailureStatics(manifest) {
+  return [['failure',4],['epoch',8]].map(([name,size])=>{
+    const rows=manifest.mutable_input_sections.filter(row=>
+      row.source==='src/gameplay_cpu_interval.c'&&
+      row.input_object==='libgameplay_runtime.a(gameplay_cpu_interval.c.o)'&&
+      row.input_section===`.bss.${name}`);
+    if(rows.length!==1||rows[0].size!==size||
+       !Number.isSafeInteger(rows[0].address)||rows[0].address<=0||
+       rows[0].address+size>0x100000000)
+      throw new Error(`CPU interval failure diagnostic manifest row refused: ${name}`);
+    return {name,address:rows[0].address,size};
+  });
+}
+
+export async function recordCpuIntervalFailureStatics(report,page,rows,lane) {
+  if(!page||!rows)return;
+  report.cpuIntervalFailureStatics??={};
+  try {
+    report.cpuIntervalFailureStatics[lane]=await page.evaluate(selected=>{
+      const heap=window.__slippiSynctest?.module?.HEAPU8;
+      if(!(heap instanceof Uint8Array))throw new Error('Wasm memory unavailable after interval failure');
+      return selected.map(row=>{
+        if(row.address+row.size>heap.byteLength)
+          throw new Error(`CPU interval diagnostic outside current Wasm memory: ${row.name}`);
+        return {...row,bytes:Array.from(heap.slice(row.address,row.address+row.size))};
+      });
+    },rows);
+  }catch(error){report.cpuIntervalFailureStatics[lane]={error:String(error)};}
+}
+
 export function validateCpuRestoreRouteSelection(values) {
   const oneTick = values['--aggregate-cpu-drawn-reference'] === true;
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
@@ -689,6 +721,7 @@ async function main() {
   const manifest = JSON.parse(fs.readFileSync(options['--manifest'], 'utf8'));
   const manifestInventory = validateSourceStateManifest(manifest);
   const tobjFailureStatics = tobjPresentationCache ? selectTobjFailureStatics(manifest) : null;
+  const cpuIntervalFailureStatics=correctedLoop?selectCpuIntervalFailureStatics(manifest):null;
   const runtimeHashes = Object.fromEntries([runtime, wasm, data].map(file => [path.basename(file), fileSha(file)]));
   if (manifestInventory.wasmSha256 !== runtimeHashes[path.basename(wasm)]) {
     throw new Error('Source-state manifest does not describe the supplied final browser Wasm');
@@ -1299,6 +1332,8 @@ async function main() {
     }
     await recordCensusFailurePageState(report, page);
     await recordTobjFailureStatics(report, page, tobjFailureStatics);
+    await recordCpuIntervalFailureStatics(report,page,cpuIntervalFailureStatics,'reference');
+    await recordCpuIntervalFailureStatics(report,predictedPage,cpuIntervalFailureStatics,'predicted');
     if (page) {
       try { report.failureScreenshot = await screenshotRecord(page, options['--out'], 'failure.png'); }
       catch (screenshotError) { report.failureScreenshotError = String(screenshotError); }
