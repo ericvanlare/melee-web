@@ -10266,7 +10266,7 @@
         }
       },
       "reusable_owner_loop_v1": {
-        "status": "FOUR_INTERVALS_COMPARE_AND_RETIRE_NEXT_HPS_EFFECT_REFUSED",
+        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_PASS_INTEGRATION_PENDING",
         "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
         "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
         "attempts": [
@@ -10467,11 +10467,13 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "After two HPS-boundary browser attempts, reduce the actual original HPS scheduler/transport request and stream-state ownership before another capture. No cancellation fix or HPS admission change is justified.",
+        "next": "Integrate reviewed reusable-loop component after repairing retained regression fixtures, affected ordinary Release build and exact-head CI; then route the same authoritative PAD rows through the existing own Worker relay. No unchanged browser repeat.",
         "limitations": [
-          "Candidate motor output is explicitly capture-only/unpublished; physical haptic output is not implemented or accepted.",
-          "No reusable-loop pass yet; no continuous live packet delivery or full-match rollback.",
-          "No successor full regression, ordinary build or exact-head CI yet."
+          "Capture-only motor publication; physical haptics remain unimplemented.",
+          "V9 spans eight intervals and 44 inputs with one- and two-tick wrong branches. The earlier V4 independently covers two seven-tick corrections. No rolling history, complete match or live network result.",
+          "HPS refill is observed in confirmed interval4; correction across refill is not composed. Pending capture/restore/END/retirement stays refused.",
+          "Incomplete private profile only; real-time budget, physical input, uninterrupted audio output and public profile admission remain open.",
+          "V9 source/result reviews and four repaired focused fixture tests pass. Final full regression, ordinary Release and exact publication-head CI remain pending."
         ],
         "motor_candidate": {
           "native_freeze": {
@@ -10661,6 +10663,101 @@
             },
             "scope": "Pure exact-bound HPS pending proof is usable only between PRE and END during reusable recording/correction. Actual original trace admits pending without mutation and still refuses capture/restore; next scheduled160sample block pumps naturally, then all68typedleaf ranges restore. Source-file/SSM/runtime/Aurora guards unchanged. Configured5TU syntax and focused frame/audio/payload/adapter controls pass. No browser composition yet.",
             "retained_failures": "New payload fixture omitted capture fence; single-module import path failed; older modeled adapter motor exports missing. Exact fixture repairs retain failing logs; unsupported motor model exports abort rather than return success."
+          }
+        },
+        "passing_browser_v9": {
+          "runtime_producer": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+          "harness_producer": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+          "capture": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/runner/evidence.json",
+            "sha256": "9d369a1e26cfa8df6346d53ed0df69df67e16ebee3fa3f9ef13ea8e06fb8836d"
+          },
+          "launch": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/launch-result.json",
+            "sha256": "f77cf828077dd4c805a09d3336d2bc4e260756a54a63b9fdb10d260929e7ef80"
+          },
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/independent-result-review.json",
+            "sha256": "314b6227c2e62a0012d37d25473829aca8e2c63e2bfca2e4480175ff1306fe79"
+          },
+          "postflight": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/independent-postflight.json",
+            "sha256": "0e6757e7f5b390152ca4d260517f0d5567009af17fbe6dfbc99659b973eacbee"
+          },
+          "producer_archive": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v9-producer-archive/archive.json",
+            "sha256": "92c1685e7afb3deb441890b01a0db51bc9ab361c68b435b0706ddeab39b9fe57"
+          },
+          "build": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v7/artifact-inventory.json",
+            "sha256": "208f357d6cc44c779fcc1aac8889be6ae186038d43024823bf20c1ca7d854040"
+          },
+          "linked_configuration": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v7/final-linked-configuration-v1.json",
+            "sha256": "d042e8dccfa561640f6a735ebd9dc71f5b7f329a3dbfa8dd20f3d17380f84a05"
+          },
+          "linked_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v7/row-review.json",
+            "sha256": "ee74dd82d2697a92031edffcf3ab5df464367e7613ea0bd7cf516e6313f0a4dc"
+          },
+          "source_integration_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/integration-review.json",
+            "sha256": "201e097151fcc9e6c7ce39f88c9bcaf92b0768b7b566e886c3f4befad8565954"
+          },
+          "elapsed_seconds": 102.72561612492427,
+          "counts": {
+            "intervals": 8,
+            "literal_samples": 44,
+            "spans": [
+              1,
+              6,
+              7,
+              7,
+              7,
+              7,
+              7,
+              2
+            ],
+            "endpoint_comparisons": 24,
+            "raw_pairs": 52,
+            "raw_lanes": 260,
+            "captures_per_page": 8,
+            "retirements_per_page": 8,
+            "max_owned_capsules": 1,
+            "reference_draws": 44,
+            "predicted_draws": 46,
+            "motor_events_capture_only": 2
+          },
+          "wrong_branches": [
+            {
+              "sample": 300,
+              "span": 1,
+              "reference_motion": 60,
+              "predicted_motion": 14
+            },
+            {
+              "sample": 342,
+              "span": 2,
+              "reference_motion": 343,
+              "predicted_motion": 14
+            }
+          ],
+          "hps_scope": "Confirmed interval4 queues HPS work after sample322 audio and completes naturally in sample323 audio. All77 Audio ranges and raw/source lanes compare. This is not correction across refill.",
+          "cleanup": "Both CPU close0, snapshot close1 and renderer shutdown1. All12 recorded PIDs absent;9 native producer pins unchanged. Final screenshots byte-identical, not an original-game pixel comparison.",
+          "integration": {
+            "failed_full_regression": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v1/result.json",
+              "sha256": "6f75ef818e60226231d5446606da607fd7dbdb56f9d29898fc00fe9f23c737f8"
+            },
+            "source_head": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+            "tests": 3077,
+            "skipped": 238,
+            "failures": 4,
+            "failure_kind": "Four missing fixture declarations/import/source-helper dependencies repaired; all four focused tests pass with independent diff/result review. No runtime change. Final full regression, ordinary Release and exact-head CI pending.",
+            "fixture_repair_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-regression-repair-v1/root-review.json",
+              "sha256": "b5d08a51f190c49e33d271dcb28a756dfa4ea9113009daf262f9785a4d469c82"
+            }
           }
         }
       }

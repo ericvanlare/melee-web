@@ -1564,7 +1564,7 @@ comparisons. The V19 hypothesis passes this run but does not establish the exact
 owner or type of the two payload rows that differed in V3. This is not a
 continuous rolling rollback, relay, whole-profile, or full-match result.
 
-The successor branch remains unmerged, with no successor full regression or CI.
+The following retained attempts precede the passing V9 component result below.
 The reusable-owner loop now has a native/host implementation and retained failed
 browser evidence in `reusable_owner_loop_v1` in the structured receipt. It uses
 eight contiguous capsules over the same literal input history, with no external
@@ -1655,17 +1655,55 @@ capture/restore boundaries. Its reduced original-source trace passes: the
 pending query preserves request, slot and loading state, capture/restore still
 refuse, and the next scheduled 160-sample block pumps naturally. The focused
 frame/audio/payload/adapter controls and five configured translation-unit syntax
-checks pass; fixture setup/import/link failures remain retained. Composed refill
-completion remains unproved. V8
+checks pass; fixture setup/import/link failures remain retained. At V8, composed
+refill completion remained unproved. V8
 retains CPU-close refusals 1073/1044; both snapshot and renderer shutdowns
 succeed, all recorded PIDs are absent and nine native producer pins match.
 The initial leaf review findings, bounded Sol repair and corrected reviewer
-finding are retained with the exact producer. Native capsule
-cleanup still refuses; in V5 the reference snapshot close also aborts and renderer
+finding are retained with the exact producer. Earlier native capsule
+cleanup refused; in V5 the reference snapshot close also aborts and renderer
 shutdown fails. Owned-process absence and all nine producer pins pass. Focused
 fixture and browser failures remain retained. General rolling
 correction, combat, frame-budget, profile admission and full-match or online
 rollback remain open.
+
+
+V9 at runtime and harness `8f846b45` passes the complete reusable-owner
+component in 102.73 seconds: eight contiguous intervals over 44 literal inputs,
+eight captures and checked retirements per page, and at most one owned capsule.
+Both wrong predictions take different actual action/motion branches and correct
+without source draw. These corrections span one and two ticks; the earlier V4
+result separately covers two seven-tick corrections. Independent retained-byte
+review reproduces all 24 nine-domain PRE/CPU/DRAW comparisons and 260 raw-lane
+comparisons, verifies actual presents and the two capture-only motor events, and
+checks the final fully confirmed timeline. The 2,171 canonical policy rows and
+all comparison fields remain unchanged.
+
+The observed HPS refill is in confirmed interval 4. Work queued after audio at
+sample 322 completes during the next scheduled audio block at sample 323, with
+all 77 typed Audio ranges and raw/source comparisons equal at the sealed
+boundaries. This is not a correction-across-refill proof. Both native CPU closes,
+snapshot closes and renderer shutdowns succeed; all 12 recorded PIDs are absent
+and nine native producer pins are unchanged. Final screenshots are byte-identical;
+this does not compare original-game pixels or establish live output timing.
+
+Source integration and independent V9 result reviews pass. The first full suite
+at `8f846b45` ran 3,077 tests with 238 skips and four fixture link/import failures:
+missing audio stream declarations, incomplete JavaScript/source mirror inputs,
+and missing original rumble-helper/source-clock dependencies in two extracted
+controls. The four focused tests now pass after reviewed fixture repairs; the
+original failure log and subsequent fixture enum/include/rebind failures remain
+retained. Runtime and harness code are unchanged. The ordinary Release build,
+final regression and exact publication-head CI remain integration gates. The
+passing capture is retained without repetition. All runtime, harness, build,
+linked policy, review, comparison and cleanup hashes are in `passing_browser_v9`
+in the existing structured receipt.
+
+The next experiment routes the same input recipe through the existing own Worker
+relay, queues asynchronous arrivals and applies them at a safe native boundary.
+Its initial Node-held sockets will establish only packet-backed browser component
+evidence. Rolling history, correction across refill, combat/KO breadth, combined
+frame budget, full-match play and public profile admission remain open.
 
 
 ## Stage decision dependencies, issue #333

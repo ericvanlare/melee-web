@@ -561,19 +561,24 @@ static CmSubject pool[70];
 static int consume_queue=1,gameplay_ok=1,hsd_calls=0,rumble_calls=0;
 static int copy_calls=0,game_calls=0,renew_calls=0,event_count=0,event_order[6];
 static int preconsume_calls=0;
+static uint32_t source_frame=0,source_frame_reads=0,source_frame_last=UINT32_MAX;
+static int rumble_source_clock_ok=1;
 /* Explicit scheduler-context witnesses; this fixture runs outside any proc. */
 HSD_GObj *HSD_GObj_804D781C,*HSD_GObj_804D7814;
 PadLibData HSD_PadLibData;
 u32* seed_ptr;
 CmSubject *cm_804D6458,*cm_804D645C,*cm_804D6460;
 uint64_t melee_web_gameplay_generation(void){return fixture_generation;}
+uint32_t melee_web_match_source_frames(void)
+{++source_frame_reads;source_frame_last=source_frame;return source_frame;}
 int melee_web_collision_readiness(MeleeWebCollision* collision,
     MeleeWebCollisionReadiness* readiness,char* error,size_t size)
 {
  (void)readiness;(void)error;(void)size;return collision!=NULL;
 }
 StaticPlayer* Player_GetPtrForSlot(int slot){return slot>=0&&slot<4?&players[slot]:NULL;}
-void HSD_PadRumbleInterpret(void){++rumble_calls;event_order[event_count++]=1;}
+void HSD_PadRumbleInterpret(void)
+{if(source_frame_reads!=(uint32_t)(rumble_calls+1)||source_frame_last!=source_frame)rumble_source_clock_ok=0;++rumble_calls;event_order[event_count++]=1;}
 void HSD_PadRenewMasterStatus(void)
 {
  ++hsd_calls;event_order[event_count++]=2;
@@ -582,7 +587,7 @@ void HSD_PadRenewMasterStatus(void)
 void HSD_PadRenewCopyStatus(void){++copy_calls;event_order[event_count++]=3;}
 void HSD_PadRenewGameStatus(void){++game_calls;event_order[event_count++]=4;}
 int melee_web_gameplay_step(char* error,size_t size)
-{(void)error;(void)size;event_order[event_count++]=5;return gameplay_ok;}
+{(void)error;(void)size;event_order[event_count++]=5;if(gameplay_ok)++source_frame;return gameplay_ok;}
 static int phase_ok(void* context,char* error,size_t size)
 {(void)error;(void)size;return *(const int*)context;}
 static int invalidate_owner(void* context,char* error,size_t size)
@@ -608,6 +613,7 @@ static void initialize(void)
  HSD_PadLibData=(PadLibData){.qnum=1,.queue=&match.input_queue};
  consume_queue=1;gameplay_ok=1;hsd_calls=0;rumble_calls=0;
  copy_calls=0;game_calls=0;renew_calls=0;event_count=0;preconsume_calls=0;
+ source_frame=0;source_frame_reads=0;source_frame_last=UINT32_MAX;rumble_source_clock_ok=1;
  HSD_GObj_804D781C=NULL;HSD_GObj_804D7814=NULL;memset(event_order,0,sizeof(event_order));
 }
 static PADStatus sample(unsigned value)
@@ -632,7 +638,8 @@ int main(void)
  if(!melee_web_match_step_raw_phased(&match,raw,NULL,NULL,NULL,NULL,error,sizeof(error)))return 1;
  if(hsd_calls!=1||rumble_calls!=1||copy_calls!=1||game_calls!=1||renew_calls||
     HSD_PadLibData.qcount!=0||match.ticks!=1||event_count!=5||
-    event_order[0]!=1||event_order[1]!=2||event_order[2]!=3||event_order[3]!=4||event_order[4]!=5)return 2;
+    event_order[0]!=1||event_order[1]!=2||event_order[2]!=3||event_order[3]!=4||event_order[4]!=5||
+    source_frame_reads!=1||source_frame_last!=0||source_frame!=1||!rumble_source_clock_ok)return 2;
  if(!melee_web_match_stadium_pad_queue_observation(&match,&observed,error,sizeof(error)))return 3;
  if(observed.source_generation!=1||observed.source_tick_before!=0||observed.source_tick_after!=1||
     observed.qnum_before!=1||observed.qread_before!=0||observed.qcount_before!=1||

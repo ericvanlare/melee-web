@@ -277,10 +277,12 @@ int main(void){
             'test_cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
             'test_cpu_seven_tick_runner.mjs','cpu_corrected_runner.mjs','test_cpu_corrected_runner.mjs',
             'cpu_corrected_two_window_runner.mjs','test_cpu_corrected_two_window_runner.mjs',
+            'cpu_corrected_loop_runner.mjs','test_cpu_corrected_loop_runner.mjs',
             'cpu_endpoint.mjs','test_cpu_endpoint.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
         files+=['scripts/browser_tools.mjs','scripts/net_rollback_input_timeline.mjs',
                 'scripts/net_lockstep_core.mjs','tests/quiescent_wasm_snapshot.mjs']
+        files+=['src/gameplay_audio_fx.c','src/gameplay_audio.h','src/gameplay_audio_stream.h']
         for relative in files:
             source=SOURCE/relative
             if not source.is_file():source=ROOT/relative
@@ -290,6 +292,7 @@ int main(void){
         for module in ['cpu_restore_runner.mjs','cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
                        'cpu_corrected_runner.mjs','cpu_endpoint.mjs',
                        'cpu_corrected_two_window_runner.mjs',
+                       'cpu_corrected_loop_runner.mjs',
                        'run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)
             (mirror/(module+'.syntax.log')).write_text(result.stdout+result.stderr)
@@ -298,6 +301,7 @@ int main(void){
                                str(directory/'test_cpu_two_tick_runner.mjs'),str(directory/'test_cpu_seven_tick_runner.mjs'),
                                str(directory/'test_cpu_corrected_runner.mjs'),str(directory/'test_cpu_endpoint.mjs'),
                                str(directory/'test_cpu_corrected_two_window_runner.mjs'),
+                               str(directory/'test_cpu_corrected_loop_runner.mjs'),
                                str(directory/'test_write_census_contract.mjs')],cwd=mirror,
                               capture_output=True,text=True,timeout=60)
         (mirror/'node-contracts.log').write_text(result.stdout+result.stderr)
