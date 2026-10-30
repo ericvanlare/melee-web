@@ -25,6 +25,8 @@ option(MELEE_WEB_SLIPPI_SYNCTEST
   "Build the private drawn-reference versus no-draw Slippi dependency synctest" OFF)
 option(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
   "Build the private Release ordinary-runtime source-history profile" OFF)
+option(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY
+  "Enable private source-history staging-shadow inventory" OFF)
 set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED OFF)
 if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
   set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED ON)
