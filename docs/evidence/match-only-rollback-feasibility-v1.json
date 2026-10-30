@@ -9819,8 +9819,8 @@
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-corrected-early-cleanup-sol-review-v1.json",
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
-      "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and9producerpins unchanged.",
-      "next": "Repair integration regression failures and complete publication validation; then proof-backed confirmed checkpoint retirement/reuse in the same match. Continuous rolling/live relay/full-match/profile admission remain open.",
+      "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and nine producer pins unchanged.",
+      "next": "Publication-head CI and integration; then proof-backed confirmed checkpoint retirement/reuse in the same match. Continuous rolling/live relay/full-match/profile admission remain open.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
@@ -9843,7 +9843,7 @@
         "tests": 3069,
         "failures": 7,
         "skips": 238,
-        "status": "failed; patch canonicalization and extracted-fixture repairs in progress"
+        "status": "retained failure; repaired methods pass focused controls and final full regression v2"
       },
       "canonicalization": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-repair-v1/canonicalization.json",
@@ -9866,7 +9866,23 @@
           "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-regression-repair-v1/effect-helper-retry.json",
           "sha256": "4d74ef83616fab10699136d81e788f0f050fbd82b94853191c457747aaf07e3f"
         },
-        "scope": "All seven initially failed methods pass across the focused run (six) and one helper-name repair retry (one). Tests/patch canonicalization only; actual source tree unchanged. Whole-suite final rerun remains pending. First repair-run failure retained."
+        "scope": "All seven initially failed methods pass across the focused run (six) and one helper-name repair retry (one). Tests/patch canonicalization only; actual source tree unchanged. Final whole-suite rerun passes at 16c4824d. First repair-run failure retained."
+      },
+      "integration_validation": {
+        "source_head": "16c4824d6b85c8c207f50bf7073ed27682db2678",
+        "full_regression": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-full-regression-v2/summary.json",
+          "sha256": "5022b9aa46f9ba61431c340883de2e783cd0ee34dad71e2238855f9f0eb12f02"
+        },
+        "ordinary_release": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-v18-ordinary-release-v1/result.json",
+          "sha256": "15ba9275b7e2081b85d4fa8296840da0bae013d44c44e774fa166160f1ff2f7a"
+        },
+        "readiness_review": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/integration-readiness-sol-v1.json",
+          "sha256": "18c8ba1bfcccd086b4a73815b0e26f4803af1cdb879dab907bcd80154e767896"
+        },
+        "status": "Local validation passes: 3,069 tests with 238 skips and ordinary Release runtime build. Exact publication-head CI remains pending. Runtime f4ae3dc3 and capture harness 6a52264d remain distinct."
       }
     }
   }
