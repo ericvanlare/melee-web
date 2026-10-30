@@ -10394,6 +10394,39 @@
               "sha256": "2795af8928eabb00b2d2e588bf8c6520e4bfd486cd66a31885f4b1355ce40412"
             },
             "result": "Four contiguous intervals compare and retire on both pages; complete current payload topology grows3467->3471 rows in interval2. Independent strict9domain/raw-five/motor/retirement replay passes. Fifth interval reference command34/sample322 reaches sourceframe199 then refuses HPS effect3 epoch5; exact operation not yet attributed. 12 ownedPIDs absent/9producerpins unchanged; native teardown failed and reference snapshot close abort is retained."
+          },
+          {
+            "runtime_producer": "cf122de67f3d31a22f66999228eef96f3b29f70c",
+            "harness_producer": "cf122de67f3d31a22f66999228eef96f3b29f70c",
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/runner/evidence.json",
+              "sha256": "57e23741e31dc069e02a32abeb729bb7a24b52b043f50036a7b79d4376ee4f53"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/first-hps-site-summary.json",
+              "sha256": "9c304799bdba527521ef8d3519f520046fb390fe75bdd073401908bcf62c26eb"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/independent-postflight.json",
+              "sha256": "d2f2518f233acd46fdde23e4f27f01f4ae11c89a8e6b77c9a563c7b4b8839465"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v6-producer-archive/archive.json",
+              "sha256": "23ad4ff4cad61acf1d3743074d727c165ac8ad517577d216d69c29b71b4ec5dd"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v5/artifact-inventory.json",
+              "sha256": "26401bf070d3e1873ea7aeca4553705f912872c467be2575fcde8528f8feaa23"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v5/final-linked-configuration-v1.json",
+              "sha256": "5d97e907e65eb9ed71eac11608bd69add3c76743a4c45bf58b4c8e0073d9ad40"
+            },
+            "linked_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v5/row-review.json",
+              "sha256": "3267284b8aead4fc99d8baaee21f351f6ffebdd9b72e042d71d26a44103a0641"
+            },
+            "result": "Failure-only marker proves first guard is HPS DevCom request, not cancellation dispatch. Same sample322/capsule4/referencecommand34 refusal. Full request tuple not recorded. Owned processes absent and producer pins unchanged; native cleanup still fails."
           }
         ],
         "observed": {
@@ -10434,7 +10467,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Failure-only attribution at existing HPS guard sites, then reduce the actual host operation before any policy repair. Keep true HPS refill ownership and possible cancellation classification distinct; no speculative allowance inferred.",
+        "next": "After two HPS-boundary browser attempts, reduce the actual original HPS scheduler/transport request and stream-state ownership before another capture. No cancellation fix or HPS admission change is justified.",
         "limitations": [
           "Candidate motor output is explicitly capture-only/unpublished; physical haptic output is not implemented or accepted.",
           "No reusable-loop pass yet; no continuous live packet delivery or full-match rollback.",
@@ -10504,7 +10537,7 @@
           }
         },
         "hps_failure_attribution": {
-          "state": "FOCUSED_PASS_REVIEW_PENDING",
+          "state": "BROWSER_FIRST_SITE_AND_REDUCED_STREAM_OMISSION_OBSERVED_REPAIR_IN_PROGRESS",
           "freeze": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-site-attribution-freeze-v1.json",
             "sha256": "e27e5419e0422756a81544e0505c56383999a8367b54fa52443f44808786b38c"
@@ -10513,7 +10546,79 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-architecture-sol-v1.json",
             "sha256": "b808edb8f951742fd50d79f6552711efbddc42e77afa06b42060c39a3a46655d"
           },
-          "scope": "Constant first-refusal site tag at existing five HPS guards. No request, PCM, source order, admission, cleanup or comparison change. Actual DevCom request guard control passes; exact V5 caller remains unknown."
+          "scope": "Constant first-refusal site tag at existing five HPS guards. No request, PCM, source order, admission, cleanup or comparison change. Actual DevCom request guard control passes; V6 identifies devcom-request, but not its complete request tuple.",
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-site-attribution-independent-review-v1.json",
+            "sha256": "8672fd64e6a2cc4d36040a0cfc74defc0d27af5edd66cd516390b29e45f70496"
+          },
+          "speculative_repair_contract": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-speculative-repair-sol-v1.json",
+            "sha256": "92bf47f9b0c54aa4165096fa75054cf9d7a6bd13413a49c2274b9a8c625d1df2",
+            "scope": "Conditional source-only design: typed quiescent stream snapshots and stable authored-bound PCM slots, preserving original requests/callback order. Actual refill/slot-reuse proof required before admission."
+          },
+          "source_header_coverage": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-source-coverage-sol-v1.json",
+            "sha256": "a60b518ca443f3c89dbe7277f60c67e40ce9425af76a84e257e8775472850aea",
+            "scope": "Known source HPS headers and callback targets have existing full strict rows; missing host stream owner remains. Source review, not observed sample322 request coverage."
+          },
+          "reduced_stream_omission": {
+            "source_freeze": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-source-v2/freeze.json",
+              "sha256": "5aec71c3214cf35f02ad25a3eedde8597be337ad1b5ba48f0793fb9ca733dbc2"
+            },
+            "independent_source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-source-v2/independent-source-review.json",
+              "sha256": "63bf9f61a6f6569bf84b456188e398bf5412b806deb256073aa9dd489b4d770b"
+            },
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-run-v1/result-corrected-v2.json",
+              "sha256": "e1aa3c064814869df5c69aafacce2856fa0653dbb5b8ae868a85c7375e34c609"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-run-v1/producer-archive/archive.json",
+              "sha256": "1c2a1f9dca470eaa5e428649b4db0a962bfe673cdba2347b620eb5369045e239"
+            },
+            "observed": "Original sp_end scheduler:361 calls of160samples; queued0x21 header id28 -> actual same-pump0x23 payload id32 replacing occupiedslot2 block128 with196832. Mixer restore succeeds but slot identity, PCM addresses/extents/hashes and completed counter remain post-refill. PRE pending1/loading1; POSTpending0/loading0.31events/nooverflow; process group absent.",
+            "scope": "Reduced stream-owner omission only. Original source globals are not restored; no playback-wide PCM replay equivalence or exact attribution of browser sample322 tuple. Quiescent-only stream snapshot cannot admit this pending PRE.",
+            "retained_failure": "Initial build launcher could not resolve cmake; no compiler ran. Corrected launcher uses existing configured absolute executable. No default100second trace or browser rerun."
+          },
+          "integration_contract": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-audio-integration-sol-v2.json",
+            "sha256": "c7700dae9f0f85c63b4e5ffa2c5d2bc05e23da1225326feed0b4cf258d701be7",
+            "scope": "Exact active interval binding alone holds stream lifetime. Failed disarm releases it before source retirement; snapshot copies may outlive the stream. Existing Audio domain/312 ABI; source+PCM composed replay remains required."
+          },
+          "aggregate_candidate": {
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-audio-aggregate-root-v1/independent-review.json",
+              "sha256": "d72dc5ff535cc68f1baf6cefbd610a666d58043793272fef0be5aa5ec1b4596c"
+            },
+            "scope": "Root aggregate wiring source GO. Two actual aggregate tests use a synthetic stream leaf; unchanged legacy factory, absence/presence refusal, no writes on failed stream/FX admission, allocation-free restore and failed binding cleanup. No actual HPS or browser replay claim."
+          },
+          "host_candidate": {
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-host-contract-luna-v1/independent-review-v2.json",
+              "sha256": "b630bf8e22acc1f6ad5a929a4fbea83a86249553b15a1e5daaa74d5661f6fd55"
+            },
+            "scope": "12 host checks and3 admitted CPU endpoint controls pass. Legacy6/9 row forms retained, typed stream cap77 total. Historical census remains9rows/252bytes; CPU endpoint remains312bytes. Initial legacy-completeness HOLD and failed correction test retained."
+          },
+          "stream_leaf_restore": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-leaf-run-v1/result.json",
+              "sha256": "111fe157a1bc72a4d3656c678e1e79636f32d3a5f323a4a78309fb54d0d8df09"
+            },
+            "scope": "Actual original HPS advances361calls torefillid32/slot2/block196832;68typedrange identities and885476bytes incl6PCM buffers restored exactly to naturallyquiescentPRE. Pendingcapture, wrongtoken, capacitywithoutcallbacks and real failedbindingcleanup pass. No source scheduler/AX/HSD/output replay equivalence or browser claim.",
+            "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-leaf-sol-repair-v1/root-review.json",
+            "retained_findings": "Initial independent HOLD: stream visitor ABI mismatch, early stalehandle dereference and pendingadmit test inversion repaired by Sol; countercapture allegation withdrawn as reviewer readingerror. Originalfreeze/HOLD/delta preserved."
+          },
+          "interval_leaf_restore": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-interval-run-v1/result.json",
+              "sha256": "7e1d2c31a062aec836ace1ee7935c66740a6c8d479b4428e7199973e1a78853d"
+            },
+            "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interval-authorization-sol-v1/root-review.json",
+            "scope": "The same actual HPS first refill completes under the exact healthy stream snapshot/token binding. All68stream ranges restore exactly. Valid0x22 relay and cancellation attempts remain refused before changing stream bytes; failed exact bindings clean up. Focused actual closed-barrier control passes. Original scheduler globals/AX/output replay and browser composition remain unproven.",
+            "retained_failure": "First trace syntax check failed on original ssize_t/callback ABI; fixed with existing compatibility header and actual source boolean ABI; logs retained."
+          }
         }
       }
     }

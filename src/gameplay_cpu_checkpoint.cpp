@@ -73,7 +73,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
         c->commit_.context_snapshot=melee_web_match_context_snapshot_capture(c->owner_.context,leaf_error,sizeof(leaf_error));
         if(!c->commit_.context_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),leaf_error[0]?leaf_error:"Match-context snapshot capture returned null without error text");return {};}
         stage=CpuComparisonDomain::Audio;
-        c->commit_.audio_snapshot=melee_web_audio_snapshot_capture(c->owner_.audio);
+        c->commit_.audio_snapshot=allow_variable?
+            melee_web_audio_snapshot_capture_with_stream(c->owner_.audio):
+            melee_web_audio_snapshot_capture(c->owner_.audio);
         if(!c->commit_.audio_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"Audio snapshot capture returned null (opaque capture API)");return {};}
         stage=CpuComparisonDomain::Payload;
         auto payload=melee_web_source_memory_payload_snapshot_capture();
@@ -146,6 +148,10 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
     commit_.effect_token=melee_web_cpu_interval_begin();
     motor_token_=commit_.effect_token;
     if(!commit_.effect_token||melee_web_action_interval_begin_record(commit_.actions)!=1){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    if(!melee_web_audio_snapshot_interval_begin(owner_.audio,commit_.audio_snapshot,
+                                               commit_.effect_token)){
         disarm();phase_=Phase::Failed;return false;
     }
     if(reusable_loop_&&!melee_web_cpu_interval_motor_capture_begin(
@@ -546,6 +552,9 @@ void GameplayCpuCheckpoint::disarm() noexcept {
     melee_web_tobj_writer_disarm(tobj_writer_session_);
     melee_web_class_piece_disarm(class_piece_anchor_);
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);
+    if(commit_.effect_token&&commit_.audio_snapshot)
+        (void)melee_web_audio_snapshot_interval_end(owner_.audio,commit_.audio_snapshot,
+                                                  commit_.effect_token);
     if(commit_.effect_token){melee_web_cpu_interval_end(commit_.effect_token);commit_.effect_token=0;}
 }
 bool GameplayCpuCheckpoint::source_owners_retired(const GameplayMatchSession* session) noexcept {

@@ -33,7 +33,9 @@ typedef enum MeleeWebAudioOwnedRangeKind {
  MELEE_WEB_AUDIO_RANGE_AUDIO_STARTS,
  MELEE_WEB_AUDIO_RANGE_EFFECTS_OWNER,
  MELEE_WEB_AUDIO_RANGE_EFFECTS_REVERB_HEAP,
- MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP
+ MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP,
+ /* Stream kind/index pairs occupy BASE + kind*8 + index. */
+ MELEE_WEB_AUDIO_RANGE_STREAM_BASE=0x100
 } MeleeWebAudioOwnedRangeKind;
 typedef struct MeleeWebAudioOwnedRange {
  MeleeWebAudioOwnedRangeKind kind;
@@ -50,7 +52,10 @@ typedef enum MeleeWebAudioRangeVisitResult {
  MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY=-3,
  MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED=-4
 } MeleeWebAudioRangeVisitResult;
-enum { MELEE_WEB_AUDIO_OWNED_RANGE_MAX=9 };
+/* Four stream rows, 6*8 channel members, pointer/capacity/prepared/visited/
+ * progress rows, six PCM buffers and both IO handle/data pairs. */
+#define MELEE_WEB_AUDIO_STREAM_OWNED_RANGE_MAX 68u
+enum { MELEE_WEB_AUDIO_OWNED_RANGE_MAX=9+MELEE_WEB_AUDIO_STREAM_OWNED_RANGE_MAX };
 /* Borrow decoded PCM and SEM data through end; setup publishes owned native
  * banks/programs to original synth/SEM code. This is a single stereo32kHz
  * provider; output calls advance the actual160-sample original audio clock. */
@@ -65,14 +70,22 @@ int melee_web_audio_active_samples(MeleeWebAudio*,uint32_t* ids,uint32_t capacit
  * address without exposing or interpreting that address. */
 uint64_t melee_web_audio_generation(MeleeWebAudio*);
 int melee_web_audio_end(MeleeWebAudio*,char*,size_t);
-/* This component captures owned mixer/SEM descriptor bytes and effect heaps.
- * It does not capture original source globals, streamed PCM/transfer owners,
- * immutable input assets or consumed Web Audio output. Caller must be at an
- * exported-call boundary and close those other owners before world restore. */
+/* Explicit private pre-capsule opt-in. Absent streams need no preparation.
+ * Present streams allocate stable authored-bound PCM storage at quiescence. */
+int melee_web_audio_prepare_stream_snapshot(MeleeWebAudio*);
+/* Legacy mixer/SEM/effects capture does not own HPS transport. The explicit
+ * stream variant prepares stable storage and also records typed stream state
+ * or its absence. Source globals, immutable assets and consumed Web Audio
+ * output remain separate owners. No transfer is drained to capture. */
 MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio*);
+MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture_with_stream(MeleeWebAudio*);
 int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 int melee_web_audio_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioSnapshot*);
 void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot*);
+/* Exact PRE receipt binding after the CPU interval token exists. End also
+ * revokes a failed interval, before source owners are retired. */
+int melee_web_audio_snapshot_interval_begin(MeleeWebAudio*,const MeleeWebAudioSnapshot*,uint64_t);
+int melee_web_audio_snapshot_interval_end(MeleeWebAudio*,const MeleeWebAudioSnapshot*,uint64_t);
 /* Exact existing snapshot-owned scalars, borrowed only while this live owner
  * and generation remain unchanged. Pure: no pump, allocation or counter reset. */
 typedef struct MeleeWebAudioCpuStorage {
@@ -87,8 +100,9 @@ MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio*,uint64_t gene
  * capacity is checked before the first callback. A callback
  * returns nonzero to continue. If it returns zero, the result is STOPPED and
  * any delivered prefix must be discarded. Rows describe provenance only and
- * do not admit snapshot restore. Borrowed input PCM/SEM and FX aux ring
- * pointees are excluded. A row pointer is valid only during its callback;
+ * do not admit snapshot restore. Prepared HPS streams append their named
+ * mutable state and stable buffers. Borrowed input PCM/SEM and FX aux ring
+ * pointees remain excluded. A row pointer is valid only during its callback;
  * copy the row by value to retain it. The callback must not end or mutate
  * this owner. */
 MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(

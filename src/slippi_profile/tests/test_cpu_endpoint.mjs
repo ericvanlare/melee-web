@@ -2,10 +2,11 @@
 // Mocked endpoint-reader controls. These validate the fixed transport and
 // comparator; they are not a gameplay, source-owner, or browser test.
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import vm from 'node:vm';
 import {
-  CPU_ENDPOINT_LAYOUT, CPU_ENDPOINT_PROVENANCE,
+  CPU_ENDPOINT_AUDIO_RANGE, CPU_ENDPOINT_LAYOUT, CPU_ENDPOINT_PROVENANCE,
   CPU_ENDPOINT_RECORD_BYTES, CPU_ENDPOINT_STATUS, CPU_ENDPOINT_VIEW,
   collectCpuEndpointInPage, compareCpuEndpoints, decodeCpuEndpointResult,
   decodeCpuParticleEndpointResult, compareCpuParticleEndpoints, compareCpuReferenceParticleEndpoints,
@@ -17,7 +18,48 @@ const HEAP_BYTES = 131072;
 const toWire = value => JSON.parse(JSON.stringify(value));
 const keyOf = (domain, kind, index) => `${domain}/${kind}/${index}`;
 
-function overrides(domain, kind, index) {
+function parseCEnum(source, enumName) {
+  const match=source.match(new RegExp(`typedef enum ${enumName}\\s*\\{([\\s\\S]*?)\\}\\s*${enumName}\\s*;`));
+  assert.ok(match,`missing ${enumName}`);
+  const body=match[1].replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/[^\n]*/g,'');
+  const result=new Map();let previous=-1;
+  for(const raw of body.split(',')){
+    const token=raw.trim();if(!token)continue;
+    const item=token.match(/^([A-Z0-9_]+)(?:\s*=\s*(0x[0-9a-fA-F]+|[0-9]+))?$/);
+    assert.ok(item,`cannot parse ${enumName} member ${token}`);
+    const value=item[2]===undefined?previous+1:Number(item[2]);
+    result.set(item[1],value);previous=value;
+  }
+  return result;
+}
+
+function makeAudioRangeKinds(count,{omitPcmBytes=false}={}) {
+  let kinds = [...CPU_ENDPOINT_AUDIO_RANGE.legacyKinds];
+  const channelKinds = new Set([
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PCM,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_FRAMES,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_PCM,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_AND_NIBBLES,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_COEFFICIENTS,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PREDICTORS,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_HISTORIES,
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOPING,
+  ]);
+  for (const streamKind of Object.values(CPU_ENDPOINT_AUDIO_RANGE.streamKinds)) {
+    const indexes = channelKinds.has(streamKind) ||
+      streamKind === CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES
+      ? [0,1,2,3,4,5] : [0];
+    for (const index of indexes)
+      kinds.push(CPU_ENDPOINT_AUDIO_RANGE.streamBase + streamKind * CPU_ENDPOINT_AUDIO_RANGE.streamKindStride + index);
+  }
+  if(omitPcmBytes)kinds=kinds.filter(kind=>kind<CPU_ENDPOINT_AUDIO_RANGE.streamBase||
+    Math.floor((kind-CPU_ENDPOINT_AUDIO_RANGE.streamBase)/CPU_ENDPOINT_AUDIO_RANGE.streamKindStride)!==
+      CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES);
+  while (kinds.length < count) kinds.push(CPU_ENDPOINT_AUDIO_RANGE.streamBase + 24 * 8);
+  return kinds.slice(0,count);
+}
+
+function overrides(domain, kind, index, audioKinds) {
   const values = new Map();
   const set = (name, value) => values.set(name, BigInt(value));
   if (kind === 'Header') {
@@ -25,11 +67,12 @@ function overrides(domain, kind, index) {
     if (domain === 'Payload') Object.entries({Schema:1,HeapHandle:4,HeapBytes:64000,OwnerEpoch:3,World:2,Watermark:11,TopologyRevision:7,ArenaBegin:4096,ArenaEnd:60000,RowCount:1,FreeCellCount:1,AllocatedCellCount:1,PayloadBytes:3}).forEach(([n,v])=>set(n,v));
     if (domain === 'Flow') Object.entries({Identity:101,Epoch:3,Generation:4,SourceValid:1,Complete:1,OpeningDemo:0,ClockFieldCount:19,ProcessMaskBytes:3,ProfilePhaseBytes:2,CadenceFieldCount:14}).forEach(([n,v])=>set(n,v));
     if (domain === 'Bootstrap') set('RangeCount',2);
-    if (domain === 'Audio') Object.entries({Generation:3,OwnedRangeCount:1,CommandBudgetAddress:20000,SoundModeAddress:21000}).forEach(([n,v])=>set(n,v));
+    if (domain === 'Audio') Object.entries({Generation:3,OwnedRangeCount:audioKinds.length,CommandBudgetAddress:20000,SoundModeAddress:21000}).forEach(([n,v])=>set(n,v));
     if (domain === 'Statics') Object.entries({TableIdentity:30000,RowCount:1}).forEach(([n,v])=>set(n,v));
   }
   if (domain === 'Owner' && kind === 'Owner') {
     set('Storage', 0x20_0000_0000_0001n); // Above Number's exact integer range.
+    set('Audio',25000);
     set('SourceFrame', 300);
   }
   if (kind === 'ActionSlot') { set('Binding', Math.floor(index / 2)); set('Slot', index % 2); set('SymbolBytes',3); }
@@ -44,7 +87,11 @@ function overrides(domain, kind, index) {
   if (kind === 'ContextRange') set('Extent',3);
   if (kind === 'BootstrapTicks') set('Extent',3);
   if (kind === 'BootstrapDisabledLinks') set('Extent',4);
-  if (kind === 'AudioOwnedRange') set('Extent',3);
+  if (kind === 'AudioOwnedRange') {
+    const rangeKind=audioKinds[index];
+    set('Kind',rangeKind);set('Address',30000+index*16);set('Extent',3);
+    set('OwnerIdentity',25000);set('Generation',rangeKind>=CPU_ENDPOINT_AUDIO_RANGE.streamBase?4:3);
+  }
   if (kind === 'AudioCommandBudget' || kind === 'AudioSoundMode') set('Extent',4);
   if (kind === 'StaticRow') { set('Index',index); set('Extent',5); }
   return values;
@@ -60,8 +107,10 @@ function countFor(group, header) {
   return Number(base * factor);
 }
 
-function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false}={}) {
+function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false,audioRangeCount=1,
+  omitPcmBytes=false}={}) {
   const heap = new Uint8Array(HEAP_BYTES), rows = new Map();
+  const audioKinds=makeAudioRangeKinds(audioRangeCount,{omitPcmBytes});
   let nextAddress = baseAddress, previousBorrow = null, borrowSerial = 0;
   const heapView = new DataView(heap.buffer);
   const writeRecord = (record) => {
@@ -76,7 +125,7 @@ function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false
     heapView.setUint32(PTR+304,record.borrowedBytes,true); heapView.setUint32(PTR+308,record.reserved,true);
   };
   const buildRow = (domainSpec,rowSpec,index,count) => {
-    const values = overrides(domainSpec.name,rowSpec.kindName,index);
+    const values = overrides(domainSpec.name,rowSpec.kindName,index,audioKinds);
     const fields = rowSpec.fields.map((name,fieldIndex)=>values.has(name) ? values.get(name) :
       BigInt(0x1000 + domainSpec.id*100 + rowSpec.kind*10 + index + fieldIndex));
     let borrowedAddress=0, borrowedBytes=0;
@@ -236,6 +285,116 @@ test('one synchronous page callback walks every named domain and copies borrowed
   const firstBorrow=envelope.domains[2].records.find(item=>item.kindName==='ActionSlot');
   assert.notEqual(firstBorrow.bytesBase64,Buffer.alloc(firstBorrow.borrowedBytes,0xee).toString('base64'));
   assert.equal(firstBorrow.bytesBase64,Buffer.from([3*31+2*7,3*31+2*7+1,3*31+2*7+2]).toString('base64'));
+  assert.equal(envelope.domains[7].records.find(item=>item.kindName==='AudioOwnedRange').fields[0],'1',
+    'the historical one-row audio fixture remains supported');
+});
+
+test('legacy six- and nine-row audio inventories remain valid without a stream',async()=>{
+  for(const count of [6,9]){
+    const fixture=makeFixture({audioRangeCount:count});
+    const raw=await fixture.page.evaluate(collectCpuEndpointInPage,{view:1,provenance:1});
+    const endpoint=decodeCpuEndpointResult(toWire(raw));
+    const audio=endpoint.domains[7];
+    assert.equal(audio.records.filter(item=>item.kindName==='AudioOwnedRange').length,count);
+    assert.deepEqual(audio.records.filter(item=>item.kindName==='AudioOwnedRange')
+      .map(item=>item.fields[0]),Array.from({length:count},(_,index)=>String(index+1)));
+  }
+});
+
+test('audio endpoint validates the authored HPS kind/index set through the 77-row limit',async()=>{
+  const fixture=makeFixture({audioRangeCount:CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges});
+  const endpoint=await collect(fixture);
+  const ranges=endpoint.domains[7].records.filter(item=>item.kindName==='AudioOwnedRange');
+  assert.equal(ranges.length,77);
+  assert.equal(ranges.filter(row=>BigInt(row.fields[0])>=BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase)).length,68);
+  assert.equal(ranges.at(-1).fields[0],String(CPU_ENDPOINT_AUDIO_RANGE.streamBase+
+    CPU_ENDPOINT_AUDIO_RANGE.streamKinds.RELAY_BYTES*CPU_ENDPOINT_AUDIO_RANGE.streamKindStride));
+
+  const reference=await collect(makeFixture({view:2,provenance:2,audioRangeCount:77}),2,2);
+  const corrected=await collect(makeFixture({view:2,provenance:3,audioRangeCount:77}),2,3);
+  assert.equal(compareCpuEndpoints(reference,corrected).equal,true);
+  const changedAddress=structuredClone(corrected);
+  const streamRange=changedAddress.domains[7].records.find(row=>row.kindName==='AudioOwnedRange'&&
+    BigInt(row.fields[0])>=BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase));
+  streamRange.fields[1]=(BigInt(streamRange.fields[1])+1n).toString(10);
+  assert.throws(()=>compareCpuEndpoints(reference,changedAddress),/Audio\.AudioOwnedRange\[9\]\.metadata\[Address\]/,
+    'stream owner addresses remain exact across the endpoint comparison');
+
+  const missingPcm=await collect(makeFixture({audioRangeCount:71,omitPcmBytes:true}));
+  assert.equal(missingPcm.domains[7].records.filter(row=>row.kindName==='AudioOwnedRange').length,71,
+    'the leaf may omit authored PCM rows for absent channels');
+  await assert.rejects(()=>collect(makeFixture({audioRangeCount:76})),/incomplete 23 row set/,
+    'all non-PCM typed rows remain required');
+});
+
+test('audio endpoint refuses unknown HPS kinds, malformed indexes, and counts beyond the leaf bound',async()=>{
+  for(const [label,kind,pattern] of [
+    ['unknown stream kind',CPU_ENDPOINT_AUDIO_RANGE.streamBase+24*8,/kind\/index is not authored/],
+    ['scalar index',CPU_ENDPOINT_AUDIO_RANGE.streamBase+
+      CPU_ENDPOINT_AUDIO_RANGE.streamKinds.SELECTED_FILE*8+1,/kind\/index is not authored/],
+    ['channel index',CPU_ENDPOINT_AUDIO_RANGE.streamBase+
+      CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PCM*8+6,/kind\/index is not authored/],
+  ]){
+    const fixture=makeFixture({audioRangeCount:10});
+    updateRawRecord(fixture,keyOf(8,1,9),record=>{
+      record.fields[0]=BigInt(kind);record.fields[1]=32000n;
+      record.fields[3]=25000n;record.fields[4]=4n;
+    });
+    await assert.rejects(()=>collect(fixture),pattern,label);
+    assert.equal(fixture.calls.at(-1)[0],'end',`${label} closes the endpoint batch`);
+  }
+  const overflow=makeFixture({audioRangeCount:78});
+  await assert.rejects(()=>collect(overflow),/audio owned-range count is outside its authored bound/);
+  assert.equal(overflow.calls.some(call=>call[0]==='record'&&call[1]===8&&call[2]===1),false,
+    'a declared over-cap count is refused before any audio range is read');
+  assert.equal(overflow.calls.at(-1)[0],'end');
+  const badSpan=makeFixture();
+  updateRawRecord(badSpan,keyOf(8,1,0),record=>record.fields[1]=0xffff_fffen);
+  await assert.rejects(()=>collect(badSpan),/audio owned-range address, extent, owner, or generation is invalid/);
+  const partialLegacy=makeFixture({audioRangeCount:2});
+  await assert.rejects(()=>collect(partialLegacy),/audio stream snapshot is missing base audio range kind 3/);
+  const splitStreamOwner=makeFixture({audioRangeCount:77});
+  updateRawRecord(splitStreamOwner,keyOf(8,1,10),record=>record.fields[3]=25001n);
+  await assert.rejects(()=>collect(splitStreamOwner),/stream ranges disagree on owner identity or generation/);
+  const zeroSpan=makeFixture({audioRangeCount:77});
+  updateRawRecord(zeroSpan,keyOf(8,1,62),record=>{
+    record.fields[2]=0n;record.borrowedAddress=0;record.borrowedBytes=0;
+  });
+  await assert.rejects(()=>collect(zeroSpan),/address, extent, owner, or generation is invalid/,
+    'an absent PCM buffer is omitted by the leaf rather than represented by a zero extent');
+});
+
+test('audio host bounds follow the source enums while the historical census remains nine rows',()=>{
+  const audioHeader=readFileSync(new URL('../../gameplay_audio.h',import.meta.url),'utf8');
+  const streamHeader=readFileSync(new URL('../../gameplay_audio_stream.h',import.meta.url),'utf8');
+  const legacy=parseCEnum(audioHeader,'MeleeWebAudioOwnedRangeKind');
+  assert.deepEqual([...legacy],[
+    ['MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER',1],['MELEE_WEB_AUDIO_RANGE_AUDIO_ENTRIES',2],
+    ['MELEE_WEB_AUDIO_RANGE_AUDIO_BINDINGS',3],['MELEE_WEB_AUDIO_RANGE_AUDIO_PROGRAMS',4],
+    ['MELEE_WEB_AUDIO_RANGE_AUDIO_WORDS',5],['MELEE_WEB_AUDIO_RANGE_AUDIO_STARTS',6],
+    ['MELEE_WEB_AUDIO_RANGE_EFFECTS_OWNER',7],['MELEE_WEB_AUDIO_RANGE_EFFECTS_REVERB_HEAP',8],
+    ['MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP',9],['MELEE_WEB_AUDIO_RANGE_STREAM_BASE',0x100],
+  ]);
+  const stream=parseCEnum(streamHeader,'MeleeWebAudioStreamRangeKind');
+  assert.deepEqual(Object.entries(CPU_ENDPOINT_AUDIO_RANGE.streamKinds).map(([name,value])=>
+    [`MELEE_WEB_AUDIO_STREAM_RANGE_${name}`,value]),[...stream]);
+  const streamMax=Number(audioHeader.match(/#define MELEE_WEB_AUDIO_STREAM_OWNED_RANGE_MAX (\d+)u/)?.[1]);
+  assert.equal(streamMax,CPU_ENDPOINT_AUDIO_RANGE.maxStreamRanges);
+  assert.equal(9+streamMax,CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges);
+  assert.match(audioHeader,/MELEE_WEB_AUDIO_OWNED_RANGE_MAX\s*=\s*9\s*\+\s*MELEE_WEB_AUDIO_STREAM_OWNED_RANGE_MAX/);
+
+  const census=readFileSync(new URL('./synctest_browser.cpp',import.meta.url),'utf8');
+  assert.match(census,/constexpr uint32_t kAudioRangeWireCapacity = 9;/);
+  assert.match(census,/AudioRangeWireRow rows\[kAudioRangeWireCapacity\]/);
+  assert.match(census,/AudioRangeWireRow rows\[kAudioRangeWireCapacity\]\{\}/);
+  assert.match(census,/sizeof\(AudioRangeWireInventory\) == 252/);
+  assert.match(census,/audio_range_wire\.capacity = kAudioRangeWireCapacity/);
+  assert.match(census,/melee_web_audio_visit_owned_ranges\(current_audio, expected_generation,\s*kAudioRangeWireCapacity/);
+  assert.match(census,/capture\.count != 6 && capture\.count != 9/);
+  assert.doesNotMatch(census,/MELEE_WEB_AUDIO_OWNED_RANGE_MAX/);
+  const censusRunner=readFileSync(new URL('./run_synctest.mjs',import.meta.url),'utf8');
+  assert.match(censusRunner,/wireVersion = 1, wireHeaderBytes = 36, wireRowBytes = 24, wireCapacity = 9/);
+  assert.match(censusRunner,/\(count !== 6 && count !== 9\)/);
 });
 
 test('host comparison is strict for metadata and borrowed bytes while ignoring only transport addresses',async()=>{

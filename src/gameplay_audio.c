@@ -334,23 +334,51 @@ struct MeleeWebAudioSnapshot {
  MeleeWebAudioInput input;
  SampleEntry* entries;Binding* bindings;u32** programs;u32* words;u32* starts;
  uint32_t command_budget,sound_mode;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ MeleeWebAudioStreamSnapshot* stream;
+ uint64_t stream_token;
+ unsigned stream_mode,stream_present;
+#endif
 #if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  MeleeWebAudioEffectsSnapshot* effects;
 #endif
 };
 void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot* snapshot){
  if(!snapshot)return;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ if(!melee_web_audio_stream_snapshot_destroy(snapshot->stream,NULL,0))abort();
+#endif
 #if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  melee_web_audio_fx_snapshot_destroy(snapshot->effects);
 #endif
  free(snapshot->entries);free(snapshot->bindings);free(snapshot->programs);
  free(snapshot->words);free(snapshot->starts);free(snapshot);
 }
-MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio* audio){
+int melee_web_audio_prepare_stream_snapshot(MeleeWebAudio* audio){
+ if(!live(audio)||audio->source_closed)return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ return !melee_web_audio_stream_owned(audio)||
+        melee_web_audio_stream_prepare_snapshot(audio,NULL,0);
+#else
+ return 1;
+#endif
+}
+static MeleeWebAudioSnapshot* snapshot_capture(MeleeWebAudio* audio,int with_stream){
  if(!live(audio)||audio->source_closed)return NULL;
+ if(with_stream&&!melee_web_audio_prepare_stream_snapshot(audio))return NULL;
  MeleeWebAudioSnapshot* snapshot=calloc(1,sizeof(*snapshot));if(!snapshot)return NULL;
  snapshot->owner=audio;snapshot->state=*audio;snapshot->input=*audio->input;
  snapshot->command_budget=command_budget;snapshot->sound_mode=source_sound_mode;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ MeleeWebAudioStreamOwnerInfo stream_info;
+ snapshot->stream_mode=with_stream!=0;
+ if(snapshot->stream_mode){
+  if(!melee_web_audio_stream_owner_info(audio,&stream_info))goto failed;
+  snapshot->stream_present=stream_info.present;
+  if(!melee_web_audio_stream_snapshot_capture(audio,&snapshot->stream,NULL,0)||
+     snapshot->stream_present!=(snapshot->stream!=NULL))goto failed;
+ }
+#endif
  snapshot->entries=malloc(audio->input->sample_count*sizeof(*audio->entries));
  snapshot->bindings=malloc(audio->binding_count*sizeof(*audio->bindings));
  snapshot->programs=malloc(audio->input->program_count*sizeof(*audio->programs));
@@ -369,7 +397,13 @@ MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio* audio){
 failed:
  melee_web_audio_snapshot_destroy(snapshot);return NULL;
 }
-int melee_web_audio_snapshot_admit(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
+MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture(MeleeWebAudio* audio){
+ return snapshot_capture(audio,0);
+}
+MeleeWebAudioSnapshot* melee_web_audio_snapshot_capture_with_stream(MeleeWebAudio* audio){
+ return snapshot_capture(audio,1);
+}
+static int snapshot_mixer_admit(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
  if(!live(audio)||!snapshot||snapshot->owner!=audio||audio->source_closed||
     audio->generation!=snapshot->state.generation||audio->input!=snapshot->state.input||
     audio->source_sem!=snapshot->state.source_sem||
@@ -387,8 +421,59 @@ int melee_web_audio_snapshot_admit(MeleeWebAudio* audio,const MeleeWebAudioSnaps
 #endif
  return 1;
 }
+int melee_web_audio_snapshot_admit(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
+ if(!snapshot_mixer_admit(audio,snapshot))return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ MeleeWebAudioStreamOwnerInfo stream_info;
+ if(snapshot->stream_mode){
+  if(!melee_web_audio_stream_owner_info(audio,&stream_info)||
+     stream_info.present!=snapshot->stream_present)return 0;
+  if(snapshot->stream_present&&
+     !melee_web_audio_stream_snapshot_admit(audio,snapshot->stream,
+       snapshot->stream_token,NULL,0))return 0;
+ }
+#endif
+ return 1;
+}
+int melee_web_audio_snapshot_interval_begin(MeleeWebAudio* audio,
+ const MeleeWebAudioSnapshot* snapshot,uint64_t token){
+ if(!token||!snapshot_mixer_admit(audio,snapshot))return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ MeleeWebAudioStreamOwnerInfo stream_info;
+ if(snapshot->stream_mode){
+  if(!melee_web_audio_stream_owner_info(audio,&stream_info)||
+     stream_info.present!=snapshot->stream_present||snapshot->stream_token)return 0;
+  if(snapshot->stream_present&&
+     !melee_web_audio_stream_snapshot_bind_interval(audio,snapshot->stream,token,NULL,0))return 0;
+  /* Opaque receipts are allocated mutable by capture; only binding metadata,
+   * never the captured mixer/stream values, changes here. */
+  ((MeleeWebAudioSnapshot*)snapshot)->stream_token=token;
+ }
+#endif
+ return 1;
+}
+int melee_web_audio_snapshot_interval_end(MeleeWebAudio* audio,
+ const MeleeWebAudioSnapshot* snapshot,uint64_t token){
+ if(!snapshot||!token)return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ if(snapshot->stream_mode){
+  if(snapshot->stream_token!=token||
+     (snapshot->stream_present&&
+      !melee_web_audio_stream_snapshot_end_interval(audio,snapshot->stream,token)))return 0;
+  ((MeleeWebAudioSnapshot*)snapshot)->stream_token=0;
+ }
+#else
+ (void)audio;
+#endif
+ return 1;
+}
 int melee_web_audio_snapshot_restore(MeleeWebAudio* audio,const MeleeWebAudioSnapshot* snapshot){
  if(!melee_web_audio_snapshot_admit(audio,snapshot))return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ if(snapshot->stream_mode&&snapshot->stream_present&&
+    !melee_web_audio_stream_snapshot_restore(audio,snapshot->stream,
+      snapshot->stream_token,NULL,0))return 0;
+#endif
 #if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  if(audio->effects&&!melee_web_audio_fx_snapshot_restore(audio->effects,snapshot->effects))return 0;
 #endif
@@ -402,6 +487,23 @@ int melee_web_audio_snapshot_restore(MeleeWebAudio* audio,const MeleeWebAudioSna
 }
 
 
+#if defined(MELEE_WEB_AUDIO_STREAM)
+typedef struct StreamRangeCollector {
+ MeleeWebAudioOwnedRange* rows;
+ size_t count,capacity;
+} StreamRangeCollector;
+static int append_stream_range(const MeleeWebAudioStreamOwnedRange* row,void* context){
+ StreamRangeCollector* out=context;
+ if(!row||!row->address||!row->byte_extent||!row->owner_identity||!row->generation||
+    row->kind<MELEE_WEB_AUDIO_STREAM_RANGE_SELECTED_FILE||
+    row->kind>MELEE_WEB_AUDIO_STREAM_RANGE_RELAY_BYTES||row->index>=8||
+    out->count>=out->capacity)return 0;
+ out->rows[out->count++]=(MeleeWebAudioOwnedRange){
+  (MeleeWebAudioOwnedRangeKind)(MELEE_WEB_AUDIO_RANGE_STREAM_BASE+(unsigned)row->kind*8u+row->index),
+  row->address,row->byte_extent,row->owner_identity,row->generation};
+ return 1;
+}
+#endif
 MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
  MeleeWebAudio* audio,uint64_t generation,size_t capacity,
  MeleeWebAudioOwnedRangeVisitor visitor,void* context){
@@ -411,11 +513,6 @@ MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
  if(!generation||audio->generation!=generation)
   return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
  if(!visitor)return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_ARGUMENT;
- size_t required=6;
-#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
- if(audio->effects)required+=3;
-#endif
- if(capacity<required)return MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY;
  MeleeWebAudioOwnedRange ranges[MELEE_WEB_AUDIO_OWNED_RANGE_MAX];size_t count=0;
  ranges[count++]=(MeleeWebAudioOwnedRange){MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER,
   audio,sizeof(*audio),audio,audio->generation};
@@ -438,11 +535,29 @@ MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
  if(audio->effects){
   size_t fx_count=0;
   if(!melee_web_audio_fx_fill_owned_ranges(audio->effects,&ranges[count],
-                                            capacity-count,&fx_count))
+                                            MELEE_WEB_AUDIO_OWNED_RANGE_MAX-count,&fx_count))
    return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
   count+=fx_count;
  }
 #endif
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ MeleeWebAudioStreamOwnerInfo stream_info;
+ if(!melee_web_audio_stream_owner_info(audio,&stream_info))
+  return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
+ if(stream_info.prepared){
+  const size_t first=count;
+  StreamRangeCollector stream={ranges,count,MELEE_WEB_AUDIO_OWNED_RANGE_MAX};
+  size_t required=0;
+  if(melee_web_audio_stream_visit_owned_ranges(audio,generation,
+       MELEE_WEB_AUDIO_STREAM_OWNED_RANGE_MAX,append_stream_range,&stream,&required)!=
+       MELEE_WEB_AUDIO_STREAM_RANGE_VISIT_COMPLETE||stream.count-first!=required)
+   return MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
+  count=stream.count;
+ }
+#endif
+ /* Collect into fixed local storage first: insufficient caller capacity never
+  * exposes a prefix, including when the prepared stream adds named ranges. */
+ if(capacity<count)return MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY;
  for(size_t i=0;i<count;i++)if(!visitor(&ranges[i],context))
   return MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED;
  return MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE;

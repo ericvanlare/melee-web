@@ -17,6 +17,107 @@ export const CPU_ENDPOINT_DOMAIN = Object.freeze({
   owner: 1, effects: 2, actions: 3, payload: 4, flow: 5,
   context: 6, bootstrap: 7, audio: 8, statics: 9,
 });
+/* The audio leaf still uses schema 312. These limits and enum values mirror
+ * gameplay_audio.h and gameplay_audio_stream.h; the row count itself comes
+ * from Audio.Header.OwnedRangeCount. The leaf may omit PCM byte rows for
+ * absent channels; required structural rows and every present kind/index are
+ * checked against the authored stream shape. */
+export const CPU_ENDPOINT_AUDIO_RANGE = Object.freeze({
+  maxOwnedRanges: 77,
+  maxStreamRanges: 68,
+  streamBase: 0x100,
+  streamKindStride: 8,
+  legacyKinds: Object.freeze([1,2,3,4,5,6,7,8,9]),
+  streamKinds: Object.freeze({
+    SELECTED_FILE:1, HEADERS:2, SLOTS:3, SLOT_FILES:4,
+    CHANNEL_PCM:5, CHANNEL_FRAMES:6, CHANNEL_LOOP_PCM:7,
+    CHANNEL_LOOP_AND_NIBBLES:8, CHANNEL_COEFFICIENTS:9,
+    CHANNEL_PREDICTORS:10, CHANNEL_HISTORIES:11, CHANNEL_LOOPING:12,
+    PCM_POINTERS:13, PCM_BYTES:14, PCM_CAPACITIES:15, PREPARED:16,
+    VISITED_POINTER:17, VISITED_BYTES:18, PROGRESS:19, AUX_HANDLE:20,
+    AUX_BYTES:21, RELAY_HANDLE:22, RELAY_BYTES:23,
+  }),
+});
+const AUDIO_STREAM_CHANNEL_KINDS = new Set([
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PCM,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_FRAMES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_PCM,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_AND_NIBBLES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_COEFFICIENTS,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PREDICTORS,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_HISTORIES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOPING,
+]);
+
+function validateAudioOwnedRanges(records, generation, audioOwner, failWith) {
+  if (!Array.isArray(records) || records.length < 1 ||
+      records.length > CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges)
+    failWith('audio owned-range count is outside its authored bound');
+  if (audioOwner === 0n || audioOwner > BigInt(U32_MAX))
+    failWith('audio owner identity is invalid');
+  const seen = new Set(), legacyKinds = new Set(), streamRows = new Map();
+  let streamOwner = null, streamGeneration = null;
+  for (const record of records) {
+    const field = name => {
+      const index = record.fieldNames.indexOf(name);
+      if (index < 0) failWith(`AudioOwnedRange is missing ${name}`);
+      return canonicalU64(record.fields[index], `AudioOwnedRange.${name}`);
+    };
+    const kind = field('Kind'), address = field('Address'), extent = field('Extent');
+    const owner = field('OwnerIdentity'), rowGeneration = field('Generation');
+    if (seen.has(kind.toString(10))) failWith('audio owned-range kind is duplicated');
+    seen.add(kind.toString(10));
+    if (address === 0n || address > BigInt(U32_MAX) || extent === 0n ||
+        extent > BigInt(U32_MAX) || address + extent > 0x1_0000_0000n ||
+        owner === 0n || owner > BigInt(U32_MAX) || rowGeneration === 0n)
+      failWith('audio owned-range address, extent, owner, or generation is invalid');
+    if (CPU_ENDPOINT_AUDIO_RANGE.legacyKinds.includes(Number(kind))) {
+      legacyKinds.add(Number(kind));
+      if (owner !== audioOwner) failWith('legacy audio owned-range owner differs from the CPU owner row');
+      if (rowGeneration !== generation)
+        failWith('legacy audio owned-range generation differs from its header');
+      continue;
+    }
+    const encoded = kind - BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase);
+    const streamKind = Number(encoded / BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamKindStride));
+    const index = Number(encoded % BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamKindStride));
+    const knownKinds = Object.values(CPU_ENDPOINT_AUDIO_RANGE.streamKinds);
+    const allowedIndex = AUDIO_STREAM_CHANNEL_KINDS.has(streamKind) ||
+      streamKind === CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES
+      ? index < 6 : index === 0;
+    if (kind < BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase) ||
+        !knownKinds.includes(streamKind) || !allowedIndex)
+      failWith(`audio stream range kind/index is not authored (${kind})`);
+    if (streamOwner === null) { streamOwner=owner;streamGeneration=rowGeneration; }
+    else if (streamOwner!==owner || streamGeneration!==rowGeneration)
+      failWith('audio stream ranges disagree on owner identity or generation');
+    if (!streamRows.has(streamKind)) streamRows.set(streamKind,new Set());
+    streamRows.get(streamKind).add(index);
+  }
+  if (legacyKinds.size > 1) {
+    for (let kind=1;kind<=6;kind++) if(!legacyKinds.has(kind))
+      failWith(`audio stream snapshot is missing base audio range kind ${kind}`);
+    if (legacyKinds.size!==6 && legacyKinds.size!==9)
+      failWith('audio base/effects range set is incomplete');
+    for (let kind=7;kind<=9;kind++) if(legacyKinds.has(kind)!==(legacyKinds.size===9))
+      failWith('audio effects range set is incomplete');
+  }
+  if (streamRows.size > 0) {
+    if (legacyKinds.size!==6 && legacyKinds.size!==9)
+      failWith('audio base/effects range set is incomplete');
+    for (const kind of Object.values(CPU_ENDPOINT_AUDIO_RANGE.streamKinds)) {
+      const actual=streamRows.get(kind);
+      if (kind===CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES) continue;
+      const expected=AUDIO_STREAM_CHANNEL_KINDS.has(kind)?[0,1,2,3,4,5]:[0];
+      if (!actual || actual.size!==expected.length || expected.some(index=>!actual.has(index)))
+        failWith(`audio stream snapshot has an incomplete ${kind} row set`);
+    }
+    const streamCount=[...streamRows.values()].reduce((total,indexes)=>total+indexes.size,0);
+    const pcmBytesCount=streamRows.get(CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES)?.size??0;
+    if (streamCount!==62+pcmBytesCount||streamCount>CPU_ENDPOINT_AUDIO_RANGE.maxStreamRanges)
+      failWith('audio stream owned-range count is outside its authored row set');
+  }
+}
 
 const MAX_ENDPOINT_RECORDS = 65_536;
 const MAX_ENDPOINT_BORROWED_BYTES = 128 * 1024 * 1024;
@@ -144,6 +245,10 @@ export function collectCpuEndpointInPage(request) {
   const recordBytes = 312, schema = 1, maxRecords = 65536;
   const particleV2Schema=2, particleHeaderBytes=64, particleRowBytes=96;
   const maxBorrowedBytes = 128 * 1024 * 1024, u32max = 0xffff_ffff;
+  const maxAudioOwnedRanges=77,maxAudioStreamRanges=68,audioStreamBase=0x100,audioStreamStride=8;
+  const audioLegacyKinds=new Set([1,2,3,4,5,6,7,8,9]);
+  const audioStreamKinds=new Set(Array.from({length:23},(_,index)=>index+1));
+  const audioChannelKinds=new Set([5,6,7,8,9,10,11,12]);
   const row = (kind, kindName, fields, borrowField = null) => ({kind,kindName,fields,borrowField});
   const domain = (id, name, header, groups) => ({id,name,header,groups});
   // Keep the page callback self-contained for page.evaluate. This is the
@@ -277,6 +382,62 @@ export function collectCpuEndpointInPage(request) {
     if (index < 0) failPage(`native schema has no named field ${fieldName}`);
     return row.fields[index];
   };
+  const validateAudioRanges = (rows, generation, audioOwner) => {
+    const ranges=rows.filter(item=>item.kindName==='AudioOwnedRange');
+    if(ranges.length<1||ranges.length>maxAudioOwnedRanges)
+      failPage('audio owned-range count is outside its authored bound');
+    if(audioOwner===0n||audioOwner>BigInt(u32max))failPage('audio owner identity is invalid');
+    const seen=new Set(),legacyKinds=new Set(),streamRows=new Map();
+    let streamOwner=null,streamGeneration=null;
+    for(const item of ranges){
+      const value=name=>fieldValue(item,name);
+      const kind=value('Kind'),address=value('Address'),extent=value('Extent');
+      const owner=value('OwnerIdentity'),rowGeneration=value('Generation');
+      if(seen.has(kind.toString(10)))failPage('audio owned-range kind is duplicated');
+      seen.add(kind.toString(10));
+      if(address===0n||address>BigInt(u32max)||extent===0n||extent>BigInt(u32max)||
+         address+extent>0x1_0000_0000n||owner===0n||owner>BigInt(u32max)||rowGeneration===0n)
+        failPage('audio owned-range address, extent, owner, or generation is invalid');
+      if(audioLegacyKinds.has(Number(kind))){
+        legacyKinds.add(Number(kind));
+        if(owner!==audioOwner)failPage('legacy audio owned-range owner differs from the CPU owner row');
+        if(rowGeneration!==generation)failPage('legacy audio owned-range generation differs from its header');
+        continue;
+      }
+      const encoded=kind-BigInt(audioStreamBase);
+      const streamKind=Number(encoded/BigInt(audioStreamStride));
+      const index=Number(encoded%BigInt(audioStreamStride));
+      const allowedIndex=audioChannelKinds.has(streamKind)||streamKind===14?index<6:index===0;
+      if(kind<BigInt(audioStreamBase)||!audioStreamKinds.has(streamKind)||!allowedIndex)
+        failPage(`audio stream range kind/index is not authored (${kind})`);
+      if(streamOwner===null){streamOwner=owner;streamGeneration=rowGeneration;}
+      else if(streamOwner!==owner||streamGeneration!==rowGeneration)
+        failPage('audio stream ranges disagree on owner identity or generation');
+      if(!streamRows.has(streamKind))streamRows.set(streamKind,new Set());
+      streamRows.get(streamKind).add(index);
+    }
+    if(legacyKinds.size>1){
+      for(let kind=1;kind<=6;kind++)if(!legacyKinds.has(kind))
+        failPage(`audio stream snapshot is missing base audio range kind ${kind}`);
+      if(legacyKinds.size!==6&&legacyKinds.size!==9)failPage('audio base/effects range set is incomplete');
+      for(let kind=7;kind<=9;kind++)if(legacyKinds.has(kind)!==(legacyKinds.size===9))
+        failPage('audio effects range set is incomplete');
+    }
+    if(streamRows.size>0){
+      if(legacyKinds.size!==6&&legacyKinds.size!==9)failPage('audio base/effects range set is incomplete');
+      for(const streamKind of audioStreamKinds){
+        const actual=streamRows.get(streamKind);
+        if(streamKind===14)continue;
+        const expected=audioChannelKinds.has(streamKind)?[0,1,2,3,4,5]:[0];
+        if(!actual||actual.size!==expected.length||expected.some(index=>!actual.has(index)))
+          failPage(`audio stream snapshot has an incomplete ${streamKind} row set`);
+      }
+      const streamCount=[...streamRows.values()].reduce((total,indexes)=>total+indexes.size,0);
+      const pcmBytesCount=streamRows.get(14)?.size??0;
+      if(streamCount!==62+pcmBytesCount||streamCount>maxAudioStreamRanges)
+        failPage('audio stream owned-range count is outside its authored row set');
+    }
+  };
   const resolveCount = (group, header) => {
     const expression = group.count;
     if (Number.isInteger(expression) && expression >= 0) return countValue(BigInt(expression), group.row.kindName);
@@ -364,6 +525,11 @@ export function collectCpuEndpointInPage(request) {
         header = readRow(domainSpec,{...domainSpec.header},0,1);
         rows.push(header);
       }
+      if(domainSpec.id===8){
+        const ownedRangeCount=fieldValue(header,'OwnedRangeCount');
+        if(ownedRangeCount<1n||ownedRangeCount>BigInt(maxAudioOwnedRanges))
+          failPage('audio owned-range count is outside its authored bound');
+      }
       for (const group of domainSpec.groups) {
         const count = resolveCount(group,header);
         for (let index=0; index<count; ++index) rows.push(readRow(domainSpec,group.row,index,count));
@@ -386,9 +552,11 @@ export function collectCpuEndpointInPage(request) {
         failPage('flow named-field schema count is invalid');
       if (domainSpec.id===7 && rowValue('Header','RangeCount')!==2n)
         failPage('bootstrap range count is invalid');
-      if (domainSpec.id===8 && (rowValue('Header','OwnedRangeCount')===undefined ||
-          rowValue('Header','OwnedRangeCount')<1n || rowValue('Header','OwnedRangeCount')>9n))
-        failPage('audio owned-range count is outside its authored bound');
+      if (domainSpec.id===8) {
+        const ownerRecord=domains[0]?.records.find(item=>item.kindName==='Owner');
+        if(!ownerRecord)failPage('owner audio identity is missing from the endpoint');
+        validateAudioRanges(rows,rowValue('Header','Generation'),fieldValue(ownerRecord,'Audio'));
+      }
       if (domainSpec.id===3) {
         for (const item of rows) {
           if (item.kindName==='ActionSlot') {
@@ -650,6 +818,11 @@ export function validateCpuEndpointEnvelope(value) {
       if (index < 0) fail(`${domain.name} lacks named count field ${name}`);
       return canonicalU64(record.fields[index], `${domain.name}.${name}`);
     };
+    if (domain.id === 8) {
+      const ownedRangeCount = readField(header, 'OwnedRangeCount');
+      if (ownedRangeCount < 1n || ownedRangeCount > BigInt(CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges))
+        fail('audio owned-range count is outside its authored bound');
+    }
     const expected = [];
     if (domainSpec.header) expected.push({row:domainSpec.header,index:0,count:1});
     for (const group of domainSpec.groups) {
@@ -720,8 +893,13 @@ export function validateCpuEndpointEnvelope(value) {
     } else if (domain.id === 7) {
       if (readRowField('Header','RangeCount') !== 2n) fail('bootstrap range count is invalid');
     } else if (domain.id === 8) {
-      const count = readRowField('Header','OwnedRangeCount');
-      if (count < 1n || count > 9n) fail('audio range count exceeds its authored bound');
+      const ownerRecord=value.domains[0]?.records.find(record=>record.kindName==='Owner');
+      if(!ownerRecord)fail('owner audio identity is missing from the endpoint');
+      const ownerAudioIndex=ownerRecord.fieldNames.indexOf('Audio');
+      if(ownerAudioIndex<0)fail('owner row has no audio identity');
+      validateAudioOwnedRanges(domain.records.filter(record=>record.kindName==='AudioOwnedRange'),
+        readRowField('Header','Generation'),
+        canonicalU64(ownerRecord.fields[ownerAudioIndex],'Owner.Audio'),fail);
     } else if (domain.id === 9) {
       for (const item of domain.records) if (item.kindName === 'StaticRow' && BigInt(item.fields[0]) !== BigInt(item.index))
         fail(`static row index mismatch at ${item.index}`);

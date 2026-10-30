@@ -1605,11 +1605,39 @@ and exact native retirement metadata. This does not implement restoring a
 speculative topology change.
 
 The fifth interval stops at sample 322, reference command 34/source frame 199,
-with HPS effect 3 in epoch 5. The exact music-transport operation is not yet
-identified. Failure-only site attribution is the next experiment; cancellation
-dispatch classification and actual stream refill remain separate hypotheses.
+with HPS effect 3 in epoch 5. V6 (`cf122de6`) retains the first-refusal marker
+`site=devcom-request`; cancellation dispatch is not this failure. The complete
+request tuple remains unrecorded. After these two HPS-boundary experiments,
+a smaller original HPS scheduler/transport reproducer now demonstrates the
+missing stream owner. It observes a real header-to-payload callback chain replacing
+occupied slot 2; mixer restore succeeds while the slot and PCM remain at their
+post-refill values. This is a stream-owner omission result, not playback-wide
+restore equivalence or attribution of the browser request tuple. The producer,
+raw event order and initial launcher failure are retained in the structured
+receipt. Its PRE has a pending transfer and loading flag; POST is quiescent.
+The new quiescent-only snapshot must refuse that PRE rather than drain it.
 The mixer snapshot does not own the HPS stream queue or slot buffers, so this
-failure cannot be repaired by simply allowing speculative HPS mutations. Native capsule
+failure cannot be repaired by simply allowing speculative HPS mutations. Source
+review finds the known original HPS headers and callback targets already covered
+by strict static rows. The conditional repair is limited to the missing host
+stream owner, reusing the original scheduler and immutable authored data; it is
+being implemented and is not admitted. The aggregate wiring has independent
+source review and two focused controls using a synthetic stream leaf. Only an
+active interval binding holds stream lifetime; failed-interval disarm releases
+it before source retirement, and receipt copies can be destroyed afterwards.
+The host inventory retains the old six/nine-row forms and adds bounded typed
+stream rows without changing the endpoint wire. Its initial legacy-compatibility
+review failure and repair are retained; the repaired host has 12 passing checks,
+three passing native endpoint controls and independent source review. The actual
+HPS leaf now restores all 68 typed ranges (885,476 bytes, including six PCM
+buffers) after the first occupied-slot refill. Pending-capture, wrong-token,
+capacity and failed-binding cleanup controls pass. This compares stream storage,
+not source scheduler/AX state or replay output. A second bounded control now
+crosses that refill under an exact healthy snapshot/token binding, restores the
+same leaf bytes, and verifies that relay initialization and cancellation remain
+forbidden without changing stream storage. The actual closed-barrier control
+also passes. Composed browser replay remains unrun. The initial leaf review findings, bounded Sol repair
+and corrected reviewer finding are retained with the exact producer. Native capsule
 cleanup still refuses; in V5 the reference snapshot close also aborts and renderer
 shutdown fails. Owned-process absence and all nine producer pins pass. Focused
 fixture and browser failures remain retained. General rolling

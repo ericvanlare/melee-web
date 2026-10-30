@@ -147,8 +147,16 @@ int main(void){
         stream=text[:text.index('static int fail(')]
         for name in ['static int fail(', 'static int hps_interval_guard(',
                      'static void stop(', 'static const StreamFile* file_at(',
-                     'static const MeleeWebAudioStreamBlock* block_at(', 'int HSD_DevComRequest(']:
+                     'static void probe_record(',
+                     'static const MeleeWebAudioStreamBlock* block_at(',
+                     'static const char* validate_stream_request(',
+                     'static int stream_interval_bound(', 'int HSD_DevComRequest(']:
             stream+=function(text,name)
+        # This closed-barrier fixture never constructs an HPS stream/receipt.
+        # The actual binding helper must short-circuit before its live matcher;
+        # accidental bound-path reach is a hard failure, never modeled success.
+        # The original-HPS trace separately exercises real bound admission.
+        stream+='static int snapshot_matches_live(MeleeWebAudio* a,const MeleeWebAudioStreamSnapshot* p,MeleeWebAudioStream* s){abort();}\n'
         stream+='int fixture_hps_interval_site(const char* site){return hps_interval_guard(site);}\n'
         stream+='int melee_web_audio_bank_transport_file(int f){return 0;}\nint melee_web_audio_bank_transport_active(void){return 0;}\n'
         stream_file=self.work/'effect-stream.c';stream_file.write_text(stream)
