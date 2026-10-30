@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
   CPU_CORRECTED_REUSE_EVIDENCE_BYTES, CPU_CORRECTED_TWO_WINDOW_NEUTRAL_PAD44,
@@ -110,6 +111,21 @@ test('two-window CLI is opt-in and requires the existing seven-tick v18 profile'
     {enable:true,evidence:true,evidenceBytes:false}),/reuse exports are unavailable/);
   assert.throws(()=>validateBrowserProfileForRoute(profile,false,null,true,true,true,false,null,reuse),
     /The v7 light owner requires two or seven ticks/);
+});
+
+test('two-window reuse validation follows predicted seven-tick page initialization',()=>{
+  const source=readFileSync(new URL('./run_write_census.mjs',import.meta.url),'utf8');
+  const referenceReuse=source.indexOf('const correctedReuseExports = correctedTwoWindow ? await page.evaluate');
+  const referenceValidation=source.indexOf('validateBrowserProfileForRoute(init, twoTickDrawnReference',referenceReuse);
+  const predictedCreate=source.indexOf('predictedPage=await context.newPage();',referenceValidation);
+  const predictedInit=source.indexOf('predictedInit=await runBrowserInit(predictedPage,',predictedCreate);
+  const predictedReuse=source.indexOf('const predictedReuseExports=await predictedPage.evaluate',predictedInit);
+  const predictedValidation=source.indexOf('validateBrowserProfileForRoute(predictedInit,',predictedReuse);
+  assert.ok(referenceReuse>=0&&referenceValidation>referenceReuse,'validate reference exports after reading them');
+  assert.ok(predictedCreate>referenceValidation&&predictedInit>predictedCreate,
+    'create and initialize the seven-tick predicted page before reading its exports');
+  assert.ok(predictedReuse>predictedInit&&predictedValidation>predictedReuse,
+    'validate predicted reuse exports only after its initialized module is available');
 });
 
 test('literal bridge passes the exact 44-byte PAD to raw step, then draws and copies all five lanes',async()=>{

@@ -871,18 +871,6 @@ async function main() {
       sevenTickDrawnReference, sevenTickExports, correctedReuseExports);
     if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;
     if (sevenTickDrawnReference) report.profile.sevenTickEvidenceExports = sevenTickExports;
-    if(correctedTwoWindow){
-      const predictedReuseExports=await predictedPage.evaluate(()=>{
-        const {module}=window.__slippiSynctest;
-        return {enable:typeof module._melee_web_synctest_cpu_corrected_reuse_enable==='function',
-          evidence:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence==='function',
-          evidenceBytes:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence_bytes==='function'};
-      });
-      validateBrowserProfileForRoute(predictedInit,twoTickDrawnReference,twoTickExports,
-        lobjPresentationCache,tobjPresentationCache,particlePresentationCache,
-        sevenTickDrawnReference,sevenTickExports,predictedReuseExports);
-      report.profile.correctedReuseExports={reference:correctedReuseExports,predicted:predictedReuseExports};
-    }
     if (init.source !== fileSha(path.join(ROOT, 'tests/gameplay_snapshot_probe.cpp'))) {
       throw new Error('Runtime fixture identity differs from current gameplay_snapshot_probe.cpp');
     }
@@ -925,6 +913,20 @@ async function main() {
         initialPadSha256:sha256(Buffer.from(predictedInit.initial.pad,'base64'))};
       report.execution.predictedInstance={status:'initialized',profile:predictedInit.profile,
         source:predictedInit.source,initializerSha256:sha256(Buffer.from(predictedInit.initializer))};
+    }
+    if(correctedTwoWindow){
+      // The seven-tick setup above creates and initializes predictedPage.
+      // Check its reuse exports only after that shared startup boundary.
+      const predictedReuseExports=await predictedPage.evaluate(()=>{
+        const {module}=window.__slippiSynctest;
+        return {enable:typeof module._melee_web_synctest_cpu_corrected_reuse_enable==='function',
+          evidence:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence==='function',
+          evidenceBytes:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence_bytes==='function'};
+      });
+      validateBrowserProfileForRoute(predictedInit,twoTickDrawnReference,twoTickExports,
+        lobjPresentationCache,tobjPresentationCache,particlePresentationCache,
+        sevenTickDrawnReference,sevenTickExports,predictedReuseExports);
+      report.profile.correctedReuseExports={reference:correctedReuseExports,predicted:predictedReuseExports};
     }
     report.initialization = {
       exactProfileSeedAndInitializer: true,
