@@ -1728,11 +1728,47 @@ This is a Node-held local WebSocket component with an authored input recipe.
 The browser pages do not own sockets; network checksum traffic is not exercised.
 Strict reference comparisons are separate evidence. The existing structured
 receipt's `packet_backed_component_v1` retains exact producers, raw results,
-packet timestamps, reviews and failures. The next step measures admitted native
-command wall-time separately from evidence collection and GPU waits before
-selecting the continuous runtime loop. Rolling history, correction across refill,
-combat/KO breadth, combined frame budget, full-match play and public profile
-admission remain open.
+packet timestamps, reviews and failures.
+
+The subsequent command-cost run at harness `acad72d2` reuses native `8f846b45`
+and passes the existing two-window recipe in 42.71 seconds. Independent review
+reproduces six nine-domain endpoint comparisons, 255 raw lanes and all 64 timed
+commands. Both seven-tick corrections, final presents, retirement and owned
+cleanup pass. Native pins remain unchanged.
+
+| Predicted-page command wall-time | First window | Second window |
+| --- | ---: | ---: |
+| Capture | 43.14 ms | 18.91 ms |
+| Restore | 38.28 ms | 37.27 ms |
+| Seven correction commands, including final seal | 11.61 ms | 14.09 ms |
+| Present command | 8.01 ms | 7.69 ms |
+| Existing GPU-quiescence wait after present | 24.86 ms | 24.72 ms |
+| Retire | 3.33 ms | 2.28 ms |
+
+These are two observed headless intervals in the retained diagnostic Release
+build, with `SAFE_HEAP=1` and `ASSERTIONS=2`. Native-call wall-time includes
+Asyncify waits and native diagnostic checks. Page evidence work is measured
+separately; Node validation and transport are outside those measurements.
+This is not pure CPU/GPU timing or production frame-budget acceptance. Native
+snapshot residency is still unmeasured; serialized audit size is not RAM usage.
+Exact timings and producer/review identities are in `command_cost_component_v1`.
+
+Source review identifies quadratic allocation-overlap validation, run twice
+per restore, as the next bounded target. Its share of the observed cost is not
+measured yet. The next repair will retain every ownership, topology, heap,
+storage and interval check while using snapshot-owned sorted indexes; a reduced
+native control must prove equivalence and no-allocation restoration first.
+The earlier timing freeze omitted one tested fixture from its patch; the reviewed
+seven-file freeze retains that omission and repairs its manifest. Rolling
+history, correction across refill, combat/KO breadth, combined frame budget,
+full-match play and public profile admission remain open.
+
+The packet/timing batch passes the full local regression at `acad72d2`: 3,077
+tests, 238 skips and no failures. The ordinary Release runtime build passes at
+that source; its metadata-writer failures were retained and the output inventory
+corrected without repeating the build. Independent publication review passes
+subject to final-head CI. The existing `packet_cost_integration_v1` receipt
+retains exact validation and review identities; publication CI remains pending.
 
 
 ## Stage decision dependencies, issue #333
