@@ -653,3 +653,30 @@ test('confirmed reference/reference comparison is explicit and preserves strict 
     assert.equal(compareCpuParticleEndpoints(left,corrected,{preLeft,preRight}).domains,9);
   }
 });
+
+
+test('ordinary-runtime binding uses only its fixed direct export namespace', async () => {
+  const fixture=makeFixture();
+  const expected=await collect(fixture);
+  const module=fixture.module;
+  for(const name of Object.keys(module)) {
+    if(!name.startsWith('_melee_web_synctest_')) continue;
+    module[name.replace('_melee_web_synctest_','_melee_web_native_menu_match_history_')]=module[name];
+    delete module[name];
+  }
+  const result=collectCpuEndpointInPage({view:1,provenance:1}, {runtime:'match-history',module});
+  assert.deepEqual(decodeCpuEndpointResult(toWire(result)),expected);
+  assert.equal(fixture.batchActive,false);
+  const missing=module._melee_web_native_menu_match_history_cpu_endpoint_end;
+  delete module._melee_web_native_menu_match_history_cpu_endpoint_end;
+  module._melee_web_synctest_cpu_endpoint_end=missing;
+  assert.throws(()=>collectCpuEndpointInPage({view:1,provenance:1},
+    {runtime:'match-history',module}),/direct endpoint exports/);
+});
+
+test('ordinary-runtime binding rejects unknown owner modes and arbitrary prefixes', () => {
+  const module=makeFixture().module;
+  for(const binding of [null,{runtime:'other',module},
+    {runtime:'match-history',module,prefix:'_melee_web_synctest_'}])
+    assert.throws(()=>collectCpuEndpointInPage({view:1,provenance:1},binding),/runtime binding/);
+});

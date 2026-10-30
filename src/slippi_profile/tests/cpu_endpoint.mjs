@@ -239,7 +239,7 @@ export function decodeCpuEndpointRecord(input) {
  * native calls. Native begin/end enforce the checked source-owner/runtime gate;
  * JS additionally rejects shared heaps and any exposed non-idle Asyncify state.
  */
-export function collectCpuEndpointInPage(request) {
+export function collectCpuEndpointInPage(request, binding = undefined) {
   const failPage = message => { throw new Error(`CPU endpoint ${message}`); };
   const encodePageBase64 = bytes => {
     let binary='';
@@ -316,8 +316,16 @@ export function collectCpuEndpointInPage(request) {
       failPage('requested source-frame stamp is invalid');
     expectedSourceFrame = BigInt(stamp);
   }
-  const module = typeof window === 'object' && window && window.__slippiSynctest &&
-    window.__slippiSynctest.module;
+  // An ordinary runtime supplies its actual Module explicitly. Keep the
+  // legacy page.evaluate entry point, but never manufacture a synctest global
+  // or substitute endpoint methods from another native owner.
+  if (binding !== undefined && (!binding || binding.runtime !== 'match-history' ||
+      Object.keys(binding).some(key => !['runtime','module'].includes(key))))
+    failPage('unsupported explicit runtime binding');
+  const module = binding === undefined
+    ? (typeof window === 'object' && window && window.__slippiSynctest && window.__slippiSynctest.module)
+    : binding.module;
+  const prefix = binding === undefined ? '_melee_web_synctest_' : '_melee_web_native_menu_match_history_';
   if (!module || !(module.HEAPU8 instanceof Uint8Array)) failPage('native module/HEAPU8 is unavailable');
   const moduleDataValue = name => {
     const descriptor = Object.getOwnPropertyDescriptor(module,name);
@@ -344,16 +352,16 @@ export function collectCpuEndpointInPage(request) {
   if (asyncify !== undefined && (!asyncify || typeof asyncify !== 'object' || !asyncify.State ||
       typeof asyncify.State.Normal !== 'number' || asyncify.state !== asyncify.State.Normal || asyncify.currData !== null))
     failPage('refused a non-idle Asyncify/runtime boundary');
-  const required = ['_melee_web_synctest_cpu_endpoint_begin','_melee_web_synctest_cpu_endpoint_record',
-    '_melee_web_synctest_cpu_endpoint_data','_melee_web_synctest_cpu_endpoint_bytes',
-    '_melee_web_synctest_cpu_endpoint_end'];
+  const required = [prefix+'cpu_endpoint_begin',prefix+'cpu_endpoint_record',
+    prefix+'cpu_endpoint_data',prefix+'cpu_endpoint_bytes',
+    prefix+'cpu_endpoint_end'];
   if (includeParticleCells) required.push(
-    '_melee_web_synctest_cpu_particle_endpoint_header',
-    '_melee_web_synctest_cpu_particle_endpoint_header_data',
-    '_melee_web_synctest_cpu_particle_endpoint_header_bytes',
-    '_melee_web_synctest_cpu_particle_endpoint_row',
-    '_melee_web_synctest_cpu_particle_endpoint_row_data',
-    '_melee_web_synctest_cpu_particle_endpoint_row_bytes');
+    prefix+'cpu_particle_endpoint_header',
+    prefix+'cpu_particle_endpoint_header_data',
+    prefix+'cpu_particle_endpoint_header_bytes',
+    prefix+'cpu_particle_endpoint_row',
+    prefix+'cpu_particle_endpoint_row_data',
+    prefix+'cpu_particle_endpoint_row_bytes');
   if (required.some(name => typeof module[name] !== 'function')) failPage('native direct endpoint exports are unavailable');
   const wasmPointer = (value, name) => {
     if (!Number.isInteger(value) || value < -0x8000_0000 || value > u32max)
@@ -480,20 +488,20 @@ export function collectCpuEndpointInPage(request) {
   try {
     // Mark ownership immediately after a successful raw begin return, before
     // checking heap identity. If that check fails, finally must still close it.
-    const rawBeginStatus = module._melee_web_synctest_cpu_endpoint_begin(view,provenance);
+    const rawBeginStatus = module[prefix+'cpu_endpoint_begin'](view,provenance);
     if (rawBeginStatus === 0) begun = true;
     const beginStatus = statusValue(rawBeginStatus, 'begin');
     assertHeap();
     if (beginStatus !== 0) failPage(`begin refused with status ${beginStatus}`);
-    const pointer = wasmPointer(module._melee_web_synctest_cpu_endpoint_data(), 'record buffer');
+    const pointer = wasmPointer(module[prefix+'cpu_endpoint_data'](), 'record buffer');
     assertHeap();
-    const extent = module._melee_web_synctest_cpu_endpoint_bytes();
+    const extent = module[prefix+'cpu_endpoint_bytes']();
     assertHeap();
     if (extent !== recordBytes || pointer + extent > heapLength) failPage('native record buffer extent is not exactly 312 bytes');
 
     const readRow = (domainSpec, rowSpec, index, count) => {
       if (++total.records > maxRecords) failPage('endpoint record cap exceeded');
-      const callStatus = nativeCall(module._melee_web_synctest_cpu_endpoint_record, 'record',
+      const callStatus = nativeCall(module[prefix+'cpu_endpoint_record'], 'record',
         [domainSpec.id,rowSpec.kind,index]);
       const copiedRecord = heap.slice(pointer,pointer+recordBytes);
       if (copiedRecord.byteLength !== recordBytes) failPage('native fixed record was truncated');
@@ -622,11 +630,11 @@ export function collectCpuEndpointInPage(request) {
         return copied;
       };
       const readParticleHeader = () => {
-        const status = nativeCall(module._melee_web_synctest_cpu_particle_endpoint_header,
+        const status = nativeCall(module[prefix+'cpu_particle_endpoint_header'],
           'particle header');
         if (status !== 0) failPage(`particle header refused with status ${status}`);
-        const copied = readFixedBuffer('_melee_web_synctest_cpu_particle_endpoint_header_data',
-          '_melee_web_synctest_cpu_particle_endpoint_header_bytes',particleHeaderBytes,
+        const copied = readFixedBuffer(prefix+'cpu_particle_endpoint_header_data',
+          prefix+'cpu_particle_endpoint_header_bytes',particleHeaderBytes,
           'particle header');
         const data = new DataView(copied.buffer,copied.byteOffset,copied.byteLength);
         if (data.getUint32(0,true)!==1 || data.getUint32(4,true)!==particleHeaderBytes ||
@@ -645,11 +653,11 @@ export function collectCpuEndpointInPage(request) {
       const readParticleRows = (rowKind,count) => {
         const result=[];
         for(let index=0;index<count;index++){
-          const status=nativeCall(module._melee_web_synctest_cpu_particle_endpoint_row,
+          const status=nativeCall(module[prefix+'cpu_particle_endpoint_row'],
             'particle row',[rowKind,index]);
           if(status!==0)failPage(`particle row ${rowKind}[${index}] refused with status ${status}`);
-          const copied=readFixedBuffer('_melee_web_synctest_cpu_particle_endpoint_row_data',
-            '_melee_web_synctest_cpu_particle_endpoint_row_bytes',particleRowBytes,
+          const copied=readFixedBuffer(prefix+'cpu_particle_endpoint_row_data',
+            prefix+'cpu_particle_endpoint_row_bytes',particleRowBytes,
             `particle row ${rowKind}[${index}]`);
           const data=new DataView(copied.buffer,copied.byteOffset,copied.byteLength);
           if(data.getUint32(0,true)!==1||data.getUint32(4,true)!==particleRowBytes||
@@ -698,7 +706,7 @@ export function collectCpuEndpointInPage(request) {
   } finally {
     if (begun) {
       try {
-        const endStatus = nativeCall(module._melee_web_synctest_cpu_endpoint_end,'end');
+        const endStatus = nativeCall(module[prefix+'cpu_endpoint_end'],'end');
         if (endStatus !== 0) failPage(`end/revalidation refused with status ${endStatus}`);
       } catch (error) {
         endFailure = error instanceof Error ? error : new Error(String(error));
