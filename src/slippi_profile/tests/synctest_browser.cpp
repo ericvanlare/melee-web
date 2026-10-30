@@ -760,7 +760,7 @@ uint32_t payload_admission_runtime_boundary()
 #endif
 }
 
-uint32_t payload_admission_source_boundary()
+uint32_t payload_admission_source_boundary(bool owned_hps_pending = false)
 {
     if (payload_admission_runtime_boundary() != 0) return PayloadUnsafeCallBoundary;
     if (!renderer_ready || renderer_error_count != 0 || !match ||
@@ -768,7 +768,12 @@ uint32_t payload_admission_source_boundary()
         !melee_web_source_memory_healthy()) {
         return PayloadOwnerUnavailable;
     }
-    if (melee_web_snapshot_quiescent() != 1) return PayloadTransferBusy;
+    // The explicit proof is supplied only by the exact capsule's interior
+    // predicate. It does not claim DVD idle or snapshot-safe quiescence.
+    if (owned_hps_pending) {
+        if (melee_web_source_file_drive_busy() || melee_web_audio_bank_transport_busy())
+            return PayloadTransferBusy;
+    } else if (melee_web_snapshot_quiescent() != 1) return PayloadTransferBusy;
     if (match->source_frames() != observation.frame || observation.ready != 1 ||
         observation.complete != 0 || observation.paused != 0) {
         return PayloadFrameMismatch;
@@ -776,9 +781,9 @@ uint32_t payload_admission_source_boundary()
     return 0;
 }
 
-uint32_t payload_admission_boundary(bool require_new_completed_draw)
+uint32_t payload_admission_boundary(bool require_new_completed_draw, bool owned_hps_pending = false)
 {
-    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+    if (const uint32_t failure = payload_admission_source_boundary(owned_hps_pending)) return failure;
 #if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     const auto *descriptor = static_cast<const AuroraBrowserQuiescenceDescriptor *>(
         aurora_browser_quiescence_observe_descriptor());
@@ -823,9 +828,9 @@ uint32_t payload_admission_boundary(bool require_new_completed_draw)
 #endif
 }
 
-uint32_t payload_admission_submission_boundary()
+uint32_t payload_admission_submission_boundary(bool owned_hps_pending = false)
 {
-    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+    if (const uint32_t failure = payload_admission_source_boundary(owned_hps_pending)) return failure;
     if (last_completed_frame_id <= payload_admission_capture_end_frame) {
         return PayloadFrameMismatch;
     }

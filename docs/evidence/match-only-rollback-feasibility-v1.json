@@ -10627,6 +10627,40 @@
             "scope": "V7sourcebba581a4 failed at firstPRE hostvalidation before capsule source advances. FX ranges7..9 own a separate object/generation; newhostvalidator incorrectlyrequired baseaudioidentity. Exactnativecontract repaired without weakening cross-lane comparison;13focusedJS controls pass and rootindependentdelta reviewGO.",
             "cleanup": "13recordedPIDsabsent and9producerpinsunchanged. BothnativeCPUclose return1073; snapshotclose andrenderershutdown return1. Failednativeclose retained.",
             "repair_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-host-fx-owner-sol-v1/root-review.json"
+          },
+          "browser_pending_transfer_failure": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v8/first-transfer-busy-summary.json",
+              "sha256": "02252f7ff336be9c4aad0b0f6511c0ba11bde1234edef852854f5892a5bdfef6"
+            },
+            "runtime_source": "bba581a48e9751d76c7d6174b10c704e2fdb0f5f",
+            "harness_source": "5005dd6fd3d67f261cf7c6be4ce7b0036a078689",
+            "scope": "V8 retains four compared intervals, then reference command34/sample322 reaches sourceframe199 and refuses1044 (PayloadTransferBusy). CPU interval failure0/epoch5. Actual transfer tuple [198,0,0,0,0,0,0,1,0,0] isolates busy drive after audio only; source-file and bank owners idle. No composed refill completion or complete loop claim.",
+            "cleanup": "CPU closes1073/1044 retained; both snapshot closes and renderer shutdowns return1. Supervisor cleanuptrue; all recordedPIDs absent and all9nativepins unchanged.",
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v8/independent-postflight.json",
+              "sha256": "c06c6d6e7c3b0e6ba010255200cf20db7ecfee4ecd63d94a6ac8afdec81bae57"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v8-producer-archive/archive.json",
+              "sha256": "4afe4d842ca319f9e95335c626215085f3936dab40c05269adfde31e547ad03c"
+            }
+          },
+          "interior_pending_repair": {
+            "freeze": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interior-pending-sol-v1/freeze.json",
+              "sha256": "5f37c8927bd7143dbdb717941280617909fa73f23ba1e3245d8d1289a947448a"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interior-pending-sol-v1/root-review.json",
+              "sha256": "6a3bdd374b41879b8e31e7d647dc28fd10225e83f6c0a60a322967628d1db020"
+            },
+            "reduced_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-pending-boundary-run-v1/result.json",
+              "sha256": "a5d4f2aa0004c5d8f3bf237ecb1ee2304c9da02bab7a938735ade16a72da50e6"
+            },
+            "scope": "Pure exact-bound HPS pending proof is usable only between PRE and END during reusable recording/correction. Actual original trace admits pending without mutation and still refuses capture/restore; next scheduled160sample block pumps naturally, then all68typedleaf ranges restore. Source-file/SSM/runtime/Aurora guards unchanged. Configured5TU syntax and focused frame/audio/payload/adapter controls pass. No browser composition yet.",
+            "retained_failures": "New payload fixture omitted capture fence; single-module import path failed; older modeled adapter motor exports missing. Exact fixture repairs retain failing logs; unsupported motor model exports abort rather than return success."
           }
         }
       }

@@ -164,6 +164,14 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
      * here on cleanup retains both pre and first-pass leases until teardown. */
     source_step_possible_=true;return true;
 }
+bool GameplayCpuCheckpoint::interior_hps_pending(const GameplayMatchSession& session) const noexcept {
+    return reusable_loop_&&(phase_==Phase::Recording||phase_==Phase::Correcting)&&
+        same_owner(session)&&session.source_frames()>owner_.frame&&
+        session.source_frames()<owner_.frame+span_&&
+        melee_web_cpu_interval_admit(commit_.effect_token)&&
+        melee_web_audio_snapshot_interval_pending_admit(owner_.audio,commit_.audio_snapshot,
+                                                       commit_.effect_token)==1;
+}
 bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
     comparison_={};
     auto refuse=[this](CpuComparisonDomain domain,std::uint32_t detail=0){

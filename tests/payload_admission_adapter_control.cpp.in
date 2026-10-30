@@ -34,6 +34,7 @@ static bool source_step_leaves_asyncify_busy = false;
 static bool source_draw_fails = false;
 static bool draw_leaves_aurora_busy = false;
 static bool transfer_busy = false;
+static bool source_transfer_busy=false, bank_transfer_busy=false;
 static bool main_browser_thread = true;
 static bool main_runtime_thread = true;
 static int asyncify_mode = 1;
@@ -109,6 +110,8 @@ static MeleeWebSourceMemoryPayloadSnapshot fake_snapshot;
 
 uint32_t melee_web_source_memory_healthy() { ++owner_reads; return owner_unhealthy ? 0 : 1; }
 int melee_web_snapshot_quiescent() { ++owner_reads; ++quiescent_calls; return transfer_busy ? 0 : 1; }
+int melee_web_source_file_drive_busy() { return source_transfer_busy; }
+int melee_web_audio_bank_transport_busy() { return bank_transfer_busy; }
 const void *aurora_browser_quiescence_observe_descriptor() {
     ++owner_reads;
     return descriptor_unavailable ? nullptr : &descriptor;
@@ -208,6 +211,24 @@ int main(int argc, char **argv) {
     if (closed != refused || owner_reads || destroy_calls) return fail("pthread cleanup changed the first refusal or touched an owner");
     return 0;
 #else
+    if (scenario == "interior-hps") {
+        transfer_busy=true;
+        if(payload_admission_boundary(false)!=PayloadTransferBusy)return fail("Default pending transfer boundary admitted");
+        if(payload_admission_boundary(false,true)!=0)return fail("Authenticated interior HPS pending boundary refused");
+        payload_admission_capture_end_frame=last_completed_frame_id;
+        if(payload_admission_boundary(true,true)!=PayloadAuroraBusy)return fail("Interior HPS proof bypassed new draw fence");
+        source_transfer_busy=true;
+        if(payload_admission_boundary(false,true)!=PayloadTransferBusy)return fail("HPS proof bypassed source-file transfer guard");
+        source_transfer_busy=false;bank_transfer_busy=true;
+        if(payload_admission_boundary(false,true)!=PayloadTransferBusy)return fail("HPS proof bypassed SSM transfer guard");
+        bank_transfer_busy=false;observation.frame=source_frame+1;
+        if(payload_admission_boundary(false,true)!=PayloadFrameMismatch)return fail("HPS proof bypassed source frame guard");
+        observation.frame=source_frame;descriptor.workerBusy=1;
+        if(payload_admission_boundary(false,true)!=PayloadAuroraBusy)return fail("HPS proof bypassed Aurora busy guard");
+        descriptor.workerBusy=0;
+        if(capture_calls||source_step_calls||source_draw_calls||restore_calls)return fail("Pure interior admission performed source work");
+        return 0;
+    }
     if (scenario == "close-before-capture") {
         if (melee_web_synctest_payload_admission_command(5) != 0 ||
             melee_web_synctest_payload_admission_command(5) != 0 ||

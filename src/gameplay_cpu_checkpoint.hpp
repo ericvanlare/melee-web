@@ -41,6 +41,8 @@ public:
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
     /* Intermediate boundary only: no final slot/cache or typed-byte claim. */
+    /* Pure owned pending HPS proof, only between the PRE and END frames. */
+    bool interior_hps_pending(const GameplayMatchSession&) const noexcept;
     bool interval_boundary(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;

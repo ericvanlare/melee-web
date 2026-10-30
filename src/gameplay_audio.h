@@ -85,6 +85,8 @@ void melee_web_audio_snapshot_destroy(MeleeWebAudioSnapshot*);
 /* Exact PRE receipt binding after the CPU interval token exists. End also
  * revokes a failed interval, before source owners are retired. */
 int melee_web_audio_snapshot_interval_begin(MeleeWebAudio*,const MeleeWebAudioSnapshot*,uint64_t);
+/* Pure exact-bound pending HPS proof; does not admit snapshots or commits. */
+int melee_web_audio_snapshot_interval_pending_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*,uint64_t);
 int melee_web_audio_snapshot_interval_end(MeleeWebAudio*,const MeleeWebAudioSnapshot*,uint64_t);
 /* Exact existing snapshot-owned scalars, borrowed only while this live owner
  * and generation remain unchanged. Pure: no pump, allocation or counter reset. */

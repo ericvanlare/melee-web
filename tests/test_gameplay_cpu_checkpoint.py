@@ -135,6 +135,46 @@ int main(void){
         self.assertIn('eleven admission refusals write zero; light/texture/particle leaves modeled',output)
         self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
+    def test_actual_interior_hps_frame_capability(self):
+        actual=self.extract_function((SOURCE/'src/gameplay_cpu_checkpoint.cpp').read_text(),
+            'bool GameplayCpuCheckpoint::interior_hps_pending(')
+        control=self.work/'interior-hps.cpp'
+        control.write_text(r"""
+#include <cstdint>
+#include <cassert>
+#include <cstdio>
+#include <initializer_list>
+static bool healthy=true,pending=true;static unsigned reads=0;
+int melee_web_cpu_interval_admit(std::uint64_t token){return healthy&&token==5;}
+int melee_web_audio_snapshot_interval_pending_admit(void*,const void*,std::uint64_t token){++reads;return pending&&token==5;}
+namespace melee_web {
+struct GameplayMatchSession {std::uint32_t frame=101;bool owner=true;std::uint32_t source_frames()const{return frame;}};
+struct GameplayCpuCheckpoint {
+ enum class Phase{Recording,Correcting,Sealed};Phase phase_=Phase::Recording;
+ bool reusable_loop_=true;struct{std::uint32_t frame=100;void* audio=nullptr;}owner_;
+ struct{const void* audio_snapshot=nullptr;std::uint64_t effect_token=5;}commit_;
+ std::uint32_t span_=7;
+ bool same_owner(const GameplayMatchSession& s)const{return s.owner;}
+ bool interior_hps_pending(const GameplayMatchSession&)const noexcept;
+};
+"""+actual+r"""
+}
+int main(){
+ melee_web::GameplayMatchSession s;melee_web::GameplayCpuCheckpoint c;
+ assert(c.interior_hps_pending(s)&&reads==1);
+ for(unsigned frame:{100u,107u,108u}){s.frame=frame;auto n=reads;assert(!c.interior_hps_pending(s)&&reads==n);}
+ s.frame=101;c.reusable_loop_=false;assert(!c.interior_hps_pending(s));c.reusable_loop_=true;
+ s.owner=false;assert(!c.interior_hps_pending(s));s.owner=true;
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Sealed;assert(!c.interior_hps_pending(s));
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Correcting;assert(c.interior_hps_pending(s));
+ healthy=false;auto n=reads;assert(!c.interior_hps_pending(s)&&reads==n);healthy=true;
+ pending=false;assert(!c.interior_hps_pending(s));
+ puts("Actual interior HPS frame capability passed; audio/owner leaves modeled");
+}
+""")
+        self.assertIn('Actual interior HPS frame capability passed',
+            self.compile_run('interior-hps',[control],[]))
+
     def test_actual_effect_barrier_and_inactive_transport_link(self):
         def function(text,needle):
             start=text.index(needle);brace=text.index('{',start);depth=1;end=brace+1

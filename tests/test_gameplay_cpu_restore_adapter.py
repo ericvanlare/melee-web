@@ -23,6 +23,8 @@ from owned_test_workspace import OwnedWorkspaceTests
 STUB_CHECKPOINT_HEADER = r'''#pragma once
 #include "gameplay_cpu_commit.hpp"
 #include "gameplay_cpu_statics.hpp"
+#include "gameplay_cpu_interval.h"
+#include <cstdlib>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -54,6 +56,8 @@ public:
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool interval_boundary(const GameplayMatchSession&) noexcept;
+    bool interior_hps_pending(const GameplayMatchSession&) const noexcept {return false;} // no stream in this model
+    const MeleeWebCpuMotorEvidence* motor_evidence(const GameplayMatchSession&) const noexcept {std::abort();} // motor export is not modeled
     bool seal_post(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
@@ -219,7 +223,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         # Extract the real shared source/frame admission predicate: modeled
         # owner/runtime/transfer leaves remain explicit in the control.
         browser_source = (CANDIDATE_ROOT / "src/slippi_profile/tests/synctest_browser.cpp").read_text()
-        start = browser_source.index("uint32_t payload_admission_source_boundary()")
+        start = browser_source.index("uint32_t payload_admission_source_boundary(")
         end = browser_source.index("uint32_t payload_admission_boundary(", start)
         actual_source_boundary = browser_source[start:end].rstrip()
         generated = generated.replace("@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@", actual_source_boundary)

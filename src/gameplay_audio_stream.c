@@ -573,6 +573,24 @@ int melee_web_audio_stream_snapshot_bind_interval(MeleeWebAudio* audio,const Mel
     !snapshot_quiescent(active)||active->interval_snapshot){return fail(e,n,"HPS interval binding does not match a fresh prepared receipt");}
  active->interval_snapshot=snapshot;active->interval_token=token;if(e&&n)*e=0;return 1;
 }
+int melee_web_audio_stream_snapshot_pending_admit(MeleeWebAudio* audio,
+ const MeleeWebAudioStreamSnapshot* snapshot,uint64_t token){
+ if(!active||active->audio!=audio||!snapshot||active->interval_snapshot!=snapshot||
+    active->interval_token!=token||!stream_interval_bound()||active->pumping||
+    !active->requests||melee_web_io_pending(active->io)!=0)return 0;
+ /* Reuse the original pump's finite work budget. This proves ownership only;
+  * it neither services the queue nor claims a snapshot-safe boundary. */
+ unsigned budget=64;
+ for(const Request* r=active->requests;r;r=r->next){
+  if(!budget--)return 0;
+  Request validated;
+  if(validate_stream_request((int)r->file,r->src,r->dest,r->size,r->type,
+       r->priority,r->callback,(void*)r->args,&validated)||
+     (r->type!=0x21&&r->type!=0x23)||r->cancelled||
+     validated.block!=r->block||validated.slot!=r->slot)return 0;
+ }
+ return 1;
+}
 int melee_web_audio_stream_snapshot_admit(MeleeWebAudio* audio,const MeleeWebAudioStreamSnapshot* snapshot,uint64_t token,char* e,size_t n){
  if(!snapshot||!active||!snapshot_matches_live(audio,snapshot,active)||!snapshot_quiescent(active))return fail(e,n,"HPS snapshot owner or quiescence changed");
  if(melee_web_cpu_interval_active()){

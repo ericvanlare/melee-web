@@ -173,6 +173,10 @@ bool cpu_corrected_diag(unsigned index){
     if(!bytes)return false;
     std::memcpy(e.diagnostics[index].data(),bytes,132);e.diagnostic_mask|=1u<<index;return true;
 }
+bool cpu_corrected_interior_hps_pending(){
+    return payload_admission_runtime_boundary()==0&&cpu_corrected_reuse.loop_mode&&
+        match&&cpu_restore.capsule&&cpu_restore.capsule->interior_hps_pending(*match);
+}
 bool cpu_corrected_interval(){
     return match&&cpu_restore.capsule&&cpu_restore.capsule->interval_boundary(*match);
 }
@@ -284,9 +288,9 @@ uint32_t cpu_corrected_execute(uint32_t command){
         if(index>=span)return cpu_corrected_error(0x517u,"corrected baseline command exceeds selected span");
         if(index!=c.baseline_steps||(index==0?c.phase!=C::Recording:c.phase!=C::BaselineDrawSubmitted))
             return cpu_corrected_error(0x517u,"corrected baseline command is out of order");
-        if(index&&(payload_admission_boundary(true)!=0||!cpu_corrected_diag(index)))
+        if(index&&(payload_admission_boundary(true,cpu_corrected_interior_hps_pending())!=0||!cpu_corrected_diag(index)))
             return cpu_corrected_error(0x518u,"corrected baseline prior draw is not idle");
-        if(cpu_boundary()||!cpu_seven_safe(e.pre_frame+index)||!cpu_corrected_interval())
+        if(cpu_boundary(cpu_corrected_interior_hps_pending())||!cpu_seven_safe(e.pre_frame+index)||!cpu_corrected_interval())
             return cpu_corrected_error(0x519u,"corrected baseline source boundary refused");
         uint32_t sample=300u+index;
         if(cpu_corrected_reuse.enabled&&
@@ -299,7 +303,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
         cpu_seven_raw(e.tick_pairs[index],false);
         if(result!=1)return cpu_checked_source_fail(0x51au,"corrected-route baseline step refused",
             "raw source step returned failure without a diagnostic");
-        if(cpu_restore.first_failure||cpu_boundary()||!cpu_seven_safe(e.pre_frame+index+1u)||
+        if(cpu_restore.first_failure||cpu_boundary(cpu_corrected_interior_hps_pending())||!cpu_seven_safe(e.pre_frame+index+1u)||
            !cpu_corrected_reuse_live(e.pre_frame+index+1u)||
            !cpu_corrected_interval()||!cpu_seven_live_equals(e.diagnostics[index]))
             return cpu_corrected_error(0x51bu,"corrected baseline source/draw boundary refused");
@@ -320,7 +324,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
         }
         if(drawn!=1)return cpu_checked_source_fail(0x51du,"corrected-route baseline draw refused",
             "source draw returned failure without a diagnostic");
-        if(cpu_restore.first_failure||payload_admission_submission_boundary()!=0||!cpu_seven_safe(e.pre_frame+index+1u)||
+        if(cpu_restore.first_failure||payload_admission_submission_boundary(cpu_corrected_interior_hps_pending())!=0||!cpu_seven_safe(e.pre_frame+index+1u)||
            !cpu_corrected_reuse_live(e.pre_frame+index+1u))
             return cpu_corrected_error(0x51eu,"corrected baseline draw submission refused");
         c.phase=C::BaselineDrawSubmitted;return 0;
@@ -354,7 +358,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
     if(command>=43&&command<=49){
         const unsigned index=command-43u;
         if(index>=span)return cpu_corrected_error(0x524u,"correction command exceeds selected span");
-        if(c.phase!=C::Correcting||index!=c.corrected_steps||cpu_boundary()||
+        if(c.phase!=C::Correcting||index!=c.corrected_steps||cpu_boundary(cpu_corrected_interior_hps_pending())||
            !cpu_seven_safe(e.pre_frame+index)||!cpu_corrected_reuse_live(e.pre_frame+index)||
            !cpu_corrected_interval())
             return cpu_corrected_error(0x524u,"correction command is out of order or source refused");
@@ -369,7 +373,7 @@ uint32_t cpu_corrected_execute(uint32_t command){
         auto& pair=e.tick_pairs[index];cpu_seven_raw(pair,true);pair.commit_result=e.commit_result;
         if(result!=1)return cpu_checked_source_fail(0x525u,"corrected source step refused",
             "raw source step returned failure without a diagnostic");
-        if(cpu_restore.first_failure||cpu_boundary()||!cpu_seven_safe(e.pre_frame+index+1u)||
+        if(cpu_restore.first_failure||cpu_boundary(cpu_corrected_interior_hps_pending())||!cpu_seven_safe(e.pre_frame+index+1u)||
            !cpu_corrected_reuse_live(e.pre_frame+index+1u)||
            !cpu_corrected_interval()||!cpu_seven_live_equals(e.diagnostics[7])||!cpu_corrected_diag(8u+index))
             return cpu_corrected_error(0x526u,"corrected no-draw source boundary refused");

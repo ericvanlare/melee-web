@@ -41,6 +41,9 @@ int melee_web_audio_stream_snapshot_restore(MeleeWebAudio* audio,const MeleeWebA
  if(!melee_web_audio_stream_snapshot_admit(audio,snapshot,token,error,size))return 0;
  ++stream_restores;stream_value=snapshot->value;return 1;
 }
+int melee_web_audio_stream_snapshot_pending_admit(MeleeWebAudio* audio,const MeleeWebAudioStreamSnapshot* snapshot,uint64_t token){
+ (void)audio;return stream_refuse&&snapshot&&bound_stream==snapshot&&snapshot->token==token;
+}
 int melee_web_audio_stream_snapshot_end_interval(MeleeWebAudio* audio,const MeleeWebAudioStreamSnapshot* snapshot,uint64_t token){
  (void)audio;if(!token||bound_stream!=snapshot||snapshot->token!=token)return 0;
  bound_stream->token=0;bound_stream=NULL;return 1;
@@ -90,6 +93,8 @@ int main(void){
  assert(bound_stream&&bound_stream->token==42);
  words[0]=71;stream_value=99;((unsigned char*)effects.delay_heap)[0]=72;
  stream_refuse=1;
+ assert(melee_web_audio_snapshot_interval_pending_admit(&audio,snapshot,42));
+ assert(!melee_web_audio_snapshot_interval_pending_admit(&audio,snapshot,41));
  assert(!melee_web_audio_snapshot_restore(&audio,snapshot));
  assert(words[0]==71&&stream_value==99&&((unsigned char*)effects.delay_heap)[0]==72&&!stream_restores);
  stream_refuse=0;++effects.generation;

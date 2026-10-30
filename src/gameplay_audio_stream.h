@@ -123,9 +123,12 @@ int melee_web_audio_stream_prepare_snapshot(MeleeWebAudio*,char*,size_t);
  * IO, or original source load. Captures made during an interval are refused. */
 int melee_web_audio_stream_snapshot_capture(MeleeWebAudio*,MeleeWebAudioStreamSnapshot** out,char*,size_t);
 /* Bind only the exact pre-interval receipt after interval admission. The live
- * binding fences owner lifetime and restore admission; HPS requests and queued
- * work still fail the existing interval effect guard until separately reviewed. */
+ * binding fences owner lifetime and restore admission. Only validated authored
+ * 0x21/0x23 refills and their queued pump may proceed under that exact healthy
+ * binding; path selection, relay0x22, cancellation and retirement stay refused. */
 int melee_web_audio_stream_snapshot_bind_interval(MeleeWebAudio*,const MeleeWebAudioStreamSnapshot*,uint64_t token,char*,size_t);
+/* Pure interior-only ownership proof, not capture/restore admission. */
+int melee_web_audio_stream_snapshot_pending_admit(MeleeWebAudio*,const MeleeWebAudioStreamSnapshot*,uint64_t);
 int melee_web_audio_stream_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioStreamSnapshot*,uint64_t token,char*,size_t);
 int melee_web_audio_stream_snapshot_restore(MeleeWebAudio*,const MeleeWebAudioStreamSnapshot*,uint64_t token,char*,size_t);
 /* Revokes only the matching binding, including after a sticky interval error. */

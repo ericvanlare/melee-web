@@ -452,6 +452,16 @@ int melee_web_audio_snapshot_interval_begin(MeleeWebAudio* audio,
 #endif
  return 1;
 }
+int melee_web_audio_snapshot_interval_pending_admit(MeleeWebAudio* audio,
+ const MeleeWebAudioSnapshot* snapshot,uint64_t token){
+ if(!token||!snapshot_mixer_admit(audio,snapshot))return 0;
+#if defined(MELEE_WEB_AUDIO_STREAM)
+ return snapshot->stream_mode&&snapshot->stream_present&&snapshot->stream_token==token&&
+        melee_web_audio_stream_snapshot_pending_admit(audio,snapshot->stream,token);
+#else
+ return 0;
+#endif
+}
 int melee_web_audio_snapshot_interval_end(MeleeWebAudio* audio,
  const MeleeWebAudioSnapshot* snapshot,uint64_t token){
  if(!snapshot||!token)return 0;

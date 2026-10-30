@@ -1643,8 +1643,24 @@ a separate owner. The repaired validator preserves that distinction and exact
 cross-lane metadata/byte comparisons; 13 focused checks pass with independent
 review. V7's CPU-close refusals remain retained; both snapshot and renderer
 shutdowns succeed, all 13 recorded PIDs are absent and nine producer pins match.
-Composed refill progress remains unproved. The initial leaf review findings, bounded Sol repair
-and corrected reviewer finding are retained with the exact producer. Native capsule
+V8 (native `bba581a4`, host `5005dd6f`) passes the first four intervals,
+then stops at reference command 34/sample 322, source frame 199, with
+`PayloadTransferBusy` (1044). The CPU interval remains healthy. The retained
+transfer bytes show an idle drive before and after the source tick, then a busy
+drive after audio; file and bank owners stay idle. The source queues HPS work
+inside its audio callback, after the scheduled transport pump. Completing that
+work early would change callback ordering. The reviewed repair separates
+validated in-flight HPS work at intermediate ticks from strict quiescent
+capture/restore boundaries. Its reduced original-source trace passes: the
+pending query preserves request, slot and loading state, capture/restore still
+refuse, and the next scheduled 160-sample block pumps naturally. The focused
+frame/audio/payload/adapter controls and five configured translation-unit syntax
+checks pass; fixture setup/import/link failures remain retained. Composed refill
+completion remains unproved. V8
+retains CPU-close refusals 1073/1044; both snapshot and renderer shutdowns
+succeed, all recorded PIDs are absent and nine native producer pins match.
+The initial leaf review findings, bounded Sol repair and corrected reviewer
+finding are retained with the exact producer. Native capsule
 cleanup still refuses; in V5 the reference snapshot close also aborts and renderer
 shutdown fails. Owned-process absence and all nine producer pins pass. Focused
 fixture and browser failures remain retained. General rolling

@@ -44,7 +44,7 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
         for scenario in ["producer-layout", "success", "draw-pending-then-idle", "postdraw-admit-early-latches", "close-before-capture", "shutdown-fallback", "reentrant-shutdown", "order", "duplicate-capture", "capture-failure",
                          "capture-failure-pointer", "capture-admission-failure",
                          "step-admission-failure", "postdraw-admission-failure",
-                         "step-failure", "draw-failure", "transfer-busy",
+                         "step-failure", "draw-failure", "transfer-busy", "interior-hps",
                          "aurora-missing", "aurora-busy", "aurora-one-slot",
                          "aurora-layout-schema", "aurora-layout-header-only", "aurora-layout-truncated",
                          "aurora-layout-offset", "aurora-layout-stride", "aurora-layout-count",

@@ -54,7 +54,7 @@ class GameplayCpuCorrectedReuseAdapterTests(OwnedWorkspaceTests):
             'reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102)),0x103u,0x105u,frame_};}')
         base=base.replace('@ACTUAL_FIXTURE_OBSERVATIONS@',extract_fixture_observations(REPO_ROOT/'tests/gameplay_snapshot_probe.cpp'))
         browser=(REPO_ROOT/'src/slippi_profile/tests/synctest_browser.cpp').read_text()
-        start=browser.index('uint32_t payload_admission_source_boundary()')
+        start=browser.index('uint32_t payload_admission_source_boundary(')
         end=browser.index('uint32_t payload_admission_boundary(',start)
         base=base.replace('@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@',browser[start:end].rstrip())
         base=base.replace('#include "cpu_restore_adapter.inc"',

@@ -113,8 +113,8 @@ uint32_t cpu_checked_source_fail(uint32_t code,const char* boundary,
 bool cpu_tuple_unchanged(){return match&&cpu_restore.profile_owner==rng_profile_gobj&&
     cpu_restore.configured_seed==configured_source_seed&&cpu_restore.initializer==native_initializer_enabled&&
     cpu_restore.profile==rng_profile_enabled;}
-uint32_t cpu_boundary(){
-    const uint32_t b=payload_admission_boundary(false);
+uint32_t cpu_boundary(bool owned_hps_pending=false){
+    const uint32_t b=payload_admission_boundary(false,owned_hps_pending);
     if(b)return cpu_fail(0x410u+b,"unsafe source/runtime/Aurora boundary");
     if(payload_admission_state!=PayloadAdmissionState::Idle)
         return cpu_fail(0x430u,"payload dry run and CPU restore are mutually exclusive");

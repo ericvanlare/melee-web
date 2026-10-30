@@ -246,6 +246,19 @@ int main(int argc,char** argv){try{
     CHECK(!melee_web_audio_stream_snapshot_capture(bank.get(),&pending_snapshot,error,sizeof(error)));
     CHECK(!pending_snapshot);
     CHECK(!melee_web_audio_stream_snapshot_admit(bank.get(),snapshot.get(),refill_token,error,sizeof(error)));
+    CHECK(!melee_web_audio_stream_snapshot_restore(bank.get(),snapshot.get(),refill_token,error,sizeof(error)));
+    if(stream_interval_leaf){
+     CHECK(melee_web_audio_stream_snapshot_pending_admit(bank.get(),snapshot.get(),refill_token));
+     CHECK(!melee_web_audio_stream_snapshot_pending_admit(bank.get(),snapshot.get(),refill_token==1?2:1));
+     MeleeWebAudioStreamProbeBoundary unchanged{};
+     CHECK(melee_web_audio_stream_probe_boundary(bank.get(),&unchanged));
+     CHECK(unchanged.pending_requests==pre_refill_boundary.pending_requests&&
+       unchanged.pumping==pre_refill_boundary.pumping&&unchanged.source_loading==pre_refill_boundary.source_loading);
+     MeleeWebAudioStreamProbeRequest same_request{};MeleeWebAudioStreamProbeSlot same_slot_state{};
+     CHECK(melee_web_audio_stream_probe_next_refill(bank.get(),&same_request,&same_slot_state)==potential);
+     CHECK(same_request.id==candidate.id&&same_request.type==candidate.type&&
+       same_request.block_offset==candidate.block_offset&&same_request.slot==candidate.slot&&same_slot(occupied,same_slot_state));
+    }
     pending_capture_refused=true;refill=candidate;refill_before=occupied;
    }
    if(!melee_web_audio_render(bank.get(),pcm.data(),160,error,sizeof(error)))throw std::runtime_error(error);
@@ -268,6 +281,7 @@ int main(int argc,char** argv){try{
   post_quiescent=!post_refill_boundary.pending_requests&&!post_refill_boundary.pumping&&
                  !post_refill_boundary.source_loading;
   CHECK(post_quiescent);
+  if(stream_interval_leaf)CHECK(!melee_web_audio_stream_snapshot_pending_admit(bank.get(),snapshot.get(),refill_token));
   LeafRangeSet after_refill=capture_stream_leaf_ranges(bank.get(),audio_generation);
   CHECK(after_refill.count==before.count&&!same_stream_leaf_values(before,after_refill));
   CHECK(melee_web_audio_stream_snapshot_admit(bank.get(),snapshot.get(),refill_token,error,sizeof(error)));
@@ -309,9 +323,9 @@ int main(int argc,char** argv){try{
   CHECK(!melee_web_cpu_interval_active());
   snapshot.reset();
   probe_guard.end();
-  printf("%s {\"schema\":1,\"path\":\"/audio/sp_end.hps\",\"render_calls\":%u,\"initial_slots_quiescent\":true,\"prepared\":true,\"pre_rows\":%zu,\"pre_bytes\":%zu,\"pcm_rows\":%zu,\"pending_capture_refused\":true,\"wrong_token_refused\":true,\"insufficient_capacity_no_callbacks\":true,\"refill_request\":%u,\"refill_slot\":%u,\"refill_block\":%u,\"post_quiescent\":true,\"post_changed_stream_values\":true,\"restored_rows_exact\":true,\"failed_interval_binding_cleanup\":true,\"scope\":\"typed HPS stream and PCM leaf state only; source scheduler, AX/HSD globals, and replay output are not compared\"}\n",
+  printf("%s {\"schema\":1,\"path\":\"/audio/sp_end.hps\",\"render_calls\":%u,\"initial_slots_quiescent\":true,\"prepared\":true,\"pre_rows\":%zu,\"pre_bytes\":%zu,\"pcm_rows\":%zu,\"pending_capture_refused\":true,\"pending_restore_refused\":true,\"pending_interior_admitted_without_mutation\":%s,\"natural_next_block_pump\":true,\"wrong_token_refused\":true,\"insufficient_capacity_no_callbacks\":true,\"refill_request\":%u,\"refill_slot\":%u,\"refill_block\":%u,\"post_quiescent\":true,\"post_changed_stream_values\":true,\"restored_rows_exact\":true,\"failed_interval_binding_cleanup\":true,\"scope\":\"typed HPS stream and PCM leaf state only; source scheduler, AX/HSD globals, and replay output are not compared\"}\n",
    stream_interval_leaf?"HPS_STREAM_INTERVAL_LEAF":"HPS_STREAM_SNAPSHOT_LEAF",
-   render_calls,before.count,before.total_bytes,pcm_rows,replacement_id,refill.slot,refill.block_offset);
+   render_calls,before.count,before.total_bytes,pcm_rows,stream_interval_leaf?"true":"false",replacement_id,refill.slot,refill.block_offset);
   return 0;
  }
  if(argc==9){
