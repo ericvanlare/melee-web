@@ -150,7 +150,7 @@ int melee_web_audio_snapshot_interval_pending_admit(void*,const void*,std::uint6
 namespace melee_web {
 struct GameplayMatchSession {std::uint32_t frame=101;bool owner=true;std::uint32_t source_frames()const{return frame;}};
 struct GameplayCpuCheckpoint {
- enum class Phase{Recording,Correcting,Sealed};Phase phase_=Phase::Recording;
+ enum class Phase{Recording,Correcting,Sealed,HistoryRecording,HistoryCorrecting};Phase phase_=Phase::Recording;
  bool reusable_loop_=true;struct{std::uint32_t frame=100;void* audio=nullptr;}owner_;
  struct{const void* audio_snapshot=nullptr;std::uint64_t effect_token=5;}commit_;
  std::uint32_t span_=7;
@@ -167,6 +167,8 @@ int main(){
  s.owner=false;assert(!c.interior_hps_pending(s));s.owner=true;
  c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Sealed;assert(!c.interior_hps_pending(s));
  c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Correcting;assert(c.interior_hps_pending(s));
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::HistoryRecording;assert(c.interior_hps_pending(s)&&reads==3);
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::HistoryCorrecting;assert(c.interior_hps_pending(s)&&reads==4);
  healthy=false;auto n=reads;assert(!c.interior_hps_pending(s)&&reads==n);healthy=true;
  pending=false;assert(!c.interior_hps_pending(s));
  puts("Actual interior HPS frame capability passed; audio/owner leaves modeled");
@@ -278,6 +280,7 @@ int main(void){
             'test_cpu_seven_tick_runner.mjs','cpu_corrected_runner.mjs','test_cpu_corrected_runner.mjs',
             'cpu_corrected_two_window_runner.mjs','test_cpu_corrected_two_window_runner.mjs',
             'cpu_corrected_loop_runner.mjs','test_cpu_corrected_loop_runner.mjs',
+            'cpu_history_runner.mjs','cpu_history_input.mjs',
             'cpu_corrected_loop_packet_input.mjs','test_cpu_corrected_loop_packet_input.mjs',
             'cpu_endpoint.mjs','test_cpu_endpoint.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
@@ -299,6 +302,7 @@ int main(void){
                        'cpu_corrected_runner.mjs','cpu_endpoint.mjs',
                        'cpu_corrected_two_window_runner.mjs',
                        'cpu_corrected_loop_runner.mjs',
+                       'cpu_history_runner.mjs','cpu_history_input.mjs',
                        'cpu_corrected_loop_packet_input.mjs',
                        'run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)

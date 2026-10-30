@@ -38,9 +38,9 @@ class CameraSourcePrepareTests(OwnedWorkspaceTests):
             text = text[match.start():]
             body = function(text, name)
             return text[:text.index(body)] + body
-        def run(label, argv, cwd=ROOT):
-            result = subprocess.run(list(map(str,argv)), cwd=cwd, capture_output=True, text=True, timeout=120)
-            (work / (label+'.json')).write_text(json.dumps(dict(argv=list(map(str,argv)), exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr), indent=2)+'\n')
+        def run(label, argv, cwd=ROOT, env=None):
+            result = subprocess.run(list(map(str,argv)), cwd=cwd, capture_output=True, text=True, timeout=120, env=env)
+            (work / (label+'.json')).write_text(json.dumps(dict(argv=list(map(str,argv)), cwd=str(cwd), git_ceiling_directories=(env or {}).get('GIT_CEILING_DIRECTORIES'), exit_code=result.returncode, stdout=result.stdout, stderr=result.stderr), indent=2)+'\n')
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             return result
         # Materialize the actual composed camera source, including its local identity bridge.
@@ -50,10 +50,22 @@ class CameraSourcePrepareTests(OwnedWorkspaceTests):
         tree = work/'source'; camera_path = tree/'src/melee/cm/camera.c'
         camera_path.parent.mkdir(parents=True)
         lock=json.loads((ROOT/'dependencies.lock.json').read_text())
-        camera_path.write_bytes(subprocess.check_output(['git','show',lock['repositories']['melee']['commit']+':src/melee/cm/camera.c'],cwd=melee))
-        run('patch-check',['git','apply','--check','--include=src/melee/cm/camera.c',combined],tree)
-        run('patch-apply',['git','apply','--include=src/melee/cm/camera.c',combined],tree)
-        camera=camera_path.read_text();
+        original_camera = subprocess.check_output(
+            ['git','show',lock['repositories']['melee']['commit']+':src/melee/cm/camera.c'],cwd=melee)
+        camera_path.write_bytes(original_camera)
+        # An owned workspace may live below this checkout's work/. Prevent Git
+        # from discovering that enclosing repository and silently filtering out
+        # camera.c as outside the current directory's repository-relative prefix.
+        patch_env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(work.resolve()))
+        for key in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'):
+            patch_env.pop(key, None)
+        run('patch-check',['git','apply','--check','--verbose','--include=src/melee/cm/camera.c',combined],tree,patch_env)
+        run('patch-apply',['git','apply','--verbose','--include=src/melee/cm/camera.c',combined],tree,patch_env)
+        camera=camera_path.read_text()
+        self.assertNotEqual(camera.encode(), original_camera,
+            'isolated patch application must change the locked original camera source')
+        self.assertEqual(camera.count('void slippi_camera_source_identity('), 1,
+                         'composed source must contain exactly one actual camera identity bridge')
         prepared_camera=read('melee/cm/camera.c')
         for name in ('Camera_8002A4AC','Camera_8002AF68'):
             self.assertEqual(extract(camera,name),extract(prepared_camera,name))

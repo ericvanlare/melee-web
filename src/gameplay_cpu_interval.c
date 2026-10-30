@@ -320,8 +320,10 @@ int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,
 void melee_web_cpu_interval_motor_history_restore_commit(uint64_t token,
  uint64_t incarnation,uint32_t actual_end)
 {
- /* Called only after every aggregate PRE leaf has committed. No allocation,
-  * callback, or source write occurs while the selected event journal resets. */
+ /* Identity was checked by restore_admit before the aggregate PRE commit.
+  * No allocation, callback, or fallible admission belongs in this commit. */
+ (void)token;
+ (void)incarnation;
  sequence_init(&motor.evidence.selected,MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE);
  motor.evidence.selected.span=MELEE_WEB_CPU_MOTOR_MAX_SPAN;
  motor.evidence.selected_lane=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED;
