@@ -49,7 +49,7 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
             "Reusable CPU capsule interval must be one through seven ticks":
             "CPU capsule interval is not one, two, or seven ticks");return {};
     }
-    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(ticks));
+    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(ticks,allow_variable));
     if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}
     if(!statics){refused(CpuComparisonDomain::Statics,code(CpuCaptureRefusal::MissingStatics),"Configured static owner is missing");return {};}
     try {
@@ -144,7 +144,13 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
        (!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor))||
        session.source_frames()!=owner_.frame)return false;
     commit_.effect_token=melee_web_cpu_interval_begin();
+    motor_token_=commit_.effect_token;
     if(!commit_.effect_token||melee_web_action_interval_begin_record(commit_.actions)!=1){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    if(reusable_loop_&&!melee_web_cpu_interval_motor_capture_begin(
+       commit_.effect_token,owner_.world,owner_.context,owner_.context_epoch,
+       static_cast<std::uint32_t>(owner_.frame),span_)){
         disarm();phase_=Phase::Failed;return false;
     }
     phase_=Phase::Recording;
@@ -212,6 +218,8 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
         if(!same_owner(session)||(!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor))||
            session.source_frames()!=owner_.frame+static_cast<std::uint32_t>(span_)||
            !melee_web_cpu_interval_admit(commit_.effect_token)||
+           (reusable_loop_&&!melee_web_cpu_interval_motor_baseline_seal(
+               commit_.effect_token,session.source_frames()))||
            melee_web_action_interval_seal_record(commit_.actions)!=1){disarm();phase_=Phase::Failed;return false;}
         auto payload=melee_web_source_memory_payload_snapshot_capture();post_payload_=payload.snapshot;
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
@@ -231,7 +239,13 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
         return GameplayCpuCommitResult::MissingOwner;
+    if(!melee_web_cpu_interval_motor_restore_admit(
+       commit_.effect_token,MELEE_WEB_CPU_MOTOR_LANE_REPLAY))
+        return GameplayCpuCommitResult::Effect;
     const auto result=gameplay_cpu_commit(commit_);
+    if(result==GameplayCpuCommitResult::Ok)
+        melee_web_cpu_interval_motor_restore_commit(commit_.effect_token,
+            MELEE_WEB_CPU_MOTOR_LANE_REPLAY);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(result==GameplayCpuCommitResult::Ok&&
        !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
@@ -253,7 +267,13 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
     const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
         return GameplayCpuCommitResult::MissingOwner;
+    if(!melee_web_cpu_interval_motor_restore_admit(
+       commit_.effect_token,MELEE_WEB_CPU_MOTOR_LANE_CORRECTED))
+        return GameplayCpuCommitResult::Effect;
     const auto result=gameplay_cpu_commit_corrected(commit_);
+    if(result==GameplayCpuCommitResult::Ok)
+        melee_web_cpu_interval_motor_restore_commit(commit_.effect_token,
+            MELEE_WEB_CPU_MOTOR_LANE_CORRECTED);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(result==GameplayCpuCommitResult::Ok&&
        !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
@@ -285,6 +305,8 @@ bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session
                       (slippi_lobj_failure()|(slippi_tobj_failure()<<16)));
     if(!melee_web_cpu_interval_admit(commit_.effect_token))
         return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
+    if(!melee_web_cpu_interval_motor_selected_finish(commit_.effect_token,session.source_frames()))
+        return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
     const auto action_failure=melee_web_action_interval_active_failure(commit_.actions);
     if(action_failure)
         return refuse(CpuComparisonDomain::Actions,action_failure);
@@ -293,6 +315,14 @@ bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session
                       melee_web_action_interval_failure_code(commit_.actions));
     phase_=Phase::CorrectedSealed;
     return true;
+}
+const MeleeWebCpuMotorEvidence* GameplayCpuCheckpoint::motor_evidence(
+    const GameplayMatchSession& session) const noexcept {
+    if(!reusable_loop_||!motor_token_||!owner_.context||!owner_.world||
+       !owner_.context_epoch||commit_.effect_token!=motor_token_||
+       melee_web_cpu_interval_token()!=motor_token_||!same_owner(session))return nullptr;
+    return melee_web_cpu_interval_motor_evidence_for(motor_token_,owner_.world,
+        owner_.context,owner_.context_epoch,owner_.frame,span_);
 }
 bool GameplayCpuCheckpoint::matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>& bytes,const AudioRanges& ranges,std::size_t count) noexcept {
     struct Visit {const AudioRanges* ranges;std::size_t count,n;bool failed;};Visit visit{&ranges,count,0,false};
@@ -336,6 +366,8 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
     };
     if(!check(CpuComparisonDomain::Owner,phase_==Phase::Replaying&&same_owner(session)&&
         session.source_frames()==post_frame_&&slippi_lobj_anchor_admit(commit_.lobj_anchor)==1&&slippi_tobj_anchor_admit(commit_.tobj_anchor)==1,(slippi_lobj_failure()|(slippi_tobj_failure()<<16))))return false;
+    if(!melee_web_cpu_interval_motor_selected_finish(commit_.effect_token,session.source_frames()))
+        return check(CpuComparisonDomain::Effects,false,melee_web_cpu_interval_failure());
     if(!check(CpuComparisonDomain::Effects,melee_web_cpu_interval_admit(commit_.effect_token)==1,melee_web_cpu_interval_failure()))return false;
     const int action_result=melee_web_action_interval_finish_replay(commit_.actions);
     if(!check(CpuComparisonDomain::Actions,action_result==1,
@@ -471,6 +503,9 @@ bool GameplayCpuCheckpoint::retire_confirmed(
 
     if(melee_web_cpu_interval_admit(commit_.effect_token)!=1)
         return false;
+    if(!melee_web_cpu_interval_motor_commit_admit(commit_.effect_token,owner_.world,
+       owner_.context,owner_.context_epoch,static_cast<std::uint32_t>(owner_.frame),span_))
+        return false;
     if(slippi_lobj_anchor_admit(commit_.lobj_anchor)!=1||
        slippi_tobj_anchor_admit(commit_.tobj_anchor)!=1||
        slippi_particle_presentation_anchor_admit(commit_.particle_anchor)!=1)
@@ -483,6 +518,10 @@ bool GameplayCpuCheckpoint::retire_confirmed(
         return false;
     if(melee_web_action_interval_retire_confirmed(commit_.actions)!=1)
         return false;
+
+    // The private reusable route captures only the already admitted selected
+    // motor transcript. This bookkeeping never dispatches a hardware command.
+    melee_web_cpu_interval_motor_capture_commit(commit_.effect_token);
 
     // All remaining operations revoke routing/anchors and are non-failing.
     // Keep this terminal distinct from source-owner teardown: the match stays

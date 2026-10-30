@@ -5,7 +5,10 @@ import assert from 'node:assert/strict';
 import {buildCpuCorrectedLoopCapsules,createCpuCorrectedLoopSchedule,
   planCpuCorrectedLoopForward,acknowledgeCpuCorrectedLoopForward,planCpuCorrectedLoopReplay,
   decodeCpuCorrectedLoopMetadata,validateCpuCorrectedLoopCommandEvidence,
-  persistCpuCorrectedLoopInterval,runBrowserCpuCorrectedLoop} from './cpu_corrected_loop_runner.mjs';
+  persistCpuCorrectedLoopInterval,runBrowserCpuCorrectedLoop,
+  decodeCpuCorrectedLoopMotorEvidence,requireCpuCorrectedLoopMotorEvidence,
+  compareCpuCorrectedLoopMotorEvents,hashCpuCorrectedLoopMotorEvents,
+  decodeCpuCorrectedLoopMotorCommitReceipt} from './cpu_corrected_loop_runner.mjs';
 import {decodeCpuCorrectedLoopEvidence} from './cpu_seven_tick_runner.mjs';
 import {operateCorrectedInPage} from './cpu_corrected_runner.mjs';
 import {buildCpuCorrectedTwoWindowFirstCorpus,buildCpuCorrectedTwoWindowSecondCorpus,
@@ -180,4 +183,136 @@ test('actual runner pre-sink failure retains full partial source and failed sink
     assert.equal(failure.cpuCorrectedLoopPartial.partialInterval.failure,'Error: capture first failure');
     assert.deepEqual(failure.cpuCorrectedLoopPartial.partialInterval.sourceProgress.reference,progress);
   }
+});
+
+
+function motorWire({baseline=[],selected=baseline,lane=1,token=0x20000000000001n,world=17n,epoch=3n}={}){
+  const bytes=Buffer.alloc(1016),u32=(offset,value)=>bytes.writeUInt32LE(value,offset),
+    u64=(offset,value)=>bytes.writeBigUInt64LE(value,offset);
+  [1,1016,1,lane,0,0,0,0].forEach((value,index)=>u32(index*4,value));
+  for(const [offset,events] of [[32,baseline],[524,selected]]){
+    [1,3,100,3,events.length].forEach((value,index)=>u32(offset+index*4,value));
+    u64(offset+20,token);u64(offset+28,world);u64(offset+36,epoch);
+    events.forEach((event,index)=>['sourceFrame','channel','command','ordinal'].forEach(
+      (key,field)=>u32(offset+44+index*16+field*4,event[key])));
+  }
+  return bytes;
+}
+const motorEvent=(sourceFrame=100,channel=0,command=1,ordinal=0)=>({sourceFrame,channel,command,ordinal});
+const decodeMotor=options=>decodeCpuCorrectedLoopMotorEvidence(motorWire(options));
+const requireMotor=(value,lane=1,baseline=null)=>requireCpuCorrectedLoopMotorEvidence(value,
+  {preFrame:100,span:3,selectedLane:lane,baseline});
+function motorReceipt(selected,lane){
+  const bytes=Buffer.alloc(64);
+  [1,64,1,lane,0,selected.eventCount,selected.firstFrame,selected.span].forEach(
+    (value,index)=>bytes.writeUInt32LE(value,index*4));
+  ['token','world','contextEpoch'].forEach((key,index)=>bytes.writeBigUInt64LE(BigInt(selected[key]),32+index*8));
+  bytes.writeBigUInt64LE(BigInt(hashCpuCorrectedLoopMotorEvents(selected.events)),56);return bytes;
+}
+
+test('motor evidence preserves exact local identities and compares only ordered source events across instances',()=>{
+  const events=[motorEvent(100,0,1,0),motorEvent(100,3,2,1),motorEvent(102,1,0,2)];
+  const reference=requireMotor(decodeMotor({baseline:events}));
+  const other=requireMotor(decodeMotor({baseline:events,token:0x30000000000003n,world:99n,epoch:19n}));
+  assert.equal(reference.selected.token,'9007199254740993');
+  assert.notEqual(reference.selected.token,other.selected.token);
+  assert.equal(compareCpuCorrectedLoopMotorEvents(reference.selected,other.selected).equal,true);
+  assert.equal(hashCpuCorrectedLoopMotorEvents([]),'14695981039346656037');
+  const hash=hashCpuCorrectedLoopMotorEvents(events);
+  assert.equal(hash,'2145455273860952881','independent little-endian FNV-1a64 vector');
+  assert.notEqual(hash,hashCpuCorrectedLoopMotorEvents(events.slice(1)));
+  assert.throws(()=>hashCpuCorrectedLoopMotorEvents([{...events[0],command:-1}]),/u32/);
+  const baseline=decodeMotor({baseline:[motorEvent(100,1,2)]});
+  const corrected=requireMotor(decodeMotor({baseline:[motorEvent(100,1,2)],selected:events,lane:3}),
+    3,baseline.baseline);
+  assert.equal(compareCpuCorrectedLoopMotorEvents(reference.selected,corrected.selected).equal,true);
+  assert.throws(()=>requireMotor(corrected,3,reference.baseline),/baseline journal changed/);
+  assert.throws(()=>compareCpuCorrectedLoopMotorEvents(reference.selected,baseline.selected),/authority events differ/);
+});
+
+test('empty authority permits empty corrected output while preserving differing wrong-branch events',()=>{
+  const authority=requireMotor(decodeMotor({}));
+  for(const wrong of [[],[motorEvent()],[motorEvent(100,2,2),motorEvent(102,3,0,1)]]){
+    const baseline=decodeMotor({baseline:wrong});
+    const corrected=requireMotor(decodeMotor({baseline:wrong,selected:[],lane:3}),3,baseline.baseline);
+    assert.equal(corrected.baseline.eventCount,wrong.length);
+    assert.equal(compareCpuCorrectedLoopMotorEvents(authority.selected,corrected.selected).eventCount,0);
+    const receipt=decodeCpuCorrectedLoopMotorCommitReceipt(motorReceipt(corrected.selected,3),corrected.selected,3);
+    assert.equal(receipt.eventHash,'14695981039346656037');assert.equal(receipt.published,0);
+  }
+});
+
+test('motor wire decoder rejects malformed bounds, order, opcodes, duplicate channels and unused capacity',()=>{
+  const mutations=[
+    [bytes=>bytes.writeUInt32LE(1015,4),/schema/],
+    [bytes=>bytes.writeUInt32LE(1,16),/publication/],
+    [bytes=>bytes.writeUInt32LE(1,28),/schema/],
+    [bytes=>bytes.writeUInt32LE(29,48),/state\/count/],
+    [bytes=>bytes.writeUInt32LE(8,36),/frame extent/],
+    [bytes=>bytes.writeUInt32LE(4,44),/frame extent/],
+    [bytes=>bytes.writeUInt32LE(99,76),/event frame/],
+    [bytes=>bytes.writeUInt32LE(4,80),/event frame/],
+    [bytes=>bytes.writeUInt32LE(3,84),/event frame/],
+    [bytes=>bytes.writeUInt32LE(1,88),/event frame/],
+    [bytes=>{bytes[92]=1;},/unused event/],
+    [bytes=>bytes.writeUInt32LE(0,32),/absent sequence/],
+  ];
+  for(const [mutate,pattern] of mutations){const bytes=motorWire({baseline:[motorEvent()]});mutate(bytes);
+    assert.throws(()=>decodeCpuCorrectedLoopMotorEvidence(bytes),pattern);}
+  assert.throws(()=>decodeMotor({baseline:[motorEvent(),motorEvent(100,0,2,1)]}),/duplicate channel/);
+  assert.throws(()=>decodeMotor({baseline:[motorEvent(102),motorEvent(100,1,1,1)]}),/event frame/);
+  assert.throws(()=>decodeCpuCorrectedLoopMotorEvidence(Buffer.alloc(1015)),/extent/);
+  const bytes=motorWire();bytes.writeUInt32LE(2,32);bytes.writeUInt32LE(1,44);
+  const partial=decodeCpuCorrectedLoopMotorEvidence(bytes);
+  assert.equal(partial.baseline.state,2);assert.throws(()=>requireMotor(partial),/complete/);
+  const refused=decodeMotor();refused.failure=4;assert.throws(()=>requireMotor(refused),/refused/);
+  const badIdentity=decodeMotor();badIdentity.selected.token='1';assert.throws(()=>requireMotor(badIdentity),/identity/);
+});
+
+test('native capture-only commit receipt binds selected events, full local identity, lane and publication',()=>{
+  const selected=decodeMotor({baseline:[motorEvent()]}).selected;
+  const bytes=motorReceipt(selected,1);
+  const receipt=decodeCpuCorrectedLoopMotorCommitReceipt(bytes,selected,1);
+  assert.equal(receipt.token,selected.token);assert.equal(receipt.contextEpoch,selected.contextEpoch);
+  for(const offset of [0,4,8,12,16,20,24,28,32,36,40,44,48,52,56,60]){
+    const changed=Buffer.from(bytes);changed.writeUInt32LE(changed.readUInt32LE(offset)^1,offset);
+    assert.throws(()=>decodeCpuCorrectedLoopMotorCommitReceipt(changed,selected,1));
+  }
+  assert.throws(()=>decodeCpuCorrectedLoopMotorCommitReceipt(bytes.subarray(0,60),selected,1),/extent/);
+});
+
+test('production sink boundary compares motor events before sink and retirement, including empty output',async()=>{
+  for(const events of [[],[motorEvent()]]){
+    const reference=decodeMotor({baseline:events}),predicted=decodeMotor({baseline:[motorEvent(101,2,2)],selected:events,lane:3});
+    const interval={reference:{motorEvidence:reference},predicted:{motorEvidence:predicted}};
+    const order=[];
+    await persistCpuCorrectedLoopInterval(0,interval,{},async()=>{
+      assert.equal(interval.comparisons.motor.equal,true);order.push('sink');return receipt;
+    },async()=>{order.push('retire');return {published:false};});
+    assert.deepEqual(order,['sink','retire']);
+    predicted.selected.events=[motorEvent(102,3,2)];predicted.selected.eventCount=1;
+    await assert.rejects(persistCpuCorrectedLoopInterval(0,interval,{},async()=>{
+      order.push('wrong sink');return receipt;
+    },async()=>order.push('wrong retire')),/authority events differ/);
+    assert.deepEqual(order,['sink','retire']);
+  }
+});
+
+test('actual opt-in in-page motor reads retain evidence and read one unpublished commit receipt after command53',async()=>{
+  const calls=[],heap=new Uint8Array(4096),journal=motorWire(),selected=decodeCpuCorrectedLoopMotorEvidence(journal).selected;
+  heap.set(journal,512);heap.set(motorReceipt(selected,1),2048);
+  heap.set([3,0,0,0,40],64);
+  globalThis.window={__slippiSynctest:{module:{HEAPU8:heap,
+    ccall:async(_name,_ret,_types,[command])=>{calls.push(['command',command]);return 0;},
+    _melee_web_synctest_cpu_corrected_loop_evidence_bytes:()=>40,
+    _melee_web_synctest_cpu_corrected_loop_evidence:()=>64,
+    _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes:()=>64,
+    _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt:()=>{calls.push(['commit receipt']);return 2048;}}}};
+  try{
+    const operation=await operateCorrectedInPage({command:53,readLoopEvidence:true,readLoopMotorEvidence:true});
+    const committed=decodeCpuCorrectedLoopMotorCommitReceipt(decode(operation.motorCommitReceiptBase64),selected,1);
+    assert.equal(committed.published,0);assert.equal(committed.status,1);
+    assert.deepEqual(calls,[['command',53],['commit receipt']]);
+    assert.equal(window.__slippiSynctest.cpuCorrectedProgress.motorCommitReceiptBase64,operation.motorCommitReceiptBase64);
+  }finally{delete globalThis.window;}
 });

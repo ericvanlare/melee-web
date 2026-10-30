@@ -108,7 +108,7 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         ]
         for profile,profile_defines in profiles:
             lane=out/profile;lane.mkdir()
-            cmd=[compiler,'-std=c++20','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1',*profile_defines,'-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(lane/'control')]
+            cmd=[compiler,'-std=c++20','-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1',*profile_defines,'-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(lane/'control')]
             result=subprocess.run(cmd,cwd=lane,env=env,text=True,capture_output=True,timeout=60)
             (lane/'compile.json').write_text(json.dumps({'profile':profile,'argv':cmd,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

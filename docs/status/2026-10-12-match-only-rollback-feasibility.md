@@ -1565,9 +1565,30 @@ owner or type of the two payload rows that differed in V3. This is not a
 continuous rolling rollback, relay, whole-profile, or full-match result.
 
 The successor branch remains unmerged, with no successor full regression or CI.
-The next boundary is a reusable-owner loop under root design review; it is not
-implemented here. General rolling correction, combat, frame-budget, profile admission
-and full-match or online rollback remain open.
+The reusable-owner loop now has a native/host implementation and retained failed
+browser evidence in `reusable_owner_loop_v1` in the structured receipt. It uses
+eight contiguous capsules over the same literal input history, with no external
+bridge. The first corrected capsule and the following confirmed capsule compare
+and retire successfully. The third capsule stops at reference sample 310: an
+original motor request trips the existing CPU-interval effect barrier. A second
+run uses the unchanged runtime and a reviewed, read-only diagnostic to identify
+MOTOR (effect 4), epoch 3; the predicted page has not executed that sample. The
+particle-token error is a downstream failed-admission message, not evidence of
+a stale particle owner. Both failures and exact producer identities are retained.
+Owned processes are absent after cleanup; native teardown refusals remain explicit.
+
+The token-owned motor-request journal now passes focused source and host controls
+and independent ownership review. It retains ordered source-frame/channel/command
+requests, preserves the predicted baseline, replaces selected output only after a
+successful restore, and records a confirmed capture-only receipt. The original
+rumble interpreter remains unchanged; physical rumble is not published. Review
+caught a raw-step/source-clock mismatch before capture: the bracket now reads the
+same authoritative source frame as its checkpoint, once across interpretation.
+The reduced production-bracket control distinguishes these clocks. Legacy motor,
+file, SSM and HPS barriers remain unchanged. The affected build, exact linked
+configuration and one further browser run remain pending. Focused fixture failures
+are retained in the structured receipt. General rolling correction, combat,
+frame-budget, profile admission and full-match or online rollback remain open.
 
 
 ## Stage decision dependencies, issue #333

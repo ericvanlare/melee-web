@@ -10264,6 +10264,118 @@
             "limitation": "Passing V4 does not prove the V3 changed PayloadRow bytes belonged to this TEV dependency; the two earlier payload nodes remain unattributed."
           }
         }
+      },
+      "reusable_owner_loop_v1": {
+        "status": "FAILED_BROWSER_MOTOR_EFFECT_REPAIRED_FOCUSED_REVIEW_PASS",
+        "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
+        "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
+        "attempts": [
+          {
+            "harness_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/runner/evidence.json",
+              "sha256": "aad94102893b5b20db7ad5f106919c8dc858607fc5a24988dc4010a9f3208148"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/first-failure-summary.json",
+              "sha256": "d9ad8f033c57c57eba99b4b4ab569335ef2c0bcb2fd38210dad5e529052538e2"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/independent-postflight.json",
+              "sha256": "959951ff09cc25ba50e27da8f24f05f988242c9481eff6be90aee005b50057bc"
+            }
+          },
+          {
+            "harness_producer": "36942a379fc00bf9e396a8128365020e3a2f1c5e",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/runner/evidence.json",
+              "sha256": "081159749c5c8e3a1f59d85c09c1506528fcbe45672c8c35e859fa8d37531ad9"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/first-effect-summary.json",
+              "sha256": "f9eace058e2563017d7223dcbf0174b3bfc08eb2d7e3a2ada62fc3b153b2fbc9"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/independent-postflight.json",
+              "sha256": "d2b86761beb6be350444deeb1dfc8daefe5efa3ab49d33989f450d7b6f1c7fd3"
+            },
+            "diagnostic_review": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-effect-diagnostic-sol-review-v1.json",
+              "sha256": "3dff1a26c49a0b89cb1b5364ca57d80aeef8a2ab996a4bb40ecab65461e97d1a"
+            }
+          }
+        ],
+        "observed": {
+          "completed_capsules": [
+            0,
+            1
+          ],
+          "first_failure": {
+            "capsule": 2,
+            "sample": 310,
+            "reference_command": 36,
+            "effect_enum": 4,
+            "effect": "MOTOR",
+            "reference_epoch": 3,
+            "predicted_effect_enum": 0,
+            "predicted_epoch": 3
+          },
+          "source_effect_semantics": "Original HSD rumble interpreter attempted a motor request before source PAD renewal; legacy interval barrier latched MOTOR, then particle preparation observed failed interval admission. No HPS/source-file/SSM attribution.",
+          "cleanup": "Owned browser/server process retirement confirmed; native capsule/snapshot/renderer refusal details retained and are not a native-cleanup pass."
+        },
+        "producer_archive": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v1-producer-archive/archive.json",
+          "sha256": "5ac52ba8ed058c7bdfdafbcbd6e15331eff67031874b52a0fa80c674547edaea"
+        },
+        "focused_source_freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-combined-freeze-v1.json",
+          "sha256": "19b177b958910707f84e8d9c46d78a5d8c9ba0a14dae454f46c0cf8850b03898"
+        },
+        "linked_configuration": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v1/final-linked-configuration-v1.json",
+          "sha256": "5942ddc995edcea0be95e60d4f23292394ab4de1bfefaae86ac3d3e9daf59688"
+        },
+        "next_contract": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-abi-root-v1.json",
+          "sha256": "cc64021d0e26ec3b812cc8945fb95fff5b349b24153be73fff106a191544919c"
+        },
+        "design_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
+          "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
+        },
+        "next": "Affected build, independently reviewed exact linked configuration, then one unchanged eight-capsule browser run. No successful reusable-loop result yet.",
+        "limitations": [
+          "Candidate motor output is explicitly capture-only/unpublished; physical haptic output is not implemented or accepted.",
+          "No reusable-loop pass yet; no continuous live packet delivery or full-match rollback.",
+          "No successor full regression, ordinary build or exact-head CI yet."
+        ],
+        "motor_candidate": {
+          "native_freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/motor-journal-final-focused-v1/freeze.json",
+            "sha256": "3e5a34c8e2e7c9572cec34a4bbb48c2ba232aedb3a54d8093fcf9ab1ce8cb13a"
+          },
+          "native_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-native-independent-sol-review-v1.json",
+            "sha256": "d08f9b8759540bcd3a31ad8e1c5e9398df7ccf198aca631522f16ee00a0471d1"
+          },
+          "host_freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-host-sol-v1/report.json",
+            "sha256": "8d247f1de58dd215a2b914a9d0cc33cb476871ffb4df24fef8811ba9ef9f773c"
+          },
+          "host_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-host-independent-sol-review-v1.json",
+            "sha256": "552bb90c5605ccb74b4095769e2962ed23b113ef248a4d7db4b9d459418d4198"
+          },
+          "clock_binding": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-clock-binding-review-v1.json",
+            "sha256": "781fc8366548e306016e13956164e15ba4e120bee03245c3cace81003736332f"
+          },
+          "scope": "Actual original direct-status rumble interpreter and production bracket with distinct raw/source clocks; native adapter/capture controls and 41 host tests pass. Explicit capture-only with no physical motor publication. Current source and exact ownership reviewed; browser result pending.",
+          "additional_retained_failures": [
+            "motor-journal-native-focused-v1/run.log: compatibility typedef compile failure",
+            "motor-journal-native-focused-v3/run.log: fixture provider counter expected1 after reset0; assertions were active"
+          ]
+        }
       }
     }
   }

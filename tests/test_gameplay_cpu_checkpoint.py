@@ -40,6 +40,68 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
         self.assertEqual(run.returncode,0,run.stdout+run.stderr)
         return run.stdout
 
+    @staticmethod
+    def extract_function(text,signature):
+        start=text.index(signature);brace=text.index('{',start);depth=1;end=brace+1
+        while depth:
+            if text[end]=='{':depth+=1
+            elif text[end]=='}':depth-=1
+            end+=1
+        return text[start:end]
+
+    def test_actual_rumble_interpreter_capture_only_journal(self):
+        source=ROOT/'.deps/melee/src/sysdolphin/baselib/rumble.c'
+        actual=self.extract_function(source.read_text(),'void HSD_PadRumbleInterpret(void)')
+        fixture=(ROOT/'tests/cpu_interval_motor_journal_control.c').read_text()
+        self.assertEqual(fixture.count('@ACTUAL_INTERPRETER@'),1)
+        control=self.work/'motor-journal-control.c'
+        control.write_text(fixture.replace('@ACTUAL_INTERPRETER@',actual))
+        output=self.compile_run('motor-journal',[SOURCE/'src/gameplay_cpu_interval.c',control],
+            ['-include',str(ROOT/'src/hsd_probe_compat.h'),
+             '-I'+str(ROOT/'.deps/melee/src'),
+             '-I'+str(ROOT/'.deps/melee/extern/dolphin/include')],cpp=False)
+        self.assertIn('Actual HSD rumble interpreter preserves source state',output)
+        self.assertIn('Legacy MOTOR barrier, token/frame/channel validation and fixed journal bounds passed',output)
+
+    def test_match_rumble_bracket_uses_authoritative_source_clock(self):
+        match_context=(SOURCE/'src/gameplay_match_context.c').read_text()
+        bracket=self.extract_function(match_context,'static int interpret_match_rumble(')
+        control=self.work/'match-rumble-source-clock.c'
+        control.write_text(r'''#include "gameplay_cpu_interval.h"
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+typedef struct MeleeWebMatchContext { uint64_t generation,ticks; } MeleeWebMatchContext;
+static uint64_t owner_epoch=11;
+static uint32_t source_frame=401;
+static unsigned source_frame_reads;
+static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
+uint32_t melee_web_match_source_frames(void){++source_frame_reads;return source_frame;}
+void HSD_PadRumbleInterpret(void){melee_web_cpu_interval_pad_motor(2,1);}
+void PADControlMotor(unsigned channel,unsigned command){(void)channel;(void)command;assert(!"capture-only route dispatched hardware");}
+'''+bracket+r'''
+int main(void){
+ MeleeWebMatchContext context={9,3};char error[160]={0};
+ uint64_t token=melee_web_cpu_interval_begin();assert(token);
+ assert(melee_web_cpu_interval_motor_capture_begin(token,context.generation,&context,
+        owner_epoch,source_frame,1));
+ assert(interpret_match_rumble(&context,error,sizeof(error)));
+ assert(source_frame_reads==1&&context.ticks==3);
+ const MeleeWebCpuMotorEvidence* evidence=melee_web_cpu_interval_motor_evidence();
+ assert(evidence&&evidence->baseline.frames_seen==1&&evidence->baseline.event_count==1);
+ assert(evidence->baseline.events[0].source_frame==401&&
+        evidence->baseline.events[0].channel==2&&evidence->baseline.events[0].command==1);
+ assert(melee_web_cpu_interval_motor_baseline_seal(token,402));
+ assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_NONE);
+ assert(melee_web_cpu_interval_end(token));
+ puts("Production rumble bracket binds one authoritative source-clock frame across interpretation; raw-step counter remains separate");
+}
+''')
+        output=self.compile_run('match-rumble-source-clock',
+            [SOURCE/'src/gameplay_cpu_interval.c',control],cpp=False)
+        self.assertIn('Production rumble bracket binds one authoritative source-clock frame',output)
+
     def test_actual_static_engine_refusal_and_prepared_noalloc_commit(self):
         output=self.compile_run('statics',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'tests/cpu_statics_control.cpp'],
             ['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0'])

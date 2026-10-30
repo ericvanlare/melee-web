@@ -1,4 +1,5 @@
 #include "gameplay_class_piece_diagnostic.h"
+#include "gameplay_cpu_interval.h"
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
 #include "slippi_profile/particle_source_schedule.h"
@@ -156,6 +157,15 @@ void melee_web_source_memory_payload_snapshot_destroy(Snapshot* p){destroy(p);}
 void melee_web_action_interval_disarm(Snapshot*){++action_disarm_calls;}
 int melee_web_cpu_interval_admit(std::uint64_t){retirement_step(5);return effect_ok;}
 std::uint32_t melee_web_cpu_interval_failure(){return effect_ok?0:99;}
+/* The capture-refusal fixture compiles the actual checkpoint lifecycle but
+ * models the interval-owned motor leaves. It does not exercise the journal;
+ * that actual runtime/interpreter boundary has a separate focused control. */
+int melee_web_cpu_interval_motor_baseline_seal(std::uint64_t,std::uint32_t){return 1;}
+int melee_web_cpu_interval_motor_restore_admit(std::uint64_t,std::uint32_t){return 1;}
+void melee_web_cpu_interval_motor_restore_commit(std::uint64_t,std::uint32_t){}
+int melee_web_cpu_interval_motor_selected_finish(std::uint64_t,std::uint32_t){return 1;}
+int melee_web_cpu_interval_motor_commit_admit(std::uint64_t,std::uint64_t,const void*,std::uint64_t,std::uint32_t,std::uint32_t){return 1;}
+void melee_web_cpu_interval_motor_capture_commit(std::uint64_t){}
 int melee_web_action_interval_admit(Snapshot*){return action_ok;}
 int melee_web_action_interval_matches_finished(Snapshot*){return action_ok;}
 int melee_web_action_interval_seal_record(Snapshot*){return action_ok;}
@@ -247,10 +257,10 @@ class GameplayCpuCheckpoint{public:
  void disarm() noexcept;
  void release() noexcept;
 private:
- explicit GameplayCpuCheckpoint(std::uint32_t span):span_(span){}
- explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):GameplayCpuCheckpoint(static_cast<std::uint32_t>(span)){}
+ explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop):span_(span),reusable_loop_(reusable_loop){}
+ explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):GameplayCpuCheckpoint(static_cast<std::uint32_t>(span),false){}
  static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool) noexcept;
- const std::uint32_t span_;
+ const std::uint32_t span_;const bool reusable_loop_;
  enum class Phase{Captured,Recording,Sealed,Replaying,Correcting,CorrectedSealed,Finished,Failed,ConfirmedDetached,Retired};Phase phase_=Phase::Captured;
  bool same_owner(const GameplayMatchSession&)const{return !owner_missing&&fixture_particle_anchor_admit(commit_.particle_anchor);}
  using AudioRanges=std::array<int,16>;

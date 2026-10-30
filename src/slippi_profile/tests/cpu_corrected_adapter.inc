@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Independent-reference correction diagnostic. The host owns cross-instance
  * equality; native success means only a checked local operation completed. */
+#include "gameplay_cpu_interval.h"
 #include <new>
 #if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)
 namespace {
@@ -548,6 +549,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loo
 }
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_evidence_bytes(){
     return sizeof(cpu_corrected_reuse_evidence);
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loop_motor_evidence(){
+    return cpu_restore.capsule&&match?
+        cpu_restore.capsule->motor_evidence(*match):nullptr;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_motor_evidence_bytes(){
+    return melee_web_cpu_interval_motor_evidence_bytes();
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_loop_motor_commit_receipt(){
+    return melee_web_cpu_interval_motor_commit_receipt();
+}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes(){
+    return melee_web_cpu_interval_motor_commit_receipt_bytes();
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_corrected_evidence(){
     cpu_corrected.evidence.first_failure=cpu_restore.first_failure;

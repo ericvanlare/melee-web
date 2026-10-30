@@ -249,8 +249,128 @@ function validateSinkReceipt(receipt){
   return receipt;
 }
 
+export const CPU_LOOP_MOTOR_EVIDENCE_BYTES=1016;
+export const CPU_LOOP_MOTOR_RECEIPT_BYTES=64;
+export const CPU_LOOP_MOTOR_LANE=Object.freeze({none:0,baseline:1,replay:2,corrected:3});
+const MOTOR_SEQUENCE_BYTES=492,MOTOR_EVENT_CAPACITY=28;
+const motorIdentityKeys=['token','world','contextEpoch','firstFrame','span'];
+
+/** Native integers remain exact even above JavaScript's safe integer range. */
+export function decodeCpuCorrectedLoopMotorEvidence(input){
+  const bytes=Buffer.from(input);
+  if(bytes.length!==CPU_LOOP_MOTOR_EVIDENCE_BYTES)throw new Error('Loop motor evidence extent');
+  const u32=offset=>bytes.readUInt32LE(offset);
+  const u64=offset=>(BigInt(u32(offset))|(BigInt(u32(offset+4))<<32n)).toString();
+  const sequence=offset=>{
+    const state=u32(offset),span=u32(offset+4),firstFrame=u32(offset+8),framesSeen=u32(offset+12),
+      eventCount=u32(offset+16);
+    if(![0,1,2].includes(state)||eventCount>MOTOR_EVENT_CAPACITY)
+      throw new Error('Loop motor sequence state/count');
+    if(state===0){
+      if(!bytes.subarray(offset,offset+MOTOR_SEQUENCE_BYTES).every(value=>value===0))
+        throw new Error('Loop motor absent sequence is not zero');
+    }else if(span<1||span>7||firstFrame>0xffffffff-span||framesSeen>span||
+             state===1&&framesSeen!==span)
+      throw new Error('Loop motor sequence frame extent');
+    const events=[],channelsByFrame=new Set();
+    for(let index=0;index<MOTOR_EVENT_CAPACITY;index++){
+      const row=offset+44+index*16;
+      if(index>=eventCount){
+        if(!bytes.subarray(row,row+16).every(value=>value===0))
+          throw new Error('Loop motor unused event capacity is not zero');
+        continue;
+      }
+      const event={sourceFrame:u32(row),channel:u32(row+4),command:u32(row+8),ordinal:u32(row+12)};
+      if(event.sourceFrame<firstFrame||event.sourceFrame>=firstFrame+span||
+         event.channel>3||event.command>2||event.ordinal!==index||
+         index&&event.sourceFrame<events[index-1].sourceFrame)
+        throw new Error('Loop motor event frame/channel/command/order');
+      const channelKey=`${event.sourceFrame}/${event.channel}`;
+      if(channelsByFrame.has(channelKey))throw new Error('Loop motor duplicate channel/frame');
+      channelsByFrame.add(channelKey);
+      events.push(event);
+    }
+    return {state,span,firstFrame,framesSeen,eventCount,token:u64(offset+20),world:u64(offset+28),
+      contextEpoch:u64(offset+36),events};
+  };
+  const result={schema:u32(0),bytes:u32(4),mode:u32(8),selectedLane:u32(12),published:u32(16),
+    commitState:u32(20),failure:u32(24),reserved:u32(28),baseline:sequence(32),selected:sequence(524),
+    base64:bytes.toString('base64')};
+  if(result.schema!==1||result.bytes!==CPU_LOOP_MOTOR_EVIDENCE_BYTES||result.mode!==1||
+     ![0,1,2,3].includes(result.selectedLane)||result.published!==0||
+     ![0,1,2].includes(result.commitState)||result.reserved!==0)
+    throw new Error('Loop motor schema/mode/publication/commit state');
+  return result;
+}
+
+export function hashCpuCorrectedLoopMotorEvents(events){
+  let hash=0xcbf29ce484222325n;
+  for(const event of events)for(const key of ['sourceFrame','channel','command','ordinal']){
+    const value=event[key];
+    if(!Number.isInteger(value)||value<0||value>0xffffffff)throw new Error('Loop motor hash event u32');
+    for(let byte=0;byte<4;byte++){
+      hash^=BigInt((value>>>(byte*8))&255);
+      hash=BigInt.asUintN(64,hash*0x100000001b3n);
+    }
+  }
+  return hash.toString();
+}
+
+export function requireCpuCorrectedLoopMotorEvidence(value,{preFrame,span,selectedLane,baseline=null}={}){
+  if(value?.failure!==0||value.commitState!==0||value.published!==0||value.selectedLane!==selectedLane)
+    throw new Error('Loop motor pending capture-only selection refused');
+  for(const sequence of [value.baseline,value.selected]){
+    if(sequence.state!==1||sequence.framesSeen!==span||sequence.span!==span||sequence.firstFrame!==preFrame||
+       sequence.token==='0'||sequence.world==='0'||sequence.contextEpoch==='0')
+      throw new Error('Loop motor complete local sequence identity/extent');
+  }
+  for(const key of motorIdentityKeys)if(value.baseline[key]!==value.selected[key])
+    throw new Error(`Loop motor local selected identity ${key} differs`);
+  if(selectedLane===CPU_LOOP_MOTOR_LANE.baseline&&
+     JSON.stringify(value.baseline)!==JSON.stringify(value.selected))
+    throw new Error('Loop motor baseline selection differs from baseline journal');
+  if(baseline&&JSON.stringify(value.baseline)!==JSON.stringify(baseline))
+    throw new Error('Loop motor baseline journal changed after restore');
+  return value;
+}
+
+/** Local receipt identities authenticate each journal; only source events cross instances. */
+export function compareCpuCorrectedLoopMotorEvents(reference,selected){
+  for(const sequence of [reference,selected])if(!sequence||sequence.state!==1||
+     sequence.framesSeen!==sequence.span||sequence.events.length!==sequence.eventCount)
+    throw new Error('Loop motor comparison requires complete selected journals');
+  if(JSON.stringify(reference.events)!==JSON.stringify(selected.events)||
+     reference.eventCount!==selected.eventCount||reference.firstFrame!==selected.firstFrame||
+     reference.span!==selected.span||reference.framesSeen!==selected.framesSeen)
+    throw new Error('Loop motor selected actual-authority events differ');
+  return {equal:true,eventCount:reference.eventCount,firstFrame:reference.firstFrame,span:reference.span,
+    eventHash:hashCpuCorrectedLoopMotorEvents(reference.events),published:false,mode:'capture-only'};
+}
+
+export function decodeCpuCorrectedLoopMotorCommitReceipt(input,selected,selectedLane){
+  const bytes=Buffer.from(input);
+  if(bytes.length!==CPU_LOOP_MOTOR_RECEIPT_BYTES)throw new Error('Loop motor commit receipt extent');
+  const u32=offset=>bytes.readUInt32LE(offset);
+  const u64=offset=>(BigInt(u32(offset))|(BigInt(u32(offset+4))<<32n)).toString();
+  const result={schema:u32(0),bytes:u32(4),status:u32(8),selectedLane:u32(12),published:u32(16),
+    eventCount:u32(20),firstFrame:u32(24),span:u32(28),token:u64(32),world:u64(40),
+    contextEpoch:u64(48),eventHash:u64(56)};
+  if(result.schema!==1||result.bytes!==CPU_LOOP_MOTOR_RECEIPT_BYTES||result.status!==1||
+     result.selectedLane!==selectedLane||result.published!==0||
+     result.eventCount!==selected?.eventCount||result.eventHash!==hashCpuCorrectedLoopMotorEvents(selected.events))
+    throw new Error('Loop motor commit receipt status/selection/hash/publication');
+  for(const key of motorIdentityKeys)if(result[key]!==selected[key])
+    throw new Error(`Loop motor commit receipt local identity ${key} differs`);
+  return result;
+}
+
 /** Shared production boundary: one awaited immutable sink, then checked retirement. */
 export async function persistCpuCorrectedLoopInterval(index,interval,summary,sink,retire){
+  if(interval.reference?.motorEvidence||interval.predicted?.motorEvidence){
+    interval.comparisons??={};
+    interval.comparisons.motor=compareCpuCorrectedLoopMotorEvents(
+      interval.reference.motorEvidence.selected,interval.predicted.motorEvidence.selected);
+  }
   const receipt=validateSinkReceipt(await sink(index,interval));
   interval.evidenceReceipt=receipt;
   summary.evidence=receipt;summary.status='evidence-saved';
@@ -289,12 +409,15 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
   let loopEnabled=new Set(),current=null,sinkAttempted=false;
   const laneFor=(interval,page)=>page===referencePage?interval.reference:interval.predicted;
   const operate=async(interval,page,command,options={})=>{
-    const result=await page.evaluate(operateCorrectedInPage,{...defaults,...options,command});
+    const result=await page.evaluate(operateCorrectedInPage,{...defaults,readLoopMotorEvidence:true,...options,command});
     const lane=laneFor(interval,page);
     lane.lastOperationResult=result;
     if(command===53){
       const metadata=decodeCpuCorrectedLoopMetadata(decode(result.loopEvidenceBase64??''));
-      lane.commands.push({command,result:0,loopMetadata:metadata});return {result,metadata};
+      const motorCommit=decodeCpuCorrectedLoopMotorCommitReceipt(decode(result.motorCommitReceiptBase64??''),
+        lane.motorEvidence.selected,lane.motorEvidence.selectedLane);
+      lane.motorCommitReceipt=motorCommit;
+      lane.commands.push({command,result:0,loopMetadata:metadata,motorCommit});return {result,metadata,motorCommit};
     }
     const evidence=decodeCpuCorrectedLoopEvidence(decode(result.evidenceBase64),interval.span);
     validateCpuCorrectedLoopCommandEvidence(evidence,command,{preFrame:interval.preFrame,span:interval.span});
@@ -390,6 +513,12 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       const predIdle=await operate(interval,predictedPage,41);
       interval.reference.nativeEvidence=refIdle.evidence;
       interval.predicted.nativeEvidence=predIdle.evidence;
+      for(const [lane,operation] of [[interval.reference,refIdle],[interval.predicted,predIdle]]){
+        lane.motorEvidence=decodeCpuCorrectedLoopMotorEvidence(decode(operation.result.motorEvidenceBase64??''));
+        requireCpuCorrectedLoopMotorEvidence(lane.motorEvidence,{preFrame:interval.preFrame,span:interval.span,
+          selectedLane:CPU_LOOP_MOTOR_LANE.baseline});
+        lane.motorBaselineEvidence=lane.motorEvidence;
+      }
       const refDraw=await endpoint(interval,referencePage,CPU_ENDPOINT_VIEW.drawEnd,CPU_ENDPOINT_PROVENANCE.reference,'draw');
       const predBaselineDraw=await endpoint(interval,predictedPage,CPU_ENDPOINT_VIEW.drawEnd,
         CPU_ENDPOINT_PROVENANCE.reference,capsule.kind.startsWith('speculative')?'speculativeDraw':'draw');
@@ -437,6 +566,11 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
         await operate(interval,predictedPage,50,{draw:true});
         const correctedIdle=await operate(interval,predictedPage,51);
         interval.predicted.nativeEvidence=correctedIdle.evidence;
+        interval.predicted.motorEvidence=decodeCpuCorrectedLoopMotorEvidence(
+          decode(correctedIdle.result.motorEvidenceBase64??''));
+        requireCpuCorrectedLoopMotorEvidence(interval.predicted.motorEvidence,
+          {preFrame:interval.preFrame,span:interval.span,selectedLane:CPU_LOOP_MOTOR_LANE.corrected,
+            baseline:interval.predicted.motorBaselineEvidence.baseline});
         const correctedDraw=await endpoint(interval,predictedPage,CPU_ENDPOINT_VIEW.drawEnd,
           CPU_ENDPOINT_PROVENANCE.corrected,'draw');
         interval.predicted.endpoints.draw=correctedDraw;
@@ -455,20 +589,23 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
         throw new Error(`Corrected loop capsule ${index} final baseline source frame drift`);
       interval.status='compared';
       // Evidence is immutable before command53 retires native ownership.
-      sinkAttempted=true;
       const summary=report.capsules[index];
-      await persistCpuCorrectedLoopInterval(index,interval,summary,onIntervalEvidence,async()=>{
+      await persistCpuCorrectedLoopInterval(index,interval,summary,async(sinkIndex,sinkInterval)=>{
+        sinkAttempted=true;return onIntervalEvidence(sinkIndex,sinkInterval);
+      },async()=>{
         const refRetire=await operate(interval,referencePage,53,{readLoopEvidence:true});
         // Preserve progress if the other page refuses retirement.
-        summary.retirementProgress={reference:refRetire.metadata};
+        summary.retirementProgress={reference:refRetire.metadata,referenceMotorCommit:refRetire.motorCommit};
         const predRetire=await operate(interval,predictedPage,53,{readLoopEvidence:true});
         summary.retirementProgress.predicted=predRetire.metadata;
+        summary.retirementProgress.predictedMotorCommit=predRetire.motorCommit;
         const retiredExpected=metadataExpected(index,capsule,interval.preFrame,true);
         requireCpuCorrectedLoopMetadata(refRetire.metadata,retiredExpected,`capsule${index} reference retirement`);
         requireCpuCorrectedLoopMetadata(predRetire.metadata,retiredExpected,`capsule${index} predicted retirement`);
         if(JSON.stringify(refRetire.metadata)!==JSON.stringify(predRetire.metadata))
           throw new Error(`Corrected loop capsule ${index} retirement metadata differs across pages`);
-        return {reference:refRetire.metadata,predicted:predRetire.metadata};
+        return {reference:refRetire.metadata,predicted:predRetire.metadata,
+          motorCommit:{reference:refRetire.motorCommit,predicted:predRetire.motorCommit}};
       });
       summary.timeline=schedule.timeline.status();
       report.timelineAfterCapsule=schedule.timeline.status();

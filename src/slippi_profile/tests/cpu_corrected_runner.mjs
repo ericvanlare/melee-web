@@ -107,6 +107,13 @@ export async function operateCorrectedInPage(plan){
       throw new Error('Corrected loop evidence size drift');
     return encode(read(module._melee_web_synctest_cpu_corrected_loop_evidence(),40));
   };
+  const readLoopMotor=(commit=false)=>{
+    const prefix='_melee_web_synctest_cpu_corrected_loop_motor_'+(commit?'commit_receipt':'evidence');
+    const size=commit?64:1016;
+    if(typeof module[prefix]!=='function'||typeof module[prefix+'_bytes']!=='function'||
+       module[prefix+'_bytes']()!==size)throw new Error('Corrected loop motor receipt export/extent');
+    return encode(read(module[prefix](),size));
+  };
   try{
     if(typeof SharedArrayBuffer!=='undefined'&&module.HEAPU8.buffer instanceof SharedArrayBuffer)
       throw new Error('Corrected route refuses shared Wasm memory');
@@ -152,16 +159,24 @@ export async function operateCorrectedInPage(plan){
     if(entry.result!==0)throw new Error(`Corrected command ${plan.command} refused ${entry.result}: `+
       module.UTF8ToString(module._melee_web_snapshot_error()));
     if(plan.command===53){
+      if(plan.readLoopMotorEvidence){
+        entry.motorCommitReceiptBase64=readLoopMotor(true);
+        progress.motorCommitReceiptBase64=entry.motorCommitReceiptBase64;
+      }
       if(plan.readLoopEvidence){
         entry.loopEvidenceBase64=readLoopEvidence();
         progress.loopEvidenceBase64=entry.loopEvidenceBase64;
-        return {loopEvidenceBase64:entry.loopEvidenceBase64};
+        return {loopEvidenceBase64:entry.loopEvidenceBase64,
+          motorCommitReceiptBase64:entry.motorCommitReceiptBase64??null};
       }
       entry.reuseEvidenceBase64=readReuseEvidence();
       progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
       return {reuseEvidenceBase64:entry.reuseEvidenceBase64};
     }
     progress.nativeEvidenceBase64=readEvidence();
+    if(plan.readLoopMotorEvidence){
+      entry.motorEvidenceBase64=readLoopMotor();progress.motorEvidenceBase64=entry.motorEvidenceBase64;
+    }
     if(plan.readReuseEvidence){
       entry.reuseEvidenceBase64=readReuseEvidence();
       progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
@@ -186,10 +201,17 @@ export async function operateCorrectedInPage(plan){
     if(!boundary.interactive)throw new Error(`Corrected route lost interactive boundary: ${JSON.stringify(boundary.refusalReasons)}`);
     return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64:encode(draw),boundary,status,
       reuseEvidenceBase64:entry.reuseEvidenceBase64??null,
-      loopEvidenceBase64:entry.loopEvidenceBase64??null};
+      loopEvidenceBase64:entry.loopEvidenceBase64??null,
+      motorEvidenceBase64:entry.motorEvidenceBase64??null};
   }catch(error){
     entry.error=String(error);progress.status='failed';
     try{progress.nativeEvidenceBase64=readEvidence();}catch(readError){progress.readError=String(readError);}
+    if(plan.readLoopMotorEvidence){
+      try{
+        if(plan.command===53)progress.motorCommitReceiptBase64=readLoopMotor(true);
+        else progress.motorEvidenceBase64=readLoopMotor();
+      }catch(readError){progress.motorReadError=String(readError);}
+    }
     throw error;
   }
 }
