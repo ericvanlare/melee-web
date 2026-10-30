@@ -10,7 +10,7 @@ import {buildCpuCorrectedLoopCapsules,createCpuCorrectedLoopSchedule,
   compareCpuCorrectedLoopMotorEvents,hashCpuCorrectedLoopMotorEvents,
   decodeCpuCorrectedLoopMotorCommitReceipt} from './cpu_corrected_loop_runner.mjs';
 import {decodeCpuCorrectedLoopEvidence} from './cpu_seven_tick_runner.mjs';
-import {operateCorrectedInPage} from './cpu_corrected_runner.mjs';
+import {createCorrectedCommandTimer,operateCorrectedInPage} from './cpu_corrected_runner.mjs';
 import {buildCpuCorrectedTwoWindowFirstCorpus,buildCpuCorrectedTwoWindowSecondCorpus,
   CPU_CORRECTED_TWO_WINDOW_NEUTRAL_PAD44 as neutral} from './cpu_corrected_two_window_runner.mjs';
 const encode=value=>Buffer.from(value).toString('base64');
@@ -171,7 +171,8 @@ test('actual in-page operation enables pristine loop before configuration and re
     _melee_web_synctest_cpu_corrected_loop_evidence_bytes:()=>40,
     _melee_web_synctest_cpu_corrected_loop_evidence:()=>64}}};
   try{
-    for(let i=0;i<2;i++)await operateCorrectedInPage({command:53,loopEnableSchema:i?undefined:3,
+    for(let i=0;i<2;i++)await operateCorrectedInPage({commandTimingSource:createCorrectedCommandTimer.toString(),
+      command:53,loopEnableSchema:i?undefined:3,
       wire:[[1,2,3,4]],selectSpan:i+1,readLoopEvidence:true});
     assert.deepEqual(calls,[['enable',3],['configure'],['span',1],['command',53],
       ['configure'],['span',2],['command',53]]);
@@ -324,7 +325,8 @@ test('actual opt-in in-page motor reads retain evidence and read one unpublished
     _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes:()=>64,
     _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt:()=>{calls.push(['commit receipt']);return 2048;}}}};
   try{
-    const operation=await operateCorrectedInPage({command:53,readLoopEvidence:true,readLoopMotorEvidence:true});
+    const operation=await operateCorrectedInPage({commandTimingSource:createCorrectedCommandTimer.toString(),
+      command:53,readLoopEvidence:true,readLoopMotorEvidence:true});
     const committed=decodeCpuCorrectedLoopMotorCommitReceipt(decode(operation.motorCommitReceiptBase64),selected,1);
     assert.equal(committed.published,0);assert.equal(committed.status,1);
     assert.deepEqual(calls,[['command',53],['commit receipt']]);

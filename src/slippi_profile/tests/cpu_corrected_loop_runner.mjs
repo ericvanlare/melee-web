@@ -422,12 +422,14 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
       const motorCommit=decodeCpuCorrectedLoopMotorCommitReceipt(decode(result.motorCommitReceiptBase64??''),
         lane.motorEvidence.selected,lane.motorEvidence.selectedLane);
       lane.motorCommitReceipt=motorCommit;
-      lane.commands.push({command,result:0,loopMetadata:metadata,motorCommit});return {result,metadata,motorCommit};
+      lane.commands.push({command,result:0,loopMetadata:metadata,motorCommit,timing:result.timing});
+      return {result,metadata,motorCommit,timing:result.timing};
     }
     const evidence=decodeCpuCorrectedLoopEvidence(decode(result.evidenceBase64),interval.span);
     validateCpuCorrectedLoopCommandEvidence(evidence,command,{preFrame:interval.preFrame,span:interval.span});
     lane.lastNativeEvidence=evidence;lane.commands.push({command,result:0,state:evidence.state,
-      baselineStepNoDrawMask:evidence.baselineStepNoDrawMask,replayStepNoDrawMask:evidence.replayStepNoDrawMask});
+      baselineStepNoDrawMask:evidence.baselineStepNoDrawMask,replayStepNoDrawMask:evidence.replayStepNoDrawMask,
+      timing:result.timing});
     if(options.readLoopEvidence){
       result.loopMetadata=decodeCpuCorrectedLoopMetadata(decode(result.loopEvidenceBase64??''));
     }
@@ -652,6 +654,11 @@ export async function runBrowserCpuCorrectedLoop(predictedPage,referencePage,wir
         requireCpuCorrectedLoopMetadata(predRetire.metadata,retiredExpected,`capsule${index} predicted retirement`);
         if(JSON.stringify(refRetire.metadata)!==JSON.stringify(predRetire.metadata))
           throw new Error(`Corrected loop capsule ${index} retirement metadata differs across pages`);
+        // Keep command durations in the mutable run summary after the immutable
+        // interval sink has recorded evidence. This includes command53 retirement
+        // without changing the pre-retirement evidence receipt.
+        summary.commandTimings={reference:interval.reference.commands.map(({command,timing})=>({command,timing})),
+          predicted:interval.predicted.commands.map(({command,timing})=>({command,timing}))};
         return {reference:refRetire.metadata,predicted:predRetire.metadata,
           motorCommit:{reference:refRetire.motorCommit,predicted:predRetire.motorCommit}};
       });

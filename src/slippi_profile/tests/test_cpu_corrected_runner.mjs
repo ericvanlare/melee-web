@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {compareCorrectedRawPairs,validateCorrectedCommandEvidence,recordPredictedActionDivergence} from './cpu_corrected_runner.mjs';
+import {compareCorrectedRawPairs,validateCorrectedCommandEvidence,recordPredictedActionDivergence,
+  createCorrectedCommandTimer,operateCorrectedInPage} from './cpu_corrected_runner.mjs';
 import {validateCpuRestoreRouteSelection} from './run_write_census.mjs';
 
 const lanes={Observation:1280,Pcm:4272,Pad:44,RngProfile:32,Transfer:40};
@@ -57,4 +58,69 @@ test('wrong-branch proof needs changed selection requests, not changed cache ide
   assert.throws(()=>recordPredictedActionDivergence(endpoint('60'),endpoint('60')),/selection requests/);
   const changedClip=endpoint('60');changedClip.domains[0].records[0].fields[5]='999';
   assert.throws(()=>recordPredictedActionDivergence(endpoint('60'),changedClip),/selection requests/);
+});
+
+test('corrected command timing separates setup, async native call, GPU wait and evidence work',async()=>{
+  let clock=0,failNative=false;
+  const heap=new Uint8Array(100000),priorWindow=Object.getOwnPropertyDescriptor(globalThis,'window');
+  const priorPerformance=Object.getOwnPropertyDescriptor(globalThis,'performance');
+  const priorBtoa=Object.getOwnPropertyDescriptor(globalThis,'btoa');
+  const module={HEAPU8:heap,
+    _melee_web_snapshot_input:()=>{clock+=3;return 1;},
+    _melee_web_synctest_cpu_corrected_evidence_bytes:()=>93512,
+    _melee_web_synctest_cpu_corrected_evidence:()=>100,
+    _melee_web_synctest_cpu_corrected_loop_evidence_bytes:()=>40,
+    _melee_web_synctest_cpu_corrected_loop_evidence:()=>{clock+=2;return 94000;},
+    _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes:()=>64,
+    _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt:()=>{clock+=1;return 95000;},
+    _melee_web_snapshot_observation:()=>{clock+=2;return 94000;},
+    _melee_web_synctest_draw_diagnostics:()=>{clock+=1;return 96000;},
+    _melee_web_synctest_motion_boundary:()=>0,_melee_web_synctest_is_mario_kind:()=>1,
+    async ccall(){clock+=7;if(failNative)throw nativeFailure;return 0;},
+    UTF8ToString:()=>''};
+  const nativeFailure=new Error('native command failed');
+  const mapping=[{sourceSlot:0,initializerPort:0,rawController:0},
+    {sourceSlot:1,initializerPort:0,rawController:1}];
+  globalThis.window={__slippiSynctest:{module},__timingAdvance:milliseconds=>{clock+=milliseconds;}};
+  Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>clock}});
+  Object.defineProperty(globalThis,'btoa',{configurable:true,value:value=>{
+    if(value.length===132)clock+=2;
+    return Buffer.from(value,'binary').toString('base64');
+  }});
+  const base={commandTimingSource:createCorrectedCommandTimer.toString(),pad:Buffer.alloc(44).toString('base64')};
+  try{
+    const retire=await operateCorrectedInPage({...base,command:53,readLoopEvidence:true,
+      readLoopMotorEvidence:true});
+    assert.equal(retire.timing.preCallSetupMs,3);
+    assert.equal(retire.timing.nativeCallWallMs,7);
+    assert.equal(retire.timing.postCallEvidenceMs,3);
+    assert.equal(retire.timing.gpuQuiescenceWaitMs,0);
+    assert.equal(retire.timing.clock,'browser.performance.now');
+    assert.match(retire.timing.interpretation,/Asyncify waits.*not pure CPU or GPU/);
+    assert.deepEqual(window.__slippiSynctest.cpuCorrectedProgress.commands[0].timing,retire.timing,
+      'retirement timing remains in page progress as well as the returned command');
+
+    const draw=await operateCorrectedInPage({...base,command:32,draw:true,waitSource:
+      'async function wait(){window.__timingAdvance(4);return {waited:true};}',
+      decodeDrawSource:'bytes=>({slotCount:2})',inputMappingSource:'value=>value',
+      inspectSource:'(observation,context)=>({interactive:true,players:[]})',mapping,stocks:[4,4]});
+    assert.equal(draw.timing.nativeCallWallMs,7);
+    assert.equal(draw.timing.gpuQuiescenceWaitMs,4);
+    assert.equal(draw.timing.postCallEvidenceMs,5,
+      'the wait is excluded while page-side diagnostic base64 encoding remains timed');
+
+    failNative=true;
+    await assert.rejects(()=>operateCorrectedInPage({...base,command:33}),error=>error===nativeFailure,
+      'timing capture must preserve the original native command error');
+    const failed=window.__slippiSynctest.cpuCorrectedProgress.commands.at(-1);
+    assert.equal(failed.error,'Error: native command failed');
+    assert.equal(failed.timing.phase,'failed');
+    assert.equal(failed.timing.failedDuring,'native-call');
+    assert.equal(failed.timing.nativeCallWallMs,7);
+  }finally{
+    if(priorWindow)Object.defineProperty(globalThis,'window',priorWindow);else delete globalThis.window;
+    if(priorPerformance)Object.defineProperty(globalThis,'performance',priorPerformance);
+    else delete globalThis.performance;
+    if(priorBtoa)Object.defineProperty(globalThis,'btoa',priorBtoa);else delete globalThis.btoa;
+  }
 });

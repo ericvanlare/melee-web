@@ -12,8 +12,10 @@ import {buildCpuCorrectedLoopPacketAgreement,openCpuCorrectedLoopPacketInput} fr
 import {LOCKSTEP_VERSION} from '../../../scripts/net_lockstep_protocol.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
+const SOURCE_ROOT=path.resolve(process.env.MELEE_PACKET_ADAPTER_SOURCE_ROOT||ROOT);
 const OUT=process.env.MELEE_PACKET_ADAPTER_TEST_EVIDENCE;
 const toolsPath=process.env.MELEE_A3_ROOM_RELAY_TOOLS;
+const runWorker=process.env.MELEE_PACKET_ADAPTER_RUN_WORKER==='1';
 const toolsAvailable=Boolean(toolsPath&&path.isAbsolute(toolsPath)&&
   ['wrangler/package.json','miniflare/package.json','workerd/package.json']
   .every(file=>existsSync(path.join(toolsPath,file))));
@@ -66,13 +68,15 @@ test('A2 agreement binds the initialized source identity and observed port/contr
 });
 
 test('actual local Worker carries all 44 A2 remote PAD contributions with bounded one-capsule authority',
-  {skip:!toolsAvailable||!evidenceConfigured},async(t)=>{
+  {skip:!runWorker?'set MELEE_PACKET_ADAPTER_RUN_WORKER=1 to opt in':
+    !toolsAvailable?'pinned relay tools path is unavailable':
+    !evidenceConfigured?'explicit Worker evidence path is unavailable':false},async(t)=>{
     try{await mkdir(OUT,{recursive:true});await access(OUT,constants.W_OK);}
     catch(error){t.skip(`explicit evidence path is unavailable: ${error.message}`);return;}
     const evidence=await mkdtemp(path.join(OUT,'worker-control-'));
     const {startRoomRelayRuntime}=await import('../../../scripts/net_room_relay_runtime_owner.mjs');
-    const producer={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
-      tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:ROOT,encoding:'utf8'}).trim()};
+    const producer={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:SOURCE_ROOT,encoding:'utf8'}).trim(),
+      tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:SOURCE_ROOT,encoding:'utf8'}).trim()};
     const runtime=await startRoomRelayRuntime({producer,evidenceDir:path.join(evidence,'worker-evidence')});
     let packetInput=null,refusalInput=null,passed=false,primary=null;
     try{
