@@ -104,7 +104,8 @@ void piece_jobj_trace_emit() {
 #endif
 }
 extern "C" int melee_web_piece_jobj_begin(void* object,uint32_t leaf,MeleeWebPieceJObjTicket* ticket) {
- if(!ticket)return 0;*ticket={};
+ if(!ticket)return 0;
+ *ticket={};
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
  auto& t=piece_slab_trace;if(leaf<1||leaf>2)return 0;
  bool target=false;

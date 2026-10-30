@@ -9882,7 +9882,23 @@
           "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/integration-readiness-sol-v1.json",
           "sha256": "18c8ba1bfcccd086b4a73815b0e26f4803af1cdb879dab907bcd80154e767896"
         },
-        "status": "Local validation passes: 3,069 tests with 238 skips and ordinary Release runtime build. Exact publication-head CI remains pending. Runtime f4ae3dc3 and capture harness 6a52264d remain distinct."
+        "status": "Local validation passes: 3,069 tests with 238 skips and ordinary Release runtime build. Exact publication-head CI remains pending. Runtime f4ae3dc3 and capture harness 6a52264d remain distinct.",
+        "first_publication_ci": {
+          "result": {
+            "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-initial-complete.json",
+            "sha256": "52b8c41e20512ca94619eb6776eec8a72f2e56456555e1eb70f8f0996452e819"
+          },
+          "status": "10 successes, two expected skips, unit-1 failure and dependent browser-build aggregate failure. GCC rejects misleading indentation in the diagnostic ticket null guard.",
+          "repair": {
+            "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-format-repair.json",
+            "sha256": "b1b14c8f035b8401ff9b136082918acd485cbbccb72126be3c5d6e6af9015ed7"
+          },
+          "review": {
+            "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-format-sol-review.json",
+            "sha256": "8d6c43bd4d29d9aef5c17e5cf72dbeefce2ee8910e41b7653fcd607176cbb2b4"
+          },
+          "scope": "Whitespace-only split; tokens/order unchanged. The focused source-memory snapshot control passes locally. Exact repaired-head CI remains required."
+        }
       }
     }
   }

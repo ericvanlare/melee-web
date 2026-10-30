@@ -1508,8 +1508,12 @@ helper-name retry; that first repair-run failure is retained too. Canonicalizing
 the gameplay patch preserves its exact applied source tree. At validation source
 `16c4824d`, the final full suite passes 3,069 tests with 238 skips in 695.723
 seconds, and the ordinary Release runtime build passes. Independent integration
-review finds no new source blockers. Publication-head CI remains pending. The
-next runtime step is proof-backed retirement of a confirmed checkpoint
+review finds no new source blockers. Initial publication CI at `102d4c37`
+retains one Linux unit failure: GCC rejects misleading indentation in a diagnostic
+null-ticket guard. Its dependent aggregate check also fails. The reviewed repair
+splits the guard and assignment onto separate lines with identical tokens and
+operation order; the focused source-memory snapshot control passes locally.
+Repaired-head CI remains pending. The next runtime step is proof-backed retirement of a confirmed checkpoint
 while permanent resident action assets remain live, allowing one bounded owner
 slot to be reused. Generic destructor/retirement guards stay intact. Publication
 validation, repeated corrections, combat, frame-budget, profile admission and
