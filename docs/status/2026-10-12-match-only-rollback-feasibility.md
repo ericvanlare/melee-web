@@ -1693,10 +1693,15 @@ missing audio stream declarations, incomplete JavaScript/source mirror inputs,
 and missing original rumble-helper/source-clock dependencies in two extracted
 controls. The four focused tests now pass after reviewed fixture repairs; the
 original failure log and subsequent fixture enum/include/rebind failures remain
-retained. Runtime and harness code are unchanged. The ordinary Release build,
-final regression and exact publication-head CI remain integration gates. The
-passing capture is retained without repetition. All runtime, harness, build,
-linked policy, review, comparison and cleanup hashes are in `passing_browser_v9`
+retained. Runtime and harness code are unchanged. Final local regression at
+`d0865eec` passes all 3,077 tests with 238 skips; the ordinary Release build also
+passes at that source. Initial Linux CI exposed a truncated dependency download
+before the effects build and a missing explicit `<cstdint>` include in the
+snapshot test trace. The test-only include repair passes both focused snapshot
+controls locally. Those failures are retained; complete publication-head CI
+remains required and is tracked in PR #358. No additional browser capture is
+needed for these fixture-only changes. All runtime, harness, build, linked policy,
+review, comparison, cleanup and validation hashes are in `passing_browser_v9`
 in the existing structured receipt.
 
 The next experiment routes the same input recipe through the existing own Worker

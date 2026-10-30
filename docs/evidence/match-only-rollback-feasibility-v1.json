@@ -10266,7 +10266,7 @@
         }
       },
       "reusable_owner_loop_v1": {
-        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_PASS_INTEGRATION_PENDING",
+        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_PASS_LOCAL_VALIDATION_COMPLETE",
         "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
         "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
         "attempts": [
@@ -10467,13 +10467,13 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Integrate reviewed reusable-loop component after repairing retained regression fixtures, affected ordinary Release build and exact-head CI; then route the same authoritative PAD rows through the existing own Worker relay. No unchanged browser repeat.",
+        "next": "Complete exact publication-head CI and integrate PR358, then route the same authoritative PAD rows through the existing own Worker relay. No unchanged browser repeat.",
         "limitations": [
           "Capture-only motor publication; physical haptics remain unimplemented.",
           "V9 spans eight intervals and 44 inputs with one- and two-tick wrong branches. The earlier V4 independently covers two seven-tick corrections. No rolling history, complete match or live network result.",
           "HPS refill is observed in confirmed interval4; correction across refill is not composed. Pending capture/restore/END/retirement stays refused.",
           "Incomplete private profile only; real-time budget, physical input, uninterrupted audio output and public profile admission remain open.",
-          "V9 source/result reviews and four repaired focused fixture tests pass. Final full regression, ordinary Release and exact publication-head CI remain pending."
+          "V9 source/result review, repaired focused fixtures, full3077-test regression with238skips and ordinary Release pass. Publication-head CI and merge are tracked in PR358; local/capture producers remain distinct."
         ],
         "motor_candidate": {
           "native_freeze": {
@@ -10753,11 +10753,52 @@
             "tests": 3077,
             "skipped": 238,
             "failures": 4,
-            "failure_kind": "Four missing fixture declarations/import/source-helper dependencies repaired; all four focused tests pass with independent diff/result review. No runtime change. Final full regression, ordinary Release and exact-head CI pending.",
+            "failure_kind": "Four fixture declarations/import/source-helper dependencies repaired; all focused tests and final local regression pass. No runtime change. Initial Linux CI header omission repaired with explicit cstdint include; final current-head CI tracked in PR358.",
             "fixture_repair_review": {
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-regression-repair-v1/root-review.json",
               "sha256": "b5d08a51f190c49e33d271dcb28a756dfa4ea9113009daf262f9785a4d469c82"
-            }
+            },
+            "full_regression": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v2/result.json",
+              "sha256": "72ab4b3ac4049634c565d0115cddaab1e3c463d91123ba30fcb59962269694a0"
+            },
+            "full_regression_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v2/unittest.log",
+              "sha256": "c591821b390cd6d33260112b7f10f8aa40e6c4faee1f2e9574c9861fdf01ae59"
+            },
+            "ordinary_release": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-ordinary-release-v1/result.json",
+              "sha256": "5c29ec4d9e152135d3454f79122ed04fd2b3cef4f285fab3f212d3b78e1e6ba1"
+            },
+            "validation_source_head": "d0865eecf3b635d8fb1f985efcbcbdea456011f4",
+            "final_local_result": {
+              "tests": 3077,
+              "skipped": 238,
+              "failures": 0,
+              "elapsed_seconds": 697.6404376248829
+            },
+            "fixture_repair_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-regression-repair-v1/receipt.json",
+              "sha256": "132022416b086d1c7decd8bb0709db757122e5beca1fe3241152e61f05f38d71"
+            },
+            "ci_initial_attempt": {
+              "run_id": 41071359479,
+              "head": "d0865eecf3b635d8fb1f985efcbcbdea456011f4",
+              "effects_setup_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/ci-effects-failed.log",
+                "sha256": "e4fe86c5d8c319877c672295a685be4fa7a3b95a34198b85209fdebeee1e1ea8"
+              },
+              "unit1_fixture_compile_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/ci-unit1-failed.log",
+                "sha256": "3e1ed85ea230d3681d2cef3bf70e75df80fc64792cc9c2ce08f4141ab3d0aca7"
+              },
+              "explanation": "Effects dependency download ended early before compilation. Unit1 snapshot test used std integer types without explicit cstdint; explicit test-only include added, both focused snapshot controls pass. No runtime change; final current-head CI required."
+            },
+            "cstdint_focused": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/cstdint-focused.log",
+              "sha256": "c3dd920456911eb5abb49358114ffd567ff3f3650f605aa0e698a542b574b420"
+            },
+            "pull_request": "https://github.com/ericvanlare/melee-web/pull/358"
           }
         }
       }

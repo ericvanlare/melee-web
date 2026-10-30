@@ -1,4 +1,5 @@
 #include "gameplay_source_memory_runtime.h"
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
