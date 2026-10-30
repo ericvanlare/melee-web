@@ -12,6 +12,9 @@ static struct {
  const void* context;
  uint32_t span,first_frame,active_lane,open_frame,frame_channels;
  unsigned capture_enabled,restore_used,frame_open,retired;
+ unsigned history_mode,history_restore_count,history_sealed,history_replay_active;
+ uint64_t history_incarnation;
+ uint32_t history_end_frame,history_replay_end;
 } motor;
 
 static uint32_t low32(uint64_t value){return (uint32_t)value;}
@@ -48,12 +51,16 @@ static void motor_refuse(uint32_t reason)
 }
 static int sequence_owner_matches(const MeleeWebCpuMotorSequence* sequence)
 {
- return sequence->span==motor.evidence.baseline.span&&
-        sequence->first_frame==motor.evidence.baseline.first_frame&&
+ return (motor.history_mode?
+          (sequence->span>=1u&&sequence->span<=MELEE_WEB_CPU_MOTOR_MAX_SPAN&&
+           sequence->first_frame==motor.first_frame):
+          (sequence->span==motor.evidence.baseline.span&&
+           sequence->first_frame==motor.evidence.baseline.first_frame))&&
         join64(sequence->token_lo,sequence->token_hi)==motor.token&&
         join64(sequence->world_lo,sequence->world_hi)==motor.world&&
         join64(sequence->context_epoch_lo,sequence->context_epoch_hi)==motor.context_epoch;
 }
+static uint64_t motor_hash(const MeleeWebCpuMotorSequence* sequence);
 uint64_t melee_web_cpu_interval_begin(void)
 {
 #if defined(__EMSCRIPTEN_PTHREADS__)
@@ -162,7 +169,7 @@ int melee_web_cpu_interval_motor_baseline_seal(uint64_t token,uint32_t post_fram
 int melee_web_cpu_interval_motor_restore_admit(uint64_t token,uint32_t lane)
 {
  if(!motor.capture_enabled)return 1;
- return melee_web_cpu_interval_admit(token)&&token==motor.token&&!motor.restore_used&&
+ return !motor.history_mode&&melee_web_cpu_interval_admit(token)&&token==motor.token&&!motor.restore_used&&
   (lane==MELEE_WEB_CPU_MOTOR_LANE_REPLAY||lane==MELEE_WEB_CPU_MOTOR_LANE_CORRECTED)&&
   !motor.frame_open&&motor.active_lane==MELEE_WEB_CPU_MOTOR_LANE_NONE&&
   motor.evidence.baseline.state==MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE&&
@@ -196,6 +203,206 @@ int melee_web_cpu_interval_motor_selected_finish(uint64_t token,uint32_t post_fr
  }
  selected->state=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE;
  motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;return 1;
+}
+
+int melee_web_cpu_interval_motor_history_capture_begin(uint64_t token,uint64_t world,
+ const void* context,uint64_t context_epoch,uint32_t pre_frame)
+{
+ if(motor.capture_enabled)return 0; /* Never clear a live or failed journal. */
+ if(!active||!token||token!=epoch||!melee_web_cpu_interval_admit(token))return 0;
+ memset(&motor,0,sizeof(motor));
+ motor.evidence.schema=1;motor.evidence.bytes=sizeof(motor.evidence);
+ motor.evidence.mode=2;motor.evidence.selected_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;
+ motor.evidence.published=0;
+ motor.evidence.commit_state=MELEE_WEB_CPU_MOTOR_COMMIT_PENDING;
+ motor.capture_enabled=1;motor.history_mode=1;motor.token=token;motor.world=world;
+ motor.context=context;motor.context_epoch=context_epoch;
+ motor.span=MELEE_WEB_CPU_MOTOR_MAX_SPAN;motor.first_frame=pre_frame;
+ if(!world||!context||!context_epoch||pre_frame>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN){
+  motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_INVALID_OWNER);return 0;
+ }
+ sequence_init(&motor.evidence.baseline,MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE);
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_BASELINE;
+ return 1;
+}
+
+int melee_web_cpu_interval_motor_history_begin_incarnation(uint64_t token,
+ uint64_t incarnation,uint32_t source_frame)
+{
+ if(!motor.capture_enabled||!motor.history_mode||!incarnation||incarnation>3u||
+    !melee_web_cpu_interval_admit(token)||token!=motor.token||motor.frame_open||
+    motor.history_replay_active||motor.history_restore_count>2u){
+  if(motor.capture_enabled&&motor.history_mode)motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_LANE);
+  return 0;
+ }
+ if(!motor.history_incarnation){
+  if(incarnation!=1u||source_frame!=motor.first_frame||motor.history_sealed||
+     motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_BASELINE||
+     motor.evidence.baseline.state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE||
+     motor.evidence.baseline.frames_seen!=0u){
+   motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_LANE);return 0;
+  }
+  motor.history_incarnation=incarnation;
+  return 1;
+ }
+ if(motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_NONE||!motor.history_sealed||
+    !sequence_owner_matches(&motor.evidence.selected)||
+    motor.evidence.selected.state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE||
+    source_frame!=motor.history_end_frame||motor.history_incarnation>=3u||
+    incarnation!=motor.history_incarnation+1u){
+  motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_LANE);return 0;
+ }
+ motor.history_incarnation=incarnation;
+ motor.history_sealed=0;
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED;
+ motor.evidence.selected.state=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE;
+ motor.evidence.selected.span=MELEE_WEB_CPU_MOTOR_MAX_SPAN;
+ return 1;
+}
+
+int melee_web_cpu_interval_motor_history_seal(uint64_t token,uint64_t incarnation,
+ uint32_t actual_end)
+{
+ if(!motor.capture_enabled||!motor.history_mode||!incarnation||
+    incarnation!=motor.history_incarnation||!melee_web_cpu_interval_admit(token)||
+    token!=motor.token||motor.frame_open||motor.history_sealed||motor.history_replay_active||
+    (motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_BASELINE&&
+     motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED)){
+  if(motor.capture_enabled&&motor.history_mode)motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_LANE);
+  return 0;
+ }
+ MeleeWebCpuMotorSequence* selected=active_sequence();
+ if(!selected||!sequence_owner_matches(selected)||
+    selected->state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE||
+    selected->frames_seen<1u||selected->frames_seen>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    actual_end!=motor.first_frame+selected->frames_seen||
+    (motor.active_lane==MELEE_WEB_CPU_MOTOR_LANE_BASELINE&&
+     (incarnation!=1u||motor.history_restore_count||
+      motor.evidence.baseline.state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE))||
+    (motor.active_lane==MELEE_WEB_CPU_MOTOR_LANE_CORRECTED&&
+     (motor.history_incarnation==0u||
+      (motor.history_replay_active&&incarnation!=motor.history_incarnation)))){
+  motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_INCOMPLETE);return 0;
+ }
+ selected->span=selected->frames_seen;
+ selected->state=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE;
+ if(motor.active_lane==MELEE_WEB_CPU_MOTOR_LANE_BASELINE){
+  motor.evidence.selected=motor.evidence.baseline;
+  motor.evidence.selected_lane=MELEE_WEB_CPU_MOTOR_LANE_BASELINE;
+ }else{
+  motor.evidence.selected_lane=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED;
+ }
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;
+ motor.history_end_frame=actual_end;motor.history_sealed=1;
+ return 1;
+}
+
+int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,
+ uint64_t incarnation,uint32_t actual_end)
+{
+ if(!motor.capture_enabled||!motor.history_mode||!incarnation||
+    incarnation!=motor.history_incarnation||motor.history_restore_count>=2u||
+    !motor.history_sealed||motor.history_replay_active||motor.frame_open||
+    motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_NONE||
+    actual_end!=motor.history_end_frame||actual_end<=motor.first_frame||
+    actual_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    !melee_web_cpu_interval_admit(token)||token!=motor.token||
+    !sequence_owner_matches(&motor.evidence.baseline)||
+    motor.evidence.baseline.state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE||
+    !sequence_owner_matches(&motor.evidence.selected)||
+    motor.evidence.selected.state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE||
+    motor.evidence.selected.frames_seen!=actual_end-motor.first_frame||
+    (motor.evidence.selected_lane!=MELEE_WEB_CPU_MOTOR_LANE_BASELINE&&
+     motor.evidence.selected_lane!=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED))return 0;
+ return 1;
+}
+
+void melee_web_cpu_interval_motor_history_restore_commit(uint64_t token,
+ uint64_t incarnation,uint32_t actual_end)
+{
+ /* Called only after every aggregate PRE leaf has committed. No allocation,
+  * callback, or source write occurs while the selected event journal resets. */
+ sequence_init(&motor.evidence.selected,MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE);
+ motor.evidence.selected.span=MELEE_WEB_CPU_MOTOR_MAX_SPAN;
+ motor.evidence.selected_lane=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED;
+ motor.history_restore_count++;motor.history_replay_active=1;
+ motor.history_replay_end=actual_end;motor.history_sealed=0;
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED;
+ motor.restore_used=1;
+}
+
+int melee_web_cpu_interval_motor_history_replay_finish(uint64_t token,
+ uint64_t incarnation,uint32_t actual_end)
+{
+ MeleeWebCpuMotorSequence* selected=&motor.evidence.selected;
+ if(!motor.capture_enabled||!motor.history_mode||!incarnation||
+    incarnation!=motor.history_incarnation||!motor.history_replay_active||
+    actual_end!=motor.history_replay_end||actual_end<=motor.first_frame||
+    actual_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    !melee_web_cpu_interval_admit(token)||token!=motor.token||motor.frame_open||
+    motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED||
+    !sequence_owner_matches(selected)||
+    selected->state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE||
+    selected->frames_seen!=actual_end-motor.first_frame){
+  motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_INCOMPLETE);return 0;
+ }
+ selected->span=selected->frames_seen;
+ selected->state=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE;
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;
+ motor.history_replay_active=0;motor.history_end_frame=actual_end;
+ motor.history_sealed=1;
+ return 1;
+}
+
+int melee_web_cpu_interval_motor_history_retire_admit(uint64_t token,
+ uint64_t incarnation,uint32_t actual_end)
+{
+ return motor.capture_enabled&&motor.history_mode&&incarnation&&
+    incarnation==motor.history_incarnation&&incarnation<=3u&&
+    motor.history_restore_count<=2u&&motor.history_sealed&&
+    !motor.history_replay_active&&!motor.frame_open&&
+    motor.active_lane==MELEE_WEB_CPU_MOTOR_LANE_NONE&&
+    actual_end==motor.history_end_frame&&actual_end>motor.first_frame&&
+    actual_end-motor.first_frame<=MELEE_WEB_CPU_MOTOR_MAX_SPAN&&
+    melee_web_cpu_interval_admit(token)&&token==motor.token&&
+    sequence_owner_matches(&motor.evidence.baseline)&&
+    motor.evidence.baseline.state==MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE&&
+    sequence_owner_matches(&motor.evidence.selected)&&
+    motor.evidence.selected.state==MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE&&
+    motor.evidence.selected.frames_seen==actual_end-motor.first_frame&&
+    motor.evidence.failure==MELEE_WEB_CPU_MOTOR_FAILURE_NONE;
+}
+
+void melee_web_cpu_interval_motor_history_retire_commit(uint64_t token,
+ uint64_t incarnation,uint32_t actual_end)
+{
+ if(!melee_web_cpu_interval_motor_history_retire_admit(token,incarnation,actual_end))return;
+ const MeleeWebCpuMotorSequence* selected=&motor.evidence.selected;
+ const uint64_t hash=motor_hash(selected);
+ motor.evidence.commit_state=MELEE_WEB_CPU_MOTOR_COMMIT_CAPTURE_ONLY;
+ motor.evidence.published=0;
+ memset(&motor.receipt,0,sizeof(motor.receipt));
+ motor.receipt.schema=1;motor.receipt.bytes=sizeof(motor.receipt);
+ motor.receipt.status=MELEE_WEB_CPU_MOTOR_COMMIT_CAPTURE_ONLY;
+ motor.receipt.selected_lane=motor.evidence.selected_lane;motor.receipt.published=0;
+ motor.receipt.event_count=selected->event_count;motor.receipt.first_frame=selected->first_frame;
+ motor.receipt.span=selected->span;motor.receipt.token_lo=low32(token);motor.receipt.token_hi=high32(token);
+ motor.receipt.world_lo=selected->world_lo;motor.receipt.world_hi=selected->world_hi;
+ motor.receipt.context_epoch_lo=selected->context_epoch_lo;
+ motor.receipt.context_epoch_hi=selected->context_epoch_hi;
+ motor.receipt.event_hash_lo=low32(hash);motor.receipt.event_hash_hi=high32(hash);
+}
+
+const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_history_evidence_for(
+ uint64_t token,uint64_t world,const void* context,uint64_t context_epoch,
+ uint32_t pre_frame,uint64_t incarnation,uint32_t actual_end)
+{
+ if(!motor.history_mode||!motor.history_sealed||incarnation!=motor.history_incarnation||
+    actual_end!=motor.history_end_frame||motor.first_frame!=pre_frame||
+    !motor_owner_matches(token,context,world,context_epoch)||
+    !sequence_owner_matches(&motor.evidence.baseline)||
+    !sequence_owner_matches(&motor.evidence.selected))return NULL;
+ return &motor.evidence;
 }
 int melee_web_cpu_interval_motor_commit_admit(uint64_t token,uint64_t world,
  const void* context,uint64_t context_epoch,uint32_t first_frame,uint32_t span)
@@ -272,7 +479,9 @@ const MeleeWebCpuMotorCommitReceipt* melee_web_cpu_interval_motor_commit_receipt
     join64(motor.receipt.token_lo,motor.receipt.token_hi)!=motor.token||
     join64(motor.receipt.world_lo,motor.receipt.world_hi)!=motor.world||
     join64(motor.receipt.context_epoch_lo,motor.receipt.context_epoch_hi)!=motor.context_epoch||
-    motor.receipt.first_frame!=motor.first_frame||motor.receipt.span!=motor.span||
+    motor.receipt.first_frame!=motor.first_frame||
+    (motor.history_mode?motor.receipt.span!=motor.history_end_frame-motor.first_frame:
+                        motor.receipt.span!=motor.span)||
     motor.receipt.selected_lane!=motor.evidence.selected_lane||
     motor.receipt.event_count!=motor.evidence.selected.event_count||
     join64(motor.receipt.event_hash_lo,motor.receipt.event_hash_hi)!=

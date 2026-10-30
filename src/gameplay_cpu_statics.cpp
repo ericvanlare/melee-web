@@ -124,6 +124,259 @@ bool GameplayCpuStatics::commit_prevalidated() noexcept
     }
     phase_=Phase::Restored;return true;
 }
+bool GameplayCpuStatics::begin_history(std::uint32_t pre_frame) noexcept
+{
+    if(phase_!=Phase::Captured||history_phase_!=HistoryPhase::Disabled||
+       pre_frame>std::numeric_limits<std::uint32_t>::max()-7u||
+       !layout_valid()||!invariants_match())return false;
+    history_phase_=HistoryPhase::Ready;
+    history_pre_frame_=pre_frame;
+    history_start_frame_=pre_frame;
+    return true;
+}
+
+bool GameplayCpuStatics::history_begin_incarnation(std::uint64_t incarnation,
+                                                    std::uint32_t source_frame) noexcept
+{
+    if(!incarnation||incarnation>3u||history_restore_count_>2u||
+       history_phase_==HistoryPhase::Failed||!layout_valid()||!invariants_match())return false;
+    if(history_phase_==HistoryPhase::Ready){
+        if(incarnation!=1u||source_frame!=history_pre_frame_)return false;
+    }else{
+        if(history_phase_!=HistoryPhase::EndpointSealed||!history_endpoint_closed_||
+           !history_incarnation_||history_incarnation_>=3u||
+           incarnation!=history_incarnation_+1u||source_frame!=history_end_frame_||
+           history_end_frame_<=history_pre_frame_||
+           history_end_frame_-history_pre_frame_>7u)return false;
+    }
+    history_incarnation_=incarnation;
+    history_start_frame_=source_frame;
+    history_endpoint_closed_=false;
+    history_phase_=HistoryPhase::Recording;
+    return true;
+}
+
+bool GameplayCpuStatics::history_captured_pre_admit(
+    std::uint32_t pre_frame) const noexcept
+{
+    if(phase_!=Phase::Captured||history_phase_!=HistoryPhase::Ready||
+       history_incarnation_!=0u||history_restore_incarnation_!=0u||
+       history_restore_count_!=0u||history_end_frame_!=0u||
+       history_start_frame_!=pre_frame||history_endpoint_closed_||
+       !layout_valid()||!invariants_match()||
+       pre_frame!=history_pre_frame_)return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(row.policy==CpuStaticPolicy::Restore&&
+           std::memcmp(reinterpret_cast<const void*>(std::uintptr_t(row.address)),
+                       before_.data()+offset,row.bytes))return false;
+        offset+=row.bytes;
+    }
+    return true;
+}
+
+bool GameplayCpuStatics::history_armed_pre_admit(
+    std::uint64_t incarnation,std::uint32_t pre_frame) const noexcept
+{
+    if(phase_!=Phase::Captured||history_phase_!=HistoryPhase::Recording||
+       incarnation!=1u||history_incarnation_!=incarnation||
+       history_start_frame_!=pre_frame||history_restore_incarnation_!=0u||
+       history_restore_count_!=0u||history_end_frame_!=0u||
+       history_endpoint_closed_||!layout_valid()||!invariants_match()||
+       pre_frame!=history_pre_frame_)return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(row.policy==CpuStaticPolicy::Restore&&
+           std::memcmp(reinterpret_cast<const void*>(std::uintptr_t(row.address)),
+                       before_.data()+offset,row.bytes))return false;
+        offset+=row.bytes;
+    }
+    return true;
+}
+
+bool GameplayCpuStatics::history_restored_pre_admit(
+    std::uint64_t incarnation,std::uint32_t restore_count,
+    std::uint32_t pre_frame) const noexcept
+{
+    if(phase_!=Phase::Captured||history_phase_!=HistoryPhase::Restored||
+       incarnation==0u||incarnation>3u||incarnation!=history_incarnation_||
+       incarnation!=history_restore_incarnation_||restore_count==0u||
+       restore_count>2u||restore_count!=history_restore_count_||
+       history_restore_end_!=history_end_frame_||history_restore_end_<=pre_frame||
+       history_restore_end_-pre_frame>7u||
+       history_endpoint_closed_||!layout_valid()||!invariants_match()||
+       pre_frame!=history_pre_frame_)return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(row.policy==CpuStaticPolicy::Restore&&
+           std::memcmp(reinterpret_cast<const void*>(std::uintptr_t(row.address)),
+                       before_.data()+offset,row.bytes))return false;
+        offset+=row.bytes;
+    }
+    return true;
+}
+
+bool GameplayCpuStatics::history_seal_endpoint(std::uint64_t incarnation,
+                                                std::uint32_t actual_end) noexcept
+{
+    if(!incarnation||incarnation!=history_incarnation_||
+       (history_phase_!=HistoryPhase::Recording&&history_phase_!=HistoryPhase::Restored)||
+       history_endpoint_closed_||!layout_valid()||!invariants_match()||
+       actual_end<=history_pre_frame_||actual_end-history_pre_frame_>7u)return false;
+    if(history_phase_==HistoryPhase::Recording){
+        if(actual_end<=history_start_frame_)return false;
+    }else if(history_restore_incarnation_!=incarnation||
+             actual_end!=history_restore_end_||actual_end!=history_end_frame_){
+        return false;
+    }
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        std::memcpy(after_.data()+offset,
+                    reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes);
+        offset+=row.bytes;
+    }
+    history_end_frame_=actual_end;
+    history_endpoint_closed_=false;
+    history_phase_=HistoryPhase::EndpointSealed;
+    return true;
+}
+
+CpuStaticEndpointHeader GameplayCpuStatics::history_endpoint_header() const noexcept
+{
+    CpuStaticEndpointHeader result{};
+    if(history_phase_!=HistoryPhase::EndpointSealed){
+        result.status=CpuStaticEndpointStatus::WrongPhase;
+        return result;
+    }
+    if(!layout_valid()){
+        result.status=CpuStaticEndpointStatus::InvalidLayout;
+        return result;
+    }
+    if(!invariants_match()){
+        result.status=CpuStaticEndpointStatus::InvariantChanged;
+        return result;
+    }
+    result.status=CpuStaticEndpointStatus::Ok;
+    result.schema=1;
+    result.bytes=static_cast<std::uint32_t>(sizeof(result));
+    result.phase=CpuStaticEndpointPhase::Sealed;
+    result.table_identity=table_identity_;
+    result.row_count=static_cast<std::uint64_t>(rows_.size());
+    return result;
+}
+
+CpuStaticEndpointRow GameplayCpuStatics::history_endpoint_row(std::uint64_t index) const noexcept
+{
+    CpuStaticEndpointRow result{};
+    if(history_phase_!=HistoryPhase::EndpointSealed){
+        result.status=CpuStaticEndpointStatus::WrongPhase;
+        return result;
+    }
+    if(index>=rows_.size()||index>std::numeric_limits<std::uint32_t>::max()){
+        result.status=CpuStaticEndpointStatus::InvalidIndex;
+        return result;
+    }
+    const auto& row=rows_[static_cast<std::size_t>(index)];
+    result.status=CpuStaticEndpointStatus::Ok;
+    result.schema=1;
+    result.bytes=static_cast<std::uint32_t>(sizeof(result));
+    result.index=static_cast<std::uint32_t>(index);
+    result.address=row.address;
+    result.extent=row.bytes;
+    result.policy=static_cast<std::uint32_t>(row.policy);
+    result.domain=static_cast<std::uint32_t>(row.domain);
+    return result;
+}
+
+bool GameplayCpuStatics::history_close_endpoint(std::uint64_t incarnation,
+                                                 std::uint32_t actual_end) noexcept
+{
+    if(history_phase_!=HistoryPhase::EndpointSealed||history_endpoint_closed_||
+       incarnation!=history_incarnation_||actual_end!=history_end_frame_||
+       !layout_valid()||!invariants_match())return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(std::memcmp(after_.data()+offset,
+                       reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes))return false;
+        offset+=row.bytes;
+    }
+    history_endpoint_closed_=true;
+    return true;
+}
+
+bool GameplayCpuStatics::history_prepare_commit(std::uint64_t incarnation,
+                                                 std::uint32_t actual_end) noexcept
+{
+    if(history_phase_!=HistoryPhase::EndpointSealed||!history_endpoint_closed_||
+       !incarnation||incarnation!=history_incarnation_||actual_end!=history_end_frame_||
+       history_restore_count_>=2u||!layout_valid()||!invariants_match())return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(std::memcmp(after_.data()+offset,
+                       reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes))return false;
+        offset+=row.bytes;
+    }
+    history_prepared_incarnation_=incarnation;
+    history_prepared_end_=actual_end;
+    history_phase_=HistoryPhase::Prepared;
+    return true;
+}
+
+bool GameplayCpuStatics::history_admit_commit(std::uint64_t incarnation,
+                                               std::uint32_t actual_end) const noexcept
+{
+    if(history_phase_!=HistoryPhase::Prepared||!history_endpoint_closed_||
+       !incarnation||incarnation!=history_incarnation_||
+       incarnation!=history_prepared_incarnation_||actual_end!=history_prepared_end_||
+       actual_end!=history_end_frame_||history_restore_count_>=2u||
+       !layout_valid()||!invariants_match())return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(std::memcmp(after_.data()+offset,
+                       reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes))return false;
+        offset+=row.bytes;
+    }
+    return true;
+}
+
+void GameplayCpuStatics::history_commit_prevalidated() noexcept
+{
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(row.policy==CpuStaticPolicy::Restore)
+            std::memcpy(reinterpret_cast<void*>(std::uintptr_t(row.address)),
+                        before_.data()+offset,row.bytes);
+        offset+=row.bytes;
+    }
+    history_restore_incarnation_=history_prepared_incarnation_;
+    history_restore_end_=history_prepared_end_;
+    ++history_restore_count_;
+    history_endpoint_closed_=false;
+    history_phase_=HistoryPhase::Restored;
+}
+
+bool GameplayCpuStatics::history_retire_admit(std::uint64_t incarnation,
+                                               std::uint32_t actual_end) const noexcept
+{
+    if(history_phase_!=HistoryPhase::EndpointSealed||!history_endpoint_closed_||
+       !incarnation||incarnation!=history_incarnation_||incarnation>3u||
+       actual_end!=history_end_frame_||actual_end<=history_pre_frame_||
+       actual_end-history_pre_frame_>7u||history_restore_count_>2u||
+       !layout_valid()||!invariants_match())return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        if(std::memcmp(after_.data()+offset,
+                       reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes))return false;
+        offset+=row.bytes;
+    }
+    return true;
+}
+
+void GameplayCpuStatics::history_retire_confirmed() noexcept
+{
+    history_phase_=HistoryPhase::Retired;
+}
+
 CpuComparison GameplayCpuStatics::compare_post() const noexcept
 {
     const auto domain=static_cast<std::uint32_t>(CpuComparisonDomain::Statics);

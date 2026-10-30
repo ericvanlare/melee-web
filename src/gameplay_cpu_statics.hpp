@@ -53,6 +53,37 @@ public:
     /* Caller has admitted ALL aggregate owners. This is bounded copies only;
      * no checks, allocation, callback or failure branch after its first write. */
     bool commit_prevalidated() noexcept;
+    /* Separate retained-history mode. The reviewed table, forbidden ranges,
+     * and PRE bytes remain the immutable restore authority. Only one bounded
+     * live endpoint bank is reused, after the host closes its copied receipt. */
+    bool begin_history(std::uint32_t pre_frame) noexcept;
+    bool history_begin_incarnation(std::uint64_t incarnation,
+                                   std::uint32_t source_frame) noexcept;
+    /* Exact read-only PRE guards for three distinct history roles. Each role
+     * binds the immutable reviewed layout and every current Restore byte to
+     * before_; restore count is cumulative and independent from incarnation. */
+    bool history_captured_pre_admit(std::uint32_t pre_frame) const noexcept;
+    bool history_armed_pre_admit(std::uint64_t incarnation,
+                                 std::uint32_t pre_frame) const noexcept;
+    bool history_restored_pre_admit(std::uint64_t incarnation,
+                                    std::uint32_t restore_count,
+                                    std::uint32_t pre_frame) const noexcept;
+    bool history_seal_endpoint(std::uint64_t incarnation,
+                               std::uint32_t actual_end) noexcept;
+    CpuStaticEndpointHeader history_endpoint_header() const noexcept;
+    CpuStaticEndpointRow history_endpoint_row(std::uint64_t index) const noexcept;
+    bool history_close_endpoint(std::uint64_t incarnation,
+                                std::uint32_t actual_end) noexcept;
+    bool history_prepare_commit(std::uint64_t incarnation,
+                                std::uint32_t actual_end) noexcept;
+    bool history_admit_commit(std::uint64_t incarnation,
+                              std::uint32_t actual_end) const noexcept;
+    /* Final source writer: caller has just passed aggregate admission. This
+     * copies immutable PRE bytes only, with no refusal branch or allocation. */
+    void history_commit_prevalidated() noexcept;
+    bool history_retire_admit(std::uint64_t incarnation,
+                              std::uint32_t actual_end) const noexcept;
+    void history_retire_confirmed() noexcept;
     /* Read-only second endpoint over the same immutable reviewed table.
      * This grants no new ranges and has no restore entry point. */
     CpuComparison capture_expected(std::vector<std::byte>&) const noexcept;
@@ -69,6 +100,8 @@ public:
     std::size_t row_count() const noexcept { return rows_.size(); }
 private:
     enum class Phase { Configured, Captured, Sealed, Prepared, Restored };
+    enum class HistoryPhase { Disabled, Ready, Recording, EndpointSealed,
+                              Prepared, Restored, Retired, Failed };
     GameplayCpuStatics() = default;
     bool layout_valid() const noexcept;
     bool invariants_match() const noexcept;
@@ -78,5 +111,11 @@ private:
     std::vector<std::byte> before_, after_;
     std::uint64_t table_identity_{};
     Phase phase_ = Phase::Configured;
+    HistoryPhase history_phase_ = HistoryPhase::Disabled;
+    std::uint64_t history_incarnation_{},history_restore_incarnation_{};
+    std::uint64_t history_prepared_incarnation_{};
+    std::uint32_t history_pre_frame_{},history_start_frame_{},history_end_frame_{};
+    std::uint32_t history_restore_end_{},history_restore_count_{},history_prepared_end_{};
+    bool history_endpoint_closed_{};
 };
 }

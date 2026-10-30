@@ -2,6 +2,7 @@
 #include "gameplay_action_store.h"
 #include "dat_commands.hpp"
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -50,6 +51,7 @@ public:
     void interval_test_restore_cache_hooks();
     void interval_test_change_cache_owner();
     void interval_test_restore_cache_owner();
+    int interval_test_try_select(int motion, unsigned slot);
 #endif
     // Operand/graph readiness only; original effects and sound still require
     // their actual world providers when the source executor reaches them.
@@ -89,5 +91,121 @@ private:
     [[nodiscard]] DatSelectedAction select_source_action(uint32_t motion, bool result_domain,
         std::shared_ptr<MeleeWebNativeActionRows>* identity_rows,
         std::shared_ptr<DatCommands>* command_owner);
+};
+
+/* Private bounded history anchor for one confirmed PRE. The caller owns
+ * source-frame admission, replay-to-END, and receipt copying. A restore enters
+ * Correcting in the same incarnation; only the selected sealed endpoint may
+ * start the next forward incarnation. At most two PRE restores and 256 events
+ * per predicted/corrected tape are retained; overflow fails closed. */
+class GameplayActionStoreHistory {
+public:
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    struct CacheStringBankTestLayout {
+        // live, before, after, corrected-after, immutable PRE, restore-0, restore-1
+        std::uintptr_t symbol_data[7]{};
+        std::size_t symbol_bytes[7]{};
+        std::size_t capacity[7]{};
+        std::size_t catalog_max_symbol_bytes = 0;
+    };
+    struct EventTapeTestLayout {
+        std::size_t predicted_size = 0, corrected_size = 0;
+        std::size_t predicted_capacity = 0, corrected_capacity = 0;
+    };
+#endif
+    static std::unique_ptr<GameplayActionStoreHistory> capture();
+    ~GameplayActionStoreHistory();
+    GameplayActionStoreHistory(const GameplayActionStoreHistory&) = delete;
+    GameplayActionStoreHistory& operator=(const GameplayActionStoreHistory&) = delete;
+
+    // Starts the first forward incarnation from PRE, or the next one from the
+    // last copied/closed selected endpoint. Returns zero on phase refusal.
+    [[nodiscard]] std::uint64_t begin_incarnation() noexcept;
+    [[nodiscard]] bool seal_incarnation(std::uint64_t) noexcept;
+    [[nodiscard]] bool seal_corrected_incarnation(std::uint64_t) noexcept;
+
+    // Endpoint access is read-only. close_endpoint_batch is the host's
+    // acknowledgement that this selected endpoint's complete admitted batch
+    // has been copied into its retained receipt before the next begin.
+    [[nodiscard]] std::uint32_t endpoint_admit() const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointHeader endpoint_header() const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointBinding endpoint_binding(std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointSlot endpoint_slot(std::uint32_t,
+                                                              std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointCache endpoint_cache(std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointEvent endpoint_event(std::uint32_t) const noexcept;
+    [[nodiscard]] bool close_endpoint_batch(std::uint64_t) noexcept;
+
+    // Strict no-event PRE readers for initial capture, the armed first
+    // incarnation, and the same PRE after successful restore. These are
+    // separate roles; generic endpoint admission remains phase-bound to
+    // selected recording endpoints.
+    [[nodiscard]] std::uint32_t history_captured_pre_admit() const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointHeader history_captured_pre_header() const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointBinding history_captured_pre_binding(
+        std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointSlot history_captured_pre_slot(
+        std::uint32_t, std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointCache history_captured_pre_cache(
+        std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointEvent history_captured_pre_event(
+        std::uint32_t) const noexcept;
+    [[nodiscard]] std::uint32_t history_armed_pre_admit(
+        std::uint64_t incarnation) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointHeader history_armed_pre_header(
+        std::uint64_t incarnation) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointBinding history_armed_pre_binding(
+        std::uint64_t incarnation, std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointSlot history_armed_pre_slot(
+        std::uint64_t incarnation, std::uint32_t, std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointCache history_armed_pre_cache(
+        std::uint64_t incarnation, std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointEvent history_armed_pre_event(
+        std::uint64_t incarnation, std::uint32_t) const noexcept;
+    [[nodiscard]] std::uint32_t history_restored_pre_admit(
+        std::uint64_t incarnation, std::uint64_t restore_count) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointHeader history_restored_pre_header(
+        std::uint64_t incarnation, std::uint64_t restore_count) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointBinding history_restored_pre_binding(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointSlot history_restored_pre_slot(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        std::uint32_t, std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointCache history_restored_pre_cache(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        std::uint32_t) const noexcept;
+    [[nodiscard]] ::MeleeWebActionEndpointEvent history_restored_pre_event(
+        std::uint64_t incarnation, std::uint64_t restore_count,
+        std::uint32_t) const noexcept;
+
+    // Preparation selects a capture-preallocated, catalog-sized swap bank.
+    // The final pure admission is repeated after all aggregate owners prepare;
+    // restore_pre then consumes that exact ticket, restoring PRE and entering
+    // Correcting for the same incarnation without allocation, deallocation,
+    // callbacks, or Fighter-field writes.
+    [[nodiscard]] bool prepare_restore(std::uint64_t) noexcept;
+    [[nodiscard]] bool admit_restore(std::uint64_t) const noexcept;
+    [[nodiscard]] bool restore_pre(std::uint64_t) noexcept;
+
+    [[nodiscard]] std::uint32_t failure_code() const noexcept;
+    [[nodiscard]] std::uint32_t active_failure() const noexcept;
+    [[nodiscard]] bool retire_admit() const noexcept;
+    [[nodiscard]] bool retire_confirmed() noexcept;
+#if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
+    [[nodiscard]] bool interval_test_cache_string_layout(
+        std::uint32_t cache_index, std::uint32_t entry_index,
+        CacheStringBankTestLayout* out) const noexcept;
+    [[nodiscard]] bool interval_test_event_tape_layout(EventTapeTestLayout* out) const noexcept;
+#endif
+
+    // Cleanup-only detach for both successful and failed runs. Revokes this
+    // handle's routing but retains its PRE/displaced leases and owner exclusion
+    // until destruction; capture remains refused while this handle is retained.
+    void disarm() noexcept;
+
+private:
+    explicit GameplayActionStoreHistory(::MeleeWebActionInterval*) noexcept;
+    ::MeleeWebActionInterval* capsule_ = nullptr;
 };
 }

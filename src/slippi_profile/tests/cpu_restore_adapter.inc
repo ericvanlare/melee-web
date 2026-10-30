@@ -780,6 +780,18 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_restore_command(
     if(command==5){
         if(cpu_restore.two_active)cpu_restore.two.last_command=5;
         if(cpu_restore.seven_active)cpu_restore.seven.last_command=5;
+#if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)
+        if(cpu_history_active()){
+            if(!cpu_restore.capsule&&cpu_restore.state==CpuRestoreControl::Idle&&
+               !cpu_restore.first_failure){
+                cpu_restore.state=CpuRestoreControl::Closed;
+                cpu_restore.evidence.state=cpu_restore.state;
+                return 0;
+            }
+            if(cpu_restore.capsule&&!cpu_restore.first_failure)
+                cpu_fail(0x580u,"legacy CLOSE cannot bypass retained history retirement");
+        }
+#endif
         return cpu_close();
     }
 #if defined(MELEE_WEB_SYNCTEST_CORRECTED_CPU)

@@ -10,7 +10,18 @@ export const CPU_CORRECTED_LOOP_PACKET_WAIT_MS=3000;
 export const CPU_CORRECTED_LOOP_PEER_TIMEOUT_MS=5000;
 export const CPU_CORRECTED_LOOP_PACKET_ROWS=44;
 export const CPU_CORRECTED_LOOP_SOURCE_TICKS=46;
-const PAD_BYTES=11,FRAME_BYTES=44,FIRST_SAMPLE=300,LAST_SAMPLE=343;
+export const CPU_HISTORY_PACKET_ROWS=4;
+export const CPU_HISTORY_SOURCE_TICKS=6;
+const PAD_BYTES=11,FRAME_BYTES=44;
+const PACKET_MODES=Object.freeze({
+  correctedLoop:Object.freeze({scope:'cpu-corrected-loop-packet-input-v1',first:300,last:343,
+    rows:CPU_CORRECTED_LOOP_PACKET_ROWS,sourceTicks:CPU_CORRECTED_LOOP_SOURCE_TICKS,
+    predictedDrawCommand:40,summaryScope:'bounded packet receive component; Node-held room WebSocket peers'}),
+  retainedHistory:Object.freeze({scope:'cpu-history-packet-input-v1',first:300,last:303,
+    rows:CPU_HISTORY_PACKET_ROWS,sourceTicks:CPU_HISTORY_SOURCE_TICKS,
+    predictedDrawCommand:67,
+    summaryScope:'four-row retained-PRE packet component; Node-held room WebSocket peers'}),
+});
 const sha256=value=>createHash('sha256').update(value).digest('hex');
 const ns=()=>process.hrtime.bigint();
 const asBuffer=value=>Buffer.from(value);
@@ -64,10 +75,16 @@ function mappingFromInitializer(initializerText,inputMapping,slotCount){
   return observed;
 }
 
+function packetModeForAgreement(agreement){
+  const mode=Object.values(PACKET_MODES).find(row=>row.scope===agreement?.scope);
+  if(!mode||agreement.samples?.first!==mode.first||agreement.samples?.last!==mode.last)
+    throw new Error('Corrected-loop A2 start identity is not bound to the diagnostic producer/profile');
+  return mode;
+}
+
 function expectedAgreement(agreement){
+  const mode=packetModeForAgreement(agreement);
   if(!agreement||agreement.protocol!=='melee-web-local-lockstep-a2-v1'||
-     agreement.scope!=='cpu-corrected-loop-packet-input-v1'||
-     agreement.samples?.first!==FIRST_SAMPLE||agreement.samples?.last!==LAST_SAMPLE||
      !agreement.producer||!/^[0-9a-f]{40}$/.test(agreement.producer.commit||'')||
      !/^[0-9a-f]{40}$/.test(agreement.producer.tree||'')||
      !agreement.profile||typeof agreement.profile.name!=='string'||!agreement.profile.name.length||
@@ -85,16 +102,15 @@ function expectedAgreement(agreement){
   return agreement;
 }
 
-/** Construct the exact hello agreement from the frozen diagnostic/profile report. */
-export function buildCpuCorrectedLoopPacketAgreement({producer,profile,initializer,inputMapping,
-  slotCount=2,sourceStateManifest,runtimeSha256,harnessSha256,worker}={}){
+function buildPacketAgreement({producer,profile,initializer,inputMapping,
+  slotCount=2,sourceStateManifest,runtimeSha256,harnessSha256,worker}={},mode){
   if(!producer||!profile||typeof initializer!=='string'||!Array.isArray(inputMapping)||
      !Number.isInteger(slotCount)||slotCount<2||!sourceStateManifest||
      !runtimeSha256||!harnessSha256||!worker)
     throw new Error('Corrected-loop packet identity requires producer, profile, initializer, mapping, manifest, and runtime evidence');
   const observedMapping=mappingFromInitializer(initializer,inputMapping,slotCount);
   const agreement={protocol:'melee-web-local-lockstep-a2-v1',
-    scope:'cpu-corrected-loop-packet-input-v1',samples:{first:FIRST_SAMPLE,last:LAST_SAMPLE},
+    scope:mode.scope,samples:{first:mode.first,last:mode.last},
     producer:{commit:producer.commit,tree:producer.tree},
     profile:{name:profile.name,identity:profile.identity,sourceIdentity:profile.sourceIdentity,
       rngHelper:profile.rngHelper,stageBridge:profile.stageBridge,seed:profile.seed,
@@ -107,11 +123,21 @@ export function buildCpuCorrectedLoopPacketAgreement({producer,profile,initializ
   return expectedAgreement(agreement);
 }
 
-class CpuCorrectedLoopPacketInput {
+/** Construct the exact legacy 44-row hello agreement from diagnostic/profile evidence. */
+export function buildCpuCorrectedLoopPacketAgreement(input={}){
+  return buildPacketAgreement(input,PACKET_MODES.correctedLoop);
+}
+
+/** Construct the distinct four-row agreement used by the retained-PRE history witness. */
+export function buildCpuHistoryPacketAgreement(input={}){
+  return buildPacketAgreement(input,PACKET_MODES.retainedHistory);
+}
+
+export class CpuCorrectedLoopPacketInput {
   constructor(pair,agreement,{now=ns}={}){
-    this.pair=pair;this.agreement=expectedAgreement(agreement);this.now=now;
+    this.pair=pair;this.agreement=expectedAgreement(agreement);this.mode=packetModeForAgreement(agreement);this.now=now;
     this.failure=null;this.closed=false;this.intentionalClose=false;this.closePromise=null;
-    this.active=null;this.lastCompletedSample=FIRST_SAMPLE-1;this.inbox=new Map();
+    this.active=null;this.lastCompletedSample=this.mode.first-1;this.inbox=new Map();
     this.receivedHistory=new Map();
     this.completedP0=new Map();this.completedP1=new Map();this.receipts=[];this.frameRows={alpha:[],beta:[]};
     this.waiters=new Set();this.callbackErrors=[];this.peers={};
@@ -123,10 +149,10 @@ class CpuCorrectedLoopPacketInput {
       if(!this.intentionalClose)this.#latch(Error(`${role} lockstep peer reached terminal state: ${JSON.stringify(terminal)}`));
     };
     const pushFrame=role=>(firstTick,bytes)=>this.#captureFrames(role,firstTick,bytes);
-    this.peers.alpha=new LockstepPeer({role:'alpha',sourceTicks:CPU_CORRECTED_LOOP_SOURCE_TICKS,
-      inputTicks:CPU_CORRECTED_LOOP_PACKET_ROWS,pushFrame:pushFrame('alpha'),onTerminal:onTerminal('alpha')});
-    this.peers.beta=new LockstepPeer({role:'beta',sourceTicks:CPU_CORRECTED_LOOP_SOURCE_TICKS,
-      inputTicks:CPU_CORRECTED_LOOP_PACKET_ROWS,pushFrame:pushFrame('beta'),onTerminal:onTerminal('beta')});
+    this.peers.alpha=new LockstepPeer({role:'alpha',sourceTicks:this.mode.sourceTicks,
+      inputTicks:this.mode.rows,pushFrame:pushFrame('alpha'),onTerminal:onTerminal('alpha')});
+    this.peers.beta=new LockstepPeer({role:'beta',sourceTicks:this.mode.sourceTicks,
+      inputTicks:this.mode.rows,pushFrame:pushFrame('beta'),onTerminal:onTerminal('beta')});
     for(const role of ['alpha','beta']){
       const endpoint=pair[role],peer=this.peers[role];
       peer.attach(text=>endpoint.send(text));
@@ -149,7 +175,7 @@ class CpuCorrectedLoopPacketInput {
     if(!Number.isSafeInteger(firstTick)||firstTick<0||bytes.length===0||bytes.length%FRAME_BYTES!==0)
       throw new Error(`${role} protocol frame callback has an invalid range`);
     const count=bytes.length/FRAME_BYTES;
-    if(firstTick+count>CPU_CORRECTED_LOOP_SOURCE_TICKS)
+    if(firstTick+count>this.mode.sourceTicks)
       throw new Error(`${role} protocol emitted source frames beyond the diagnostic bound`);
     const prior=this.frameRows[role];
     if(firstTick!==prior.length)throw new Error(`${role} protocol source-frame callback is not contiguous`);
@@ -203,7 +229,7 @@ class CpuCorrectedLoopPacketInput {
     const seen=new Set();
     for(const entry of list){
       const tick=entry?.tick;
-      if(!Number.isSafeInteger(tick)||tick<0||tick>=CPU_CORRECTED_LOOP_PACKET_ROWS||seen.has(tick))
+      if(!Number.isSafeInteger(tick)||tick<0||tick>=this.mode.rows||seen.has(tick))
         throw new Error(`A2 input packet has an out-of-range or repeated tick ${tick}`);
       seen.add(tick);
       const expected=this.#expectedInput(role,tick);
@@ -220,7 +246,7 @@ class CpuCorrectedLoopPacketInput {
       for(const entry of list){
         const old=this.receivedHistory.get(entry.tick)??this.inbox.get(entry.tick);
         if(old)continue;
-        const active=this.active,first=active?active.start-FIRST_SAMPLE:-1,last=active?active.end-FIRST_SAMPLE:-1;
+        const active=this.active,first=active?active.start-this.mode.first:-1,last=active?active.end-this.mode.first:-1;
         if(!active||entry.tick<first||entry.tick>last)
           throw new Error(`A2 receive tick ${entry.tick} has no active capsule authority`);
         fresh.add(entry.tick);
@@ -261,7 +287,7 @@ class CpuCorrectedLoopPacketInput {
           this.#latch(error);throw error;
         }
         if(!old){
-          const active=this.active,first=active?active.start-FIRST_SAMPLE:-1,last=active?active.end-FIRST_SAMPLE:-1;
+          const active=this.active,first=active?active.start-this.mode.first:-1,last=active?active.end-this.mode.first:-1;
           if(!active||entry.tick<first||entry.tick>last){
             const error=Error(`A2 receive tick ${entry.tick} has no active capsule authority`);
             this.#latch(error);throw error;
@@ -308,11 +334,11 @@ class CpuCorrectedLoopPacketInput {
     const start=capsule?.startSample,rows=capsule?.rows,span=capsule?.span;
     if(!Number.isSafeInteger(start)||!Number.isSafeInteger(span)||span<1||span>7||
        !Array.isArray(rows)||rows.length!==span||start!==this.lastCompletedSample+1||
-       start+span-1>LAST_SAMPLE)
+       start+span-1>this.mode.last)
       throw new Error('Corrected-loop packet capsule is not the next bounded input range');
     const expected={alpha:new Map(),beta:new Map()},localP0=[],localP1=[];
     for(let index=0;index<span;index++){
-      const sample=start+index,tick=sample-FIRST_SAMPLE,frame=Buffer.from(rows[index],'base64');
+      const sample=start+index,tick=sample-this.mode.first,frame=Buffer.from(rows[index],'base64');
       if(frame.length!==FRAME_BYTES||frame[32]!==0xff||frame[43]!==0xff)
         throw new Error(`Corrected-loop packet sample ${sample} is not an exact PAD44`);
       const p0=Buffer.from(padAt(frame,0)),p1=Buffer.from(padAt(frame,1));
@@ -332,7 +358,7 @@ class CpuCorrectedLoopPacketInput {
       throw new Error('Corrected-loop packet publication does not match its active capsule');
     const speculative=String(active.kind||'').startsWith('speculative');
     if(speculative!== (predictedDrawRequestNs!==null))
-      throw new Error('Speculative packet publication must begin at command 40; confirmed publication must precede native input');
+      throw new Error(`Speculative packet publication must begin at command ${this.mode.predictedDrawCommand}; confirmed publication must precede native input`);
     if(active.publishRequestedNs!==null)throw new Error('Corrected-loop packet capsule was published twice');
     active.publishRequestedNs=(predictedDrawRequestNs??this.now()).toString();
     const published=await Promise.all([
@@ -342,23 +368,23 @@ class CpuCorrectedLoopPacketInput {
     if(published.some(row=>row?.status==='cancelled_unpublished'))
       throw new Error('Corrected-loop A2 local input contribution was not published');
     await this.#waitUntil(()=>{
-      const first=active.start-FIRST_SAMPLE,last=active.end-FIRST_SAMPLE;
+      const first=active.start-this.mode.first,last=active.end-this.mode.first;
       return active.receiveEvents.length>=active.span&&this.peers.alpha.remoteContiguousInput>=last&&
         this.peers.beta.remoteContiguousInput>=last&&this.peers.alpha.remoteAckInput>=last&&
         this.peers.beta.remoteAckInput>=last&&
         active.receiveEvents.every(row=>Number(row.inputTick)>=first&&Number(row.inputTick)<=last);
     },CPU_CORRECTED_LOOP_PACKET_WAIT_MS,`actual A2 rows and reciprocal ACKs for samples ${active.start}..${active.end}`);
-    const first=active.start-FIRST_SAMPLE,last=active.end-FIRST_SAMPLE;
+    const first=active.start-this.mode.first,last=active.end-this.mode.first;
     for(let tick=first;tick<=last;tick++){
       if(!this.inbox.has(tick)||!this.peers.alpha.remote.has(tick)||!this.peers.beta.remote.has(tick))
-        throw new Error(`Corrected-loop A2 authority row ${tick+FIRST_SAMPLE} is incomplete`);
+        throw new Error(`Corrected-loop A2 authority row ${tick+this.mode.first} is incomplete`);
     }
     return this.#capsuleReceipt(active);
   }
 
   notePredictedDrawResolved(sample,{resolvedNs=this.now()}={}){
     if(!this.active||this.active.start!==sample||this.active.publishRequestedNs===null)
-      throw new Error('Corrected-loop command-40 result has no matching packet release');
+      throw new Error(`Corrected-loop command-${this.mode.predictedDrawCommand} result has no matching packet release`);
     this.active.predictedDrawResolvedNs=resolvedNs.toString();
   }
 
@@ -377,9 +403,9 @@ class CpuCorrectedLoopPacketInput {
       throw new AggregateError([...failures,...callbackFailures.map(row=>row.error),this.failure].filter(Boolean),
         'Corrected-loop A2 receive queue failed owner-safe drain');
     const acceptedRows=[];
-    for(let tick=active.start-FIRST_SAMPLE;tick<=active.end-FIRST_SAMPLE;tick++){
-      if(!this.inbox.has(tick))throw new Error(`Corrected-loop A2 inbox lacks sample ${tick+FIRST_SAMPLE}`);
-      if(this.receivedHistory.has(tick))throw new Error(`Corrected-loop received PAD history repeats sample ${tick+FIRST_SAMPLE}`);
+    for(let tick=active.start-this.mode.first;tick<=active.end-this.mode.first;tick++){
+      if(!this.inbox.has(tick))throw new Error(`Corrected-loop A2 inbox lacks sample ${tick+this.mode.first}`);
+      if(this.receivedHistory.has(tick))throw new Error(`Corrected-loop received PAD history repeats sample ${tick+this.mode.first}`);
       acceptedRows.push([tick,Buffer.from(this.inbox.get(tick))]);
     }
     active.completed=true;this.lastCompletedSample=active.end;
@@ -394,28 +420,30 @@ class CpuCorrectedLoopPacketInput {
   }
 
   getRemotePad(sample){
-    const tick=sample-FIRST_SAMPLE;
-    if(!Number.isSafeInteger(sample)||sample<FIRST_SAMPLE||sample>LAST_SAMPLE||
+    const tick=sample-this.mode.first;
+    if(!Number.isSafeInteger(sample)||sample<this.mode.first||sample>this.mode.last||
        sample>this.lastCompletedSample||!this.receivedHistory.has(tick))
       throw new Error(`Corrected-loop remote PAD ${sample} has not passed owner-safe packet drain`);
     return Buffer.from(this.receivedHistory.get(tick));
   }
 
   #capsuleReceipt(active){
-    const first=active.start-FIRST_SAMPLE,last=active.end-FIRST_SAMPLE;
+    const first=active.start-this.mode.first,last=active.end-this.mode.first;
     const rows=[];
     for(let tick=first;tick<=last;tick++){
       const bytes=this.receivedHistory.get(tick)??this.inbox.get(tick);
-      if(bytes)rows.push({sample:tick+FIRST_SAMPLE,base64:bytes.toString('base64'),sha256:sha256(bytes)});
+      if(bytes)rows.push({sample:tick+this.mode.first,base64:bytes.toString('base64'),sha256:sha256(bytes)});
     }
     const drawRequestNs=active.publishRequestedNs===null?null:active.publishRequestedNs;
     const drawResolvedNs=active.predictedDrawResolvedNs;
     const overlapping=rows.some(row=>active.receiveEvents.some(received=>
-      received.inputTick===row.sample-FIRST_SAMPLE&&drawRequestNs!==null&&drawResolvedNs!==null&&
+      received.inputTick===row.sample-this.mode.first&&drawRequestNs!==null&&drawResolvedNs!==null&&
       BigInt(received.callbackEntryNs)>=BigInt(drawRequestNs)&&BigInt(received.callbackEntryNs)<=BigInt(drawResolvedNs)));
-    return {transport:'room-websocket-local-worker',socketOwner:'Node peer adapter; browser pages are unchanged',
+    const roomRelay=this.pair.transport?.type==='room-websocket';
+    const receipt={transport:roomRelay?'room-websocket-local-worker':this.pair.transport?.type??'unknown',
+      socketOwner:roomRelay?'Node peer adapter; browser pages are unchanged':'test-only endpoint adapter; no browser execution',
+      agreementScope:this.mode.scope,
       sourceStartSample:active.start,sourceEndSample:active.end,span:active.span,
-      releasedWithPredictedCommand40:active.kind.startsWith('speculative'),
       predictedDrawRequestMonotonicNs:drawRequestNs,predictedDrawResolvedMonotonicNs:drawResolvedNs,
       receiveEvents:active.receiveEvents.map(row=>({...row})),
       receivedRows:rows,receivedRowCount:rows.length,
@@ -423,8 +451,17 @@ class CpuCorrectedLoopPacketInput {
         remoteAckInput:this.peers.alpha.remoteAckInput,terminal:this.peers.alpha.terminal},
       beta:{remoteContiguousInput:this.peers.beta.remoteContiguousInput,
         remoteAckInput:this.peers.beta.remoteAckInput,terminal:this.peers.beta.terminal},
-      predictedCommand40ReceiveCallbackOverlap:overlapping,
-      overlapEvidence:overlapping?'at least one accepted Node receive callback entered after command40 request and before its promise resolved':'not observed'};
+      overlapEvidence:overlapping?
+        `at least one accepted Node receive callback entered after command ${this.mode.predictedDrawCommand} request and before its promise resolved`:
+        'not observed'};
+    if(this.mode===PACKET_MODES.correctedLoop){
+      receipt.releasedWithPredictedCommand40=active.kind.startsWith('speculative');
+      receipt.predictedCommand40ReceiveCallbackOverlap=overlapping;
+    }else{
+      receipt.releasedWithPredictedCommand67=active.kind.startsWith('speculative');
+      receipt.predictedCommand67ReceiveCallbackOverlap=overlapping;
+    }
+    return receipt;
   }
 
   async #waitUntil(predicate,timeoutMs,label){
@@ -442,7 +479,9 @@ class CpuCorrectedLoopPacketInput {
   }
 
   summary(){
-    return {scope:'bounded packet receive component; Node-held room WebSocket peers',
+    return {scope:this.mode.summaryScope,agreementScope:this.mode.scope,
+      expectedSamples:{first:this.mode.first,last:this.mode.last},
+      expectedRows:this.mode.rows,expectedSourceTicks:this.mode.sourceTicks,
       agreementSha256:sha256(Buffer.from(JSON.stringify(this.agreement))),
       transport:this.pair.transport,packetWaitMs:CPU_CORRECTED_LOOP_PACKET_WAIT_MS,
       peerReadyTimeoutMs:CPU_CORRECTED_LOOP_PEER_TIMEOUT_MS,

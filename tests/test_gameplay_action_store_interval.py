@@ -242,6 +242,80 @@ class GameplayActionStoreIntervalTests(unittest.TestCase):
                            lifecycle["destroys_after_store_destruction"],
                            "Destroying the capsule did not release its retained A Clip lease")
 
+        # Separate actual-source witness for catalog-sized ActionStore cache
+        # banks. Both fresh Wasm instances start from the same PRE capture; one
+        # advances cleanly and the other restores that PRE twice. Compare
+        # source-owned tree/row/stream addresses and typed bytes, cache meaning,
+        # reserved capacities, and matched allocation deltas. Transport string
+        # storage addresses are deliberately omitted from cache semantics.
+        history_layout = {}
+        for lane in ("history-layout-clean", "history-layout-repeat"):
+            command = [str(node), str(output), lane]
+            run = subprocess.run(command, cwd=output_dir, env=env,
+                                 capture_output=True, text=True, timeout=30)
+            command_record(output_dir / f"run-{lane}.json", command, run)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+            try:
+                history_layout[lane] = json.loads(run.stdout)
+            except json.JSONDecodeError as error:
+                self.fail(f"{lane} did not emit its bounded layout witness: {error}\n{run.stdout}\n{run.stderr}")
+
+        clean_history = history_layout["history-layout-clean"]
+        repeated_history = history_layout["history-layout-repeat"]
+        expected_symbol_bytes = len("action_store_history_symbol_longer_than_small_string_storage")
+        self.assertEqual(clean_history["maximum_catalog_symbol_bytes"], expected_symbol_bytes)
+        self.assertEqual(repeated_history["maximum_catalog_symbol_bytes"], expected_symbol_bytes)
+        self.assertEqual(clean_history["event_tape_capacity"], 256)
+        self.assertEqual(repeated_history["event_tape_capacity"], 256)
+        for evidence in (clean_history, repeated_history):
+            self.assertEqual(evidence["maintenance"], {"allocations": 0, "deallocations": 0})
+            self.assertEqual(evidence["capacities"]["captured"], evidence["capacities"]["final"])
+            self.assertEqual(evidence["native_clip_create_delta"], 0)
+            self.assertEqual(evidence["native_clip_destroy_delta"], 0)
+            for operation in evidence["operations"].values():
+                if operation is not None:
+                    self.assertEqual(operation["allocations"], operation["deallocations"],
+                                     "A measured selection retained an unmatched host allocation")
+        self.assertEqual(clean_history["capacities"]["captured"],
+                         repeated_history["capacities"]["captured"],
+                         "Identical catalog-sized captures reserved different cache banks")
+
+        for operation_name in ("A1_predicted", "B2_predicted", "C2_predicted", "A2_predicted"):
+            self.assertEqual(clean_history["operations"][operation_name],
+                             repeated_history["operations"][operation_name],
+                             f"Clean and repeated-history allocator deltas differ for {operation_name}")
+        for predicted_name, corrected_name in (
+            ("A1_predicted", "A1_corrected"),
+            ("A1_predicted", "A2_corrected_prefix"),
+            ("B2_predicted", "B2_corrected"),
+            ("C2_predicted", "C2_corrected"),
+            ("A2_predicted", "A2_corrected"),
+        ):
+            self.assertEqual(repeated_history["operations"][predicted_name],
+                             repeated_history["operations"][corrected_name],
+                             f"Repeated identical selection changed allocator deltas for {predicted_name}")
+        for operation_name in ("A1_predicted", "B2_predicted", "C2_predicted", "A2_predicted"):
+            self.assertIsNone(first_difference(clean_history["trees"][operation_name],
+                                               repeated_history["trees"][operation_name]),
+                              f"Clean and repeated-history source witness differs for {operation_name}")
+        for predicted_name, corrected_name in (
+            ("A1_predicted", "A1_corrected"),
+            ("A1_predicted", "A2_corrected_prefix"),
+            ("B2_predicted", "B2_corrected"),
+            ("C2_predicted", "C2_corrected"),
+            ("A2_predicted", "A2_corrected"),
+        ):
+            self.assertIsNone(first_difference(repeated_history["trees"][predicted_name],
+                                               repeated_history["trees"][corrected_name]),
+                              f"Corrected source tree/row/stream bytes differ for {predicted_name}")
+        self.assertIsNone(first_difference(clean_history["final_cache"],
+                                           repeated_history["final_cache"]),
+                          "Final clean and repeated-history cache contents/owners differ")
+        self.assertTrue(any(entry["symbol"] == "action_store_history_symbol_longer_than_small_string_storage"
+                            for cache in repeated_history["final_cache"] for entry in cache["entries"]),
+                        "Final source-owned cache omitted the actual long authored key")
+        print("ActionStore retained-history layout: clean and two-restore source/cache/allocation witnesses match.")
+
         print("ActionStore retention gate: identical fresh-Wasm prestate/layout verified.")
         difference = first_difference(clean["endpoint_p2"], corrected["endpoint_p2"], "$.endpoint_p2")
         result_path = output_dir / "retention-gate-comparison.json"

@@ -21,16 +21,23 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
     return capture_checked(session,std::move(statics),diagnostic,
-                           static_cast<std::uint32_t>(span),false);
+                           static_cast<std::uint32_t>(span),false,false);
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,std::uint32_t span) noexcept {
-    return capture_checked(session,std::move(statics),diagnostic,span,true);
+    return capture_checked(session,std::move(statics),diagnostic,span,true,false);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_history(
+    const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
+    CpuCaptureDiagnostic& diagnostic) noexcept {
+    return capture_checked(session,std::move(statics),diagnostic,
+                           MELEE_WEB_CPU_MOTOR_MAX_SPAN,true,true);
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
-    CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool allow_variable) noexcept {
+    CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool allow_variable,
+    bool history_mode) noexcept {
     /* Internal caller supplies fresh private stack storage. No diagnostic
      * pointer is exported and no source owner is written by this attribution. */
     diagnostic={};
@@ -53,12 +60,17 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
     if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}
     if(!statics){refused(CpuComparisonDomain::Statics,code(CpuCaptureRefusal::MissingStatics),"Configured static owner is missing");return {};}
     try {
+        c->history_mode_=history_mode;
         c->owner_=session.diagnostic_cpu_owners();
         if(!c->owner_.storage||!c->owner_.world){
             refused(stage,code(CpuCaptureRefusal::OwnerTuple),"Live session CPU owner tuple is unavailable");return {};
         }
         if(c->owner_.frame>std::numeric_limits<std::uint32_t>::max()-ticks){
             refused(stage,code(CpuCaptureRefusal::SourceFrameWrap),"Source frame cannot advance without wrapping");return {};
+        }
+        if(history_mode&&(!session.diagnostic_source_files_quiescent()||
+           c->owner_.frame>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN)){
+            refused(stage,code(CpuCaptureRefusal::OwnerTuple),"History PRE requires quiet source files and a bounded source-frame window");return {};
         }
         c->statics_=std::move(statics);c->commit_.statics=c->statics_.get();
         c->commit_.audio=c->owner_.audio;c->commit_.flow=c->owner_.flow;c->commit_.context=c->owner_.context;
@@ -84,13 +96,24 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
             refused(stage,static_cast<std::uint32_t>(payload.status),"Source payload capture refused; detail is actual payload status (null snapshot if status is OK)");return {};
         }
         stage=CpuComparisonDomain::Actions;
-        c->commit_.actions=melee_web_action_interval_capture();
-        if(!c->commit_.actions){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"ActionStore interval capture returned null (opaque capture API)");return {};}
+        if(history_mode){
+            c->history_actions_=GameplayActionStoreHistory::capture();
+            if(!c->history_actions_){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"ActionStore history PRE capture returned null (opaque capture API)");return {};}
+        }else{
+            c->commit_.actions=melee_web_action_interval_capture();
+            if(!c->commit_.actions){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"ActionStore interval capture returned null (opaque capture API)");return {};}
+        }
         stage=CpuComparisonDomain::Statics;
         if(!c->statics_->capture()){refused(stage,code(CpuCaptureRefusal::StaticCapture),"Configured static snapshot capture returned false");return {};}
+        if(history_mode&&(!c->statics_->begin_history(static_cast<std::uint32_t>(c->owner_.frame)))){
+            refused(stage,code(CpuCaptureRefusal::StaticCapture),"Configured static owner refused retained-history PRE");return {};
+        }
         stage=CpuComparisonDomain::Audio;
         c->audio_generation_=melee_web_audio_generation(c->owner_.audio);
         if(!c->audio_generation_){refused(stage,code(CpuCaptureRefusal::AudioGeneration),"Captured audio owner generation is zero");return {};}
+        if(history_mode&&(!melee_web_audio_snapshot_admit(c->owner_.audio,c->commit_.audio_snapshot))){
+            refused(stage,code(CpuCaptureRefusal::AudioGeneration),"Audio snapshot is not quiescent at retained-history PRE");return {};
+        }
         c->commit_.lobj_anchor=slippi_lobj_anchor_capture();
         if(!slippi_lobj_anchor_admit(c->commit_.lobj_anchor)){
             std::snprintf(leaf_error,sizeof(leaf_error),"Canonical LObj owner capture refused (%u)",(slippi_lobj_failure()|(slippi_tobj_failure()<<16)));
@@ -128,6 +151,7 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
         // v7 relocates lvec: the historical SOURCE writer diagnostic is
         // inapplicable, not a successful source-write observation. Session 0
         // leaves its fixed evidence unavailable; strict payload checks remain.
+        if(history_mode)c->phase_=Phase::HistoryReady;
         return c;
     }catch(const std::bad_alloc&){refused(stage,code(CpuCaptureRefusal::AllocationException),"CPU capture leaf threw std::bad_alloc");return {};}
     catch(...){refused(stage,code(CpuCaptureRefusal::UnexpectedException),"CPU capture leaf threw an unexpected exception");return {};}
@@ -164,9 +188,224 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
      * here on cleanup retains both pre and first-pass leases until teardown. */
     source_step_possible_=true;return true;
 }
+bool GameplayCpuCheckpoint::begin_history_incarnation(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_mode_||
+       (phase_!=Phase::HistoryReady&&phase_!=Phase::HistorySealed&&
+        phase_!=Phase::HistoryCorrectedSealed)||
+       (phase_!=Phase::HistoryReady&&
+        (!history_endpoint_archived_||!history_endpoint_closed_))||
+       !same_owner(session)||!session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot))return false;
+    const auto source_frame=session.source_frames();
+    const auto expected=history_incarnation_?history_end_frame_:
+        static_cast<std::uint32_t>(owner_.frame);
+    /* PRE capture already reserved the full seven-frame no-wrap window.
+     * Later forward segments may begin inside that final seven-frame window. */
+    if(source_frame!=expected||(history_incarnation_>=3u))return false;
+
+    if(!commit_.effect_token){
+        commit_.effect_token=melee_web_cpu_interval_begin();
+        motor_token_=commit_.effect_token;
+        if(!commit_.effect_token||
+           !melee_web_audio_snapshot_interval_begin(owner_.audio,commit_.audio_snapshot,
+                                                    commit_.effect_token)||
+           !melee_web_cpu_interval_motor_history_capture_begin(commit_.effect_token,
+                owner_.world,owner_.context,owner_.context_epoch,expected)){
+            disarm();phase_=Phase::Failed;return false;
+        }
+    }
+    const auto incarnation=history_actions_?history_actions_->begin_incarnation():0;
+    if(!incarnation||incarnation!=history_incarnation_+1u||
+       !melee_web_cpu_interval_motor_history_begin_incarnation(
+            commit_.effect_token,incarnation,source_frame)||
+       !statics_->history_begin_incarnation(incarnation,source_frame)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_incarnation_=incarnation;
+    history_start_frame_=source_frame;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryRecording;
+    source_step_possible_=true;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::seal_history_incarnation(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_mode_||phase_!=Phase::HistoryRecording||!same_owner(session)){
+        phase_=history_mode_?Phase::Failed:phase_;return false;
+    }
+    const auto actual_end=session.source_frames();
+    if(!session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_cpu_interval_admit(commit_.effect_token)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
+       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
+       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
+       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
+       melee_web_source_memory_payload_snapshot_admit(commit_.payload)!=
+            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+       actual_end<=history_start_frame_||actual_end<=owner_.frame||
+       actual_end-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       !melee_web_cpu_interval_motor_history_seal(commit_.effect_token,
+            history_incarnation_,actual_end)||
+       !history_actions_||!history_actions_->seal_incarnation(history_incarnation_)||
+       !statics_->history_seal_endpoint(history_incarnation_,actual_end)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_end_frame_=actual_end;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistorySealed;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::history_endpoint_admit(
+    const GameplayMatchSession& session) const noexcept {
+    const bool selected=phase_==Phase::HistorySealed||
+                        phase_==Phase::HistoryCorrectedSealed;
+    return history_mode_&&selected&&same_owner(session)&&
+        session.source_frames()==history_end_frame_&&
+        history_end_frame_>owner_.frame&&
+        history_end_frame_-owner_.frame<=MELEE_WEB_CPU_MOTOR_MAX_SPAN&&
+        session.diagnostic_source_files_quiescent()&&
+        slippi_lobj_anchor_admit(commit_.lobj_anchor)&&
+        slippi_tobj_anchor_admit(commit_.tobj_anchor)&&
+        slippi_particle_presentation_anchor_admit(commit_.particle_anchor)&&
+        melee_web_cpu_interval_admit(commit_.effect_token)&&
+        melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)&&
+        melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)&&
+        melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)&&
+        melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)&&
+        melee_web_source_memory_payload_snapshot_admit(commit_.payload)==
+            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+        history_actions_&&
+        history_actions_->endpoint_admit()==MELEE_WEB_ACTION_ENDPOINT_OK&&
+        statics_->history_endpoint_header().status==CpuStaticEndpointStatus::Ok&&
+        melee_web_cpu_interval_motor_history_evidence_for(commit_.effect_token,
+            owner_.world,owner_.context,owner_.context_epoch,
+            static_cast<std::uint32_t>(owner_.frame),history_incarnation_,
+            history_end_frame_)!=nullptr;
+}
+
+bool GameplayCpuCheckpoint::archive_history_endpoint(
+    const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::HistorySealed||!history_endpoint_admit(session)||
+       history_endpoint_archived_||history_endpoint_closed_)return false;
+    if(!statics_->history_close_endpoint(history_incarnation_,history_end_frame_)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_endpoint_archived_=true;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::close_history_endpoint(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_endpoint_admit(session)||history_endpoint_closed_)return false;
+    if(!history_endpoint_archived_){
+        if(!statics_->history_close_endpoint(history_incarnation_,history_end_frame_)){
+            disarm();phase_=Phase::Failed;return false;
+        }
+        history_endpoint_archived_=true;
+    }
+    if(!history_actions_->close_endpoint_batch(history_incarnation_)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_endpoint_closed_=true;
+    return true;
+}
+
+GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_mode_||phase_!=Phase::HistorySealed||!history_endpoint_archived_||
+       history_endpoint_closed_||
+       !same_owner(session)||session.source_frames()!=history_end_frame_||
+       !session.diagnostic_source_files_quiescent()||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot))
+        return GameplayCpuCommitResult::MissingOwner;
+    commit_.action_history=history_actions_.get();
+    commit_.history_incarnation=history_incarnation_;
+    commit_.history_end_frame=history_end_frame_;
+    const auto result=gameplay_cpu_commit_history_pre(commit_);
+    if(result!=GameplayCpuCommitResult::Ok){phase_=Phase::Failed;disarm();return result;}
+#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
+    if(!slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
+        phase_=Phase::Failed;return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
+#endif
+    if(!slippi_particle_source_reset_after_restore(commit_.particle_anchor)){
+        phase_=Phase::Failed;return GameplayCpuCommitResult::UnexpectedWriterFailure;
+    }
+    history_restore_end_=history_end_frame_;
+    ++history_restore_count_;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryCorrecting;
+    return GameplayCpuCommitResult::Ok;
+}
+
+bool GameplayCpuCheckpoint::finish_history_replay(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_mode_||phase_!=Phase::HistoryCorrecting||!same_owner(session)||
+       session.source_frames()!=history_restore_end_||
+       !session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_cpu_interval_admit(commit_.effect_token)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
+       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
+       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
+       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
+       melee_web_source_memory_payload_snapshot_admit(commit_.payload)!=
+            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+       !history_actions_||history_actions_->active_failure()!=0||
+       !melee_web_cpu_interval_motor_history_replay_finish(commit_.effect_token,
+            history_incarnation_,history_restore_end_)||
+       !history_actions_->seal_corrected_incarnation(history_incarnation_)||
+       !statics_->history_seal_endpoint(history_incarnation_,history_restore_end_)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_end_frame_=history_restore_end_;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryCorrectedSealed;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::retire_history_confirmed(
+    const GameplayMatchSession& session) noexcept {
+    if(!history_mode_||!history_endpoint_archived_||!history_endpoint_closed_||
+       !history_endpoint_admit(session)||
+       !history_actions_||!history_actions_->retire_admit()||
+       !statics_->history_retire_admit(history_incarnation_,history_end_frame_)||
+       !melee_web_cpu_interval_motor_history_retire_admit(
+            commit_.effect_token,history_incarnation_,history_end_frame_))return false;
+    if(!history_actions_->retire_confirmed())return false;
+    statics_->history_retire_confirmed();
+    melee_web_cpu_interval_motor_history_retire_commit(
+        commit_.effect_token,history_incarnation_,history_end_frame_);
+    disarm();confirmed_disarmed_=true;phase_=Phase::ConfirmedDetached;
+    source_step_possible_=false;
+    return true;
+}
+
+CpuStaticEndpointHeader GameplayCpuCheckpoint::history_static_header() const noexcept {
+    return history_mode_&&statics_?statics_->history_endpoint_header():CpuStaticEndpointHeader{};
+}
+CpuStaticEndpointRow GameplayCpuCheckpoint::history_static_row(std::uint64_t index) const noexcept {
+    return history_mode_&&statics_?statics_->history_endpoint_row(index):CpuStaticEndpointRow{};
+}
 bool GameplayCpuCheckpoint::interior_hps_pending(const GameplayMatchSession& session) const noexcept {
-    return reusable_loop_&&(phase_==Phase::Recording||phase_==Phase::Correcting)&&
-        same_owner(session)&&session.source_frames()>owner_.frame&&
+    const bool recording=phase_==Phase::Recording||phase_==Phase::Correcting||
+        phase_==Phase::HistoryRecording||phase_==Phase::HistoryCorrecting;
+    return reusable_loop_&&recording&&same_owner(session)&&session.source_frames()>owner_.frame&&
         session.source_frames()<owner_.frame+span_&&
         melee_web_cpu_interval_admit(commit_.effect_token)&&
         melee_web_audio_snapshot_interval_pending_admit(owner_.audio,commit_.audio_snapshot,
@@ -176,10 +415,14 @@ bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& sessio
     comparison_={};
     auto refuse=[this](CpuComparisonDomain domain,std::uint32_t detail=0){
         comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};
-        if(phase_==Phase::Correcting)phase_=Phase::Failed;
+        if(phase_==Phase::Correcting||phase_==Phase::HistoryRecording||
+           phase_==Phase::HistoryCorrecting)phase_=Phase::Failed;
         return false;
     };
-    if((phase_!=Phase::Recording&&phase_!=Phase::Replaying&&phase_!=Phase::Correcting)||
+    const bool history_recording=phase_==Phase::HistoryRecording||
+                                 phase_==Phase::HistoryCorrecting;
+    if((phase_!=Phase::Recording&&phase_!=Phase::Replaying&&phase_!=Phase::Correcting&&
+        !history_recording)||
        !same_owner(session))
         return refuse(CpuComparisonDomain::Owner);
     if((!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor)))
@@ -188,7 +431,9 @@ bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& sessio
         return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
     // Unlike failure_code, this pure active guard does not require the final
     // replay slots/cache or complete event cursor at an intermediate tick.
-    const auto failure=melee_web_action_interval_active_failure(commit_.actions);
+    const auto failure=history_recording?
+        (history_actions_?history_actions_->active_failure():1u):
+        melee_web_action_interval_active_failure(commit_.actions);
     if(failure)return refuse(CpuComparisonDomain::Actions,failure);
     return true;
 }
@@ -335,6 +580,10 @@ const MeleeWebCpuMotorEvidence* GameplayCpuCheckpoint::motor_evidence(
     if(!reusable_loop_||!motor_token_||!owner_.context||!owner_.world||
        !owner_.context_epoch||commit_.effect_token!=motor_token_||
        melee_web_cpu_interval_token()!=motor_token_||!same_owner(session))return nullptr;
+    if(history_mode_)
+        return melee_web_cpu_interval_motor_history_evidence_for(motor_token_,owner_.world,
+            owner_.context,owner_.context_epoch,static_cast<std::uint32_t>(owner_.frame),
+            history_incarnation_,history_end_frame_);
     return melee_web_cpu_interval_motor_evidence_for(motor_token_,owner_.world,
         owner_.context,owner_.context_epoch,owner_.frame,span_);
 }
@@ -559,6 +808,7 @@ void GameplayCpuCheckpoint::disarm() noexcept {
     melee_web_lobj_writer_disarm(lobj_writer_session_);
     melee_web_tobj_writer_disarm(tobj_writer_session_);
     melee_web_class_piece_disarm(class_piece_anchor_);
+    if(history_actions_)history_actions_->disarm();
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);
     if(commit_.effect_token&&commit_.audio_snapshot)
         (void)melee_web_audio_snapshot_interval_end(owner_.audio,commit_.audio_snapshot,
@@ -574,6 +824,7 @@ bool GameplayCpuCheckpoint::source_owners_retired(const GameplayMatchSession* se
 }
 void GameplayCpuCheckpoint::release() noexcept {
     melee_web_action_interval_destroy(commit_.actions);
+    history_actions_.reset();
     melee_web_audio_snapshot_destroy(const_cast<MeleeWebAudioSnapshot*>(commit_.audio_snapshot));
     melee_web_match_flow_cpu_snapshot_destroy(const_cast<MeleeWebMatchFlowCpuSnapshot*>(commit_.flow_snapshot));
     melee_web_match_context_snapshot_destroy(const_cast<MeleeWebMatchContextSnapshot*>(commit_.context_snapshot));

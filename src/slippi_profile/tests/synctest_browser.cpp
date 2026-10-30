@@ -14,6 +14,7 @@
 namespace {
 bool cpu_native_active();
 bool cpu_corrected_active();
+bool cpu_history_active();
 void cpu_corrected_forbid(std::vector<melee_web::CpuIntervalSpan>&);
 }
 #endif
@@ -1134,6 +1135,7 @@ melee_web_synctest_payload_admission_command(uint32_t command)
 
 #include "cpu_restore_adapter.inc"
 #include "cpu_corrected_adapter.inc"
+#include "cpu_history_adapter.inc"
 
 EMSCRIPTEN_KEEPALIVE int melee_web_synctest_renderer_shutdown(void)
 {

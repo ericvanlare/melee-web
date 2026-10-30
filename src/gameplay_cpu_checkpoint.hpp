@@ -1,4 +1,5 @@
 #pragma once
+#include "gameplay_action_store.hpp"
 #include "gameplay_cpu_commit.hpp"
 #include "gameplay_cpu_interval.h"
 #include "gameplay_match_session.hpp"
@@ -37,6 +38,11 @@ public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture_span(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&,std::uint32_t span) noexcept;
+    /* Private match-scoped retained history: one immutable PRE, at most three
+     * forward incarnations and two corrections within seven actual ticks. */
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_history(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
@@ -48,6 +54,23 @@ public:
     bool finish_replay(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
     bool finish_corrected(const GameplayMatchSession&) noexcept;
+    bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
+    bool seal_history_incarnation(const GameplayMatchSession&) noexcept;
+    bool history_endpoint_admit(const GameplayMatchSession&) const noexcept;
+    /* Archive a predicted endpoint before PRE restore. This closes only the
+     * reusable CPU static bank; ActionStore remains open for correction. */
+    bool archive_history_endpoint(const GameplayMatchSession&) noexcept;
+    /* Close ActionStore only after the endpoint is selected (corrected, or
+     * an uncorrected final endpoint) and its complete receipt was copied. */
+    bool close_history_endpoint(const GameplayMatchSession&) noexcept;
+    GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&) noexcept;
+    bool finish_history_replay(const GameplayMatchSession&) noexcept;
+    bool retire_history_confirmed(const GameplayMatchSession&) noexcept;
+    GameplayActionStoreHistory* history_actions() const noexcept {
+        return history_actions_.get();
+    }
+    CpuStaticEndpointHeader history_static_header() const noexcept;
+    CpuStaticEndpointRow history_static_row(std::uint64_t index) const noexcept;
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
     // Release-safety proof only; host independently admits CPU/DRAW/raw
@@ -74,6 +97,8 @@ private:
     friend struct GameplayCpuEndpointTestFixture;
 #endif
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
+                       HistoryReady, HistoryRecording, HistorySealed,
+                       HistoryCorrecting, HistoryCorrectedSealed,
                        Finished, Failed, ConfirmedDetached, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop)
@@ -82,7 +107,8 @@ private:
         :GameplayCpuCheckpoint(static_cast<std::uint32_t>(span),false){}
     static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
-        CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable) noexcept;
+        CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable,
+        bool history_mode=false) noexcept;
     const std::uint32_t span_;
     const bool reusable_loop_;
     std::uint64_t motor_token_{};
@@ -94,6 +120,12 @@ private:
     GameplayMatchCpuOwners owner_{};
     GameplayCpuCommitOwners commit_{};
     std::unique_ptr<GameplayCpuStatics> statics_;
+    std::unique_ptr<GameplayActionStoreHistory> history_actions_;
+    bool history_mode_=false;
+    std::uint64_t history_incarnation_{};
+    std::uint32_t history_start_frame_{},history_end_frame_{},history_restore_end_{};
+    std::uint32_t history_restore_count_{};
+    bool history_endpoint_archived_{},history_endpoint_closed_{};
     MeleeWebSourceMemoryPayloadSnapshot* post_payload_{};
     MeleeWebMatchFlowCpuSnapshot* post_flow_{};
     std::vector<PostBytes> post_bytes_;

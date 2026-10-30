@@ -260,6 +260,15 @@ const motorIdentityKeys=['token','world','contextEpoch','firstFrame','span'];
 
 /** Native integers remain exact even above JavaScript's safe integer range. */
 export function decodeCpuCorrectedLoopMotorEvidence(input){
+  return decodeCpuMotorEvidence(input,1);
+}
+
+/** The retained-history journal has mode2; legacy loop mode1 stays strict. */
+export function decodeCpuHistoryMotorEvidence(input){
+  return decodeCpuMotorEvidence(input,2);
+}
+
+function decodeCpuMotorEvidence(input,expectedMode){
   const bytes=Buffer.from(input);
   if(bytes.length!==CPU_LOOP_MOTOR_EVIDENCE_BYTES)throw new Error('Loop motor evidence extent');
   const u32=offset=>bytes.readUInt32LE(offset);
@@ -299,7 +308,7 @@ export function decodeCpuCorrectedLoopMotorEvidence(input){
   const result={schema:u32(0),bytes:u32(4),mode:u32(8),selectedLane:u32(12),published:u32(16),
     commitState:u32(20),failure:u32(24),reserved:u32(28),baseline:sequence(32),selected:sequence(524),
     base64:bytes.toString('base64')};
-  if(result.schema!==1||result.bytes!==CPU_LOOP_MOTOR_EVIDENCE_BYTES||result.mode!==1||
+  if(result.schema!==1||result.bytes!==CPU_LOOP_MOTOR_EVIDENCE_BYTES||result.mode!==expectedMode||
      ![0,1,2,3].includes(result.selectedLane)||result.published!==0||
      ![0,1,2].includes(result.commitState)||result.reserved!==0)
     throw new Error('Loop motor schema/mode/publication/commit state');

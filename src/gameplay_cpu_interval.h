@@ -91,6 +91,31 @@ int melee_web_cpu_interval_motor_selected_finish(uint64_t token,uint32_t post_fr
 int melee_web_cpu_interval_motor_commit_admit(uint64_t token,uint64_t world,
     const void* context,uint64_t context_epoch,uint32_t first_frame,uint32_t span);
 void melee_web_cpu_interval_motor_capture_commit(uint64_t token);
+/* Additive private retained-history journal. Legacy capture/restore above keeps
+ * its fixed span and single restore. History records one bounded source prefix,
+ * resets selected output only after the aggregate PRE commit succeeds, then
+ * permits a later forward incarnation to append to that selected prefix. */
+int melee_web_cpu_interval_motor_history_capture_begin(uint64_t token,uint64_t world,
+    const void* context,uint64_t context_epoch,uint32_t pre_frame);
+int melee_web_cpu_interval_motor_history_begin_incarnation(uint64_t token,
+    uint64_t incarnation,uint32_t source_frame);
+int melee_web_cpu_interval_motor_history_seal(uint64_t token,uint64_t incarnation,
+    uint32_t actual_end);
+int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,
+    uint64_t incarnation,uint32_t actual_end);
+/* Unchecked post-aggregate bookkeeping. Caller must have just passed the pure
+ * history_restore_admit check and committed every source owner successfully. */
+void melee_web_cpu_interval_motor_history_restore_commit(uint64_t token,
+    uint64_t incarnation,uint32_t actual_end);
+int melee_web_cpu_interval_motor_history_replay_finish(uint64_t token,
+    uint64_t incarnation,uint32_t actual_end);
+int melee_web_cpu_interval_motor_history_retire_admit(uint64_t token,
+    uint64_t incarnation,uint32_t actual_end);
+void melee_web_cpu_interval_motor_history_retire_commit(uint64_t token,
+    uint64_t incarnation,uint32_t actual_end);
+const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_history_evidence_for(
+    uint64_t token,uint64_t world,const void* context,uint64_t context_epoch,
+    uint32_t pre_frame,uint64_t incarnation,uint32_t actual_end);
 const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_evidence(void);
 /* The current capture endpoint is readable only through the exact active
  * capsule identity. The adapter must not expose process-global evidence as
@@ -119,6 +144,15 @@ static inline void melee_web_cpu_interval_motor_restore_commit(uint64_t t,uint32
 static inline int melee_web_cpu_interval_motor_selected_finish(uint64_t t,uint32_t f){(void)t;(void)f;return 1;}
 static inline int melee_web_cpu_interval_motor_commit_admit(uint64_t t,uint64_t w,const void* c,uint64_t e,uint32_t f,uint32_t s){(void)t;(void)w;(void)c;(void)e;(void)f;(void)s;return 1;}
 static inline void melee_web_cpu_interval_motor_capture_commit(uint64_t t){(void)t;}
+static inline int melee_web_cpu_interval_motor_history_capture_begin(uint64_t t,uint64_t w,const void* c,uint64_t e,uint32_t f){(void)t;(void)w;(void)c;(void)e;(void)f;return 0;}
+static inline int melee_web_cpu_interval_motor_history_begin_incarnation(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline int melee_web_cpu_interval_motor_history_seal(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline int melee_web_cpu_interval_motor_history_restore_admit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline void melee_web_cpu_interval_motor_history_restore_commit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;}
+static inline int melee_web_cpu_interval_motor_history_replay_finish(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline int melee_web_cpu_interval_motor_history_retire_admit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline void melee_web_cpu_interval_motor_history_retire_commit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;}
+static inline const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_history_evidence_for(uint64_t t,uint64_t w,const void* c,uint64_t e,uint32_t f,uint64_t i,uint32_t end){(void)t;(void)w;(void)c;(void)e;(void)f;(void)i;(void)end;return (const MeleeWebCpuMotorEvidence*)0;}
 static inline const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_evidence(void){return (const MeleeWebCpuMotorEvidence*)0;}
 static inline const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_evidence_for(uint64_t t,uint64_t w,const void* c,uint64_t e,uint32_t f,uint32_t s){(void)t;(void)w;(void)c;(void)e;(void)f;(void)s;return (const MeleeWebCpuMotorEvidence*)0;}
 static inline uint32_t melee_web_cpu_interval_motor_evidence_bytes(void){return 0;}

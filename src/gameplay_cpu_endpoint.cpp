@@ -114,37 +114,123 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
     if(!session_||!checkpoint_)return collect_refusal("owners");
     const auto& checkpoint=*checkpoint_;
     const bool pre=view_==View::Pre;
-    if((pre&&(checkpoint.phase_!=GameplayCpuCheckpoint::Phase::Recording||
-              provenance_!=Provenance::SharedPre))||
-       (!pre&&((provenance_==Provenance::Reference&&
-                checkpoint.phase_!=GameplayCpuCheckpoint::Phase::Sealed)||
-               (provenance_==Provenance::Corrected&&
-                checkpoint.phase_!=GameplayCpuCheckpoint::Phase::CorrectedSealed)||
-               (provenance_!=Provenance::Reference&&provenance_!=Provenance::Corrected))))
-        return collect_refusal("phase");
-    if(!checkpoint.same_owner(*session_)||
-       !slippi_lobj_anchor_admit(checkpoint.commit_.lobj_anchor)||
-       !slippi_tobj_anchor_admit(checkpoint.commit_.tobj_anchor)||
-       !slippi_particle_presentation_anchor_admit(checkpoint.commit_.particle_anchor)||
-       !checkpoint.commit_.effect_token||
-       !melee_web_cpu_interval_admit(checkpoint.commit_.effect_token))
-        return collect_refusal("owners");
+    if(!history_mode_){
+        if((pre&&(checkpoint.phase_!=GameplayCpuCheckpoint::Phase::Recording||
+                  provenance_!=Provenance::SharedPre))||
+           (!pre&&((provenance_==Provenance::Reference&&
+                    checkpoint.phase_!=GameplayCpuCheckpoint::Phase::Sealed)||
+                   (provenance_==Provenance::Corrected&&
+                    checkpoint.phase_!=GameplayCpuCheckpoint::Phase::CorrectedSealed)||
+                   (provenance_!=Provenance::Reference&&provenance_!=Provenance::Corrected))))
+            return collect_refusal("phase");
+        if(!checkpoint.same_owner(*session_)||
+           !slippi_lobj_anchor_admit(checkpoint.commit_.lobj_anchor)||
+           !slippi_tobj_anchor_admit(checkpoint.commit_.tobj_anchor)||
+           !slippi_particle_presentation_anchor_admit(checkpoint.commit_.particle_anchor)||
+           !checkpoint.commit_.effect_token||
+           !melee_web_cpu_interval_admit(checkpoint.commit_.effect_token))
+            return collect_refusal("owners");
+    }else{
+        using Phase=GameplayCpuCheckpoint::Phase;
+        const bool captured_pre=pre&&
+            checkpoint.phase_==Phase::HistoryReady&&
+            checkpoint.history_incarnation_==0u&&checkpoint.history_restore_count_==0u&&
+            checkpoint.history_end_frame_==0u;
+        const bool armed_pre=pre&&
+            checkpoint.phase_==Phase::HistoryRecording&&
+            checkpoint.history_incarnation_==1u&&checkpoint.history_restore_count_==0u&&
+            checkpoint.history_start_frame_==checkpoint.owner_.frame&&
+            checkpoint.history_end_frame_==0u;
+        const bool restored_pre=pre&&
+            checkpoint.phase_==Phase::HistoryCorrecting&&
+            checkpoint.history_incarnation_!=0u&&checkpoint.history_incarnation_<=3u&&
+            checkpoint.history_restore_count_!=0u&&checkpoint.history_restore_count_<=2u&&
+            checkpoint.history_end_frame_>checkpoint.owner_.frame&&
+            checkpoint.history_end_frame_-checkpoint.owner_.frame<=7u&&
+            checkpoint.history_restore_end_==checkpoint.history_end_frame_;
+        const bool predicted_end=!pre&&provenance_==Provenance::Reference&&
+            checkpoint.phase_==Phase::HistorySealed;
+        const bool corrected_end=!pre&&provenance_==Provenance::Corrected&&
+            checkpoint.phase_==Phase::HistoryCorrectedSealed;
+        if(!checkpoint.history_mode_||
+           (pre&&provenance_!=Provenance::SharedPre)||
+           (!pre&&provenance_==Provenance::SharedPre)||
+           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end))
+            return collect_refusal("history-phase");
+        if(!checkpoint.same_owner(*session_)||
+           !session_->diagnostic_source_files_quiescent()||
+           !slippi_lobj_anchor_admit(checkpoint.commit_.lobj_anchor)||
+           !slippi_tobj_anchor_admit(checkpoint.commit_.tobj_anchor)||
+           !slippi_particle_presentation_anchor_admit(checkpoint.commit_.particle_anchor)||
+           !melee_web_audio_snapshot_admit(checkpoint.owner_.audio,
+                                            checkpoint.commit_.audio_snapshot))
+            return collect_refusal("history-owners");
+        if((armed_pre||restored_pre)&&(!checkpoint.commit_.effect_token||
+           !melee_web_cpu_interval_admit(checkpoint.commit_.effect_token)))
+            return collect_refusal("history-live-owner");
+        if(captured_pre&&checkpoint.commit_.effect_token)
+            return collect_refusal("history-captured-effect");
+        if(pre){
+            const auto pre_frame=static_cast<std::uint32_t>(checkpoint.owner_.frame);
+            const bool statics_admitted=checkpoint.statics_&&(
+                captured_pre?checkpoint.statics_->history_captured_pre_admit(pre_frame):
+                armed_pre?checkpoint.statics_->history_armed_pre_admit(
+                    checkpoint.history_incarnation_,pre_frame):
+                restored_pre?checkpoint.statics_->history_restored_pre_admit(
+                    checkpoint.history_incarnation_,checkpoint.history_restore_count_,
+                    pre_frame):false);
+            if(!statics_admitted)return collect_refusal("history-static-pre");
+        }
+        if(!pre&&!checkpoint.history_endpoint_admit(*session_))
+            return collect_refusal("history-end-admit");
+        out.history_phase=static_cast<std::uint32_t>(checkpoint.phase_);
+        out.history_incarnation=checkpoint.history_incarnation_;
+        out.history_pre_frame=static_cast<std::uint32_t>(checkpoint.owner_.frame);
+        out.history_current_end=checkpoint.history_end_frame_;
+        out.history_restore_count=checkpoint.history_restore_count_;
+        out.history_effect_token=checkpoint.commit_.effect_token;
+    }
 
     out.source_frame=session_->source_frames();
-    const auto expected_frame=pre?checkpoint.owner_.frame:checkpoint.post_frame_;
+    const auto expected_frame=history_mode_?
+        (pre?checkpoint.owner_.frame:checkpoint.history_end_frame_):
+        (pre?checkpoint.owner_.frame:checkpoint.post_frame_);
     if(out.source_frame!=expected_frame)return collect_refusal("frame");
 
-    const auto action_admission=
-        melee_web_action_interval_endpoint_admit(checkpoint.commit_.actions);
-    if(action_admission!=MELEE_WEB_ACTION_ENDPOINT_OK)
-        return collect_refusal("action-admit",action_admission);
-    out.actions=melee_web_action_interval_endpoint_header(checkpoint.commit_.actions);
+    if(history_mode_&&pre){
+        auto* actions=checkpoint.history_actions_.get();
+        if(!actions)return collect_refusal("history-action-pre-owner");
+        const bool restored=checkpoint.phase_==GameplayCpuCheckpoint::Phase::HistoryCorrecting;
+        const bool armed=checkpoint.phase_==GameplayCpuCheckpoint::Phase::HistoryRecording;
+        const auto action_admission=restored?
+            actions->history_restored_pre_admit(checkpoint.history_incarnation_,
+                                                 checkpoint.history_restore_count_):
+            armed?actions->history_armed_pre_admit(checkpoint.history_incarnation_):
+            actions->history_captured_pre_admit();
+        if(action_admission!=MELEE_WEB_ACTION_ENDPOINT_OK)
+            return collect_refusal("history-action-pre-admit",action_admission);
+        out.actions=restored?
+            actions->history_restored_pre_header(checkpoint.history_incarnation_,
+                                                  checkpoint.history_restore_count_):
+            armed?actions->history_armed_pre_header(checkpoint.history_incarnation_):
+            actions->history_captured_pre_header();
+    }else if(history_mode_){
+        if(!checkpoint.history_actions_)return collect_refusal("history-action-end-owner");
+        out.actions=checkpoint.history_actions_->endpoint_header();
+    }else{
+        const auto action_admission=
+            melee_web_action_interval_endpoint_admit(checkpoint.commit_.actions);
+        if(action_admission!=MELEE_WEB_ACTION_ENDPOINT_OK)
+            return collect_refusal("action-admit",action_admission);
+        out.actions=melee_web_action_interval_endpoint_header(checkpoint.commit_.actions);
+    }
     const auto leaf_view=pre?MELEE_WEB_ACTION_ENDPOINT_PRE:MELEE_WEB_ACTION_ENDPOINT_END;
     const auto leaf_provenance=provenance_==Provenance::Corrected?
         MELEE_WEB_ACTION_ENDPOINT_CORRECTED:MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
     if(out.actions.status!=MELEE_WEB_ACTION_ENDPOINT_OK||out.actions.schema!=1||
        out.actions.view!=leaf_view||out.actions.provenance!=leaf_provenance||
-       out.actions.slots_per_binding!=2)
+       out.actions.slots_per_binding!=2||
+       (history_mode_&&pre&&out.actions.event_count!=0))
         return collect_refusal("action-header",out.actions.status);
     if(out.actions.binding_count>UINT32_MAX/2u||out.actions.cache_count>UINT32_MAX/2u)
         return collect_refusal("action-header",out.actions.status);
@@ -157,7 +243,8 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
        out.payload.allocated_cell_count>UINT32_MAX)
         return collect_refusal("payload-header",static_cast<std::uint32_t>(out.payload.status));
 
-    const auto* flow_snapshot=pre?checkpoint.commit_.flow_snapshot:checkpoint.post_flow_;
+    const auto* flow_snapshot=pre||history_mode_?
+        checkpoint.commit_.flow_snapshot:checkpoint.post_flow_;
     out.flow=melee_web_match_flow_cpu_endpoint_read(checkpoint.owner_.flow,flow_snapshot);
     if(out.flow.status!=0)return collect_refusal("flow",out.flow.status);
     if(!melee_web_match_context_snapshot_admit(checkpoint.owner_.context,
@@ -204,7 +291,8 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
     out.clock=clock;out.clock_endpoint=clock_endpoint;
     out.cadence=cadence;out.cadence_endpoint=cadence_endpoint;
 
-    out.statics=checkpoint.statics_->endpoint_header();
+    out.statics=history_mode_&&!pre?checkpoint.history_static_header():
+                                    checkpoint.statics_->endpoint_header();
     if(out.statics.status!=CpuStaticEndpointStatus::Ok||out.statics.schema!=1||
        out.statics.row_count>UINT32_MAX)
         return collect_refusal("statics",static_cast<std::uint32_t>(out.statics.status));
@@ -247,17 +335,37 @@ bool GameplayCpuEndpointReader::same_batch(const BatchData& a,
        xa.command_budget!=ya.command_budget||xa.sound_mode!=ya.sound_mode||
        xs.status!=ys.status||xs.schema!=ys.schema||xs.phase!=ys.phase||
        xs.table_identity!=ys.table_identity||xs.row_count!=ys.row_count||
-       a.audio_count!=b.audio_count||a.source_frame!=b.source_frame)return false;
+       a.audio_count!=b.audio_count||a.source_frame!=b.source_frame||
+       a.history_phase!=b.history_phase||
+       a.history_incarnation!=b.history_incarnation||
+       a.history_pre_frame!=b.history_pre_frame||
+       a.history_current_end!=b.history_current_end||
+       a.history_restore_count!=b.history_restore_count||
+       a.history_effect_token!=b.history_effect_token)return false;
     for(std::uint32_t i=0;i<a.audio_count;++i)
         if(!equal_range(a.audio_ranges[i],b.audio_ranges[i]))return false;
     return true;
+}
+
+bool GameplayCpuEndpointReader::history_identity_matches() const noexcept
+{
+    if(!history_mode_||!session_||!checkpoint_)return !history_mode_;
+    const auto& c=*checkpoint_;
+    return c.history_mode_&&
+        static_cast<std::uint32_t>(c.phase_)==data_.history_phase&&
+        c.history_incarnation_==data_.history_incarnation&&
+        static_cast<std::uint32_t>(c.owner_.frame)==data_.history_pre_frame&&
+        c.history_end_frame_==data_.history_current_end&&
+        c.history_restore_count_==data_.history_restore_count&&
+        c.commit_.effect_token==data_.history_effect_token&&
+        session_->source_frames()==data_.source_frame;
 }
 
 bool GameplayCpuEndpointReader::begin(const GameplayMatchSession& session,
     const GameplayCpuCheckpoint& checkpoint,View view,Provenance provenance) noexcept
 {
     if(active_){status_=Status::Incomplete;return false;}
-    session_=nullptr;checkpoint_=nullptr;data_={};
+    session_=nullptr;checkpoint_=nullptr;data_={};history_mode_=false;
     status_=Status::Invalid;
     if(view!=View::Pre&&view!=View::CpuEnd&&view!=View::DrawEnd)return false;
     if((view==View::Pre&&provenance!=Provenance::SharedPre)||
@@ -271,12 +379,33 @@ bool GameplayCpuEndpointReader::begin(const GameplayMatchSession& session,
     active_=true;status_=Status::Ok;return true;
 }
 
+bool GameplayCpuEndpointReader::begin_history(const GameplayMatchSession& session,
+    const GameplayCpuCheckpoint& checkpoint,View view,Provenance provenance) noexcept
+{
+    if(active_){status_=Status::Incomplete;return false;}
+    session_=nullptr;checkpoint_=nullptr;data_={};history_mode_=false;
+    status_=Status::Invalid;
+    if(view!=View::Pre&&view!=View::CpuEnd&&view!=View::DrawEnd)return false;
+    if((view==View::Pre&&provenance!=Provenance::SharedPre)||
+       (view!=View::Pre&&provenance==Provenance::SharedPre)){
+        status_=Status::WrongPhase;return false;
+    }
+    history_mode_=true;
+    session_=&session;checkpoint_=&checkpoint;view_=view;provenance_=provenance;
+    if(!collect(data_)){
+        session_=nullptr;checkpoint_=nullptr;history_mode_=false;
+        status_=Status::OwnerRefused;return false;
+    }
+    active_=true;status_=Status::Ok;return true;
+}
+
 bool GameplayCpuEndpointReader::particle_header(
     SlippiParticleCellEndpointHeader& out) const noexcept
 {
     out={};
     if(!active_||!session_||!checkpoint_||
-       session_->source_frames()!=data_.source_frame)return false;
+       session_->source_frames()!=data_.source_frame||
+       (history_mode_&&!history_identity_matches()))return false;
     return slippi_particle_presentation_cell_endpoint_header(
         checkpoint_->commit_.particle_anchor,&out)==1;
 }
@@ -287,7 +416,8 @@ bool GameplayCpuEndpointReader::particle_row(
 {
     out={};
     if(!active_||!session_||!checkpoint_||
-       session_->source_frames()!=data_.source_frame)return false;
+       session_->source_frames()!=data_.source_frame||
+       (history_mode_&&!history_identity_matches()))return false;
     return slippi_particle_presentation_cell_endpoint_row(
         checkpoint_->commit_.particle_anchor,kind,index,&out)==1;
 }
@@ -296,8 +426,10 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
     Domain domain,Kind kind,std::uint32_t index) const noexcept
 {
     if(!active_||!session_||!checkpoint_)return refusal(Status::Incomplete);
-    if(session_->source_frames()!=data_.source_frame)return refusal(Status::OwnerRefused);
+    if(session_->source_frames()!=data_.source_frame||
+       (history_mode_&&!history_identity_matches()))return refusal(Status::OwnerRefused);
     const auto& c=*checkpoint_;
+    const bool pre=view_==View::Pre;
     using namespace GameplayCpuEndpointField;
     const auto v=view_;const auto p=provenance_;
     auto make=[&](Kind row_kind,std::uint32_t count,std::initializer_list<std::uint64_t> fields){
@@ -307,6 +439,50 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
         if(result.status)return result;
         if(!set_borrowed(result,bytes,size))return refusal(Status::Overflow);
         return result;
+    };
+    auto action_binding=[&](std::uint32_t binding){
+        auto* history=c.history_actions_.get();
+        if(!history_mode_)return melee_web_action_interval_endpoint_binding(c.commit_.actions,binding);
+        if(view_!=View::Pre)return history->endpoint_binding(binding);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryCorrecting)
+            return history->history_restored_pre_binding(c.history_incarnation_,
+                c.history_restore_count_,binding);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryRecording)
+            return history->history_armed_pre_binding(c.history_incarnation_,binding);
+        return history->history_captured_pre_binding(binding);
+    };
+    auto action_slot=[&](std::uint32_t binding,std::uint32_t slot){
+        auto* history=c.history_actions_.get();
+        if(!history_mode_)return melee_web_action_interval_endpoint_slot(c.commit_.actions,binding,slot);
+        if(view_!=View::Pre)return history->endpoint_slot(binding,slot);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryCorrecting)
+            return history->history_restored_pre_slot(c.history_incarnation_,
+                c.history_restore_count_,binding,slot);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryRecording)
+            return history->history_armed_pre_slot(c.history_incarnation_,binding,slot);
+        return history->history_captured_pre_slot(binding,slot);
+    };
+    auto action_cache=[&](std::uint32_t cache){
+        auto* history=c.history_actions_.get();
+        if(!history_mode_)return melee_web_action_interval_endpoint_cache(c.commit_.actions,cache);
+        if(view_!=View::Pre)return history->endpoint_cache(cache);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryCorrecting)
+            return history->history_restored_pre_cache(c.history_incarnation_,
+                c.history_restore_count_,cache);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryRecording)
+            return history->history_armed_pre_cache(c.history_incarnation_,cache);
+        return history->history_captured_pre_cache(cache);
+    };
+    auto action_event=[&](std::uint32_t event){
+        auto* history=c.history_actions_.get();
+        if(!history_mode_)return melee_web_action_interval_endpoint_event(c.commit_.actions,event);
+        if(view_!=View::Pre)return history->endpoint_event(event);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryCorrecting)
+            return history->history_restored_pre_event(c.history_incarnation_,
+                c.history_restore_count_,event);
+        if(c.phase_==GameplayCpuCheckpoint::Phase::HistoryRecording)
+            return history->history_armed_pre_event(c.history_incarnation_,event);
+        return history->history_captured_pre_event(event);
     };
     const auto k=static_cast<std::uint32_t>(kind);
 
@@ -343,7 +519,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
                 data_.actions.slots_per_binding,data_.actions.cache_count,data_.actions.event_count});
         }
         if(kind==Kind::ActionBinding){
-            const auto x=melee_web_action_interval_endpoint_binding(c.commit_.actions,index);
+            const auto x=action_binding(index);
             if(x.status!=MELEE_WEB_ACTION_ENDPOINT_OK)return refusal(Status::LeafRefused);
             return make(kind,data_.actions.binding_count,{x.present,x.generation,x.fighter,x.store,
                 x.select_callback,x.transfer_callback,x.table});
@@ -353,7 +529,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
             if(index>=count)return refusal(Status::InvalidIndex);
             const std::uint32_t binding=index/data_.actions.slots_per_binding;
             const std::uint32_t slot=index%data_.actions.slots_per_binding;
-            const auto x=melee_web_action_interval_endpoint_slot(c.commit_.actions,binding,slot);
+            const auto x=action_slot(binding,slot);
             if(x.status!=MELEE_WEB_ACTION_ENDPOINT_OK)return refusal(Status::LeafRefused);
             auto result=make(kind,count,{x.binding,x.slot,x.present,x.motion,x.offset,x.archive_bytes,
                 x.symbol_bytes,x.fighter,x.store,x.table,x.clip,x.tree,x.row_identity,x.animation,
@@ -364,7 +540,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
             const std::uint32_t count=data_.actions.cache_count*2u;
             if(index>=count)return refusal(Status::InvalidIndex);
             const std::uint32_t cache_index=index/2u,entry=index%2u;
-            const auto x=melee_web_action_interval_endpoint_cache(c.commit_.actions,cache_index);
+            const auto x=action_cache(cache_index);
             if(x.status!=MELEE_WEB_ACTION_ENDPOINT_OK)return refusal(Status::LeafRefused);
             const auto& e=x.entries[entry];
             auto result=make(kind,count,{cache_index,entry,x.next,x.root,x.owner,x.cache,x.runtime,
@@ -373,7 +549,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
             return borrowed(result,reinterpret_cast<const void*>(static_cast<std::uintptr_t>(e.symbol_data)),e.symbol_bytes);
         }
         if(kind==Kind::ActionEvent){
-            const auto x=melee_web_action_interval_endpoint_event(c.commit_.actions,index);
+            const auto x=action_event(index);
             if(x.status!=MELEE_WEB_ACTION_ENDPOINT_OK)return refusal(Status::LeafRefused);
             auto result=make(kind,data_.actions.event_count,{x.kind,x.policy,x.cache_hit,x.motion,x.slot,
                 x.result_domain,x.offset,x.archive_bytes,x.symbol_bytes,x.cache,x.runtime,x.row,
@@ -503,7 +679,8 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
         }
         if(kind!=Kind::StaticRow||index>=data_.statics.row_count)return refusal(Status::InvalidIndex);
         {
-            const auto x=c.statics_->endpoint_row(index);
+            const auto x=history_mode_&&!pre?c.history_static_row(index):
+                                               c.statics_->endpoint_row(index);
             if(x.status!=CpuStaticEndpointStatus::Ok||x.schema!=1||x.index!=index)
                 return refusal(Status::LeafRefused);
             const auto* bytes=reinterpret_cast<const void*>(static_cast<std::uintptr_t>(x.address));
@@ -519,10 +696,11 @@ bool GameplayCpuEndpointReader::revalidate() noexcept
     if(!active_||!session_||!checkpoint_){status_=Status::Incomplete;return false;}
     BatchData after{};
     if(!collect(after)||!same_batch(data_,after)||
-       session_->source_frames()!=data_.source_frame){
+       session_->source_frames()!=data_.source_frame||
+       (history_mode_&&!history_identity_matches())){
         active_=false;status_=Status::OwnerRefused;return false;
     }
-    active_=false;status_=Status::Ok;session_=nullptr;checkpoint_=nullptr;
+    active_=false;status_=Status::Ok;session_=nullptr;checkpoint_=nullptr;history_mode_=false;
     return true;
 }
 }

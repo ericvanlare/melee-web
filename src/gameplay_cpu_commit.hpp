@@ -1,4 +1,5 @@
 #pragma once
+#include "gameplay_action_store.hpp"
 #include "gameplay_action_store.h"
 #include "gameplay_audio.h"
 #include "gameplay_bootstrap.h"
@@ -29,6 +30,9 @@ struct GameplayCpuCommitOwners {
     SlippiLObjAnchor lobj_anchor{};
     SlippiTObjAnchor tobj_anchor{};
     SlippiParticlePresentationAnchor particle_anchor{};
+    GameplayActionStoreHistory* action_history{};
+    std::uint64_t history_incarnation{};
+    std::uint32_t history_end_frame{};
 };
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
@@ -41,4 +45,9 @@ GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners&) noex
 /* Same owner admissions and fixed writer order, selecting only the
  * one-shot corrected ActionStore endpoint. Exact replay keeps the API above. */
 GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwners&) noexcept;
+/* Repeatable same-PRE history restore. All capture-time prepared banks are
+ * ready before final aggregate admission; selected motor output resets only
+ * after every source owner has committed. */
+GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
+    const GameplayCpuCommitOwners&) noexcept;
 }

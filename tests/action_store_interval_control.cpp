@@ -3,6 +3,7 @@
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/lb/lbanim.h>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>
@@ -12,6 +13,9 @@
 #include <cstring>
 #include <iostream>
 #include <new>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -55,6 +59,44 @@ fighter_runtime_test::FighterFixture make_fixture()
     fighter_runtime_test::put32(fixture.data, fixture.command_b, 0);
     return fixture;
 }
+constexpr auto history_layout_action = std::uint32_t(ftMr_SM_SpecialN);
+constexpr std::uint32_t history_layout_action_c = 15;
+const std::string history_layout_long_symbol =
+    "action_store_history_symbol_longer_than_small_string_storage";
+const std::string history_layout_action_c_symbol = "history_layout_action_c";
+fighter_runtime_test::FighterFixture make_history_layout_fixture()
+{
+    auto fixture = make_fixture();
+    const std::uint32_t symbol = static_cast<std::uint32_t>(fixture.data.size());
+    fixture.data.insert(fixture.data.end(), history_layout_long_symbol.begin(),
+                        history_layout_long_symbol.end());
+    fixture.data.push_back(0);
+
+    animation_test::Fixture animation;
+    const auto clip = fighter_runtime_test::pack(animation.data, animation.slots,
+        history_layout_long_symbol, animation_test::Fixture::root);
+    constexpr std::uint32_t offset = 512;
+    fixture.container.resize(offset + clip.size());
+    std::copy(clip.begin(), clip.end(), fixture.container.begin() + offset);
+    set_action(fixture, history_layout_action, offset);
+    fixture.link(fixture.row(history_layout_action), symbol);
+
+    const std::uint32_t c_symbol = static_cast<std::uint32_t>(fixture.data.size());
+    fixture.data.insert(fixture.data.end(), history_layout_action_c_symbol.begin(),
+                        history_layout_action_c_symbol.end());
+    fixture.data.push_back(0);
+    animation_test::Fixture animation_c;
+    const auto clip_c = fighter_runtime_test::pack(animation_c.data, animation_c.slots,
+        history_layout_action_c_symbol, animation_test::Fixture::root);
+    const auto offset_c = static_cast<std::uint32_t>(
+        (std::size_t(offset) + clip.size() + 31U) & ~std::size_t(31U));
+    fixture.container.resize(std::max<std::size_t>(fixture.container.size(),
+                                                    offset_c + clip_c.size()));
+    std::copy(clip_c.begin(), clip_c.end(), fixture.container.begin() + offset_c);
+    set_action(fixture, history_layout_action_c, offset_c);
+    fixture.link(fixture.row(history_layout_action_c), c_symbol);
+    return fixture;
+}
 
 struct Harness {
     fighter_runtime_test::FighterFixture fixture;
@@ -69,7 +111,10 @@ struct Harness {
 
     explicit Harness(melee_web::GameplayActionStorePolicy policy =
                          melee_web::GameplayActionStorePolicy::Legacy)
-        : fixture(make_fixture()),
+        : Harness(make_fixture(), policy) {}
+    Harness(fighter_runtime_test::FighterFixture supplied,
+            melee_web::GameplayActionStorePolicy policy)
+        : fixture(std::move(supplied)),
           archive(std::make_shared<const melee_web::DatArchive>(fixture.file())),
           store1(archive, fighter_runtime_test::mario(), fixture.container,
                  {}, {}, nullptr, {}, policy),
@@ -136,6 +181,422 @@ bool same(const State& a, const State& b)
     return a.p1_motion == b.p1_motion && a.p2_motion == b.p2_motion &&
         a.p1_tree == b.p1_tree && a.p2_tree == b.p2_tree &&
         a.p1_identity == b.p1_identity && a.p2_identity == b.p2_identity;
+}
+
+struct HistoryEndpointCopy {
+    MeleeWebActionEndpointHeader header{};
+    std::vector<MeleeWebActionEndpointBinding> bindings;
+    std::vector<MeleeWebActionEndpointSlot> slots;
+    std::vector<MeleeWebActionEndpointCache> caches;
+    std::vector<MeleeWebActionEndpointEvent> events;
+};
+
+HistoryEndpointCopy copy_history_endpoint(
+    const melee_web::GameplayActionStoreHistory& history)
+{
+    check(history.endpoint_admit() == MELEE_WEB_ACTION_ENDPOINT_OK,
+          "Retained ActionStore endpoint failed its complete admission");
+    HistoryEndpointCopy copy;
+    copy.header = history.endpoint_header();
+    check(copy.header.status == MELEE_WEB_ACTION_ENDPOINT_OK &&
+              copy.header.binding_count == 6 && copy.header.slots_per_binding == 2,
+          "Retained ActionStore endpoint header is incomplete");
+    copy.bindings.reserve(copy.header.binding_count);
+    copy.slots.reserve(copy.header.binding_count * copy.header.slots_per_binding);
+    copy.caches.reserve(copy.header.cache_count);
+    copy.events.reserve(copy.header.event_count);
+    for (std::uint32_t i = 0; i < copy.header.binding_count; ++i) {
+        auto binding = history.endpoint_binding(i);
+        check(binding.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Retained ActionStore endpoint binding refused");
+        copy.bindings.push_back(binding);
+        for (std::uint32_t slot = 0; slot < copy.header.slots_per_binding; ++slot) {
+            auto row = history.endpoint_slot(i, slot);
+            check(row.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+                  "Retained ActionStore endpoint slot refused");
+            copy.slots.push_back(row);
+        }
+    }
+    for (std::uint32_t i = 0; i < copy.header.cache_count; ++i) {
+        auto cache = history.endpoint_cache(i);
+        check(cache.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Retained ActionStore endpoint cache refused");
+        copy.caches.push_back(cache);
+    }
+    for (std::uint32_t i = 0; i < copy.header.event_count; ++i) {
+        auto event = history.endpoint_event(i);
+        check(event.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Retained ActionStore endpoint event refused");
+        copy.events.push_back(event);
+    }
+    return copy;
+}
+
+enum class HistoryPreView { Captured, Armed, Restored };
+HistoryEndpointCopy copy_history_pre(
+    const melee_web::GameplayActionStoreHistory& history, HistoryPreView view,
+    std::uint64_t incarnation = 0, std::uint64_t restore_count = 0)
+{
+    const auto admit = [&] {
+        switch (view) {
+            case HistoryPreView::Captured: return history.history_captured_pre_admit();
+            case HistoryPreView::Armed: return history.history_armed_pre_admit(incarnation);
+            case HistoryPreView::Restored:
+                return history.history_restored_pre_admit(incarnation, restore_count);
+        }
+        return std::uint32_t(MELEE_WEB_ACTION_ENDPOINT_INVALID);
+    };
+    check(admit() == MELEE_WEB_ACTION_ENDPOINT_OK,
+          "Strict ActionStore PRE role failed its complete admission");
+    HistoryEndpointCopy copy;
+    switch (view) {
+        case HistoryPreView::Captured:
+            copy.header = history.history_captured_pre_header(); break;
+        case HistoryPreView::Armed:
+            copy.header = history.history_armed_pre_header(incarnation); break;
+        case HistoryPreView::Restored:
+            copy.header = history.history_restored_pre_header(incarnation, restore_count); break;
+    }
+    check(copy.header.status == MELEE_WEB_ACTION_ENDPOINT_OK &&
+              copy.header.view == MELEE_WEB_ACTION_ENDPOINT_PRE &&
+              copy.header.provenance == MELEE_WEB_ACTION_ENDPOINT_REFERENCE &&
+              copy.header.event_count == 0 && copy.header.binding_count == 6 &&
+              copy.header.slots_per_binding == 2,
+          "Strict ActionStore PRE header advertised a non-PRE or event-bearing image");
+    copy.bindings.reserve(copy.header.binding_count);
+    copy.slots.reserve(copy.header.binding_count * copy.header.slots_per_binding);
+    copy.caches.reserve(copy.header.cache_count);
+    for (std::uint32_t i = 0; i < copy.header.binding_count; ++i) {
+        const auto binding = view == HistoryPreView::Captured ?
+            history.history_captured_pre_binding(i) : view == HistoryPreView::Armed ?
+            history.history_armed_pre_binding(incarnation, i) :
+            history.history_restored_pre_binding(incarnation, restore_count, i);
+        check(binding.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Strict ActionStore PRE binding refused");
+        copy.bindings.push_back(binding);
+        for (std::uint32_t slot = 0; slot < copy.header.slots_per_binding; ++slot) {
+            const auto row = view == HistoryPreView::Captured ?
+                history.history_captured_pre_slot(i, slot) : view == HistoryPreView::Armed ?
+                history.history_armed_pre_slot(incarnation, i, slot) :
+                history.history_restored_pre_slot(incarnation, restore_count, i, slot);
+            check(row.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+                  "Strict ActionStore PRE slot refused");
+            copy.slots.push_back(row);
+        }
+    }
+    for (std::uint32_t i = 0; i < copy.header.cache_count; ++i) {
+        const auto cache = view == HistoryPreView::Captured ?
+            history.history_captured_pre_cache(i) : view == HistoryPreView::Armed ?
+            history.history_armed_pre_cache(incarnation, i) :
+            history.history_restored_pre_cache(incarnation, restore_count, i);
+        check(cache.status == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Strict ActionStore PRE cache refused");
+        copy.caches.push_back(cache);
+    }
+    const auto event = view == HistoryPreView::Captured ?
+        history.history_captured_pre_event(0) : view == HistoryPreView::Armed ?
+        history.history_armed_pre_event(incarnation, 0) :
+        history.history_restored_pre_event(incarnation, restore_count, 0);
+    check(event.status == MELEE_WEB_ACTION_ENDPOINT_PHASE && event.index == 0 &&
+              event.kind == 0 && event.clip == 0,
+          "Strict ActionStore PRE role exposed or fabricated an event row");
+    check(admit() == MELEE_WEB_ACTION_ENDPOINT_OK,
+          "Strict ActionStore PRE role changed during its getter batch");
+    return copy;
+}
+
+template<class T>
+bool same_pod(const T& left, const T& right)
+{ return std::memcmp(&left, &right, sizeof(T)) == 0; }
+
+void verify_retained_pre_action_history()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    Harness h(Policy::ResidentOrdinaryActions);
+    h.prepare_wait_only();
+    const State baseline = state(h);
+    auto history = melee_web::GameplayActionStoreHistory::capture();
+    check(bool(history), "Retained PRE history capture refused the resident fixture");
+    check(history->history_captured_pre_admit() == MELEE_WEB_ACTION_ENDPOINT_OK &&
+              history->history_restored_pre_admit(1, 1) == MELEE_WEB_ACTION_ENDPOINT_PHASE,
+          "Captured PRE role or premature restored PRE role had the wrong phase admission");
+    auto captured_pre = copy_history_pre(*history, HistoryPreView::Captured);
+    melee_web::GameplayActionStoreHistory::EventTapeTestLayout tape_layout{};
+    check(history->interval_test_event_tape_layout(&tape_layout) &&
+              tape_layout.predicted_size == 0 && tape_layout.corrected_size == 0 &&
+              tape_layout.predicted_capacity >= 256 && tape_layout.corrected_capacity >= 256,
+          "History tapes were not both preallocated to the explicit diagnostic event budget");
+    auto incarnation = history->begin_incarnation();
+    check(incarnation == 1, "Retained PRE history did not start its first incarnation");
+    check(history->history_armed_pre_admit(incarnation) == MELEE_WEB_ACTION_ENDPOINT_OK &&
+              history->history_armed_pre_admit(incarnation + 1) ==
+                  MELEE_WEB_ACTION_ENDPOINT_PHASE,
+          "Armed PRE role did not admit only the first active incarnation");
+    const auto armed_pre = copy_history_pre(
+        *history, HistoryPreView::Armed, incarnation);
+    check(same_pod(captured_pre.header, armed_pre.header) &&
+              captured_pre.bindings.size() == armed_pre.bindings.size() &&
+              captured_pre.slots.size() == armed_pre.slots.size() &&
+              captured_pre.caches.size() == armed_pre.caches.size(),
+          "Armed PRE image dimensions differed from captured PRE");
+    for (std::size_t i = 0; i < captured_pre.bindings.size(); ++i)
+        check(same_pod(captured_pre.bindings[i], armed_pre.bindings[i]),
+              "Armed PRE binding differed from captured PRE");
+    for (std::size_t i = 0; i < captured_pre.slots.size(); ++i)
+        check(same_pod(captured_pre.slots[i], armed_pre.slots[i]),
+              "Armed PRE slot differed from captured PRE");
+    for (std::size_t i = 0; i < captured_pre.caches.size(); ++i)
+        check(same_pod(captured_pre.caches[i], armed_pre.caches[i]),
+              "Armed PRE cache differed from captured PRE");
+    auto pre = copy_history_endpoint(*history);
+    check(pre.header.view == MELEE_WEB_ACTION_ENDPOINT_PRE && pre.events.empty(),
+          "First retained-history batch was not the immutable PRE witness");
+    check(same_pod(captured_pre.header, pre.header) &&
+              captured_pre.bindings.size() == pre.bindings.size() &&
+              captured_pre.slots.size() == pre.slots.size() &&
+              captured_pre.caches.size() == pre.caches.size(),
+          "Captured PRE reader disagreed with the existing recording PRE endpoint dimensions");
+    for (std::size_t i = 0; i < pre.bindings.size(); ++i)
+        check(same_pod(captured_pre.bindings[i], pre.bindings[i]),
+              "Captured PRE binding differed from the existing PRE endpoint");
+    for (std::size_t i = 0; i < pre.slots.size(); ++i)
+        check(same_pod(captured_pre.slots[i], pre.slots[i]),
+              "Captured PRE slot differed from the existing PRE endpoint");
+    for (std::size_t i = 0; i < pre.caches.size(); ++i)
+        check(same_pod(captured_pre.caches[i], pre.caches[i]),
+              "Captured PRE cache differed from the existing PRE endpoint");
+
+    h.load(h.p1, ftMr_SM_SpecialN, 0);
+    check(history->seal_incarnation(incarnation),
+          "Predicted ActionStore endpoint did not seal for retained correction");
+    auto predicted = copy_history_endpoint(*history);
+    check(predicted.header.view == MELEE_WEB_ACTION_ENDPOINT_END &&
+              predicted.header.event_count > 0,
+          "Predicted ActionStore endpoint lost its source event tape");
+    check(history->prepare_restore(incarnation) && history->admit_restore(incarnation),
+          "Predicted ActionStore endpoint did not publish a restore ticket");
+    check(!history->admit_restore(incarnation + 1) &&
+              !history->restore_pre(incarnation + 1),
+          "A stale retained-history ticket was accepted");
+
+    const State predicted_state = state(h);
+    watched_allocations = 0;
+    watched_deallocations = 0;
+    watch_allocations = true;
+    const bool restored = history->restore_pre(incarnation);
+    watch_allocations = false;
+    check(restored && watched_allocations == 0 && watched_deallocations == 0,
+          "Retained PRE ActionStore commit allocated or deallocated storage");
+    const State after_action_restore = state(h);
+    check(h.store1.selected_motion(0) == 14 && h.store2.selected_motion(1) == 14 &&
+              after_action_restore.p1_tree == predicted_state.p1_tree &&
+              after_action_restore.p1_identity == predicted_state.p1_identity,
+          "Retained PRE ActionStore commit changed Fighter-owned payload fields");
+    check(!history->admit_restore(incarnation) && !history->restore_pre(incarnation),
+          "The same retained PRE restore ticket committed twice");
+
+    MeleeWebActionFighterClipState p1_pre{}, p2_pre{};
+    check(melee_web_action_fighter_clip_state(h.p1, &p1_pre) &&
+              melee_web_action_fighter_clip_state(h.p2, &p2_pre),
+          "Could not read Fighter payload for the corrected ActionStore incarnation");
+    p1_pre.trees[0] = baseline.p1_tree;
+    p1_pre.identities[0] = baseline.p1_identity;
+    p2_pre.trees[1] = baseline.p2_tree;
+    p2_pre.identities[1] = baseline.p2_identity;
+    melee_web_action_interval_test_set_fighter_clip_state(h.p1, &p1_pre);
+    melee_web_action_interval_test_set_fighter_clip_state(h.p2, &p2_pre);
+    check(same(state(h), baseline),
+          "Later payload restore did not rejoin the exact ActionStore PRE endpoint");
+    check(history->endpoint_admit() == MELEE_WEB_ACTION_ENDPOINT_PHASE &&
+              history->history_restored_pre_admit(incarnation + 1, 1) ==
+                  MELEE_WEB_ACTION_ENDPOINT_PHASE,
+          "Generic endpoint or stale-incarnation reader admitted restored PRE");
+    check(history->history_restored_pre_admit(incarnation, 0) ==
+              MELEE_WEB_ACTION_ENDPOINT_PHASE &&
+              history->history_restored_pre_admit(incarnation, 2) ==
+                  MELEE_WEB_ACTION_ENDPOINT_PHASE,
+          "Restored PRE role accepted a stale or future cumulative restore count");
+    auto restored_pre = copy_history_pre(
+        *history, HistoryPreView::Restored, incarnation, 1);
+    check(same_pod(captured_pre.header, restored_pre.header) &&
+              captured_pre.bindings.size() == restored_pre.bindings.size() &&
+              captured_pre.slots.size() == restored_pre.slots.size() &&
+              captured_pre.caches.size() == restored_pre.caches.size(),
+          "Restored PRE reader did not expose the same immutable PRE dimensions");
+    for (std::size_t i = 0; i < captured_pre.bindings.size(); ++i)
+        check(same_pod(captured_pre.bindings[i], restored_pre.bindings[i]),
+              "Restored PRE binding differed from its captured PRE bytes");
+    for (std::size_t i = 0; i < captured_pre.slots.size(); ++i)
+        check(same_pod(captured_pre.slots[i], restored_pre.slots[i]),
+              "Restored PRE slot differed from its captured PRE bytes");
+    for (std::size_t i = 0; i < captured_pre.caches.size(); ++i)
+        check(same_pod(captured_pre.caches[i], restored_pre.caches[i]),
+              "Restored PRE cache differed from its captured PRE bytes");
+
+    h.load(h.p2, ftCo_SM_AttackS4, 1);
+    check(history->active_failure() == MELEE_WEB_ACTION_INTERVAL_OK &&
+              history->seal_corrected_incarnation(incarnation),
+          "Corrected ActionStore branch failed to seal in the same incarnation");
+    auto selected = copy_history_endpoint(*history);
+    check(selected.header.provenance == MELEE_WEB_ACTION_ENDPOINT_CORRECTED &&
+              selected.header.event_count > 0 &&
+              history->close_endpoint_batch(incarnation),
+          "Corrected selected endpoint was not fully copied and closed");
+
+    auto next = history->begin_incarnation();
+    check(next == 2 && h.store2.selected_motion(1) == ftCo_SM_AttackS4,
+          "Next forward incarnation did not begin at the selected corrected endpoint");
+    h.load(h.p1, ftMr_SM_SpecialN, 0);
+    check(history->seal_incarnation(next),
+          "Second predicted ActionStore endpoint did not seal");
+    auto second_predicted = copy_history_endpoint(*history);
+    check(second_predicted.header.event_count >= selected.header.event_count,
+          "Forward ActionStore continuation discarded its selected prefix tape");
+    check(history->prepare_restore(next) && history->admit_restore(next),
+          "Second incarnation failed to prepare the independent PRE restore bank");
+    watched_allocations = 0;
+    watched_deallocations = 0;
+    watch_allocations = true;
+    const bool restored_again = history->restore_pre(next);
+    watch_allocations = false;
+    check(restored_again && watched_allocations == 0 && watched_deallocations == 0,
+          "Second retained PRE restore allocated or deallocated storage");
+    check(h.store1.selected_motion(0) == 14 && h.store2.selected_motion(1) == 14,
+          "Second retained PRE restore did not return ActionStore slots to the original anchor");
+
+    check(melee_web_action_fighter_clip_state(h.p1, &p1_pre) &&
+              melee_web_action_fighter_clip_state(h.p2, &p2_pre),
+          "Could not read second corrected-branch Fighter payload");
+    p1_pre.trees[0] = baseline.p1_tree;
+    p1_pre.identities[0] = baseline.p1_identity;
+    p2_pre.trees[1] = baseline.p2_tree;
+    p2_pre.identities[1] = baseline.p2_identity;
+    melee_web_action_interval_test_set_fighter_clip_state(h.p1, &p1_pre);
+    melee_web_action_interval_test_set_fighter_clip_state(h.p2, &p2_pre);
+    h.load(h.p1, ftCo_SM_AttackS4, 0);
+    check(history->seal_corrected_incarnation(next),
+          "Second corrected ActionStore branch failed to seal");
+    auto selected_again = copy_history_endpoint(*history);
+    check(selected_again.header.provenance == MELEE_WEB_ACTION_ENDPOINT_CORRECTED &&
+              history->close_endpoint_batch(next),
+          "Second corrected endpoint receipt was not closed");
+
+    auto final_incarnation = history->begin_incarnation();
+    check(final_incarnation == 3,
+          "Bounded ActionStore history did not permit its final forward incarnation");
+    h.load(h.p2, ftMr_SM_SpecialN, 1);
+    check(history->seal_incarnation(final_incarnation),
+          "Final selected ActionStore forward endpoint did not seal");
+    (void)copy_history_endpoint(*history);
+    check(history->close_endpoint_batch(final_incarnation) &&
+              !history->prepare_restore(final_incarnation) &&
+              history->retire_admit() && history->retire_confirmed(),
+          "History exceeded its two-restore budget or refused final retirement");
+}
+
+void verify_retained_pre_action_history_refusals()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        const State before = state(h);
+        auto history = melee_web::GameplayActionStoreHistory::capture();
+        check(bool(history), "Could not capture unexpected-selection history control");
+        const auto incarnation = history->begin_incarnation();
+        h.load(h.p1, ftMr_SM_SpecialN, 0);
+        check(history->seal_incarnation(incarnation),
+              "Unexpected-selection history control did not seal");
+        const State sealed = state(h);
+        check(h.store2.interval_test_try_select(ftCo_SM_AttackS4, 1) == 0 &&
+                  same(state(h), sealed) && !history->admit_restore(incarnation) &&
+                  history->failure_code() == MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED,
+              "Unexpected post-seal action selection was not terminal and write-free");
+        history->disarm();
+        check(history->failure_code() == MELEE_WEB_ACTION_INTERVAL_OWNER_STATE_CHANGED &&
+                  !history->begin_incarnation() && !history->prepare_restore(incarnation) &&
+                  !history->admit_restore(incarnation) &&
+                  !melee_web_action_interval_capture() &&
+                  !melee_web::GameplayActionStoreHistory::capture(),
+              "Disarming failed history revived it, lost its failure, or released owner exclusion");
+        (void)before;
+    }
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        auto history = melee_web::GameplayActionStoreHistory::capture();
+        check(bool(history), "Could not capture history for cleanup disarm control");
+        history->disarm();
+        check(history->failure_code() == MELEE_WEB_ACTION_INTERVAL_DISARMED &&
+                  !history->begin_incarnation() && !melee_web_action_interval_capture() &&
+                  !melee_web::GameplayActionStoreHistory::capture(),
+              "Cleanup disarm did not detach routing while retaining live-owner exclusion");
+        history.reset();
+        check(bool(melee_web::GameplayActionStoreHistory::capture()),
+              "Destroying disarmed history did not release its owner exclusion");
+    }
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        auto history = melee_web::GameplayActionStoreHistory::capture();
+        check(bool(history), "Could not capture stale-binding history control");
+        const auto incarnation = history->begin_incarnation();
+        h.load(h.p1, ftMr_SM_SpecialN, 0);
+        check(history->seal_incarnation(incarnation) && history->prepare_restore(incarnation),
+              "Stale-binding history control did not prepare its ticket");
+        h.store2.unbind();
+        const State after_unbind = state(h);
+        check(!history->admit_restore(incarnation) && !history->restore_pre(incarnation) &&
+                  state(h).p2_motion == after_unbind.p2_motion &&
+                  state(h).p2_tree == after_unbind.p2_tree &&
+                  history->failure_code() == MELEE_WEB_ACTION_INTERVAL_BINDING_CHANGED,
+              "Stale ActionStore generation was dereferenced or restored through its ticket");
+    }
+    {
+        Harness h(Policy::ResidentOrdinaryActions);
+        h.prepare_wait_only();
+        const State before = state(h);
+        fail_next_allocation = true;
+        auto history = melee_web::GameplayActionStoreHistory::capture();
+        check(!history && same(state(h), before),
+              "Failed retained PRE capture changed live ActionStore state");
+    }
+}
+
+void verify_history_event_budget_refusal()
+{
+    using Policy = melee_web::GameplayActionStorePolicy;
+    Harness h(Policy::ResidentOrdinaryActions);
+    h.prepare_wait_only();
+    auto history = melee_web::GameplayActionStoreHistory::capture();
+    check(bool(history), "Could not capture history for the bounded event-budget control");
+    const auto incarnation = history->begin_incarnation();
+    check(incarnation == 1, "Event-budget control could not begin its first incarnation");
+    melee_web::GameplayActionStoreHistory::EventTapeTestLayout tape{};
+    std::size_t selections = 0;
+    while (selections < 256 && history->active_failure() == MELEE_WEB_ACTION_INTERVAL_OK) {
+        h.load(h.p1, ftMr_SM_SpecialN, 0);
+        ++selections;
+        check(history->interval_test_event_tape_layout(&tape),
+              "Event-budget control could not inspect the private tape");
+        if (tape.predicted_size == 256) break;
+    }
+    check(tape.predicted_size == 256 && tape.predicted_capacity >= 256 &&
+              tape.corrected_size == 0 && tape.corrected_capacity >= 256 &&
+              history->active_failure() == MELEE_WEB_ACTION_INTERVAL_OK,
+          "History event tape did not fill its complete preallocated capacity before refusal");
+    check(selections == 128,
+          "The budget control did not retain the expected two authored events per selection");
+    h.load(h.p1, ftMr_SM_SpecialN, 0);
+    check(history->failure_code() == MELEE_WEB_ACTION_INTERVAL_RECORD_FAILED &&
+              !history->seal_incarnation(incarnation) &&
+              history->endpoint_admit() != MELEE_WEB_ACTION_ENDPOINT_OK &&
+              history->interval_test_event_tape_layout(&tape) &&
+              tape.predicted_size == 256 && tape.predicted_capacity >= 256,
+          "History event overflow was dropped, grew the tape, or published an incomplete endpoint");
+    std::cout << "ActionStore private history event budget exercised: used=256 capacity="
+              << tape.predicted_capacity << "; next authored selection refused.\n";
+    history->disarm();
 }
 
 /* This is an actual-source ownership probe over the same synthetic DAT corpus
@@ -290,6 +751,403 @@ void print_gate_tree(const char* name, const GateTreeWitness& w)
     }
     std::cout << "]}";
 }
+
+struct AllocationDelta {
+    std::uint64_t allocations = 0;
+    std::uint64_t deallocations = 0;
+};
+struct AllocationWatch {
+    AllocationWatch()
+    {
+        watched_allocations = 0;
+        watched_deallocations = 0;
+        watch_allocations = true;
+    }
+    ~AllocationWatch() { watch_allocations = false; }
+    AllocationDelta finish()
+    {
+        watch_allocations = false;
+        return {watched_allocations.load(), watched_deallocations.load()};
+    }
+};
+template<class Fn>
+AllocationDelta measure_allocations(Fn&& operation)
+{
+    AllocationWatch watch;
+    operation();
+    return watch.finish();
+}
+bool zero_allocations(AllocationDelta delta)
+{ return delta.allocations == 0 && delta.deallocations == 0; }
+bool same_allocations(AllocationDelta a, AllocationDelta b)
+{ return a.allocations == b.allocations && a.deallocations == b.deallocations; }
+AllocationDelta& operator+=(AllocationDelta& a, const AllocationDelta& b)
+{
+    a.allocations += b.allocations;
+    a.deallocations += b.deallocations;
+    return a;
+}
+using CacheCapacityRows = std::vector<std::array<std::size_t, 7>>;
+CacheCapacityRows snapshot_cache_capacities(
+    const melee_web::GameplayActionStoreHistory& history, std::uint32_t cache_count)
+{
+    CacheCapacityRows rows;
+    rows.reserve(std::size_t(cache_count) * 2);
+    for (std::uint32_t cache = 0; cache < cache_count; ++cache) {
+        for (std::uint32_t entry = 0; entry < 2; ++entry) {
+            melee_web::GameplayActionStoreHistory::CacheStringBankTestLayout layout{};
+            check(history.interval_test_cache_string_layout(cache, entry, &layout),
+                  "Could not inspect the seven ActionStore string banks");
+            for (std::size_t bank = 0; bank < std::size(layout.capacity); ++bank)
+                if (layout.capacity[bank] < layout.catalog_max_symbol_bytes)
+                    throw std::runtime_error("Cache " + std::to_string(cache) +
+                        " entry " + std::to_string(entry) + " bank " +
+                        std::to_string(bank) + " capacity " +
+                        std::to_string(layout.capacity[bank]) + " below its catalog maximum " +
+                        std::to_string(layout.catalog_max_symbol_bytes));
+            rows.emplace_back();
+            std::copy(std::begin(layout.capacity), std::end(layout.capacity), rows.back().begin());
+        }
+    }
+    return rows;
+}
+void verify_cache_capacities(const CacheCapacityRows& rows, std::size_t maximum_symbol_bytes)
+{
+    check(!rows.empty(), "History cache layout had no live cache entries");
+    for (std::size_t row_index = 0; row_index < rows.size(); ++row_index)
+        for (std::size_t bank = 0; bank < rows[row_index].size(); ++bank)
+            if (rows[row_index][bank] < maximum_symbol_bytes)
+                throw std::runtime_error("ActionStore string bank " + std::to_string(bank) +
+                    " at cache row " + std::to_string(row_index) + " has capacity " +
+                    std::to_string(rows[row_index][bank]) + ", expected " +
+                    std::to_string(maximum_symbol_bytes));
+}
+void verify_cache_capacities_stable(const CacheCapacityRows& captured,
+                                    const CacheCapacityRows& current)
+{
+    check(captured.size() == current.size(), "ActionStore cache layout dimensions changed");
+    for (std::size_t row = 0; row < captured.size(); ++row)
+        check(captured[row] == current[row],
+              "A live, snapshot, or swap string bank changed capacity after capture");
+}
+void verify_history_symbol_in_bank(
+    const melee_web::GameplayActionStoreHistory& history, std::uint32_t cache_count,
+    std::size_t bank_index, std::size_t symbol_bytes)
+{
+    check(bank_index < 7, "Invalid private cache bank index in history test");
+    bool found = false;
+    for (std::uint32_t cache = 0; cache < cache_count; ++cache) {
+        for (std::uint32_t entry = 0; entry < 2; ++entry) {
+            melee_web::GameplayActionStoreHistory::CacheStringBankTestLayout layout{};
+            check(history.interval_test_cache_string_layout(cache, entry, &layout),
+                  "Could not inspect cache bytes after a source selection");
+            found = found || layout.symbol_bytes[bank_index] == symbol_bytes;
+        }
+    }
+    check(found, "The selected long authored key was absent from its expected ActionStore bank");
+}
+void print_capacity_rows(const char* name, const CacheCapacityRows& rows)
+{
+    std::cout << '"' << name << "\":[";
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        if (row) std::cout << ',';
+        std::cout << '[';
+        for (std::size_t bank = 0; bank < rows[row].size(); ++bank) {
+            if (bank) std::cout << ',';
+            std::cout << rows[row][bank];
+        }
+        std::cout << ']';
+    }
+    std::cout << ']';
+}
+void print_allocation_delta(const AllocationDelta& delta)
+{
+    std::cout << "{\"allocations\":" << delta.allocations
+              << ",\"deallocations\":" << delta.deallocations << '}';
+}
+void print_history_cache_semantics(const HistoryEndpointCopy& endpoint)
+{
+    std::cout << "\"final_cache\":[";
+    for (std::size_t cache_index = 0; cache_index < endpoint.caches.size(); ++cache_index) {
+        if (cache_index) std::cout << ',';
+        const auto& cache = endpoint.caches[cache_index];
+        std::cout << "{\"index\":" << cache.index << ",\"next\":" << cache.next
+                  << ",\"root\":"; gate_ptr(cache.root);
+        std::cout << ",\"owner\":"; gate_ptr(cache.owner);
+        std::cout << ",\"cache\":"; gate_ptr(cache.cache);
+        std::cout << ",\"runtime\":"; gate_ptr(cache.runtime);
+        std::cout << ",\"interval_owner\":"; gate_ptr(cache.interval_owner);
+        std::cout << ",\"hit_callback\":"; gate_ptr(cache.hit_callback);
+        std::cout << ",\"miss_replay_callback\":"; gate_ptr(cache.miss_replay_callback);
+        std::cout << ",\"miss_record_callback\":"; gate_ptr(cache.miss_record_callback);
+        std::cout << ",\"entries\":[";
+        for (std::size_t entry_index = 0; entry_index < 2; ++entry_index) {
+            if (entry_index) std::cout << ',';
+            const auto& entry = cache.entries[entry_index];
+            check(!entry.symbol_bytes || entry.symbol_data,
+                  "Selected ActionStore cache row lost its transport bytes");
+            std::cout << "{\"offset\":" << entry.offset << ",\"archive_bytes\":"
+                      << entry.archive_bytes << ",\"native_action\":" << entry.native_action
+                      << ",\"animation\":"; gate_ptr(entry.animation);
+            const char* symbol_data = entry.symbol_bytes ?
+                reinterpret_cast<const char*>(static_cast<std::uintptr_t>(entry.symbol_data)) : "";
+            const std::string_view symbol(symbol_data, entry.symbol_bytes);
+            std::cout << ",\"symbol\":\"";
+            for (const char ch : symbol) {
+                if (ch == '"' || ch == '\\') std::cout << '\\';
+                std::cout << ch;
+            }
+            std::cout << "\"}";
+        }
+        std::cout << "]}";
+    }
+    std::cout << ']';
+}
+
+void run_history_layout_gate(bool repeat)
+{
+    constexpr std::size_t op_a1 = 0;
+    constexpr std::size_t op_a1_corrected = 1;
+    constexpr std::size_t op_b_predicted = 2;
+    constexpr std::size_t op_c_predicted = 3;
+    constexpr std::size_t op_a2_predicted = 4;
+    constexpr std::size_t op_a2_corrected_prefix = 5;
+    constexpr std::size_t op_b_corrected = 6;
+    constexpr std::size_t op_c_corrected = 7;
+    constexpr std::size_t op_a2_corrected = 8;
+    static constexpr const char* operation_names[] = {
+        "A1_predicted", "A1_corrected", "B2_predicted", "C2_predicted",
+        "A2_predicted", "A2_corrected_prefix", "B2_corrected", "C2_corrected",
+        "A2_corrected"};
+    using Policy = melee_web::GameplayActionStorePolicy;
+    auto fixture = make_history_layout_fixture();
+    const auto fixture_archive = std::make_shared<const melee_web::DatArchive>(fixture.file());
+    check(std::find_if(fixture_archive->public_symbols().begin(),
+                       fixture_archive->public_symbols().end(),
+                       [](const auto& symbol) {
+                           return symbol.name == fighter_runtime_test::mario().fighter_symbol;
+                       }) != fixture_archive->public_symbols().end(),
+          "Long-key fixture omitted the canonical Fighter public symbol");
+    const melee_web::DatFighterRuntime fixture_runtime(
+        fixture_archive, fighter_runtime_test::mario());
+    for (const auto motion : {14U, history_layout_action, std::uint32_t(ftCo_SM_AttackS4),
+                              8U, history_layout_action_c}) {
+        const auto& action = fixture_runtime.action(motion);
+        const auto nested = melee_web::DatArchive(fixture_runtime.archive_actions().slice(
+            fixture.container, motion));
+        if (std::find_if(nested.public_symbols().begin(), nested.public_symbols().end(),
+                         [&](const auto& symbol) { return symbol.name == action.symbol; }) ==
+            nested.public_symbols().end()) {
+            std::string symbols;
+            for (const auto& symbol : nested.public_symbols()) symbols += " [" + symbol.name + "]";
+            throw std::runtime_error("Fixture action " + std::to_string(motion) + " (" +
+                                     action.symbol + ") is absent from its nested archive symbols:" + symbols);
+        }
+    }
+    auto harness = std::make_unique<Harness>(
+        std::move(fixture), Policy::ResidentOrdinaryActions);
+    Harness& h = *harness;
+    h.prepare_wait_only();
+    MeleeWebActionFighterClipState pre_p1{}, pre_p2{};
+    check(melee_web_action_fighter_clip_state(h.p1, &pre_p1) &&
+              melee_web_action_fighter_clip_state(h.p2, &pre_p2),
+          "Could not retain exact Fighter clip fields before long-key history");
+
+    std::size_t maximum_symbol_bytes = 0;
+    for (const auto& row : h.store1.runtime().actions())
+        maximum_symbol_bytes = std::max(maximum_symbol_bytes, row.symbol.size());
+    check(maximum_symbol_bytes == history_layout_long_symbol.size(),
+          "Long-key fixture is not the exact maximum symbol in the complete runtime catalog");
+
+    auto history = melee_web::GameplayActionStoreHistory::capture();
+    check(bool(history), "Could not capture history for the catalog-sized string-bank gate");
+    const auto captured_header = history->history_captured_pre_header();
+    check(captured_header.status == MELEE_WEB_ACTION_ENDPOINT_OK &&
+              captured_header.cache_count > 0,
+          "Long-key history capture did not publish its captured-PRE cache dimensions");
+    const std::uint32_t cache_count = captured_header.cache_count;
+    CacheCapacityRows captured_capacities = snapshot_cache_capacities(*history, cache_count);
+    verify_cache_capacities(captured_capacities, maximum_symbol_bytes);
+    CacheCapacityRows current_capacities = captured_capacities;
+    std::array<AllocationDelta, 9> operations{};
+    std::array<bool, 9> operation_present{};
+    std::vector<GateTreeWitness> trees(9);
+    AllocationDelta maintenance{};
+    const auto clips_created = melee_web_action_interval_test_clip_create_count();
+    const auto clips_destroyed = melee_web_action_interval_test_clip_destroy_count();
+
+    bool phase_ok = false;
+    std::uint64_t first = 0;
+    auto delta = measure_allocations([&] { first = history->begin_incarnation(); });
+    maintenance += delta;
+    check(first == 1 && zero_allocations(delta),
+          "First bounded history incarnation allocated or failed to begin");
+
+    auto select = [&](std::size_t op, std::uint32_t motion) {
+        operations[op] = measure_allocations([&] { h.load(h.p1, int(motion), 0); });
+        operation_present[op] = true;
+        trees[op] = gate_slot(h.p1, 0, motion);
+        current_capacities = snapshot_cache_capacities(*history, cache_count);
+        verify_cache_capacities(current_capacities, maximum_symbol_bytes);
+        verify_cache_capacities_stable(captured_capacities, current_capacities);
+    };
+    select(op_a1, history_layout_action);
+    verify_history_symbol_in_bank(*history, cache_count, 0, history_layout_long_symbol.size());
+
+    delta = measure_allocations([&] { phase_ok = history->seal_incarnation(first); });
+    maintenance += delta;
+    check(phase_ok && zero_allocations(delta),
+          "Predicted endpoint bank capture allocated or failed to seal");
+    verify_history_symbol_in_bank(*history, cache_count, 2, history_layout_long_symbol.size());
+    auto first_selected = copy_history_endpoint(*history);
+    check(first_selected.header.event_count > 0,
+          "First long-key endpoint omitted its selected cache/action events");
+    delta = measure_allocations([&] { phase_ok = history->close_endpoint_batch(first); });
+    maintenance += delta;
+    check(phase_ok && zero_allocations(delta),
+          "Predicted endpoint close allocated or failed");
+
+    if (repeat) {
+        delta = measure_allocations([&] {
+            phase_ok = history->prepare_restore(first) && history->admit_restore(first);
+        });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "First retained-PRE ticket preparation allocated or refused");
+        delta = measure_allocations([&] { phase_ok = history->restore_pre(first); });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "First retained-PRE commit allocated or refused");
+        melee_web_action_interval_test_set_fighter_clip_state(h.p1, &pre_p1);
+        melee_web_action_interval_test_set_fighter_clip_state(h.p2, &pre_p2);
+        check(history->history_restored_pre_admit(first, 1) == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Restored-PRE role failed after the fixture restored its source payload");
+        select(op_a1_corrected, history_layout_action);
+        check(same_allocations(operations[op_a1], operations[op_a1_corrected]),
+              "Identical long-key A selection changed host allocation/free deltas after one restore");
+        delta = measure_allocations([&] {
+            phase_ok = history->seal_corrected_incarnation(first);
+        });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "Corrected endpoint bank capture allocated or failed to seal");
+        verify_history_symbol_in_bank(*history, cache_count, 3, history_layout_long_symbol.size());
+        auto selected = copy_history_endpoint(*history);
+        delta = measure_allocations([&] { phase_ok = history->close_endpoint_batch(first); });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta) &&
+                  selected.header.provenance == MELEE_WEB_ACTION_ENDPOINT_CORRECTED,
+              "Corrected endpoint close allocated or selected the wrong provenance");
+    }
+
+    std::uint64_t second = 0;
+    delta = measure_allocations([&] { second = history->begin_incarnation(); });
+    maintenance += delta;
+    check(second == 2 && zero_allocations(delta),
+          "Second bounded history incarnation allocated or failed to begin");
+    select(op_b_predicted, std::uint32_t(ftCo_SM_AttackS4));
+    select(op_c_predicted, history_layout_action_c);
+    select(op_a2_predicted, history_layout_action);
+    delta = measure_allocations([&] { phase_ok = history->seal_incarnation(second); });
+    maintenance += delta;
+    check(phase_ok && zero_allocations(delta),
+          "Second predicted endpoint bank capture allocated or failed to seal");
+    verify_history_symbol_in_bank(*history, cache_count, 2, history_layout_long_symbol.size());
+    auto second_predicted = copy_history_endpoint(*history);
+    delta = measure_allocations([&] { phase_ok = history->close_endpoint_batch(second); });
+    maintenance += delta;
+    check(phase_ok && zero_allocations(delta),
+          "Second predicted endpoint close allocated or failed");
+
+    if (repeat) {
+        delta = measure_allocations([&] {
+            phase_ok = history->prepare_restore(second) && history->admit_restore(second);
+        });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "Second retained-PRE ticket preparation allocated or refused");
+        delta = measure_allocations([&] { phase_ok = history->restore_pre(second); });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "Second retained-PRE commit allocated or refused");
+        melee_web_action_interval_test_set_fighter_clip_state(h.p1, &pre_p1);
+        melee_web_action_interval_test_set_fighter_clip_state(h.p2, &pre_p2);
+        check(history->history_restored_pre_admit(second, 2) == MELEE_WEB_ACTION_ENDPOINT_OK,
+              "Second restore did not rejoin the same immutable PRE source state");
+        select(op_a2_corrected_prefix, history_layout_action);
+        select(op_b_corrected, std::uint32_t(ftCo_SM_AttackS4));
+        select(op_c_corrected, history_layout_action_c);
+        select(op_a2_corrected, history_layout_action);
+        check(same_allocations(operations[op_a1], operations[op_a1_corrected]) &&
+                  same_allocations(operations[op_a1], operations[op_a2_corrected_prefix]) &&
+                  same_allocations(operations[op_b_predicted], operations[op_b_corrected]) &&
+                  same_allocations(operations[op_c_predicted], operations[op_c_corrected]) &&
+                  same_allocations(operations[op_a2_predicted], operations[op_a2_corrected]),
+              "A repeated identical source selection changed its allocation/free deltas");
+        delta = measure_allocations([&] {
+            phase_ok = history->seal_corrected_incarnation(second);
+        });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta),
+              "Second corrected endpoint bank capture allocated or failed to seal");
+        verify_history_symbol_in_bank(*history, cache_count, 3, history_layout_long_symbol.size());
+        auto selected = copy_history_endpoint(*history);
+        delta = measure_allocations([&] { phase_ok = history->close_endpoint_batch(second); });
+        maintenance += delta;
+        check(phase_ok && zero_allocations(delta) &&
+                  selected.header.provenance == MELEE_WEB_ACTION_ENDPOINT_CORRECTED,
+              "Second corrected endpoint close allocated or selected the wrong provenance");
+    } else {
+        check(second_predicted.header.event_count > 0,
+              "Clean history lane lost its selected source events");
+    }
+
+    // Both branches already copied and closed their selected endpoint above.
+    auto final_endpoint = copy_history_endpoint(*history);
+    delta = measure_allocations([&] {
+        phase_ok = history->retire_admit() && history->retire_confirmed();
+    });
+    maintenance += delta;
+    check(phase_ok && zero_allocations(delta),
+          "Confirmed ActionStore history retirement allocated or freed storage");
+    current_capacities = snapshot_cache_capacities(*history, cache_count);
+    verify_cache_capacities(current_capacities, maximum_symbol_bytes);
+    verify_cache_capacities_stable(captured_capacities, current_capacities);
+    check(melee_web_action_interval_test_clip_create_count() == clips_created &&
+              melee_web_action_interval_test_clip_destroy_count() == clips_destroyed,
+          "Resident ActionStore selection created or destroyed a native Clip after capture");
+    check(zero_allocations(maintenance),
+          "History begin/seal/prepare/restore/close/retire changed host allocator state");
+
+    std::cout << "{\"scenario\":\"catalog-sized ActionStore string banks with one retained PRE\",\"lane\":\""
+              << (repeat ? "history-layout-repeat" : "history-layout-clean")
+              << "\",\"maximum_catalog_symbol_bytes\":" << maximum_symbol_bytes
+              << ",\"event_tape_capacity\":256,\"maintenance\":";
+    print_allocation_delta(maintenance);
+    std::cout << ",\"operations\":{";
+    for (std::size_t i = 0; i < operations.size(); ++i) {
+        if (i) std::cout << ',';
+        std::cout << '\"' << operation_names[i] << "\":";
+        if (operation_present[i]) print_allocation_delta(operations[i]);
+        else std::cout << "null";
+    }
+    std::cout << "},\"trees\":{";
+    bool first_tree = true;
+    for (std::size_t i = 0; i < trees.size(); ++i) if (operation_present[i]) {
+        if (!first_tree) std::cout << ',';
+        print_gate_tree(operation_names[i], trees[i]);
+        first_tree = false;
+    }
+    std::cout << "},\"capacities\":{";
+    print_capacity_rows("captured", captured_capacities);
+    std::cout << ',';
+    print_capacity_rows("final", current_capacities);
+    std::cout << "},";
+    print_history_cache_semantics(final_endpoint);
+    std::cout << ",\"final_event_count\":" << final_endpoint.header.event_count
+              << ",\"native_clip_create_delta\":0,\"native_clip_destroy_delta\":0}\n";
+}
+
 void run_retention_gate(bool corrected)
 {
     gate_result = GateResult{};
@@ -1526,6 +2384,16 @@ void operator delete[](void* pointer, const std::nothrow_t&) noexcept { ::operat
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && (std::strcmp(argv[1], "history-layout-clean") == 0 ||
+                      std::strcmp(argv[1], "history-layout-repeat") == 0)) {
+        try {
+            run_history_layout_gate(std::strcmp(argv[1], "history-layout-repeat") == 0);
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "ActionStore history layout gate failed: " << error.what() << '\n';
+            return 1;
+        }
+    }
     if (argc == 2 && (std::strcmp(argv[1], "gate-a") == 0 ||
                       std::strcmp(argv[1], "gate-b") == 0)) {
         try {
@@ -1543,6 +2411,9 @@ int main(int argc, char** argv)
         static_assert(ftMr_SM_SpecialN < 303 && ftCo_SM_AttackS4 < 303);
         verify_round_trip(melee_web::GameplayActionStorePolicy::Legacy);
         verify_round_trip(melee_web::GameplayActionStorePolicy::ResidentOrdinaryActions);
+        verify_retained_pre_action_history();
+        verify_retained_pre_action_history_refusals();
+        verify_history_event_budget_refusal();
         verify_resident_action_catalog();
         verify_action_endpoint_getters();
         verify_corrected_recording();
