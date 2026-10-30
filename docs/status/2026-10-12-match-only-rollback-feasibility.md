@@ -1698,17 +1698,77 @@ retained. Runtime and harness code are unchanged. Final local regression at
 passes at that source. Initial Linux CI exposed a truncated dependency download
 before the effects build and a missing explicit `<cstdint>` include in the
 snapshot test trace. The test-only include repair passes both focused snapshot
-controls locally. Those failures are retained; complete publication-head CI
-remains required and is tracked in PR #358. No additional browser capture is
-needed for these fixture-only changes. All runtime, harness, build, linked policy,
+controls locally. Those failures are retained. PR #358 merged as `d2122fe6`
+after all 14 publication-head CI jobs at `17f1a625` completed with 12 successes
+and two expected skips; the merged tree exactly matches the reviewed tree. No
+additional browser capture is needed for these fixture-only changes. All runtime, harness, build, linked policy,
 review, comparison, cleanup and validation hashes are in `passing_browser_v9`
 in the existing structured receipt.
 
-The next experiment routes the same input recipe through the existing own Worker
-relay, queues asynchronous arrivals and applies them at a safe native boundary.
-Its initial Node-held sockets will establish only packet-backed browser component
-evidence. Rolling history, correction across refill, combat/KO breadth, combined
-frame budget, full-match play and public profile admission remain open.
+The packet-backed successor passes at harness `88268eca`, reusing native producer
+`8f846b45`, in 104.06 seconds. All 44 remote input contributions travel through
+the existing local Worker relay and are accepted from actual A2 receive state.
+Independent review reproduces all 24 nine-domain comparisons and 260 raw lanes,
+checks each received remote PAD against the reference and selected native PAD,
+and confirms both actual wrong-prediction corrections, final draws and eight
+retirements per page. Both speculative intervals record a Node receive callback
+between the final-draw command request and its promise resolution. This is host
+operation overlap; it does not establish simultaneous native execution. The two
+A2 pre-roll frames per peer remain protocol-only and do not become native inputs.
+
+The first packet attempt, at harness `df985b8f`, stopped before the loop because
+its start agreement guessed the second initializer port. The existing source
+validator and parsed initializer now bind the observed port/controller mapping
+without changing native setup or PAD bytes. That failure, the reduced actual-report
+control and independent repair review remain retained. The passing run leaves
+44 accepted rows, zero pending inbox rows, no callback errors, and verified native,
+Chrome and Worker cleanup; all nine native producer pins remain unchanged.
+
+This is a Node-held local WebSocket component with an authored input recipe.
+The browser pages do not own sockets; network checksum traffic is not exercised.
+Strict reference comparisons are separate evidence. The existing structured
+receipt's `packet_backed_component_v1` retains exact producers, raw results,
+packet timestamps, reviews and failures.
+
+The subsequent command-cost run at harness `acad72d2` reuses native `8f846b45`
+and passes the existing two-window recipe in 42.71 seconds. Independent review
+reproduces six nine-domain endpoint comparisons, 255 raw lanes and all 64 timed
+commands. Both seven-tick corrections, final presents, retirement and owned
+cleanup pass. Native pins remain unchanged.
+
+| Predicted-page command wall-time | First window | Second window |
+| --- | ---: | ---: |
+| Capture | 43.14 ms | 18.91 ms |
+| Restore | 38.28 ms | 37.27 ms |
+| Seven correction commands, including final seal | 11.61 ms | 14.09 ms |
+| Present command | 8.01 ms | 7.69 ms |
+| Existing GPU-quiescence wait after present | 24.86 ms | 24.72 ms |
+| Retire | 3.33 ms | 2.28 ms |
+
+These are two observed headless intervals in the retained diagnostic Release
+build, with `SAFE_HEAP=1` and `ASSERTIONS=2`. Native-call wall-time includes
+Asyncify waits and native diagnostic checks. Page evidence work is measured
+separately; Node validation and transport are outside those measurements.
+This is not pure CPU/GPU timing or production frame-budget acceptance. Native
+snapshot residency is still unmeasured; serialized audit size is not RAM usage.
+Exact timings and producer/review identities are in `command_cost_component_v1`.
+
+Source review identifies quadratic allocation-overlap validation, run twice
+per restore, as the next bounded target. Its share of the observed cost is not
+measured yet. The next repair will retain every ownership, topology, heap,
+storage and interval check while using snapshot-owned sorted indexes; a reduced
+native control must prove equivalence and no-allocation restoration first.
+The earlier timing freeze omitted one tested fixture from its patch; the reviewed
+seven-file freeze retains that omission and repairs its manifest. Rolling
+history, correction across refill, combat/KO breadth, combined frame budget,
+full-match play and public profile admission remain open.
+
+The packet/timing batch passes the full local regression at `acad72d2`: 3,077
+tests, 238 skips and no failures. The ordinary Release runtime build passes at
+that source; its metadata-writer failures were retained and the output inventory
+corrected without repeating the build. Independent publication review passes
+subject to final-head CI. The existing `packet_cost_integration_v1` receipt
+retains exact validation and review identities; publication CI remains pending.
 
 
 ## Stage decision dependencies, issue #333

@@ -278,10 +278,16 @@ int main(void){
             'test_cpu_seven_tick_runner.mjs','cpu_corrected_runner.mjs','test_cpu_corrected_runner.mjs',
             'cpu_corrected_two_window_runner.mjs','test_cpu_corrected_two_window_runner.mjs',
             'cpu_corrected_loop_runner.mjs','test_cpu_corrected_loop_runner.mjs',
+            'cpu_corrected_loop_packet_input.mjs','test_cpu_corrected_loop_packet_input.mjs',
             'cpu_endpoint.mjs','test_cpu_endpoint.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
         files+=['scripts/browser_tools.mjs','scripts/net_rollback_input_timeline.mjs',
-                'scripts/net_lockstep_core.mjs','tests/quiescent_wasm_snapshot.mjs']
+                'scripts/net_lockstep_core.mjs','scripts/net_lockstep_protocol.mjs',
+                'scripts/net_lockstep_transport.mjs','scripts/net_lockstep_relay.mjs',
+                'scripts/net_lockstep_websocket_relay.mjs',
+                'scripts/net_room_relay_runtime_owner.mjs','scripts/net_room_relay_direct_runtime.mjs',
+                'scripts/net_room_relay_miniflare_options.mjs','tests/quiescent_wasm_snapshot.mjs',
+                'dependencies.lock.json','online/relay/worker.mjs','online/relay/wrangler.jsonc']
         files+=['src/gameplay_audio_fx.c','src/gameplay_audio.h','src/gameplay_audio_stream.h']
         for relative in files:
             source=SOURCE/relative
@@ -293,6 +299,7 @@ int main(void){
                        'cpu_corrected_runner.mjs','cpu_endpoint.mjs',
                        'cpu_corrected_two_window_runner.mjs',
                        'cpu_corrected_loop_runner.mjs',
+                       'cpu_corrected_loop_packet_input.mjs',
                        'run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)
             (mirror/(module+'.syntax.log')).write_text(result.stdout+result.stderr)
@@ -302,7 +309,10 @@ int main(void){
                                str(directory/'test_cpu_corrected_runner.mjs'),str(directory/'test_cpu_endpoint.mjs'),
                                str(directory/'test_cpu_corrected_two_window_runner.mjs'),
                                str(directory/'test_cpu_corrected_loop_runner.mjs'),
+                               str(directory/'test_cpu_corrected_loop_packet_input.mjs'),
                                str(directory/'test_write_census_contract.mjs')],cwd=mirror,
+                              env=dict(os.environ,MELEE_PACKET_ADAPTER_RUN_WORKER='0',
+                                       MELEE_PACKET_ADAPTER_SOURCE_ROOT=str(SOURCE)),
                               capture_output=True,text=True,timeout=60)
         (mirror/'node-contracts.log').write_text(result.stdout+result.stderr)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)

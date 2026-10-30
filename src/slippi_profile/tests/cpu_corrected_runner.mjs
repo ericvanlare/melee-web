@@ -72,13 +72,74 @@ export function recordPredictedActionDivergence(reference, predicted) {
 
 // This callback performs source work only for the explicitly issued command.
 // Endpoint reads have their own synchronous callback with no await or source work.
+export function createCorrectedCommandTimer(now=()=>performance.now()){
+  if(typeof now!=='function')throw new Error('Corrected command clock must be callable');
+  const started=now();
+  let phase='pre-call-setup',setupMs=null,nativeStarted=null,nativeCallWallMs=null;
+  let gpuStarted=null,gpuQuiescenceWaitMs=0,evidenceStarted=null,postCallEvidenceMs=0;
+  let finished=false,failedDuring=null;
+  const addEvidence=at=>{
+    if(evidenceStarted!==null){postCallEvidenceMs+=at-evidenceStarted;evidenceStarted=null;}
+  };
+  const snapshotAt=at=>({schema:1,clock:'browser.performance.now',phase,
+    failedDuring,
+    setupIncludes:'per-command source configuration and PAD input staging before module.ccall',
+    gpuWaitIncludes:'existing waitForAuroraSubmission call only; excluded from post-call evidence time',
+    postCallIncludes:'page-side evidence byte reads, base64 encoding and draw inspection; on failure stops at the first error and excludes recovery reads; excludes Node-side validation and page.evaluate transport',
+    preCallSetupMs:setupMs??(phase==='pre-call-setup'?at-started:null),
+    nativeCallWallMs:nativeCallWallMs??(nativeStarted===null?null:at-nativeStarted),
+    gpuQuiescenceWaitMs:gpuQuiescenceWaitMs+(gpuStarted===null?0:at-gpuStarted),
+    postCallEvidenceMs:postCallEvidenceMs+(evidenceStarted===null?0:at-evidenceStarted),
+    complete:finished,
+    interpretation:'Native call is wall time including Asyncify waits and native diagnostic checks; it is not pure CPU or GPU time.'});
+  return Object.freeze({
+    beginNativeCall(){
+      if(finished||phase!=='pre-call-setup')throw new Error('Corrected command timing setup phase is stale');
+      const at=now();setupMs=at-started;nativeStarted=at;phase='native-call';
+    },
+    endNativeCall(){
+      if(finished||phase!=='native-call'||nativeStarted===null)
+        throw new Error('Corrected command timing native phase is stale');
+      const at=now();nativeCallWallMs=at-nativeStarted;nativeStarted=null;
+      evidenceStarted=at;phase='post-call-evidence';
+    },
+    beginGpuWait(){
+      if(finished||phase!=='post-call-evidence'||evidenceStarted===null)
+        throw new Error('Corrected command timing evidence phase is stale');
+      const at=now();addEvidence(at);gpuStarted=at;phase='gpu-quiescence-wait';
+    },
+    endGpuWait(){
+      if(finished||phase!=='gpu-quiescence-wait'||gpuStarted===null)
+        throw new Error('Corrected command timing GPU phase is stale');
+      const at=now();gpuQuiescenceWaitMs+=at-gpuStarted;gpuStarted=null;
+      evidenceStarted=at;phase='post-call-evidence';
+    },
+    finish(){
+      if(finished)throw new Error('Corrected command timing already finished');
+      const at=now();addEvidence(at);phase='complete';finished=true;return snapshotAt(at);
+    },
+    fail(){
+      if(finished)return snapshotAt(now());
+      const at=now();failedDuring=phase;
+      if(phase==='pre-call-setup')setupMs=at-started;
+      if(phase==='native-call'&&nativeStarted!==null){nativeCallWallMs=at-nativeStarted;nativeStarted=null;}
+      if(phase==='gpu-quiescence-wait'&&gpuStarted!==null){
+        gpuQuiescenceWaitMs+=at-gpuStarted;gpuStarted=null;
+      }
+      addEvidence(at);phase='failed';finished=true;return snapshotAt(at);
+    },
+  });
+}
+
 export function correctedPageDefaults(mapping,stocks){
   return {mapping,stocks,waitSource:waitForAuroraSubmission.toString(),
+    commandTimingSource:createCorrectedCommandTimer.toString(),
     decodeDrawSource:decodeDrawDiagnostics.toString(),inputMappingSource:validateSourceInputMapping.toString(),
     inspectSource:inspectInteractiveObservation.toString()};
 }
 
 export async function operateCorrectedInPage(plan){
+  const createTimer=new Function(`return (${plan.commandTimingSource})`)();
   const {module}=window.__slippiSynctest;
   const progress=window.__slippiSynctest.cpuCorrectedProgress??=
     {status:'running',commands:[],nativeEvidenceBase64:null};
@@ -114,6 +175,7 @@ export async function operateCorrectedInPage(plan){
        module[prefix+'_bytes']()!==size)throw new Error('Corrected loop motor receipt export/extent');
     return encode(read(module[prefix](),size));
   };
+  const timer=createTimer(()=>performance.now());
   try{
     if(typeof SharedArrayBuffer!=='undefined'&&module.HEAPU8.buffer instanceof SharedArrayBuffer)
       throw new Error('Corrected route refuses shared Wasm memory');
@@ -153,8 +215,10 @@ export async function operateCorrectedInPage(plan){
         throw new Error('Corrected PAD ABI drift');
       const pointer=module._melee_web_snapshot_input();read(pointer,44);module.HEAPU8.set(pad,pointer);
     }
+    timer.beginNativeCall();
     entry.result=await module.ccall('melee_web_synctest_cpu_corrected_command','number',
       ['number'],[plan.command],{async:true});
+    timer.endNativeCall();
     entry.outcome='returned';
     if(entry.result!==0)throw new Error(`Corrected command ${plan.command} refused ${entry.result}: `+
       module.UTF8ToString(module._melee_web_snapshot_error()));
@@ -166,12 +230,14 @@ export async function operateCorrectedInPage(plan){
       if(plan.readLoopEvidence){
         entry.loopEvidenceBase64=readLoopEvidence();
         progress.loopEvidenceBase64=entry.loopEvidenceBase64;
+        entry.timing=timer.finish();
         return {loopEvidenceBase64:entry.loopEvidenceBase64,
-          motorCommitReceiptBase64:entry.motorCommitReceiptBase64??null};
+          motorCommitReceiptBase64:entry.motorCommitReceiptBase64??null,timing:entry.timing};
       }
       entry.reuseEvidenceBase64=readReuseEvidence();
       progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
-      return {reuseEvidenceBase64:entry.reuseEvidenceBase64};
+      entry.timing=timer.finish();
+      return {reuseEvidenceBase64:entry.reuseEvidenceBase64,timing:entry.timing};
     }
     progress.nativeEvidenceBase64=readEvidence();
     if(plan.readLoopMotorEvidence){
@@ -187,7 +253,10 @@ export async function operateCorrectedInPage(plan){
     }
     let status=null;
     if(plan.draw){
-      const wait=new Function(`return (${plan.waitSource})`)();status=await wait(module,plan.command);
+      const wait=new Function(`return (${plan.waitSource})`)();
+      timer.beginGpuWait();
+      status=await wait(module,plan.command);
+      timer.endGpuWait();
     }
     const observation=read(module._melee_web_snapshot_observation(),1280);
     const draw=read(module._melee_web_synctest_draw_diagnostics(),132);
@@ -199,11 +268,14 @@ export async function operateCorrectedInPage(plan){
       isMarioKind:value=>module._melee_web_synctest_is_mario_kind(value)===1,
       slotCount:decodeDraw(draw).slotCount,expectedInputMapping:plan.mapping,expectedStocks:plan.stocks});
     if(!boundary.interactive)throw new Error(`Corrected route lost interactive boundary: ${JSON.stringify(boundary.refusalReasons)}`);
-    return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64:encode(draw),boundary,status,
+    const drawDiagnosticsBase64=encode(draw);
+    entry.timing=timer.finish();
+    return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64,boundary,status,
       reuseEvidenceBase64:entry.reuseEvidenceBase64??null,
       loopEvidenceBase64:entry.loopEvidenceBase64??null,
-      motorEvidenceBase64:entry.motorEvidenceBase64??null};
+      motorEvidenceBase64:entry.motorEvidenceBase64??null,timing:entry.timing};
   }catch(error){
+    try{entry.timing=timer.fail();}catch(timingError){entry.timingError=String(timingError);}
     entry.error=String(error);progress.status='failed';
     try{progress.nativeEvidenceBase64=readEvidence();}catch(readError){progress.readError=String(readError);}
     if(plan.readLoopMotorEvidence){
@@ -228,6 +300,7 @@ export async function runBrowserCpuCorrectedSeven(predictedPage,referencePage,wi
     sourceSteps:7,reference:{commands:[],rows:[],endpoints:{}},predicted:{commands:[],rows:[],endpoints:{}},
     comparisons:{},scope:'one private Mario/FD correction; no rolling snapshots, live relay or profile acceptance'};
   const defaults={mapping,stocks,waitSource:waitForAuroraSubmission.toString(),
+    commandTimingSource:createCorrectedCommandTimer.toString(),
     decodeDrawSource:decodeDrawDiagnostics.toString(),inputMappingSource:validateSourceInputMapping.toString(),
     inspectSource:inspectInteractiveObservation.toString()};
   const stateFor=(page)=>page===referencePage?report.reference:report.predicted;
@@ -237,7 +310,8 @@ export async function runBrowserCpuCorrectedSeven(predictedPage,referencePage,wi
     const result=await page.evaluate(operateCorrectedInPage,{...defaults,...options,command});
     const evidence=decodeCpuSevenTickEvidence(bytes(result.evidenceBase64),2);
     validateCorrectedCommandEvidence(evidence,command,pre);
-    const state=stateFor(page);state.nativeEvidence=evidence;state.commands.push({command,result:0,state:evidence.state});
+    const state=stateFor(page);state.nativeEvidence=evidence;
+    state.commands.push({command,result:0,state:evidence.state,timing:result.timing});
     if(options.draw){
       const old=gpu.get(page),current=validateAuroraFrame(result.status,old.beginFrameId,old.endFrameId);
       const draw=decodeDrawDiagnostics(bytes(result.drawDiagnosticsBase64));

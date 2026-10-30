@@ -2,6 +2,7 @@
 // Read-only Wasm-memory write census for one warmed, actually drawn Slippi
 // fixture sample. This records net byte-value deltas, not stores or a restore.
 import crypto from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restore_runner.mjs';
 import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_tick_runner.mjs';
 import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_SAMPLES} from './cpu_seven_tick_runner.mjs';
@@ -194,7 +195,9 @@ export function validateCpuRestoreRouteSelection(values) {
   const sevenTick = values['--aggregate-cpu-drawn-reference-seven-tick'] === true;
   const corrected = values['--correct-predicted-branch'] === true;
   const correctedTwoWindow = values['--correct-predicted-branch-two-window'] === true;
-  const correctedLoop = values['--correct-predicted-branch-loop'] === true;
+  const correctedLoop = values['--correct-predicted-branch-loop'] === true ||
+    values['--correct-predicted-branch-loop-packets'] === true;
+  const correctedLoopPackets = values['--correct-predicted-branch-loop-packets'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
   const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
@@ -203,6 +206,8 @@ export function validateCpuRestoreRouteSelection(values) {
     throw new Error('The seven-tick route requires the private v19 TEV stage scratch profile');
   }
   if ((corrected || correctedTwoWindow || correctedLoop) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick-capable preparation route');
+  if(values['--correct-predicted-branch-loop']===true&&correctedLoopPackets)
+    throw new Error('Local and packet-backed reusable-loop routes are mutually exclusive');
   if (Number(corrected)+Number(correctedTwoWindow)+Number(correctedLoop)>1) throw new Error('One-window, two-window and reusable-loop correction routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
@@ -218,7 +223,7 @@ export function validateCpuRestoreRouteSelection(values) {
   if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return correctedLoop ? 'independent-browser-correction-loop-v1' : correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return correctedLoopPackets ? 'independent-browser-correction-loop-packets-v1' : correctedLoop ? 'independent-browser-correction-loop-v1' : correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
@@ -261,7 +266,8 @@ export function parseArgs(argv) {
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
     '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
     '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch',
-    '--correct-predicted-branch-two-window','--correct-predicted-branch-loop']);
+    '--correct-predicted-branch-two-window','--correct-predicted-branch-loop',
+    '--correct-predicted-branch-loop-packets']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -272,7 +278,7 @@ export function parseArgs(argv) {
     }
     const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--correct-predicted-branch | --correct-predicted-branch-two-window | --correct-predicted-branch-loop] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--correct-predicted-branch | --correct-predicted-branch-two-window | --correct-predicted-branch-loop | --correct-predicted-branch-loop-packets] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
     }
     values[key] = value;
     i += 2;
@@ -349,7 +355,7 @@ function addPrefixSignature(hash, sample, result) {
   }
 }
 
-function sourceHashes() {
+function sourceHashes({packetInput = false} = {}) {
   const files = [
     'src/slippi_profile/tests/run_write_census.mjs',
     'src/slippi_profile/tests/run_synctest.mjs',
@@ -401,6 +407,15 @@ function sourceHashes() {
     'scripts/net_lockstep_core.mjs',
     'src/gameplay_cpu_checkpoint.cpp','src/gameplay_cpu_commit.cpp','src/gameplay_cpu_statics.cpp','src/gameplay_cpu_interval.c',
   ];
+  if(packetInput)files.push(
+    'src/slippi_profile/tests/cpu_corrected_loop_packet_input.mjs',
+    'scripts/net_lockstep_protocol.mjs',
+    'scripts/net_lockstep_transport.mjs',
+    'scripts/net_lockstep_relay.mjs',
+    'scripts/net_lockstep_websocket_relay.mjs',
+    'scripts/net_room_relay_runtime_owner.mjs',
+    'scripts/net_room_relay_direct_runtime.mjs',
+    'scripts/net_room_relay_miniflare_options.mjs');
   return Object.fromEntries(files.map(name => [name, fileSha(path.join(ROOT, name))]));
 }
 
@@ -698,7 +713,9 @@ async function main() {
   const sevenTickDrawnReference=options['--aggregate-cpu-drawn-reference-seven-tick']===true;
   const correctedPrediction=options['--correct-predicted-branch']===true;
   const correctedTwoWindow=options['--correct-predicted-branch-two-window']===true;
-  const correctedLoop=options['--correct-predicted-branch-loop']===true;
+  const correctedLoopLocal=options['--correct-predicted-branch-loop']===true;
+  const correctedLoopPackets=options['--correct-predicted-branch-loop-packets']===true;
+  const correctedLoop=correctedLoopLocal||correctedLoopPackets;
   const correctedRoute=correctedPrediction||correctedTwoWindow||correctedLoop;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
@@ -786,7 +803,7 @@ async function main() {
       sourceCStaticCandidates: manifestInventory.sourceCStaticCandidates,
       excludedMutableInputSections: manifestInventory.excludedMutableInputSections,
       completeGameState: manifestInventory.completeGameState},
-    harnessSha256: sourceHashes(),
+    harnessSha256: sourceHashes({packetInput: correctedLoopPackets}),
     assetSha256: flatAssetHashes(options['--assets']),
     browser: null,
     browser_process_info: [],
@@ -842,10 +859,17 @@ async function main() {
   }
   if(correctedLoop){
     report.schema='melee-web-independent-browser-correction-loop-component-v1';
-    report.statement='One continuing private match/input timeline uses confirmed and speculative intervals of one through seven ticks. Each interval compares all declared PRE/CPU/DRAW domains and raw lanes against an independent drawn instance; exact interval evidence is saved before confirmed retirement. This is bounded reusable ownership, not asynchronous rolling netcode or public-profile admission.';
+    report.statement=correctedLoopPackets?
+      'One continuing private match/input timeline uses confirmed and speculative intervals of one through seven ticks. A Node-held pair of existing local A2 peers supplies all 44 remote PAD rows through the owned loopback Worker relay; speculative batches are released with the predicted command-40 final draw request and accepted only after complete protocol receive. Each interval retains exact PRE/CPU/DRAW and raw-lane checks, with evidence saved before retirement. Component evidence only; browser pages own no sockets, and this does not establish rolling checkpoints, whole-match rollback, or official Slippi interoperability.':
+      'One continuing private match/input timeline uses confirmed and speculative intervals of one through seven ticks. Each interval compares all declared PRE/CPU/DRAW domains and raw lanes against an independent drawn instance; exact interval evidence is saved before confirmed retirement. This is bounded reusable ownership, not asynchronous rolling netcode or public-profile admission.';
     report.execution={status:'incomplete',prefixSamples:300,correctedLoop:{status:'not-started'},
       intervalEvidence:[],restorePerformed:'not-yet-observed'};
-    report.exclusions=['No #341 milestone closure','No asynchronous live packet delivery or relay match',
+    report.exclusions=correctedLoopPackets?
+      ['No #341 milestone closure','No browser-owned socket or original browser input-path integration',
+      'No rolling/multiple simultaneous checkpoints or whole-match rollback',
+      'No official Slippi/public interoperability or whole-profile acceptance',
+      'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround']:
+      ['No #341 milestone closure','No asynchronous live packet delivery or relay match',
       'No multiple simultaneous checkpoints or repeated restoration within one capsule',
       'No whole-profile, vanilla, H1 or whole-session acceptance','No renderer/host allocator rewind',
       'No #339 nonzero-history/drop workaround'];
@@ -861,6 +885,7 @@ async function main() {
 
   let server = null, browserServer = null, browserProcess = null;
   let browser = null, browserCdp = null, context = null, page = null, predictedPage = null;
+  let relayRuntime=null,packetInput=null,packetRunPassed=false;
   let browserProcessPid = null, profileDirectory = null;
   const ownedChromePids = new Set();
   const pageErrors = [];
@@ -1104,15 +1129,45 @@ async function main() {
       if(sevenTickDrawnReference){
         if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
         if(correctedLoop){
+          if(correctedLoopPackets){
+            const relayTools=process.env.MELEE_A3_ROOM_RELAY_TOOLS;
+            if(!relayTools||!path.isAbsolute(relayTools)||
+               !['wrangler/package.json','miniflare/package.json','workerd/package.json']
+                 .every(file=>fs.existsSync(path.join(relayTools,file))))
+              throw new Error('Packet-backed loop requires the existing pinned Wrangler, Miniflare, and workerd packages in an absolute MELEE_A3_ROOM_RELAY_TOOLS path');
+            const {startRoomRelayRuntime}=await import('../../../scripts/net_room_relay_runtime_owner.mjs');
+            const packetModule=await import('./cpu_corrected_loop_packet_input.mjs');
+            const producer={commit:execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),
+              tree:execFileSync('git',['rev-parse','HEAD^{tree}'],{cwd:ROOT,encoding:'utf8'}).trim()};
+            relayRuntime=await startRoomRelayRuntime({producer,evidenceDir:path.join(options['--out'],'packet-worker-evidence'),
+              diagnostic:message=>{(report.packetInputRuntimeLog??=[]).push(String(message));writeReport();}});
+            const agreement=packetModule.buildCpuCorrectedLoopPacketAgreement({producer,profile:report.profile,
+              initializer:init.initializer,inputMapping:expectedInputMapping,slotCount:drawDiagnostics.slotCount,
+              sourceStateManifest:report.sourceStateManifest,
+              runtimeSha256:report.runtimeSha256,harnessSha256:report.harnessSha256,
+              worker:{identity:relayRuntime.runtimeIdentity,hashes:relayRuntime.hashes}});
+            packetInput=await packetModule.openCpuCorrectedLoopPacketInput({runtime:relayRuntime,agreement});
+            report.packetInput={status:'ready',scope:'Node-held A2 peers over the owned local Worker relay',
+              browserOwnsSocket:false,agreementSha256:packetInput.startup.agreementSha256,
+              runtime:{port:relayRuntime.port,identity:relayRuntime.runtimeIdentity,hashes:relayRuntime.hashes},
+              peerReadyTimeoutMs:packetInput.startup.peerReadyTimeoutMs,
+              neutralPreroll:packetInput.startup.neutralPreroll};
+            writeReport();
+          }
           const result=await runBrowserCpuCorrectedLoop(predictedPage,page,cpuWire,checkpoint,
-            expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,onIntervalEvidence);
+            expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics,onIntervalEvidence,
+            packetInput?{packetInput}:{});
+          packetRunPassed=result.status==='passed';
           report.execution={...report.execution,status:'completed',correctedLoop:result,restorePerformed:true,
-            scope:'bounded variable-span confirmed/speculative ownership with one capsule and a persistent timeline'};
+            scope:packetInput?
+              'bounded variable-span confirmed/speculative ownership, Node-held A2 input for 44 rows, one capsule and a persistent timeline':
+              'bounded variable-span confirmed/speculative ownership with one capsule and a persistent timeline'};
           report.cpuResult={referenceScreenshot:await screenshotRecord(page,options['--out'],'reference-final.png'),
             correctedScreenshot:await screenshotRecord(predictedPage,options['--out'],'corrected-final.png')};
           report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,
             sourceStateManifestComplete:false,wasmAndMapBound:true,staticRows:cpuWire.length};
           if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+          if(packetInput)report.packetInput.finalSummary=packetInput.summary();
           report.result='passed';writeReport();return;
         }
         if(correctedTwoWindow){
@@ -1326,7 +1381,9 @@ async function main() {
     report.browser.pageErrors = pageErrors;
     writeReport();
   } catch (error) {
+    packetRunPassed=false;
     recordFailedCensusExecution(report, error);
+    if(packetInput&&report.packetInput)report.packetInput.partialSummary=packetInput.summary();
     if(cpuWire){
       recordCpuRestoreFailure(report,error);
     }
@@ -1405,6 +1462,22 @@ async function main() {
     if (server) {
       try { await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); }
       catch (error) { cleanupFailures.push({step: 'http-server-close', error: String(error)}); }
+    }
+    if(packetInput){
+      try{
+        const closed=await packetInput.close();
+        report.packetInput={...(report.packetInput||{}),closed:true,closeSummary:closed.summary};
+      }catch(error){
+        cleanupFailures.push({step:'packet-input-close',error:String(error?.stack||error)});
+        report.packetInput={...(report.packetInput||{}),closed:false,closeError:String(error),
+          finalSummary:packetInput.summary()};
+      }
+    }
+    if(relayRuntime){
+      try{
+        const closed=await relayRuntime.close(Boolean(packetRunPassed&&report.result==='passed'&&cleanupFailures.length===0));
+        report.packetInputRuntimeCleanup=closed;
+      }catch(error){cleanupFailures.push({step:'packet-worker-runtime-close',error:String(error?.stack||error)});}
     }
     if (applyCleanupVerdict(report, cleanupFailures) === 'failed') process.exitCode = 1;
     writeReport();

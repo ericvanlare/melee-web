@@ -195,13 +195,13 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     const result=await page.evaluate(operateCorrectedInPage,{...defaults,...options,command});
     if(command===53){
       const reuse=decodeCpuCorrectedReuseEvidence(decode(result.reuseEvidenceBase64));
-      stateFor(page).commands.push({command,result:0,reuse});
-      return {reuse};
+      stateFor(page).commands.push({command,result:0,reuse,timing:result.timing});
+      return {reuse,timing:result.timing};
     }
     const evidence=decodeCpuSevenTickEvidence(decode(result.evidenceBase64),2);
     validateCorrectedCommandEvidence(evidence,command,options.preFrame);
     const state=stateFor(page);state.nativeEvidence=evidence;
-    state.commands.push({command,result:0,state:evidence.state});
+    state.commands.push({command,result:0,state:evidence.state,timing:result.timing});
     if(options.readReuseEvidence){
       result.reuse=decodeCpuCorrectedReuseEvidence(decode(result.reuseEvidenceBase64));
     }
@@ -212,7 +212,7 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
       state.draws??=[];state.draws.push({command,gpu:result.status,selected});
       gpu.set(page,current);diagnostics.set(page,draw);
     }
-    return {result,evidence,reuse:result.reuse??null};
+    return {result,evidence,reuse:result.reuse??null,timing:result.timing};
   };
   const endpoint=async(page,view,provenance,name)=>{
     const result=decodeCpuParticleEndpointResult(await page.evaluate(collectCpuEndpointInPage,
@@ -227,7 +227,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     const runCommand=async(page,command,options={})=>{
       const value=await operate(page,command,{...options,preFrame});
       const lane=page===referencePage?window.reference:window.predicted;
-      if(command!==53)lane.commands.push({command,state:value.evidence.state});
+      lane.commands.push(command===53?{command,reuse:value.reuse,timing:value.timing}:
+        {command,state:value.evidence.state,timing:value.timing});
       return value;
     };
     const setup={wire,reuseEnable:enableReuse,readReuseEvidence:true};

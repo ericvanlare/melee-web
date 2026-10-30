@@ -10,7 +10,7 @@ import {buildCpuCorrectedLoopCapsules,createCpuCorrectedLoopSchedule,
   compareCpuCorrectedLoopMotorEvents,hashCpuCorrectedLoopMotorEvents,
   decodeCpuCorrectedLoopMotorCommitReceipt} from './cpu_corrected_loop_runner.mjs';
 import {decodeCpuCorrectedLoopEvidence} from './cpu_seven_tick_runner.mjs';
-import {operateCorrectedInPage} from './cpu_corrected_runner.mjs';
+import {createCorrectedCommandTimer,operateCorrectedInPage} from './cpu_corrected_runner.mjs';
 import {buildCpuCorrectedTwoWindowFirstCorpus,buildCpuCorrectedTwoWindowSecondCorpus,
   CPU_CORRECTED_TWO_WINDOW_NEUTRAL_PAD44 as neutral} from './cpu_corrected_two_window_runner.mjs';
 const encode=value=>Buffer.from(value).toString('base64');
@@ -73,6 +73,21 @@ test('all spans 1..7 replay a late dirty suffix through the whole captured prefi
       assert.equal(schedule.timeline.status().dirty_from,null);
     }finally{schedule.timeline.dispose();}
   }
+});
+
+test('confirmed loop planning accepts an exact received remote PAD while speculative rows still predict',()=>{
+  const schedule=createCpuCorrectedLoopSchedule(),literal=decode(neutral),received=Buffer.from(literal.subarray(11,22));
+  received[2]=0x12;received[7]=0xa5;
+  try{
+    assert.throws(()=>planCpuCorrectedLoopForward(schedule,300,neutral,{remotePad:Buffer.alloc(10)}),/11 bytes/);
+    const plan=planCpuCorrectedLoopForward(schedule,300,neutral,{remotePad:received});
+    assert.equal(plan.remote_source,'actual');
+    assert.deepEqual(Buffer.from(plan.frame).subarray(11,22),received);
+    acknowledgeCpuCorrectedLoopForward(schedule,plan);
+    assert.deepEqual(schedule.lastRemotePad,received);
+    assert.throws(()=>planCpuCorrectedLoopForward(schedule,301,neutral,
+      {speculative:true,remotePad:received}),/cannot accept PAD before its final draw/);
+  }finally{schedule.timeline.dispose();}
 });
 
 test('later dirty suffix rejects a changed frozen prefix before source replay',()=>{
@@ -156,7 +171,8 @@ test('actual in-page operation enables pristine loop before configuration and re
     _melee_web_synctest_cpu_corrected_loop_evidence_bytes:()=>40,
     _melee_web_synctest_cpu_corrected_loop_evidence:()=>64}}};
   try{
-    for(let i=0;i<2;i++)await operateCorrectedInPage({command:53,loopEnableSchema:i?undefined:3,
+    for(let i=0;i<2;i++)await operateCorrectedInPage({commandTimingSource:createCorrectedCommandTimer.toString(),
+      command:53,loopEnableSchema:i?undefined:3,
       wire:[[1,2,3,4]],selectSpan:i+1,readLoopEvidence:true});
     assert.deepEqual(calls,[['enable',3],['configure'],['span',1],['command',53],
       ['configure'],['span',2],['command',53]]);
@@ -309,7 +325,8 @@ test('actual opt-in in-page motor reads retain evidence and read one unpublished
     _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt_bytes:()=>64,
     _melee_web_synctest_cpu_corrected_loop_motor_commit_receipt:()=>{calls.push(['commit receipt']);return 2048;}}}};
   try{
-    const operation=await operateCorrectedInPage({command:53,readLoopEvidence:true,readLoopMotorEvidence:true});
+    const operation=await operateCorrectedInPage({commandTimingSource:createCorrectedCommandTimer.toString(),
+      command:53,readLoopEvidence:true,readLoopMotorEvidence:true});
     const committed=decodeCpuCorrectedLoopMotorCommitReceipt(decode(operation.motorCommitReceiptBase64),selected,1);
     assert.equal(committed.published,0);assert.equal(committed.status,1);
     assert.deepEqual(calls,[['command',53],['commit receipt']]);
