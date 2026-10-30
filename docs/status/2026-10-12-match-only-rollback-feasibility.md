@@ -1589,9 +1589,17 @@ file, SSM and HPS barriers remain unchanged. The affected build and independentl
 reviewed relink pass. Browser V3 (`7f9ee998`) clears the original MOTOR refusal:
 both pages consume all seven ticks in the third interval with exact raw-five
 agreement and the same captured motor request. The reference CPU endpoint then
-refuses owner admission at source frame 190. Its current error does not identify
-the rejecting leaf; no CPU/DRAW endpoint agreement or retirement is claimed for
-that interval. Failure-only attribution is the next reduced step. Native capsule
+refuses owner admission at source frame 190. V4 (`47f1d8e6`) identifies the first rejecting leaf as
+`payload-header`, status `TOPOLOGY_CHANGED` (5). The reader uses the PRE snapshot
+for END evidence even though the confirmed interval changes allocation topology.
+A smaller actual-source allocator control reproduces the stale-PRE refusal and
+successful fresh-POST enumeration. The repair adds allocation-free current-END
+reads for both reference and corrected execution; PRE restore admission stays
+strict. The actual-source leaf control and all three endpoint controls pass;
+the initial fixture watermark expectation failure remains retained. Independent
+source and focused-result review passes; the next gate is the rebuilt browser
+loop with unchanged comparison rules. This does not implement restoring a speculative topology change. No
+third-capsule CPU/DRAW agreement or retirement is claimed yet. Native capsule
 cleanup still refuses, while snapshot/renderer cleanup and owned-process absence
 pass. Focused fixture and browser failures remain retained. General rolling
 correction, combat, frame-budget, profile admission and full-match or online

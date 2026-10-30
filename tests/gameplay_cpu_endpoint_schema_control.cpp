@@ -27,6 +27,17 @@ MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_endpoint_free_
     const MeleeWebSourceMemoryPayloadSnapshot*,std::uint64_t) { return {}; }
 MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_endpoint_allocated_cell(
     const MeleeWebSourceMemoryPayloadSnapshot*,std::uint64_t) { return {}; }
+// The inactive-reader wire control must link both payload view branches;
+// no provider is reached when record() refuses the unadmitted reader.
+MeleeWebSourcePayloadEndpointRow melee_web_source_memory_payload_current_endpoint_row(
+    const MeleeWebSourceMemoryPayloadSnapshot*,const MeleeWebSourcePayloadEndpointHeader*,
+    std::uint64_t) { assert(!"inactive schema reader reached current payload provider");return {}; }
+MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_current_endpoint_free_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot*,const MeleeWebSourcePayloadEndpointHeader*,
+    std::uint64_t) { assert(!"inactive schema reader reached current payload provider");return {}; }
+MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_current_endpoint_allocated_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot*,const MeleeWebSourcePayloadEndpointHeader*,
+    std::uint64_t) { assert(!"inactive schema reader reached current payload provider");return {}; }
 }
 
 int main()

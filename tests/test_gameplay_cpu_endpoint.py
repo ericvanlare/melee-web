@@ -71,5 +71,6 @@ class GameplayCpuEndpointControls(OwnedWorkspaceTests):
         (directory/'run.log').write_text(run.stdout+run.stderr)
         self.assertEqual(run.returncode,0,run.stdout+run.stderr)
         self.assertIn('Admitted nine-domain PRE/reference/corrected batches',run.stdout)
+        self.assertIn('Current END payload routing enumerates grown rows/cells',run.stdout)
 
 if __name__=='__main__':unittest.main()

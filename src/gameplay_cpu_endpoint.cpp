@@ -149,7 +149,9 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
     if(out.actions.binding_count>UINT32_MAX/2u||out.actions.cache_count>UINT32_MAX/2u)
         return collect_refusal("action-header",out.actions.status);
 
-    out.payload=melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload);
+    out.payload=pre?
+        melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
+        melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
     if(out.payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||out.payload.schema!=1||
        out.payload.row_count>UINT32_MAX||out.payload.free_cell_count>UINT32_MAX||
        out.payload.allocated_cell_count>UINT32_MAX)
@@ -391,7 +393,9 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
         }
         if(kind==Kind::PayloadRow){
             if(index>=data_.payload.row_count)return refusal(Status::InvalidIndex);
-            const auto x=melee_web_source_memory_payload_endpoint_row(c.commit_.payload,index);
+            const auto x=view_==View::Pre?
+                melee_web_source_memory_payload_endpoint_row(c.commit_.payload,index):
+                melee_web_source_memory_payload_current_endpoint_row(c.commit_.payload,&data_.payload,index);
             if(x.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
                 return refusal(Status::LeafRefused);
             auto result=make(kind,static_cast<std::uint32_t>(data_.payload.row_count),
@@ -402,8 +406,11 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
             const bool free=kind==Kind::PayloadFreeCell;
             const auto count=static_cast<std::uint32_t>(free?data_.payload.free_cell_count:data_.payload.allocated_cell_count);
             if(index>=count)return refusal(Status::InvalidIndex);
-            const auto x=free?melee_web_source_memory_payload_endpoint_free_cell(c.commit_.payload,index):
-                melee_web_source_memory_payload_endpoint_allocated_cell(c.commit_.payload,index);
+            const auto x=view_==View::Pre?
+                (free?melee_web_source_memory_payload_endpoint_free_cell(c.commit_.payload,index):
+                    melee_web_source_memory_payload_endpoint_allocated_cell(c.commit_.payload,index)):
+                (free?melee_web_source_memory_payload_current_endpoint_free_cell(c.commit_.payload,&data_.payload,index):
+                    melee_web_source_memory_payload_current_endpoint_allocated_cell(c.commit_.payload,&data_.payload,index));
             if(x.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)return refusal(Status::LeafRefused);
             return make(kind,count,{x.kind,x.source_address,x.cell_bytes,x.index});
         }
