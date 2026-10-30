@@ -248,6 +248,27 @@ bool GameplayCpuEndpointReader::begin(const GameplayMatchSession& session,
     active_=true;status_=Status::Ok;return true;
 }
 
+bool GameplayCpuEndpointReader::particle_header(
+    SlippiParticleCellEndpointHeader& out) const noexcept
+{
+    out={};
+    if(!active_||!session_||!checkpoint_||
+       session_->source_frames()!=data_.source_frame)return false;
+    return slippi_particle_presentation_cell_endpoint_header(
+        checkpoint_->commit_.particle_anchor,&out)==1;
+}
+
+bool GameplayCpuEndpointReader::particle_row(
+    std::uint32_t kind,std::uint32_t index,
+    SlippiParticleCellEndpointRow& out) const noexcept
+{
+    out={};
+    if(!active_||!session_||!checkpoint_||
+       session_->source_frames()!=data_.source_frame)return false;
+    return slippi_particle_presentation_cell_endpoint_row(
+        checkpoint_->commit_.particle_anchor,kind,index,&out)==1;
+}
+
 GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
     Domain domain,Kind kind,std::uint32_t index) const noexcept
 {

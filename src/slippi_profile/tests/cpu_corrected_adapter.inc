@@ -15,6 +15,8 @@ struct CpuCorrectedControl {
     Observation pre_observation{};
     melee_web::GameplayCpuEndpointReader reader;
     melee_web::GameplayCpuEndpointRecord row{};
+    SlippiParticleCellEndpointHeader particle_header{};
+    SlippiParticleCellEndpointRow particle_row{};
     uint32_t endpoint_expected_frame=0;
 } cpu_corrected;
 
@@ -464,6 +466,30 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_record(
 }
 extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_endpoint_data(){return &cpu_corrected.row;}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_bytes(){return sizeof(cpu_corrected.row);}
+// These optional sidecar reads belong to the same synchronous endpoint batch.
+// They neither begin a new ownership interval nor admit caller-supplied anchors.
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_header(){
+    auto& c=cpu_corrected;c.particle_header={};
+    if(!cpu_restore.inflight||!c.reader.active()||cpu_restore.first_failure||
+       payload_admission_runtime_boundary()!=0||!cpu_corrected_reuse_live(c.endpoint_expected_frame))
+        return cpu_fail(0x543u,"particle endpoint header outside synchronous batch");
+    if(!c.reader.particle_header(c.particle_header))
+        return cpu_fail(0x544u,"particle endpoint header owner refused");
+    return 0;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_particle_endpoint_header_data(){return &cpu_corrected.particle_header;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_header_bytes(){return sizeof(cpu_corrected.particle_header);}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_row(uint32_t kind,uint32_t index){
+    auto& c=cpu_corrected;c.particle_row={};
+    if(!cpu_restore.inflight||!c.reader.active()||cpu_restore.first_failure||
+       payload_admission_runtime_boundary()!=0||!cpu_corrected_reuse_live(c.endpoint_expected_frame))
+        return cpu_fail(0x545u,"particle endpoint row outside synchronous batch");
+    if(!c.reader.particle_row(kind,index,c.particle_row))
+        return cpu_fail(0x546u,"particle endpoint row owner refused");
+    return 0;
+}
+extern "C" EMSCRIPTEN_KEEPALIVE const void* melee_web_synctest_cpu_particle_endpoint_row_data(){return &cpu_corrected.particle_row;}
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_particle_endpoint_row_bytes(){return sizeof(cpu_corrected.particle_row);}
 extern "C" EMSCRIPTEN_KEEPALIVE uint32_t melee_web_synctest_cpu_endpoint_end(){
     auto& c=cpu_corrected;
     if(!cpu_restore.inflight||!c.reader.active())return cpu_fail(0x53bu,"endpoint end without batch");

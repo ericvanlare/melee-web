@@ -2,6 +2,7 @@
 #include "gameplay_match_session.hpp"
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 
 using namespace melee_web;
 
@@ -55,6 +56,18 @@ int main()
     assert(record.flags==0&&record.reserved==0);
 
     GameplayCpuEndpointReader reader;
+    SlippiParticleCellEndpointHeader particle_header;
+    SlippiParticleCellEndpointRow particle_row;
+    std::memset(&particle_header,0xff,sizeof(particle_header));
+    std::memset(&particle_row,0xff,sizeof(particle_row));
+    assert(!reader.particle_header(particle_header));
+    assert(!reader.particle_row(SLIPPI_PARTICLE_CELL_ROW_LIVE,0,particle_row));
+    const auto zero=[](const auto& value){
+        const auto* bytes=reinterpret_cast<const unsigned char*>(&value);
+        for(std::size_t i=0;i<sizeof(value);++i)assert(bytes[i]==0);
+    };
+    zero(particle_header);zero(particle_row);
+    assert(sizeof(particle_header)==64&&sizeof(particle_row)==96);
     const auto refused=reader.record(GameplayCpuEndpointDomain::Actions,
         GameplayCpuEndpointRowKind::ActionEvent,0);
     assert(refused.status==static_cast<std::uint32_t>(GameplayCpuEndpointStatus::Incomplete));

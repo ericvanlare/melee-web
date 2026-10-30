@@ -8,6 +8,8 @@ import {
   CPU_ENDPOINT_LAYOUT, CPU_ENDPOINT_PROVENANCE,
   CPU_ENDPOINT_RECORD_BYTES, CPU_ENDPOINT_STATUS, CPU_ENDPOINT_VIEW,
   collectCpuEndpointInPage, compareCpuEndpoints, decodeCpuEndpointResult,
+  decodeCpuParticleEndpointResult, compareCpuParticleEndpoints,
+  validateCpuParticleEndpointAgainstPre,
 } from './cpu_endpoint.mjs';
 
 const PTR = 512;
@@ -88,7 +90,8 @@ function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false
     }
     const record={status:0,schema:1,view,provenance,domain:domainSpec.id,kind:rowSpec.kind,index,count,
       metadataBytes:fields.length*8,flags:0,fields,borrowedAddress,borrowedBytes,reserved:0};
-    rows.set(keyOf(domainSpec.id,rowSpec.kind,index),{record,domainName:domainSpec.name,kindName:rowSpec.kindName});
+    rows.set(keyOf(domainSpec.id,rowSpec.kind,index),{record,domainName:domainSpec.name,
+      kindName:rowSpec.kindName,fieldNames:rowSpec.fields});
     return {record,fieldNames:rowSpec.fields};
   };
   for(const domainSpec of CPU_ENDPOINT_LAYOUT.domains){
@@ -103,9 +106,9 @@ function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false
     }
   }
   const expectedRows=rows.size;
-  const calls=[];
+  const calls=[];let batchActive=false;
   const module={HEAPU8:heap,wasmMemory:{buffer:heap.buffer},calledRun:true,
-    _melee_web_synctest_cpu_endpoint_begin:(gotView,gotProvenance)=>{calls.push(['begin',gotView,gotProvenance]);return 0;},
+    _melee_web_synctest_cpu_endpoint_begin:(gotView,gotProvenance)=>{calls.push(['begin',gotView,gotProvenance]);batchActive=true;return 0;},
     _melee_web_synctest_cpu_endpoint_data:()=>PTR,
     _melee_web_synctest_cpu_endpoint_bytes:()=>CPU_ENDPOINT_RECORD_BYTES,
     _melee_web_synctest_cpu_endpoint_record:(domainId,kind,index)=>{
@@ -118,7 +121,7 @@ function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false
       if(record.borrowedBytes)previousBorrow={address:record.borrowedAddress,bytes:record.borrowedBytes};
       return 0;
     },
-    _melee_web_synctest_cpu_endpoint_end:()=>{calls.push(['end']);return 0;},
+    _melee_web_synctest_cpu_endpoint_end:()=>{calls.push(['end']);batchActive=false;return 0;},
   };
   const page={evaluate:(callback,request)=>{
     const context=vm.createContext({window:{__slippiSynctest:{module}},Uint8Array,DataView,SharedArrayBuffer,
@@ -126,7 +129,8 @@ function makeFixture({view=1,provenance=1,baseAddress=32768,borrowMutation=false
     context.request=request;
     return vm.runInContext(`(${callback.toString()})(request)`,context);
   }};
-  return {heap,heapView,rows,module,page,calls,expectedRows,get borrowSerial(){return borrowSerial;}};
+  return {heap,heapView,rows,module,page,calls,expectedRows,get borrowSerial(){return borrowSerial;},
+    get batchActive(){return batchActive;}};
 }
 
 async function collect(fixture,view=1,provenance=1,extra={}) {
@@ -138,6 +142,85 @@ function updateRawRecord(fixture,key,mutate) {
   const found=fixture.rows.get(key);
   assert.ok(found,key);
   mutate(found.record);
+}
+
+const PARTICLE_HEADER_PTR=100000, PARTICLE_ROW_PTR=100064, PARTICLE_HOST_BASE=0x9000,
+  PARTICLE_SOURCE_BASE=0x8000, PARTICLE_DESCRIPTOR=0xa000;
+function setNamed(record,name,value){
+  const index=record.fieldNames.indexOf(name);assert.ok(index>=0,name);record.record.fields[index]=BigInt(value);
+}
+
+function installParticleSidecar(fixture,{anchorSerial=2,historySerial=anchorSerial,anchorToken=3,
+  liveRows=null,capturedRows=null,headerAfter=null,rowStatuses=new Map()}={}){
+  const payloadHeader=fixture.rows.get(keyOf(4,0,0));
+  const payloadRow=fixture.rows.get(keyOf(4,1,0));
+  setNamed(payloadHeader,'PayloadBytes',32);
+  setNamed(payloadHeader,'World',1);setNamed(payloadHeader,'OwnerEpoch',3);
+  setNamed(payloadRow,'SourceAddress',PARTICLE_SOURCE_BASE);
+  setNamed(payloadRow,'RequestedBytes',32);
+  setNamed(payloadRow,'HostAddress',PARTICLE_HOST_BASE);
+  setNamed(payloadRow,'AllocationGeneration',7);
+  payloadRow.record.borrowedAddress=PARTICLE_HOST_BASE;
+  payloadRow.record.borrowedBytes=32;
+  fixture.heap.fill(0x44,PARTICLE_HOST_BASE,PARTICLE_HOST_BASE+32);
+  const particles=fixture.rows.get(keyOf(2,4,0));
+  setNamed(particles,'World',1);setNamed(particles,'Serial',anchorSerial);
+  setNamed(particles,'AnchorToken',anchorToken);
+  const live=liveRows??[{kind:1,index:0,objectKind:0,extent:8,receiptSerial:anchorSerial,
+    object:PARTICLE_HOST_BASE+8,world:1,epoch:3,allocation:7,pool:PARTICLE_HOST_BASE,
+    descriptor:PARTICLE_DESCRIPTOR,source:PARTICLE_SOURCE_BASE+8,cellOffset:8,stride:8}];
+  const captured=capturedRows??live.map(row=>({...row,kind:2}));
+  setNamed(particles,'ParticleCount',captured.filter(row=>row.objectKind===0).length);
+  setNamed(particles,'AppsrtCount',captured.filter(row=>row.objectKind===1).length);
+  const header={schema:1,bytes:64,liveCount:live.length,capturedCount:captured.length,
+    world:1,anchorSerial,anchorToken,historySerial};
+  const data=fixture.heapView;
+  const writeHeader=value=>{
+    data.setUint32(PARTICLE_HEADER_PTR,value.schema,true);data.setUint32(PARTICLE_HEADER_PTR+4,value.bytes,true);
+    data.setUint32(PARTICLE_HEADER_PTR+8,value.liveCount,true);data.setUint32(PARTICLE_HEADER_PTR+12,value.capturedCount,true);
+    data.setBigUint64(PARTICLE_HEADER_PTR+16,BigInt(value.world),true);
+    data.setBigUint64(PARTICLE_HEADER_PTR+24,BigInt(value.anchorSerial),true);
+    data.setBigUint64(PARTICLE_HEADER_PTR+32,BigInt(value.anchorToken),true);
+    data.setBigUint64(PARTICLE_HEADER_PTR+40,BigInt(value.historySerial),true);
+    fixture.heap.fill(0,PARTICLE_HEADER_PTR+48,PARTICLE_HEADER_PTR+64);
+  };
+  const writeRow=row=>{
+    data.setUint32(PARTICLE_ROW_PTR,1,true);data.setUint32(PARTICLE_ROW_PTR+4,96,true);
+    data.setUint32(PARTICLE_ROW_PTR+8,row.kind,true);data.setUint32(PARTICLE_ROW_PTR+12,row.index,true);
+    data.setUint32(PARTICLE_ROW_PTR+16,row.objectKind,true);data.setUint32(PARTICLE_ROW_PTR+20,row.extent,true);
+    for(const [offset,name] of [[24,'receiptSerial'],[32,'object'],[40,'world'],[48,'epoch'],
+      [56,'allocation'],[64,'pool'],[72,'descriptor']])data.setBigUint64(PARTICLE_ROW_PTR+offset,BigInt(row[name]),true);
+    data.setUint32(PARTICLE_ROW_PTR+80,row.source,true);data.setUint32(PARTICLE_ROW_PTR+84,row.cellOffset,true);
+    data.setUint32(PARTICLE_ROW_PTR+88,row.stride,true);data.setUint32(PARTICLE_ROW_PTR+92,0,true);
+  };
+  let headerReads=0;
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_header=()=>{
+    fixture.calls.push(['particle-header']);assert.equal(fixture.batchActive,true);
+    writeHeader(headerReads++===0?header:(headerAfter??header));return 0;
+  };
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_header_data=()=>PARTICLE_HEADER_PTR;
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_header_bytes=()=>64;
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_row=(kind,index)=>{
+    fixture.calls.push(['particle-row',kind,index]);assert.equal(fixture.batchActive,true);
+    const status=rowStatuses.get(`${kind}/${index}`)??0;if(status)return status;
+    const rows=kind===1?live:captured, row=rows[index];if(!row)return 5;
+    writeRow(row);return 0;
+  };
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_row_data=()=>PARTICLE_ROW_PTR;
+  fixture.module._melee_web_synctest_cpu_particle_endpoint_row_bytes=()=>96;
+  return {header,live,captured};
+}
+
+function cellRow(kind,index,{objectKind=0,extent=8,receiptSerial,offset=8}={}){
+  return {kind,index,objectKind,extent,receiptSerial,object:PARTICLE_HOST_BASE+offset,
+    world:1,epoch:3,allocation:7,pool:PARTICLE_HOST_BASE,descriptor:PARTICLE_DESCRIPTOR,
+    source:PARTICLE_SOURCE_BASE+offset,cellOffset:offset,stride:8};
+}
+
+async function collectParticle(fixture,view=1,provenance=1,extra={}){
+  const raw=await fixture.page.evaluate(collectCpuEndpointInPage,
+    {view,provenance,particleCellEndpoint:true,...extra});
+  return decodeCpuParticleEndpointResult(toWire(raw));
 }
 
 test('one synchronous page callback walks every named domain and copies borrowed bytes before reuse',async()=>{
@@ -266,4 +349,80 @@ test('host decoder rejects missing, reordered, malformed, and oversized endpoint
   assert.throws(()=>decodeCpuEndpointResult(badBorrowExtent),/borrowed-byte length mismatch/);
   const countProduct=structuredClone(valid);countProduct.domains[2].records[0].fields[1]='2';countProduct.domains[2].records[0].fields[2]='4294967295';
   assert.throws(()=>decodeCpuEndpointResult(countProduct),/count product overflows/);
+});
+
+test('typed particle endpoint keeps schema312 intact and compares local receipt authority by incarnation relation',async()=>{
+  const preLeftFixture=makeFixture(),preRightFixture=makeFixture();
+  installParticleSidecar(preLeftFixture,{anchorSerial:5,historySerial:5,
+    liveRows:[cellRow(1,0,{receiptSerial:4})],capturedRows:[cellRow(2,0,{receiptSerial:4})]});
+  installParticleSidecar(preRightFixture,{anchorSerial:19,historySerial:19,
+    liveRows:[cellRow(1,0,{receiptSerial:18})],capturedRows:[cellRow(2,0,{receiptSerial:18})]});
+  const preLeft=await collectParticle(preLeftFixture),preRight=await collectParticle(preRightFixture);
+  assert.equal(preLeft.schema,2);assert.equal(preLeft.rawSchema,1);
+  assert.deepEqual(preLeft.particleCells.liveRows[0],{
+    kind:1,index:0,objectKind:0,extent:8,receiptSerial:'4',object:String(PARTICLE_HOST_BASE+8),
+    world:'1',epoch:'3',allocation:'7',pool:String(PARTICLE_HOST_BASE),descriptor:String(PARTICLE_DESCRIPTOR),
+    source:PARTICLE_SOURCE_BASE+8,cellOffset:8,stride:8});
+  assert.deepEqual(compareCpuParticleEndpoints(preLeft,preRight),{
+    equal:true,view:1,sourceFrame:'300',domains:9,particleCells:{live:1,captured:1,incarnationRelations:1}});
+  const rawLeft={schema:1,recordBytes:preLeft.recordBytes,view:preLeft.view,provenance:preLeft.provenance,
+    sourceFrame:preLeft.sourceFrame,revalidated:preLeft.revalidated,domains:preLeft.domains};
+  const rawRight={...rawLeft,domains:preRight.domains};
+  assert.throws(()=>compareCpuEndpoints(rawLeft,rawRight),/ParticleAnchor\[0\]\.metadata\[Serial\] differs/,
+    'historical schema312 comparator remains strict for the raw serial');
+  const changedToken=structuredClone(preRight),tokenRecord=changedToken.domains[1].records.find(row=>row.kindName==='ParticleAnchor');
+  tokenRecord.fields[tokenRecord.fieldNames.indexOf('AnchorToken')]='4';
+  changedToken.particleCells.anchorToken='4';
+  assert.throws(()=>compareCpuParticleEndpoints(preLeft,changedToken),/metadata\[AnchorToken\] differs/,
+    'AnchorToken remains cross-instance strict');
+
+  const leftFixture=makeFixture({view:2,provenance:2}),rightFixture=makeFixture({view:2,provenance:3});
+  installParticleSidecar(leftFixture,{anchorSerial:5,historySerial:6,
+    liveRows:[cellRow(1,0,{receiptSerial:6,offset:16}),cellRow(1,1,{receiptSerial:4,offset:8})],
+    capturedRows:[cellRow(2,0,{receiptSerial:4,offset:8})]});
+  installParticleSidecar(rightFixture,{anchorSerial:19,historySerial:20,
+    liveRows:[cellRow(1,0,{receiptSerial:20,offset:16}),cellRow(1,1,{receiptSerial:18,offset:8})],
+    capturedRows:[cellRow(2,0,{receiptSerial:18,offset:8})]});
+  const left=await collectParticle(leftFixture,2,2),right=await collectParticle(rightFixture,2,3);
+  assert.deepEqual(validateCpuParticleEndpointAgainstPre(left,preLeft),{equal:true,capturedRows:1});
+  assert.deepEqual(validateCpuParticleEndpointAgainstPre(right,preRight),{equal:true,capturedRows:1});
+  const comparison=compareCpuParticleEndpoints(left,right,{preLeft,preRight});
+  assert.equal(comparison.equal,true);
+  assert.equal(comparison.particleCells.incarnationRelations,2);
+  const differentIncarnation=structuredClone(right);
+  differentIncarnation.particleCells.liveRows[1].receiptSerial='17';
+  assert.throws(()=>compareCpuParticleEndpoints(left,differentIncarnation,{preLeft,preRight}),
+    /live\/captured particle incarnation relation differs/,
+    'same backing address with a different constructor receipt must not masquerade as captured');
+  const shifted=structuredClone(left);
+  shifted.particleCells.liveRows[1].index=0;
+  assert.throws(()=>decodeCpuParticleEndpointResult(shifted),/row ordering|typed row metadata/);
+});
+
+test('particle sidecar is synchronous, exact, joined to payload generations, and closes on proof refusal',async()=>{
+  const fixture=makeFixture();installParticleSidecar(fixture);
+  const endpoint=await collectParticle(fixture);
+  const begin=fixture.calls.findIndex(call=>call[0]==='begin'),firstHeader=fixture.calls.findIndex(call=>call[0]==='particle-header'),
+    lastHeader=fixture.calls.map(call=>call[0]).lastIndexOf('particle-header'),end=fixture.calls.findIndex(call=>call[0]==='end');
+  assert.ok(begin>=0&&firstHeader>begin&&lastHeader>firstHeader&&end>lastHeader);
+  assert.equal(fixture.calls.filter(call=>call[0]==='particle-row').length,2);
+  assert.equal(endpoint.particleCells.historySerial,'2');
+
+  const missing=structuredClone(endpoint);missing.particleCells.liveRows.pop();
+  assert.throws(()=>decodeCpuParticleEndpointResult(missing),/count\/row extent/);
+  const wrongAllocation=structuredClone(endpoint);wrongAllocation.particleCells.liveRows[0].allocation='8';
+  wrongAllocation.particleCells.capturedRows[0].allocation='8';
+  assert.throws(()=>decodeCpuParticleEndpointResult(wrongAllocation),/payload allocation/);
+  const wrongExtent=structuredClone(endpoint);wrongExtent.particleCells.liveRows[0].extent=24;
+  assert.throws(()=>decodeCpuParticleEndpointResult(wrongExtent),/extent\/stride/);
+  const wrongToken=structuredClone(endpoint);wrongToken.particleCells.anchorToken='4';
+  assert.throws(()=>decodeCpuParticleEndpointResult(wrongToken),/authority differs/);
+
+  const changedHeader=makeFixture();installParticleSidecar(changedHeader,{headerAfter:{schema:1,bytes:64,
+    liveCount:1,capturedCount:1,world:1,anchorSerial:2,anchorToken:3,historySerial:3}});
+  await assert.rejects(()=>collectParticle(changedHeader),/header changed while cell rows were read/);
+  assert.equal(changedHeader.calls.at(-1)[0],'end');
+  const refusedRow=makeFixture();installParticleSidecar(refusedRow,{rowStatuses:new Map([['1/0',5]])});
+  await assert.rejects(()=>collectParticle(refusedRow),/particle row 1\[0\] refused with status 5/);
+  assert.equal(refusedRow.calls.at(-1)[0],'end');
 });

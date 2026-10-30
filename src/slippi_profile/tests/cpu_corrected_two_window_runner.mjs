@@ -6,7 +6,8 @@ import {
   recordPredictedActionDivergence,
 } from './cpu_corrected_runner.mjs';
 import {CPU_SEVEN_TICK_PAD44_CORPUS, createCpuSevenTickTimeline, decodeCpuSevenTickEvidence} from './cpu_seven_tick_runner.mjs';
-import {collectCpuEndpointInPage, decodeCpuEndpointResult, compareCpuEndpoints} from './cpu_endpoint.mjs';
+import {collectCpuEndpointInPage, decodeCpuParticleEndpointResult, compareCpuParticleEndpoints,
+  validateCpuParticleEndpointAgainstPre} from './cpu_endpoint.mjs';
 import {runBrowserSample} from './run_synctest.mjs';
 import {
   decodeDrawDiagnostics, inspectInteractiveObservation, validateAuroraFrame,
@@ -214,7 +215,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     return {result,evidence,reuse:result.reuse??null};
   };
   const endpoint=async(page,view,provenance,name)=>{
-    const result=decodeCpuEndpointResult(await page.evaluate(collectCpuEndpointInPage,{view,provenance}));
+    const result=decodeCpuParticleEndpointResult(await page.evaluate(collectCpuEndpointInPage,
+      {view,provenance,particleCellEndpoint:true}));
     stateFor(page).endpoints[name]=result;return result;
   };
   const runWindow=async({index,startTick,preFrame,corpus,enableReuse})=>{
@@ -237,7 +239,7 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     if(JSON.stringify(referenceCapture.reuse)!==JSON.stringify(predictedCapture.reuse))
       throw new Error(`Window ${index+1} capture metadata differs across pages`);
     const refPre=await endpoint(referencePage,1,1,'pre'),predPre=await endpoint(predictedPage,1,1,'pre');
-    window.comparisons.pre=compareCpuEndpoints(refPre,predPre);
+    window.comparisons.pre=compareCpuParticleEndpoints(refPre,predPre);
     window.reference.endpoints.pre=refPre;window.predicted.endpoints.pre=predPre;
     for(let i=0;i<WINDOW_TICKS;i++){
       const tick=startTick+i,literal=corpus[i];
@@ -262,6 +264,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     if(!remoteMotionDivergence)throw new Error(`Window ${index+1} did not change the remote player's actual motion`);
     const refCpu=await endpoint(referencePage,2,2,'cpu');
     const predictedCpu=await endpoint(predictedPage,2,2,'speculativeCpu');
+    validateCpuParticleEndpointAgainstPre(refCpu,refPre);
+    validateCpuParticleEndpointAgainstPre(predictedCpu,predPre);
     window.reference.endpoints.cpu=refCpu;
     window.predicted.endpoints.speculativeCpu=predictedCpu;
     window.actionDivergence=recordPredictedActionDivergence(refCpu,predictedCpu);
@@ -270,6 +274,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     window.reference.nativeEvidence=stateFor(referencePage).nativeEvidence;
     await runCommand(predictedPage,40,{draw:true});await runCommand(predictedPage,41);
     window.predicted.endpoints.speculativeDraw=await endpoint(predictedPage,3,2,'speculativeDraw');
+    validateCpuParticleEndpointAgainstPre(window.reference.endpoints.draw,refPre);
+    validateCpuParticleEndpointAgainstPre(window.predicted.endpoints.speculativeDraw,predPre);
     window.predicted.nativeEvidence=stateFor(predictedPage).nativeEvidence;
     const correction=planCpuCorrectedWindowReplay(schedule,window.reference.rows,startTick);
     window.correction={earliestChanged:correction.earliestChanged,dirtyFrom:correction.dirtyFrom,
@@ -287,7 +293,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     window.predicted.nativeEvidence=stateFor(predictedPage).nativeEvidence;
     const correctedCpu=await endpoint(predictedPage,2,3,'cpu');
     window.predicted.endpoints.cpu=correctedCpu;
-    window.comparisons.cpu=compareCpuEndpoints(refCpu,correctedCpu);
+    window.comparisons.cpu=compareCpuParticleEndpoints(refCpu,correctedCpu,
+      {preLeft:refPre,preRight:predPre});
     window.comparisons.raw=compareWindowRawPairs(window.reference.nativeEvidence,window.predicted.nativeEvidence,startTick);
     schedule.timeline.commitReplay(correction.replay);
     window.timelineAfterReplay=schedule.timeline.status();
@@ -295,7 +302,8 @@ export async function runBrowserCpuCorrectedTwoWindow(predictedPage,referencePag
     const correctedDraw=await endpoint(predictedPage,3,3,'draw');
     window.predicted.nativeEvidence=stateFor(predictedPage).nativeEvidence;
     window.predicted.endpoints.draw=correctedDraw;
-    window.comparisons.draw=compareCpuEndpoints(window.reference.endpoints.draw,correctedDraw);
+    window.comparisons.draw=compareCpuParticleEndpoints(window.reference.endpoints.draw,correctedDraw,
+      {preLeft:refPre,preRight:predPre});
     const a=window.reference.nativeEvidence.drawnPair,b=window.predicted.nativeEvidence.drawnPair;
     for(const lane of ['Observation','Pcm','Pad','RngProfile','Transfer'])
       if(!equal(decode(a[`baseline${lane}`]),decode(b[`replay${lane}`])))

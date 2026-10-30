@@ -13,8 +13,11 @@
 #include <sysdolphin/baselib/mtx.h>
 static uint64_t token;
 static unsigned world_calls, mint_calls;
+static unsigned match_calls, retired_match_calls, allocation_calls;
+static unsigned identity_fault, duplicate_particle_identity, fixture_retired_particle;
 static HSD_ObjAllocData particle_pool, app_pool;
 static HSD_Particle particles[3];
+static HSD_Particle speculative_particle;
 static HSD_psAppSRT app;
 HSD_Particle* hsd_804D0908[16];
 static HSD_Particle* particle_list[17];
@@ -24,19 +27,62 @@ typedef struct { HSD_Particle *head,*tail; } psdisp_ParticleSortBucket;
 uint64_t melee_web_cpu_interval_token(void) { return token; }
 int melee_web_cpu_interval_active(void) { return token!=0; }
 int melee_web_cpu_interval_admit(uint64_t t) { return t && t==token; }
+void* particle_test_calloc(size_t count,size_t size)
+{
+    void* p;
+    if(size && count>SIZE_MAX/size) return NULL;
+    ++allocation_calls;
+    p=malloc(count*size);
+    if(p) memset(p,0,count*size);
+    return p;
+}
+static int fixture_pool_cell_identity(void* p,const void* pool,size_t n,
+                                      MeleeWebSourcePoolCellIdentity* out)
+{
+    uintptr_t address=(uintptr_t)p, base=0;
+    uint64_t allocation=0;
+    uint32_t source=0, offset=0, stride=(uint32_t)n;
+    if(pool==&particle_pool && n==sizeof(HSD_Particle)) {
+        uintptr_t particle_base=(uintptr_t)particles;
+        uintptr_t particle_end=particle_base+sizeof(particles);
+        if(p==&speculative_particle) {
+            base=(uintptr_t)&speculative_particle;
+            allocation=4; source=32;
+        } else if(address>=particle_base && address<particle_end &&
+                  (address-particle_base)%sizeof(HSD_Particle)==0) {
+            base=particle_base; allocation=3;
+            offset=(uint32_t)(address-particle_base);
+            source=4+offset;
+            if(duplicate_particle_identity) { offset=0; source=4; }
+        } else return 0;
+    } else if(pool==&app_pool && p==&app && n==sizeof(HSD_psAppSRT)) {
+        base=(uintptr_t)&app; allocation=5; source=64;
+    } else return 0;
+    *out=(MeleeWebSourcePoolCellIdentity){1,2,allocation,base,
+        (uintptr_t)pool,source,offset,stride};
+    return 1;
+}
 int melee_web_source_memory_pool_cell_identity(void* p,const void* pool,size_t n,
                                               MeleeWebSourcePoolCellIdentity* out)
 {
     ++mint_calls;
-    if((pool!=&particle_pool || n!=sizeof(HSD_Particle)) &&
-       (pool!=&app_pool || n!=sizeof(HSD_psAppSRT))) return 0;
-    *out=(MeleeWebSourcePoolCellIdentity){1,2,3,(uintptr_t)p,(uintptr_t)pool,4,0,(uint32_t)n};
-    return 1;
+    return fixture_pool_cell_identity(p,pool,n,out);
 }
 int melee_web_source_memory_pool_cell_matches(void* p,const void* pool,size_t n,
                                               const MeleeWebSourcePoolCellIdentity* id)
-{ return id && id->world==1 && id->epoch==2 && id->allocation==3 &&
-         id->pool==(uintptr_t)p && id->descriptor==(uintptr_t)pool && id->stride==n; }
+{
+    MeleeWebSourcePoolCellIdentity current;
+    ++match_calls;
+    if(p==&particles[0] && fixture_retired_particle) ++retired_match_calls;
+    if(!id || !fixture_pool_cell_identity(p,pool,n,&current)) return 0;
+    if(identity_fault==1) ++current.allocation;
+    if(identity_fault==2) ++current.descriptor;
+    if(identity_fault==3) ++current.stride;
+    return id->world==current.world && id->epoch==current.epoch &&
+        id->allocation==current.allocation && id->pool==current.pool &&
+        id->descriptor==current.descriptor && id->source==current.source &&
+        id->cell_offset==current.cell_offset && id->stride==current.stride;
+}
 #if defined(ACTUAL_LINKED_MATH)
 static void measured_world(Mtx m,Vec3* scale,Vec3* rotate,Vec3* translate,Vec3* unused)
 {
@@ -132,13 +178,214 @@ static void draw(void)
     assert(slippi_particle_presentation_camera_end(&camera,NULL,0));
     assert(slippi_particle_presentation_draw_end(NULL,0));
 }
+static int row_same_identity(const SlippiParticleCellEndpointRow* a,
+                             const SlippiParticleCellEndpointRow* b)
+{
+    return a->schema==b->schema && a->bytes==b->bytes &&
+        a->object_kind==b->object_kind && a->extent==b->extent &&
+        a->receipt_serial==b->receipt_serial && a->object==b->object &&
+        a->world==b->world && a->epoch==b->epoch &&
+        a->allocation==b->allocation && a->pool==b->pool &&
+        a->descriptor==b->descriptor && a->source==b->source &&
+        a->cell_offset==b->cell_offset && a->stride==b->stride &&
+        a->reserved==0;
+}
+static void require_zero_header(const SlippiParticleCellEndpointHeader* h)
+{
+    SlippiParticleCellEndpointHeader zero={0};
+    assert(!memcmp(h,&zero,sizeof(zero)));
+}
+static void require_zero_row(const SlippiParticleCellEndpointRow* row)
+{
+    SlippiParticleCellEndpointRow zero={0};
+    assert(!memcmp(row,&zero,sizeof(zero)));
+}
+static void endpoint_control(const char* mode)
+{
+    SlippiParticlePresentationAnchor anchor, next_anchor;
+    SlippiParticleCellEndpointHeader clean={0}, after={0};
+    SlippiParticleCellEndpointRow clean_live[4], clean_captured[4], row={0};
+    HSD_Particle before_particles[3];
+    HSD_psAppSRT before_app;
+    uint8_t before_frame;
+    unsigned mint_before, alloc_before, world_before, retired_before;
+    uint32_t i;
+    token=41;
+    anchor=slippi_particle_presentation_anchor_capture();
+    assert(anchor.world==1 && anchor.token && anchor.serial==4);
+    if(!strcmp(mode,"endpoint-stale")) {
+        SlippiParticleCellEndpointHeader refused;
+        SlippiParticlePresentationAnchor stale=anchor;
+        memset(&refused,0xa5,sizeof(refused)); ++stale.token;
+        mint_before=mint_calls; alloc_before=allocation_calls;
+        assert(!slippi_particle_presentation_cell_endpoint_header(stale,&refused));
+        require_zero_header(&refused);
+        assert(mint_calls==mint_before && allocation_calls==alloc_before);
+    } else if(!strcmp(mode,"endpoint-generation") ||
+              !strcmp(mode,"endpoint-descriptor") ||
+              !strcmp(mode,"endpoint-stride")) {
+        SlippiParticleCellEndpointHeader refused;
+        memset(&refused,0xa5,sizeof(refused));
+        identity_fault=!strcmp(mode,"endpoint-generation")?1u:
+                       !strcmp(mode,"endpoint-descriptor")?2u:3u;
+        mint_before=mint_calls; alloc_before=allocation_calls;
+        assert(!slippi_particle_presentation_cell_endpoint_header(anchor,&refused));
+        require_zero_header(&refused);
+        assert(mint_calls==mint_before && allocation_calls==alloc_before);
+    } else if(!strcmp(mode,"endpoint-duplicate")) {
+        SlippiParticleCellEndpointHeader refused;
+        memset(&refused,0xa5,sizeof(refused));
+        mint_before=mint_calls; alloc_before=allocation_calls;
+        assert(!slippi_particle_presentation_cell_endpoint_header(anchor,&refused));
+        require_zero_header(&refused);
+        assert(mint_calls==mint_before && allocation_calls==alloc_before);
+    } else if(!strcmp(mode,"endpoint-index")) {
+        SlippiParticleCellEndpointRow refused;
+        assert(slippi_particle_presentation_cell_endpoint_header(anchor,&clean));
+        memset(&refused,0xa5,sizeof(refused));
+        mint_before=mint_calls; alloc_before=allocation_calls;
+        assert(!slippi_particle_presentation_cell_endpoint_row(
+            anchor,SLIPPI_PARTICLE_CELL_ROW_LIVE,UINT32_MAX,&refused));
+        require_zero_row(&refused);
+        assert(mint_calls==mint_before && allocation_calls==alloc_before);
+    } else {
+        memcpy(before_particles,particles,sizeof(particles)); before_app=app;
+        before_frame=psFrameNum; mint_before=mint_calls;
+        assert(slippi_particle_presentation_cell_endpoint_header(anchor,&clean));
+        assert(clean.schema==SLIPPI_PARTICLE_CELL_ENDPOINT_SCHEMA &&
+               clean.bytes==64 && clean.live_count==4 && clean.captured_count==4 &&
+               clean.world==1 && clean.anchor_serial==4 &&
+               clean.anchor_token==anchor.token && clean.history_serial==4);
+        for(i=0;i<4;++i) assert(clean.reserved[i]==0);
+        alloc_before=allocation_calls; world_before=world_calls;
+        for(i=0;i<4;++i) {
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                anchor,SLIPPI_PARTICLE_CELL_ROW_LIVE,i,&clean_live[i]));
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                anchor,SLIPPI_PARTICLE_CELL_ROW_CAPTURED,i,&clean_captured[i]));
+            assert(clean_live[i].bytes==96 && clean_live[i].index==i &&
+                   clean_live[i].row_kind==SLIPPI_PARTICLE_CELL_ROW_LIVE &&
+                   clean_captured[i].row_kind==SLIPPI_PARTICLE_CELL_ROW_CAPTURED &&
+                   clean_live[i].object_kind==(i==3 ?
+                       SLIPPI_PARTICLE_CELL_OBJECT_APPSRT :
+                       SLIPPI_PARTICLE_CELL_OBJECT_PARTICLE));
+            if(i<3) {
+                assert(clean_live[i].extent==sizeof(HSD_Particle) &&
+                       clean_live[i].stride==sizeof(HSD_Particle) &&
+                       clean_live[i].object==(uint64_t)(uintptr_t)&particles[2-i] &&
+                       clean_live[i].world==1 && clean_live[i].epoch==2 &&
+                       clean_live[i].allocation==3 &&
+                       clean_live[i].pool==(uint64_t)(uintptr_t)particles &&
+                       clean_live[i].descriptor==(uint64_t)(uintptr_t)&particle_pool &&
+                       clean_live[i].source==4+(uint32_t)((2-i)*sizeof(HSD_Particle)) &&
+                       clean_live[i].cell_offset==(uint32_t)((2-i)*sizeof(HSD_Particle)));
+            } else {
+                assert(clean_live[i].extent==sizeof(HSD_psAppSRT) &&
+                       clean_live[i].stride==sizeof(HSD_psAppSRT) &&
+                       clean_live[i].object==(uint64_t)(uintptr_t)&app &&
+                       clean_live[i].world==1 && clean_live[i].epoch==2 &&
+                       clean_live[i].allocation==5 &&
+                       clean_live[i].pool==(uint64_t)(uintptr_t)&app &&
+                       clean_live[i].descriptor==(uint64_t)(uintptr_t)&app_pool &&
+                       clean_live[i].source==64 && clean_live[i].cell_offset==0);
+            }
+            assert(row_same_identity(&clean_live[i],&clean_captured[i]));
+        }
+        assert(mint_calls==mint_before && allocation_calls==alloc_before &&
+               world_calls==world_before && psFrameNum==before_frame);
+        assert(!memcmp(before_particles,particles,sizeof(particles)) &&
+               !memcmp(&before_app,&app,sizeof(app)));
+
+        /* Retiring a captured cell leaves its immutable receipt enumerable.
+         * The endpoint read must not ask the backing observer about that dead
+         * object; the later checked reset is allowed to revalidate it. */
+        assert(slippi_particle_presentation_particle_retiring(
+            &particles[0],&particle_pool));
+        fixture_retired_particle=1;
+        retired_before=retired_match_calls;
+        mint_before=mint_calls; alloc_before=allocation_calls;
+        assert(slippi_particle_presentation_cell_endpoint_row(
+            anchor,SLIPPI_PARTICLE_CELL_ROW_CAPTURED,2,&row));
+        assert(row_same_identity(&row,&clean_captured[2]));
+        assert(retired_match_calls==retired_before && mint_calls==mint_before &&
+               allocation_calls==alloc_before);
+
+        memset(&speculative_particle,0,sizeof(speculative_particle));
+        assert(slippi_particle_presentation_particle_created(
+            &speculative_particle,&particle_pool));
+        assert(slippi_particle_presentation_particle_retiring(
+            &speculative_particle,&particle_pool));
+        assert(slippi_particle_presentation_reset_after_restore(anchor));
+        fixture_retired_particle=0;
+        assert(slippi_particle_presentation_prepare(visits,3,1,token,NULL,0));
+
+        /* Endpoint reads after the same helper continuation expose unchanged
+         * live/captured cell identities, while the local monotonic history
+         * watermark records the additional speculative constructor. */
+        memcpy(before_particles,particles,sizeof(particles)); before_app=app;
+        before_frame=psFrameNum; mint_before=mint_calls;
+        assert(slippi_particle_presentation_cell_endpoint_header(anchor,&after));
+        assert(after.live_count==4 && after.captured_count==4 &&
+               after.anchor_serial==4 && after.history_serial==5);
+        alloc_before=allocation_calls; world_before=world_calls;
+        for(i=0;i<4;++i) {
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                anchor,SLIPPI_PARTICLE_CELL_ROW_LIVE,i,&row));
+            assert(row.row_kind==SLIPPI_PARTICLE_CELL_ROW_LIVE && row.index==i);
+            assert(row_same_identity(&row,&clean_live[i]));
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                anchor,SLIPPI_PARTICLE_CELL_ROW_CAPTURED,i,&row));
+            assert(row.row_kind==SLIPPI_PARTICLE_CELL_ROW_CAPTURED && row.index==i);
+            assert(row_same_identity(&row,&clean_captured[i]));
+        }
+        assert(mint_calls==mint_before && allocation_calls==alloc_before &&
+               world_calls==world_before && psFrameNum==before_frame);
+        assert(!memcmp(before_particles,particles,sizeof(particles)) &&
+               !memcmp(&before_app,&app,sizeof(app)));
+        assert(slippi_particle_presentation_interval_end(1,token));
+        token=0;
+        next_anchor=slippi_particle_presentation_anchor_capture();
+        assert(next_anchor.world==anchor.world && next_anchor.serial==5 &&
+               next_anchor.token!=anchor.token);
+        assert(slippi_particle_presentation_cell_endpoint_header(next_anchor,&after));
+        assert(after.history_serial==5 && after.anchor_serial==5 &&
+               after.live_count==4 && after.captured_count==4);
+        for(i=0;i<4;++i) {
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                next_anchor,SLIPPI_PARTICLE_CELL_ROW_LIVE,i,&row));
+            assert(row.row_kind==SLIPPI_PARTICLE_CELL_ROW_LIVE && row.index==i);
+            assert(row_same_identity(&row,&clean_live[i]));
+            assert(slippi_particle_presentation_cell_endpoint_row(
+                next_anchor,SLIPPI_PARTICLE_CELL_ROW_CAPTURED,i,&row));
+            assert(row.row_kind==SLIPPI_PARTICLE_CELL_ROW_CAPTURED && row.index==i);
+            assert(row_same_identity(&row,&clean_captured[i]));
+        }
+        assert(!slippi_particle_presentation_failure());
+        slippi_particle_presentation_anchor_disarm(next_anchor);
+        assert(slippi_particle_presentation_world_end(1));
+        puts("particle presentation control endpoint passed; typed constructor receipt rows and monotonic local history");
+        return;
+    }
+    assert(slippi_particle_presentation_failure());
+    assert(slippi_particle_presentation_interval_end(1,token));
+    token=0;
+    assert(!slippi_particle_presentation_world_end(1));
+    assert(slippi_particle_presentation_world_begin(2));
+    assert(slippi_particle_presentation_world_end(2));
+    printf("particle presentation control %s passed; zero-on-refusal typed endpoint\n",mode);
+}
 int main(int argc,char** argv)
 {
     SlippiParticlePresentationAnchor anchor;
     HSD_Particle before[3];HSD_psAppSRT before_app;
     u8 initial_key, expected_key;
     const char* mode=argc>1?argv[1]:"positive";
+    if(!strcmp(mode,"endpoint-duplicate")) duplicate_particle_identity=1;
     init();
+    if(!strncmp(mode,"endpoint-",9) || !strcmp(mode,"endpoint")) {
+        endpoint_control(mode);
+        return 0;
+    }
 #if defined(ACTUAL_LINKED_MATH)
     app.rot.x=0.23f;app.rot.y=-0.5f;app.rot.z=0.9f;
     app.scale.x=1.2f;app.scale.y=0.7f;app.scale.z=2.0f;

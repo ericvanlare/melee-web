@@ -7,6 +7,40 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <stddef.h>
+
+_Static_assert(sizeof(SlippiParticleCellEndpointHeader) == 64,
+               "particle endpoint header wire size changed");
+_Static_assert(offsetof(SlippiParticleCellEndpointHeader, schema) == 0 &&
+               offsetof(SlippiParticleCellEndpointHeader, bytes) == 4 &&
+               offsetof(SlippiParticleCellEndpointHeader, live_count) == 8 &&
+               offsetof(SlippiParticleCellEndpointHeader, captured_count) == 12 &&
+               offsetof(SlippiParticleCellEndpointHeader, world) == 16 &&
+               offsetof(SlippiParticleCellEndpointHeader, anchor_serial) == 24 &&
+               offsetof(SlippiParticleCellEndpointHeader, anchor_token) == 32 &&
+               offsetof(SlippiParticleCellEndpointHeader, history_serial) == 40 &&
+               offsetof(SlippiParticleCellEndpointHeader, reserved) == 48,
+               "particle endpoint header wire offsets changed");
+_Static_assert(sizeof(SlippiParticleCellEndpointRow) == 96,
+               "particle endpoint row wire size changed");
+_Static_assert(offsetof(SlippiParticleCellEndpointRow, schema) == 0 &&
+               offsetof(SlippiParticleCellEndpointRow, bytes) == 4 &&
+               offsetof(SlippiParticleCellEndpointRow, row_kind) == 8 &&
+               offsetof(SlippiParticleCellEndpointRow, index) == 12 &&
+               offsetof(SlippiParticleCellEndpointRow, object_kind) == 16 &&
+               offsetof(SlippiParticleCellEndpointRow, extent) == 20 &&
+               offsetof(SlippiParticleCellEndpointRow, receipt_serial) == 24 &&
+               offsetof(SlippiParticleCellEndpointRow, object) == 32 &&
+               offsetof(SlippiParticleCellEndpointRow, world) == 40 &&
+               offsetof(SlippiParticleCellEndpointRow, epoch) == 48 &&
+               offsetof(SlippiParticleCellEndpointRow, allocation) == 56 &&
+               offsetof(SlippiParticleCellEndpointRow, pool) == 64 &&
+               offsetof(SlippiParticleCellEndpointRow, descriptor) == 72 &&
+               offsetof(SlippiParticleCellEndpointRow, source) == 80 &&
+               offsetof(SlippiParticleCellEndpointRow, cell_offset) == 84 &&
+               offsetof(SlippiParticleCellEndpointRow, stride) == 88 &&
+               offsetof(SlippiParticleCellEndpointRow, reserved) == 92,
+               "particle endpoint row wire offsets changed");
 
 /* Receipts are minted only by the real source constructors. No draw/capture
  * lookup can create one. Keep retired receipts until the world ends because a
@@ -248,6 +282,126 @@ int slippi_particle_presentation_anchor_admit(SlippiParticlePresentationAnchor a
     if(particles!=a.particle_count || apps!=a.appsrt_count) return fail();
     return 1;
 }
+
+static int same_cell_identity(const MeleeWebSourcePoolCellIdentity* a,
+                              const MeleeWebSourcePoolCellIdentity* b)
+{
+    return a->world==b->world && a->epoch==b->epoch &&
+        a->allocation==b->allocation && a->pool==b->pool &&
+        a->descriptor==b->descriptor && a->source==b->source &&
+        a->cell_offset==b->cell_offset && a->stride==b->stride;
+}
+
+/* Validate the current live set through its original constructor receipts.
+ * Captured-but-retired rows are counted from receipt metadata only and are
+ * never passed to the backing-memory observer. */
+static int cell_endpoint_admit(SlippiParticlePresentationAnchor a,
+                               uint32_t* live_count,
+                               uint32_t* captured_count)
+{
+    Cell *c, *other;
+    uint32_t live=0, captured=0, captured_particles=0, captured_apps=0;
+    if(!live_count || !captured_count || !slippi_particle_presentation_anchor_admit(a) ||
+       state.serial<a.serial) return fail();
+    for(c=state.cells;c;c=c->next) {
+        if((c->live || c->captured) &&
+           (!c->serial || c->serial>state.serial)) return fail();
+        if(c->live) {
+            if(!valid(c) || live==UINT32_MAX) return fail();
+            ++live;
+        }
+        if(c->captured) {
+            if(c->serial>a.serial || captured==UINT32_MAX) return fail();
+            ++captured;
+            if(c->app) {
+                if(captured_apps==UINT32_MAX) return fail();
+                ++captured_apps;
+            } else {
+                if(captured_particles==UINT32_MAX) return fail();
+                ++captured_particles;
+            }
+        }
+    }
+    if(captured_particles!=a.particle_count || captured_apps!=a.appsrt_count)
+        return fail();
+    /* Two current receipts cannot claim the same backing source cell. Check
+     * the captured set independently; cross-set reuse is retained history. */
+    for(c=state.cells;c;c=c->next) if(c->live || c->captured) {
+        for(other=c->next;other;other=other->next) {
+            if(((c->live && other->live) ||
+                (c->captured && other->captured)) &&
+               same_cell_identity(&c->identity,&other->identity)) return fail();
+        }
+    }
+    *live_count=live;
+    *captured_count=captured;
+    return 1;
+}
+
+int slippi_particle_presentation_cell_endpoint_header(
+    SlippiParticlePresentationAnchor a, SlippiParticleCellEndpointHeader* out)
+{
+    SlippiParticleCellEndpointHeader value={0};
+    if(out) *out=(SlippiParticleCellEndpointHeader){0};
+    if(!out || !cell_endpoint_admit(a,&value.live_count,&value.captured_count))
+        return 0;
+    value.schema=SLIPPI_PARTICLE_CELL_ENDPOINT_SCHEMA;
+    value.bytes=sizeof(value);
+    value.world=a.world;
+    value.anchor_serial=a.serial;
+    value.anchor_token=a.token;
+    value.history_serial=state.serial;
+    *out=value;
+    return 1;
+}
+
+int slippi_particle_presentation_cell_endpoint_row(
+    SlippiParticlePresentationAnchor a, uint32_t row_kind, uint32_t index,
+    SlippiParticleCellEndpointRow* out)
+{
+    SlippiParticleCellEndpointRow value={0};
+    Cell* c;
+    uint32_t live_count, captured_count, at=0;
+    if(out) *out=(SlippiParticleCellEndpointRow){0};
+    if(!out || (row_kind!=SLIPPI_PARTICLE_CELL_ROW_LIVE &&
+                row_kind!=SLIPPI_PARTICLE_CELL_ROW_CAPTURED) ||
+       !cell_endpoint_admit(a,&live_count,&captured_count)) return 0;
+    (void)live_count; (void)captured_count;
+    for(c=state.cells;c;c=c->next) {
+        if((row_kind==SLIPPI_PARTICLE_CELL_ROW_LIVE && c->live) ||
+           (row_kind==SLIPPI_PARTICLE_CELL_ROW_CAPTURED && c->captured)) {
+            if(at++!=index) continue;
+            /* cell_endpoint_admit has checked all live cells. Retired captured
+             * receipts are copied below without inspecting their object. */
+            value.schema=SLIPPI_PARTICLE_CELL_ENDPOINT_SCHEMA;
+            value.bytes=sizeof(value);
+            value.row_kind=row_kind;
+            value.index=index;
+            value.object_kind=c->app ? SLIPPI_PARTICLE_CELL_OBJECT_APPSRT :
+                                      SLIPPI_PARTICLE_CELL_OBJECT_PARTICLE;
+            {
+                const size_t extent=c->app ? state.app_extent :
+                                             state.particle_extent;
+                if(extent>UINT32_MAX) return fail();
+                value.extent=(uint32_t)extent;
+            }
+            value.receipt_serial=c->serial;
+            value.object=(uint64_t)(uintptr_t)c->object;
+            value.world=c->identity.world;
+            value.epoch=c->identity.epoch;
+            value.allocation=c->identity.allocation;
+            value.pool=(uint64_t)c->identity.pool;
+            value.descriptor=(uint64_t)c->identity.descriptor;
+            value.source=c->identity.source;
+            value.cell_offset=c->identity.cell_offset;
+            value.stride=c->identity.stride;
+            *out=value;
+            return 1;
+        }
+    }
+    return fail();
+}
+
 void slippi_particle_presentation_anchor_disarm(SlippiParticlePresentationAnchor a)
 {
     if (state.anchor_token && (a.world!=state.world || a.token!=state.anchor_token ||

@@ -33,6 +33,9 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
     r.view=static_cast<uint32_t>(view_);r.provenance=static_cast<uint32_t>(provenance_);
     r.count=1;return r;
 }
+// This phase model does not grant particle-sidecar ownership.
+bool GameplayCpuEndpointReader::particle_header(SlippiParticleCellEndpointHeader& out) const noexcept {out={};return false;}
+bool GameplayCpuEndpointReader::particle_row(uint32_t,uint32_t,SlippiParticleCellEndpointRow& out) const noexcept {out={};return false;}
 bool GameplayCpuEndpointReader::revalidate() noexcept {bool prior=active_;active_=false;return prior;}
 }
 namespace {

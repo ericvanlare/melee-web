@@ -8,6 +8,7 @@
 #include "gameplay_match_context.h"
 #include "gameplay_match_flow.h"
 #include "gameplay_source_memory_runtime.h"
+#include "slippi_profile/particle_presentation.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -116,6 +117,11 @@ public:
     GameplayCpuEndpointRecord record(GameplayCpuEndpointDomain,
                                      GameplayCpuEndpointRowKind,
                                      std::uint32_t index=0) const noexcept;
+    // Optional typed particle receipt sidecar. The original 312-byte records
+    // and their strict comparison remain unchanged.
+    bool particle_header(SlippiParticleCellEndpointHeader&) const noexcept;
+    bool particle_row(std::uint32_t kind,std::uint32_t index,
+                      SlippiParticleCellEndpointRow&) const noexcept;
     bool revalidate() noexcept;
     GameplayCpuEndpointStatus status() const noexcept { return status_; }
     bool active() const noexcept { return active_; }
