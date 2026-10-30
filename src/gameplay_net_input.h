@@ -31,6 +31,11 @@ enum {
 };
 
 #if defined(MELEE_WEB_NET_SESSION)
+/* Pure single-contribution admission, sharing the full-frame PAD semantics.
+ * Failure leaves out unchanged. Neither function polls, queues, advances or
+ * requires a session. These APIs cannot publish partial/predicted frames. */
+int melee_web_net_decode_pad(const uint8_t* bytes, unsigned count, PADStatus* out);
+int melee_web_net_validate_pad(const uint8_t* bytes, unsigned count);
 int melee_web_net_active(void);
 /* Begin a session on a fresh prepared CSS owner (the caller checks the
  * owner). Only the agreed seed varies; the context is the canonical

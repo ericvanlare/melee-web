@@ -62,7 +62,7 @@ target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPL
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
   MELEE_WEB_MENU_MARIO_FD)
-if(MELEE_WEB_SLIPPI_SYNCTEST)
+if(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED)
   target_sources(fighter_source_runtime PRIVATE
     src/slippi_profile/deadupfall_fix.c
     src/slippi_profile/draw_diagnostics.c
@@ -912,6 +912,12 @@ if(MELEE_WEB_PIPELINE_PROVENANCE)
   string(APPEND gameplay_menu_browser_exports
     ",_melee_web_provenance_set_case,_melee_web_provenance_drain,_melee_web_provenance_finish,_melee_web_provenance_status")
 endif()
+if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  set(_match_history_link_map
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history.map")
+  target_link_options(gameplay_menu_browser PRIVATE
+    "-Wl,--Map=${_match_history_link_map}")
+endif()
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
@@ -925,6 +931,59 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
 else()
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
+endif()
+if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(_history_source_producer_targets
+    gameplay_runtime hsd_native_runtime fighter_source_runtime)
+  set(_history_source_producers
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history_producers.tsv")
+  string(ASCII 9 _history_source_tab)
+  file(WRITE "${_history_source_producers}" "")
+  foreach(_history_source_target IN LISTS _history_source_producer_targets)
+    get_target_property(_history_source_paths "${_history_source_target}" SOURCES)
+    if(NOT _history_source_paths)
+      message(FATAL_ERROR
+        "Match-history source producer target has no sources: ${_history_source_target}")
+    endif()
+    foreach(_history_source IN LISTS _history_source_paths)
+      if(_history_source MATCHES "\\$<")
+        message(FATAL_ERROR
+          "Match-history source producer has a generated-expression source: ${_history_source_target}:${_history_source}")
+      endif()
+      if(IS_ABSOLUTE "${_history_source}")
+        set(_history_source_absolute "${_history_source}")
+      else()
+        get_filename_component(_history_source_absolute "${_history_source}" ABSOLUTE
+          BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+      endif()
+      if(_history_source_absolute MATCHES "[\t\n]")
+        message(FATAL_ERROR
+          "Match-history source path cannot be represented: ${_history_source_absolute}")
+      endif()
+      file(APPEND "${_history_source_producers}"
+        "${_history_source_target}${_history_source_tab}${_history_source_absolute}\n")
+    endforeach()
+  endforeach()
+  set(_match_history_manifest
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history.source-state.json")
+  add_custom_target(gameplay_menu_browser_match_history_source_manifest
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      --target gameplay_menu_browser
+      --link-map "${_match_history_link_map}"
+      --wasm "$<TARGET_FILE_DIR:gameplay_menu_browser>/gameplay_menu_browser.wasm"
+      --compile-commands "${CMAKE_BINARY_DIR}/compile_commands.json"
+      --producer-sources "${_history_source_producers}"
+      --source-root "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/.."
+      --repository-root "${CMAKE_CURRENT_SOURCE_DIR}"
+      --cmake-cache "${CMAKE_BINARY_DIR}/CMakeCache.txt"
+      --build-graph "${CMAKE_BINARY_DIR}/build.ninja"
+      --emscripten-version-file "${CMAKE_CURRENT_SOURCE_DIR}/.deps/emsdk/upstream/emscripten/emscripten-version.txt"
+      --build-type "${CMAKE_BUILD_TYPE}"
+      --output "${_match_history_manifest}"
+    DEPENDS gameplay_menu_browser "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      "${_history_source_producers}"
+    VERBATIM)
 endif()
 configure_file(web/native-menu.html native-menu.html @ONLY)
 

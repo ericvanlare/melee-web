@@ -8,7 +8,7 @@ export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
 
 export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl, roomId,
   timeoutMs = 5000, agreement, native, inputCapture = null, autonomousPump = false,
-  checksumConsumer = null},
+  checksumConsumer = null, onRemoteContributionBatch = null},
 {createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   if (!agreement || typeof agreement !== 'object') throw Error('Browser peer requires its frozen start agreement');
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0)
@@ -19,6 +19,8 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     throw Error('Browser peer requires bounded source and input ticks with the fixed two-tick delay');
   if (checksumConsumer !== null && typeof checksumConsumer !== 'function')
     throw Error('Browser checksum consumer must be a function');
+  if (onRemoteContributionBatch !== null && typeof onRemoteContributionBatch !== 'function')
+    throw Error('Browser remote contribution observer must be a function');
   let inputCaptureMode = null;
   if (inputCapture !== null) {
     if (!inputCapture || typeof inputCapture !== 'object' || Array.isArray(inputCapture))
@@ -92,6 +94,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   const exports = [], pending = new Set(), capturedLocalInputs = [];
   const cancelledLocalInputs = [], cancelledOutboundSends = [];
   let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null, endpoint = null;
+  let remoteContributionObserver = onRemoteContributionBatch;
   let inputCaptureRegistered = false;
   const asError = error => error instanceof Error ? error : Error(String(error));
   function invalidateConsumerBatch(batch, reason) {
@@ -277,6 +280,7 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     isClosedSendCancellation: isProvenClosedSendCancellation,
     isClosedDisconnect: isProvenCommittedDisconnect,
     onSendCancellation: recordCancelledOutboundSend,
+    onRemoteContributionBatch: batch => remoteContributionObserver?.(batch),
     pushFrame: async (tick, bytes) => {
       if (!await callNative('pushIndexed', tick, bytes)) throw Error('Native indexed input queue rejected agreed frames');
     },
@@ -661,6 +665,9 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       try { await operation(); } catch (error) { recordFailure(error); }
       if (closeMode === 'fatal') nativeQuiescence = 'aborted-fatal';
     }
+    // All receiveQueue and tracked endpoint work has settled before retiring the
+    // callback reference; an in-flight accepted batch is joined, not detached.
+    remoteContributionObserver = null;
     try { await native.dispose?.(); } catch (error) { recordFailure(error); }
     closed = endpoint.closed;
     if (closeMode === 'fatal') nativeQuiescence = 'aborted-fatal';

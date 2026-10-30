@@ -297,6 +297,7 @@ export function createRoomRelayTransport({url, roomId, role, timeoutMs,
 /** One runtime-owned native adapter, browser peer, and frame-driven progress subscription. */
 export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTicks, url, roomId,
   timeoutMs = 5000, checksumEvidenceRecords = undefined, transportType = 'webrtc',
+  onRemoteContributionBatch = null,
   createAdapter = createNetLockstepNativeAdapter, createPeer = createBrowserNativePeer,
   createTransport = createRoomTransport, createRelayTransport = createRoomRelayTransport} = {}) {
   if (!Module || typeof Module !== 'object') throw Error('Runtime lockstep session requires the loaded native Module');
@@ -307,6 +308,8 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
   if (checksumEvidenceRecords !== undefined &&
       (!Number.isSafeInteger(checksumEvidenceRecords) || checksumEvidenceRecords !== sourceTicks))
     throw Error('Runtime lockstep checksum evidence budget must equal its declared source tick bound');
+  if (onRemoteContributionBatch !== null && typeof onRemoteContributionBatch !== 'function')
+    throw Error('Runtime remote contribution observer must be a function');
   if (!['webrtc', 'relay'].includes(transportType))
     throw Error('Runtime lockstep transport type must be webrtc or relay');
   const evidenceLimit = checksumEvidenceRecords ?? BROWSER_CHECKSUM_EXPORT_LIMIT;
@@ -366,6 +369,7 @@ export function createRuntimeLockstepSession({Module, role, sourceTicks, inputTi
     transport = buildTransport({url, roomId, role, timeoutMs, agreement, sourceTicks, inputTicks});
     peer = createPeer({role, sourceTicks, inputTicks, timeoutMs, agreement, native,
       inputCapture: {mode: 'live'}, autonomousPump: true,
+      onRemoteContributionBatch,
       checksumConsumer(records) {
         if (!Array.isArray(records) || checksumRecords.length + records.length > evidenceLimit)
           throw Error('Runtime lockstep checksum evidence exceeds its bounded page retention');

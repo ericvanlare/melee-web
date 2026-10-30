@@ -44,6 +44,7 @@ class SourceStateManifestTests(unittest.TestCase):
             "CMakeLists.txt",
             "cmake/FighterRuntime.cmake",
             "scripts/source_state_manifest.py",
+            "scripts/gameplay_bool.py",
             "patches/melee-gameplay.patch",
             "src/slippi_profile/patches/melee-profile-hooks.patch",
         ):
@@ -144,11 +145,153 @@ class SourceStateManifestTests(unittest.TestCase):
                          "archive-outside-generated-source-producers")
         self.assertFalse(result["complete_game_state"])
         self.assertEqual(result["configuration_identity"]["locked_melee_commit"], self.melee_commit)
+        self.assertNotIn("execution_profile", result["configuration_identity"])
         self.assertIn("AXAlloc.c", "\n".join(result["configuration_identity"]["producer_source_sha256"]))
+
+    def _enable_match_history_cache(self):
+        options = {
+            "MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC": "ON",
+            "MELEE_WEB_SLIPPI_SYNCTEST": "OFF",
+            "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+            "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+            "MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK": "ON",
+            "MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE": "ON",
+            "MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE": "ON",
+            "MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE": "ON",
+            "MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY": "ON",
+            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "ON",
+            "MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY": "OFF",
+        }
+        lines = ["CMAKE_BUILD_TYPE:STRING=Release"]
+        lines.extend(f"{name}:BOOL={value}" for name, value in options.items())
+        self.cache.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _move_to_profile_source_tree(self):
+        self._enable_match_history_cache()
+        profile_root = self.root / "build/gameplay-source-slippi-profile"
+        self.source_root.rename(profile_root)
+        self.source_root = profile_root
+        composed = self.source_root / ".git/melee-web-slippi-profile-composed.patch"
+        composed.write_bytes(b"composed Slippi profile fixture patch\n")
+        reviewed_patch = self.root / "patches/melee-gameplay.patch"
+        base_patch = self.source_root / ".git/melee-web-composed.patch"
+        base_patch.write_bytes(b"boolean-transformed gameplay fixture patch\n")
+        (self.source_root / ".git/melee-web-composed.json").write_text(json.dumps({
+            "key": {
+                "head": self.melee_commit,
+                "reviewed": manifest.sha256(reviewed_patch),
+                "transform": manifest.sha256(self.root / "scripts/gameplay_bool.py"),
+            },
+            "patch_sha256": manifest.sha256(base_patch),
+        }), encoding="utf-8")
+        profile_patch = self.root / "src/slippi_profile/patches/melee-profile-hooks.patch"
+        (self.source_root / ".git/melee-web-gameplay.patch").write_bytes(composed.read_bytes())
+        (self.source_root / ".git/melee-web-slippi-profile-composed.json").write_text(json.dumps({
+            "key": {
+                "base_patch_sha256": manifest.sha256(base_patch),
+                "profile_patch_sha256": manifest.sha256(profile_patch),
+            },
+            "patch_sha256": manifest.sha256(composed),
+        }), encoding="utf-8")
+        self._write_inputs()
 
     def test_non_private_target_is_rejected(self):
         with self.assertRaisesRegex(manifest.ManifestError, "private to"):
             manifest.build_manifest(self._args("gameplay_release"))
+
+    def test_match_history_target_requires_exact_profile_source_provenance(self):
+        self._move_to_profile_source_tree()
+        result = manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+        self.assertEqual(result["target"], manifest.MATCH_HISTORY_TARGET)
+        identity = result["configuration_identity"]
+        self.assertEqual(identity["execution_profile"], "runtime-match-history-diagnostic")
+        self.assertEqual(identity["source_profile"], "slippi-render-dependencies-overlay")
+        self.assertEqual(identity["source_root"], "build/gameplay-source-slippi-profile")
+        source_patches = identity["source_patch_sha256"]
+        self.assertEqual(
+            source_patches["profile-composed-patch"],
+            source_patches["generated-composed-patch"],
+        )
+        self.assertIn("profile-composition-manifest", source_patches)
+        self.assertIn("base-composition-manifest", source_patches)
+        self.assertEqual(source_patches["base-composed-patch"], manifest.sha256(
+            self.source_root / ".git/melee-web-composed.patch"))
+        self.assertNotEqual(source_patches["base-composed-patch"],
+                            source_patches["melee-gameplay.patch"])
+        self.assertFalse(result["complete_game_state"])
+
+    def test_match_history_refuses_missing_or_stale_profile_composition(self):
+        self._enable_match_history_cache()
+        with self.assertRaisesRegex(manifest.ManifestError, "dedicated Slippi profile source tree"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+
+        self._move_to_profile_source_tree()
+        composition = self.source_root / ".git/melee-web-slippi-profile-composed.json"
+        stale = json.loads(composition.read_text(encoding="utf-8"))
+        stale["key"]["profile_patch_sha256"] = "f" * 64
+        composition.write_text(json.dumps(stale), encoding="utf-8")
+        with self.assertRaisesRegex(manifest.ManifestError, "different patch inputs"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+
+    def test_match_history_authenticates_base_source_reviewed_patch_and_transform(self):
+        self._move_to_profile_source_tree()
+        identity = self.source_root / ".git/melee-web-composed.json"
+        original = identity.read_bytes()
+        for key in ("head", "reviewed", "transform"):
+            with self.subTest(key=key):
+                stale = json.loads(original)
+                stale["key"][key] = "f" * len(stale["key"][key])
+                identity.write_text(json.dumps(stale), encoding="utf-8")
+                with self.assertRaisesRegex(manifest.ManifestError, "different source/patch/transform inputs"):
+                    manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+        identity.write_bytes(original)
+        for relative in ("patches/melee-gameplay.patch", "scripts/gameplay_bool.py"):
+            with self.subTest(input=relative):
+                source = self.root / relative
+                before = source.read_bytes()
+                source.write_bytes(before + b"changed input\n")
+                with self.assertRaisesRegex(manifest.ManifestError, "different source/patch/transform inputs"):
+                    manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+                source.write_bytes(before)
+
+    def test_match_history_requires_exact_generated_base_and_final_patch_joins(self):
+        self._move_to_profile_source_tree()
+        base = self.source_root / ".git/melee-web-composed.patch"
+        before = base.read_bytes()
+        base.write_bytes(before + b"drift\n")
+        with self.assertRaisesRegex(manifest.ManifestError, "base composition manifest does not match"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+        base.write_bytes(before)
+        identity = self.source_root / ".git/melee-web-slippi-profile-composed.json"
+        original = identity.read_bytes()
+        wrong = json.loads(original)
+        # Reproduce the v1 validator/fixture defect: raw != transformed base.
+        wrong["key"]["base_patch_sha256"] = manifest.sha256(self.root / "patches/melee-gameplay.patch")
+        identity.write_text(json.dumps(wrong), encoding="utf-8")
+        with self.assertRaisesRegex(manifest.ManifestError, "different patch inputs"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+        identity.write_bytes(original)
+        final = self.source_root / ".git/melee-web-gameplay.patch"
+        final.write_bytes(b"wrong applied patch\n")
+        with self.assertRaisesRegex(manifest.ManifestError, "does not use the composed Slippi profile patch"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
+
+    def test_match_history_manifest_is_release_only(self):
+        self._move_to_profile_source_tree()
+        args = self._args(manifest.MATCH_HISTORY_TARGET)
+        args.build_type = "RelWithDebInfo"
+        with self.assertRaisesRegex(manifest.ManifestError, "requires a Release build"):
+            manifest.build_manifest(args)
+
+    def test_match_history_requires_explicit_complete_cmake_profile(self):
+        self._move_to_profile_source_tree()
+        cache = self.cache.read_text(encoding="utf-8").replace(
+            "MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE:BOOL=ON",
+            "MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE:BOOL=OFF",
+        )
+        self.cache.write_text(cache, encoding="utf-8")
+        with self.assertRaisesRegex(manifest.ManifestError, "PARTICLE_PRESENTATION_CACHE must be ON"):
+            manifest.build_manifest(self._args(manifest.MATCH_HISTORY_TARGET))
 
     def test_wrong_pinned_checkout_is_rejected(self):
         lock = self.root / "dependencies.lock.json"
