@@ -9820,7 +9820,7 @@
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
       "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and nine producer pins unchanged.",
-      "next": "Publication-head CI and integration; then proof-backed confirmed checkpoint retirement/reuse in the same match. Continuous rolling/live relay/full-match/profile admission remain open.",
+      "next": "Two independently compared wrong-prediction windows in one live match using one continuing timeline and a single reusable checkpoint slot; no new browser result yet.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
@@ -9882,7 +9882,7 @@
           "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/integration-readiness-sol-v1.json",
           "sha256": "18c8ba1bfcccd086b4a73815b0e26f4803af1cdb879dab907bcd80154e767896"
         },
-        "status": "Local validation passes: 3,069 tests with 238 skips and ordinary Release runtime build. Exact publication-head CI remains pending. Runtime f4ae3dc3 and capture harness 6a52264d remain distinct.",
+        "status": "Merged in PR #342 as 97764b0f after all 14 checks on publication head 9e69d37b (12 successes, two expected skips), independent review, 3,069-test regression with 238 skips and affected builds. Reviewed and merged trees match. Runtime f4ae3dc3, capture harness 6a52264d and validation source 16c4824d remain distinct.",
         "first_publication_ci": {
           "result": {
             "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-initial-complete.json",
@@ -9898,7 +9898,28 @@
             "sha256": "8d6c43bd4d29d9aef5c17e5cf72dbeefce2ee8910e41b7653fcd607176cbb2b4"
           },
           "scope": "Whitespace-only split; tokens/order unchanged. The focused source-memory snapshot control passes locally. Exact repaired-head CI remains required."
+        },
+        "publication_ci": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-repaired-complete.json",
+          "sha256": "41c3a331c01862eb1010c74705076d0ac4e0b13a697192a8e877629518ce57d8"
+        },
+        "merge": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/merge-receipt.json",
+          "sha256": "afc7ee5fc632dd83aeca4e80ad5ef44b5dea0c145bb1b7259dc8211b13db57c2"
         }
+      },
+      "confirmed_retirement_component": {
+        "source": "8c9790876654057a06d0e35db0ed3575120d61cd",
+        "receipt": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/confirmed-retirement-component-receipt-v1.json",
+          "sha256": "202af4bbe0606a847ab80c0880210d3c658786b5360626fc3c921feb0537c970"
+        },
+        "status": "Focused component controls pass; clean-reference and corrected checkpoints retire with their exact match owners live, and later cleanup of an old detached capsule cannot disturb a new interval. Generic fallback retirement guards remain. Not yet built or exercised in the actual browser.",
+        "next_interface_review": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-two-window-interface-sol-review-v1.json",
+          "sha256": "6a0badc6244e4df5b3166c9a2b3837c68d7afa983d652ca1e8800b57e3308e55"
+        },
+        "failures": "Retain the ActionStore fixture stack overflow and derived destroyed-store status failure, plus the extracted coordinator short-circuit order expectation failure. Reviewed fixture-only repairs preserve production checks."
       }
     }
   }

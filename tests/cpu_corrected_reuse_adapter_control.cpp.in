@@ -1,0 +1,274 @@
+/* Actual corrected adapter, with named source/checkpoint/idle leaves modeled. */
+@BASE_CONTROL@
+bool confirmed_retire_ok=true;
+unsigned confirmed_retire_calls=0;
+
+namespace melee_web {
+GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
+    const GameplayMatchSession& session) noexcept { return restore(session); }
+bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session) noexcept {
+    if(phase_!=Phase::Replaying||session.source_frames()!=post_frame_||
+       !melee_web_cpu_interval_admit(effect_token_)||fail_replay)return false;
+    phase_=Phase::Finished;return true;
+}
+bool GameplayCpuCheckpoint::retire_confirmed(const GameplayMatchSession& session) noexcept {
+    ++confirmed_retire_calls;
+    if(!confirmed_retire_ok||session.source_frames()!=post_frame_||
+       (phase_!=Phase::Sealed&&phase_!=Phase::Finished))return false;
+    source_step_possible_=false;disarm();return true;
+}
+bool GameplayCpuEndpointReader::begin(const GameplayMatchSession&,
+    const GameplayCpuCheckpoint&,GameplayCpuEndpointView view,
+    GameplayCpuEndpointProvenance provenance) noexcept {
+    if(active_)return false;view_=view;provenance_=provenance;active_=true;return true;
+}
+GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
+    GameplayCpuEndpointDomain domain,GameplayCpuEndpointRowKind kind,uint32_t index) const noexcept {
+    GameplayCpuEndpointRecord r{};
+    if(!active_||index>0){r.status=5;return r;}
+    r.schema=1;r.domain=static_cast<uint32_t>(domain);r.row_kind=static_cast<uint32_t>(kind);
+    r.view=static_cast<uint32_t>(view_);r.provenance=static_cast<uint32_t>(provenance_);
+    r.count=1;return r;
+}
+bool GameplayCpuEndpointReader::revalidate() noexcept {bool prior=active_;active_=false;return prior;}
+}
+
+namespace {
+void new_page(){
+    cpu_corrected.~CpuCorrectedControl();
+    ::new(static_cast<void*>(&cpu_corrected)) CpuCorrectedControl{};
+    cpu_corrected_reuse.~CpuCorrectedReuseControl();
+    ::new(static_cast<void*>(&cpu_corrected_reuse)) CpuCorrectedReuseControl{};
+    cpu_corrected_reuse_evidence={};corrected_runtime_refused=false;
+    confirmed_retire_ok=true;confirmed_retire_calls=0;
+    reset_fixture();
+}
+void enable_reuse(){
+    check(melee_web_synctest_cpu_corrected_reuse_enable()==0,"Reuse enable refused on a clean page");
+    check(cpu_corrected_reuse.enabled&&cpu_corrected_active(),"Reuse enable did not fence the legacy adapter");
+    check(melee_web_synctest_cpu_corrected_reuse_evidence_bytes()==40,"Reuse evidence ABI changed");
+    check(melee_web_synctest_cpu_corrected_reuse_enable()!=0&&cpu_corrected_reuse.enabled,
+          "Reuse enable was accepted more than once");
+}
+void configure_and_capture(uint32_t expected_sample,uint32_t expected_pre,unsigned expected_captures=1){
+    check(configure_valid(),"Corrected reuse configuration refused");
+    check(melee_web_synctest_cpu_corrected_command(32)==0,"Corrected reuse capture refused");
+    const auto& m=cpu_corrected_reuse_evidence;
+    check(m.windows_captured==expected_captures&&m.windows_retired+1==expected_captures&&
+          m.active_capsules==1&&m.max_active_capsules==1&&m.window_first_sample==expected_sample&&
+          m.window_pre_frame==expected_pre&&m.window_post_frame==expected_pre+7,
+          "Capture metadata did not describe the actual window");
+}
+void baseline_steps(unsigned tick_start,unsigned draw_start){
+    const uint32_t pre=cpu_corrected.evidence.pre_frame;
+    for(unsigned i=0;i<7;++i){
+        pending_submission=false;
+        check(melee_web_synctest_cpu_corrected_command(33+i)==0&&
+              tick_calls==tick_start+i+1&&draw_calls==draw_start+std::min(i+1u,6u)&&
+              match->source_frames()==pre+i+1,
+              "Authoritative corrected-reuse step/draw order changed");
+    }
+    check(cpu_corrected.phase==CpuCorrectedControl::BaselineCpuEnd&&
+          draw_calls==draw_start+6&&!pending_submission,
+          "Seven-tick baseline did not pause before the final draw");
+}
+void baseline_present(unsigned draw_start){
+    check(melee_web_synctest_cpu_corrected_command(40)==0&&
+          pending_submission&&draw_calls==draw_start+7,
+          "Authoritative final draw was not submitted");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_corrected_command(41)==0&&
+          cpu_corrected.phase==CpuCorrectedControl::BaselineReady,
+          "Authoritative final draw idle was refused");
+}
+void corrected_steps(unsigned tick_start,unsigned draw_count){
+    const uint32_t pre=cpu_corrected.evidence.pre_frame;
+    check(melee_web_synctest_cpu_corrected_command(42)==0&&
+          match->source_frames()==pre,"Corrective restore lost its exact source cursor");
+    for(unsigned i=0;i<7;++i)
+        check(melee_web_synctest_cpu_corrected_command(43+i)==0&&
+              tick_calls==tick_start+i+1&&draw_calls==draw_count&&
+              match->source_frames()==pre+i+1&&!pending_submission,
+              "Corrected reuse tick drew, repeated or lost the source cursor");
+    check(cpu_corrected.evidence.replay_step_no_draw_mask==0x7fu&&
+          !cpu_corrected.evidence.cpu_equality&&!cpu_corrected.evidence.drawn_equality,
+          "Local corrected completion asserted cross-instance equality");
+}
+void final_corrected_present(unsigned draw_count){
+    check(melee_web_synctest_cpu_corrected_command(50)==0&&
+          draw_calls==draw_count+1&&pending_submission,
+          "Corrected final draw was not submitted");
+    pending_submission=false;
+    check(melee_web_synctest_cpu_corrected_command(51)==0&&
+          cpu_corrected.phase==CpuCorrectedControl::CorrectedReady,
+          "Corrected final draw idle was refused");
+}
+void endpoint_batch(uint32_t view,uint32_t provenance){
+    check(melee_web_synctest_cpu_endpoint_begin(view,provenance)==0&&cpu_restore.inflight,
+          "Endpoint begin failed in reuse fixture");
+    check(melee_web_synctest_cpu_endpoint_record(1,1,0)==0,
+          "Endpoint row failed in reuse fixture");
+    const auto* row=static_cast<const melee_web::GameplayCpuEndpointRecord*>(
+        melee_web_synctest_cpu_endpoint_data());
+    check(row->view==view&&row->provenance==provenance&&row->status==0,
+          "Endpoint provenance changed in reuse fixture");
+    check(melee_web_synctest_cpu_endpoint_end()==0&&!cpu_restore.inflight,
+          "Endpoint end failed in reuse fixture");
+}
+void retire_success(unsigned expected_windows,unsigned destroys_before){
+    auto* const old=cpu_restore.capsule.get();
+    const auto post=cpu_corrected.evidence.post_frame;
+    check(old&&melee_web_synctest_cpu_corrected_command(53)==0,
+          "Confirmed retirement command refused");
+    const auto& m=cpu_corrected_reuse_evidence;
+    check(!cpu_restore.capsule&&cpu_restore.state==CpuRestoreControl::Idle&&
+          cpu_corrected.phase==CpuCorrectedControl::Idle&&!cpu_corrected.active&&
+          cpu_restore.first_failure==0&&match&&match->source_frames()==post&&world_exists,
+          "Successful retirement did not destroy the capsule before publishing Idle");
+    check(confirmed_retire_calls==expected_windows&&capsule_destroys==destroys_before+1&&
+          m.windows_captured==expected_windows&&m.windows_retired==expected_windows&&
+          m.active_capsules==0&&m.max_active_capsules==1,
+          "Reuse retirement counts or single-slot bound changed");
+}
+void close_retained_capsule(){
+    (void)melee_web_synctest_cpu_restore_command(5);
+    check(melee_web_synctest_cpu_before_source_close()==1,
+          "Retained capsule did not disarm before source close");
+    match.reset();world_exists=false;
+    check(melee_web_synctest_cpu_after_source_close()==1,
+          "Retained capsule refused ordinary source-owner retirement");
+}
+void verify_enable_refusal_and_wrong_phase(){
+    new_page();pending_submission=true;
+    const auto refused=melee_web_synctest_cpu_corrected_reuse_enable();
+    check(refused!=0&&!cpu_corrected_reuse.enabled&&
+          cpu_corrected_reuse_evidence.windows_captured==0&&cpu_restore.state==CpuRestoreControl::Idle,
+          "Non-idle reuse enable mutated the page");
+    pending_submission=false;enable_reuse();
+    check(melee_web_synctest_cpu_restore_command(8)!=0&&cpu_restore.capsule==nullptr&&tick_calls==0,
+          "Reuse page admitted the legacy CPU command route");
+    new_page();enable_reuse();configure_and_capture(300,176);
+    auto* held=cpu_restore.capsule.get();
+    check(melee_web_synctest_cpu_corrected_command(53)!=0&&cpu_restore.capsule.get()==held&&
+          cpu_corrected_reuse_evidence.active_capsules==1&&
+          cpu_corrected_reuse_evidence.windows_retired==0&&confirmed_retire_calls==0,
+          "Wrong-phase retirement released the active capsule");
+    close_retained_capsule();
+}
+void verify_reader_idle_and_retirement_refusals(){
+    new_page();enable_reuse();configure_and_capture(300,176);
+    baseline_steps(0,0);baseline_present(0);
+    auto* held=cpu_restore.capsule.get();
+    check(melee_web_synctest_cpu_endpoint_begin(3,2)==0&&cpu_corrected.reader.active(),
+          "Active-reader retirement setup failed");
+    check(melee_web_synctest_cpu_corrected_command(53)!=0&&cpu_restore.capsule.get()==held&&
+          cpu_corrected.reader.active()&&cpu_corrected_reuse_evidence.active_capsules==1&&
+          confirmed_retire_calls==0,
+          "Retirement admitted an active endpoint reader");
+    const auto reader_failure=cpu_restore.first_failure;
+    check(melee_web_synctest_cpu_endpoint_end()==reader_failure&&!cpu_restore.inflight&&
+          !cpu_corrected.reader.active(),"Rejected reader batch did not release its guard");
+    close_retained_capsule();
+
+    new_page();enable_reuse();configure_and_capture(300,176);
+    baseline_steps(0,0);baseline_present(0);held=cpu_restore.capsule.get();
+    pending_submission=true;
+    check(melee_web_synctest_cpu_corrected_command(53)!=0&&cpu_restore.capsule.get()==held&&
+          cpu_corrected_reuse_evidence.active_capsules==1&&confirmed_retire_calls==0,
+          "GPU-pending retirement released the active capsule");
+    pending_submission=false;close_retained_capsule();
+
+    new_page();enable_reuse();configure_and_capture(300,176);
+    baseline_steps(0,0);baseline_present(0);held=cpu_restore.capsule.get();
+    confirmed_retire_ok=false;
+    check(melee_web_synctest_cpu_corrected_command(53)!=0&&cpu_restore.capsule.get()==held&&
+          cpu_corrected_reuse_evidence.active_capsules==1&&
+          cpu_corrected_reuse_evidence.windows_retired==0&&confirmed_retire_calls==1&&
+          capsule_destroys==0&&cpu_restore.first_failure,
+          "Failed permanent-catalog proof did not retain the capsule");
+    close_retained_capsule();
+}
+void verify_two_windows_and_sample_trace(){
+    new_page();enable_reuse();
+    configure_and_capture(300,176);endpoint_batch(1,1);
+    baseline_steps(0,0);endpoint_batch(2,2);baseline_present(0);endpoint_batch(3,2);
+    retire_success(1,0);
+    check(cpu_corrected_reuse_evidence.window_first_sample==300&&
+          cpu_corrected_reuse_evidence.window_pre_frame==176&&
+          cpu_corrected_reuse_evidence.window_post_frame==183,
+          "First window metadata changed after retirement");
+
+    // Model four actual neutral bridge source ticks after the first retirement.
+    // The second capture must retain the same source owner and derive sample311.
+    for(unsigned i=0;i<4;++i)match->increment_source_frames();
+    observation.frame=match->source_frames();
+    const unsigned tick_start=tick_calls,draw_start=draw_calls;
+    configure_and_capture(311,187,2);endpoint_batch(1,1);
+    baseline_steps(tick_start,draw_start);endpoint_batch(2,2);
+    baseline_present(draw_start);endpoint_batch(3,2);
+    corrected_steps(tick_start+7,draw_start+7);endpoint_batch(2,3);
+    final_corrected_present(draw_start+7);endpoint_batch(3,3);
+    check(class_piece_trace_context_count<class_piece_trace_contexts.size(),
+          "Class-piece trace overflowed during the two-window route");
+    for(unsigned sample=300;sample<=306;++sample){
+        unsigned steps=0,draws=0;
+        for(unsigned i=0;i<class_piece_trace_context_count;++i){
+            const auto& row=class_piece_trace_contexts[i];if(!row.frame||row.sample!=sample)continue;
+            steps+=row.scope==MELEE_WEB_CLASS_PIECE_TRACE_STEP;
+            draws+=row.scope==MELEE_WEB_CLASS_PIECE_TRACE_DRAW;
+        }
+        check(steps==1&&draws==1,"First-window trace lost a literal source/draw sample");
+    }
+    for(unsigned sample=311;sample<=317;++sample){
+        unsigned steps=0,draws=0;
+        for(unsigned i=0;i<class_piece_trace_context_count;++i){
+            const auto& row=class_piece_trace_contexts[i];if(!row.frame||row.sample!=sample)continue;
+            steps+=row.scope==MELEE_WEB_CLASS_PIECE_TRACE_STEP;
+            draws+=row.scope==MELEE_WEB_CLASS_PIECE_TRACE_DRAW;
+        }
+        check(steps==2&&draws==(sample==317?2u:1u),
+              "Second-window trace failed to carry the source-derived sample");
+    }
+    check(tick_sample_count==21,"Two windows did not execute the expected literal source samples");
+    for(unsigned i=0;i<7;++i)
+        check(tick_samples[i]==300+i&&tick_samples[7+i]==311+i&&
+              tick_samples[14+i]==311+i,"Raw source input sample sequence was reset or altered");
+    retire_success(2,1);
+    check(cpu_corrected_reuse_evidence.window_first_sample==311&&
+          cpu_corrected_reuse_evidence.window_pre_frame==187&&
+          cpu_corrected_reuse_evidence.window_post_frame==194,
+          "Second-window metadata did not retain the actual source-derived interval");
+    (void)melee_web_synctest_cpu_restore_command(5);
+}
+void verify_same_session_and_backward_cursor_refusal(){
+    new_page();enable_reuse();configure_and_capture(300,176);
+    baseline_steps(0,0);baseline_present(0);retire_success(1,0);
+    check(configure_valid(),"Same-session refusal configuration failed");
+    match=std::make_unique<melee_web::GameplayMatchSession>(183);
+    observation.frame=183;
+    check(melee_web_synctest_cpu_corrected_command(32)!=0&&
+          cpu_corrected_reuse_evidence.windows_captured==1&&!cpu_restore.capsule,
+          "A replacement match reused the prior page identity");
+    close_retained_capsule();
+
+    new_page();enable_reuse();configure_and_capture(300,176);
+    baseline_steps(0,0);baseline_present(0);retire_success(1,0);
+    check(configure_valid(),"Backward-cursor refusal configuration failed");
+    match->set_source_frames(182);observation.frame=182;
+    check(melee_web_synctest_cpu_corrected_command(32)!=0&&
+          cpu_corrected_reuse_evidence.windows_captured==1&&!cpu_restore.capsule,
+          "A source cursor before the prior post frame was admitted");
+    close_retained_capsule();
+}
+}
+
+int main(){try{
+    verify_enable_refusal_and_wrong_phase();
+    verify_reader_idle_and_retirement_refusals();
+    verify_two_windows_and_sample_trace();
+    verify_same_session_and_backward_cursor_refusal();
+    std::puts("Corrected reuse adapter PASS: one retained capsule slot, checked retirement, same-page owner/cursor and source-derived traces; modeled checkpoint/source/idle leaves.");
+    return 0;
+}catch(const std::exception& e){
+    std::fprintf(stderr,"Corrected reuse adapter control: %s\n",e.what());return 1;
+}}

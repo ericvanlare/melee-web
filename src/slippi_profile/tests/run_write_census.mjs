@@ -6,6 +6,7 @@ import {validateCpuRestoreConfiguration,runBrowserCpuRestore} from './cpu_restor
 import {runBrowserCpuTwoTick,validateCpuTwoTickFinalEvidence} from './cpu_two_tick_runner.mjs';
 import {runBrowserCpuSevenTick,validateCpuSevenTickFinalEvidence,CPU_SEVEN_TICK_SAMPLES} from './cpu_seven_tick_runner.mjs';
 import {runBrowserCpuCorrectedSeven} from './cpu_corrected_runner.mjs';
+import {runBrowserCpuCorrectedTwoWindow} from './cpu_corrected_two_window_runner.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -159,6 +160,7 @@ export function validateCpuRestoreRouteSelection(values) {
   const twoTick = values['--aggregate-cpu-drawn-reference-two-tick'] === true;
   const sevenTick = values['--aggregate-cpu-drawn-reference-seven-tick'] === true;
   const corrected = values['--correct-predicted-branch'] === true;
+  const correctedTwoWindow = values['--correct-predicted-branch-two-window'] === true;
   const particle = values['--slippi-particle-presentation-cache'] === true;
   const fixedCpuRouteCount = Number(oneTick) + Number(twoTick) + Number(sevenTick);
   if (fixedCpuRouteCount > 1) throw new Error('Fixed one-, two-, and seven-tick drawn-reference routes are mutually exclusive');
@@ -166,7 +168,8 @@ export function validateCpuRestoreRouteSelection(values) {
   if (sevenTick && !particle) {
     throw new Error('The seven-tick route requires the private v18 stable action asset profile');
   }
-  if (corrected && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick route');
+  if ((corrected || correctedTwoWindow) && !sevenTick) throw new Error('Corrected prediction requires the fixed seven-tick route');
+  if (corrected && correctedTwoWindow) throw new Error('One-window and two-window correction routes are mutually exclusive');
   if (particle && (values['--slippi-tobj-presentation-cache'] !== true ||
       values['--slippi-lobj-presentation-cache'] !== true || !multiTick)) {
     throw new Error('The v18 stable action asset lane requires v15 TObj, v7 LObj, and a fixed two- or seven-tick route');
@@ -181,13 +184,13 @@ export function validateCpuRestoreRouteSelection(values) {
   if ((oneTick || twoTick || sevenTick) && !values['--aggregate-cpu-restore-config']) {
     throw new Error('Drawn reference requires CPU configuration');
   }
-  return corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
+  return correctedTwoWindow ? 'independent-browser-correction-two-window-v1' : corrected ? 'independent-browser-correction-v1' : sevenTick ? 'drawn-reference-no-draw-seven-tick-v1' : twoTick ? 'drawn-reference-no-draw-two-tick-v1' : oneTick ? 'drawn-reference-one-tick-v1' :
     values['--aggregate-cpu-restore-config'] ? 'cpu-only-v1' : 'census-v1';
 }
 
 export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports = null,
   lobjPresentationCache = false, tobjPresentationCache = false, particlePresentationCache = false,
-  sevenTickDrawnReference = false, sevenTickExports = null) {
+  sevenTickDrawnReference = false, sevenTickExports = null, reuseExports = null) {
   const multiTick = twoTickDrawnReference || sevenTickDrawnReference;
   if (lobjPresentationCache && !multiTick) throw new Error('The v7 light owner requires two or seven ticks');
   if(tobjPresentationCache && (!lobjPresentationCache || !multiTick)) throw new Error('The v15 current light set lane requires v7 and two or seven ticks');
@@ -210,6 +213,10 @@ export function validateBrowserProfileForRoute(init, twoTickDrawnReference, twoT
       sevenTickExports.evidence !== true || sevenTickExports.evidenceBytes !== true)) {
     throw new Error('Seven-tick evidence exports are unavailable for the linked v18 profile');
   }
+  if (reuseExports !== null && (!sevenTickDrawnReference || reuseExports.enable !== true ||
+      reuseExports.evidence !== true || reuseExports.evidenceBytes !== true)) {
+    throw new Error('Two-window reuse exports are unavailable for the linked v18 profile');
+  }
   return expectedProfile;
 }
 
@@ -219,7 +226,8 @@ export function parseArgs(argv) {
   const flags = new Set(['--aurora-staging-shadow-inventory', '--stage-arena-owner-inventory',
     '--source-payload-admission-dry-run','--aggregate-cpu-drawn-reference',
     '--aggregate-cpu-drawn-reference-two-tick','--aggregate-cpu-drawn-reference-seven-tick', '--slippi-lobj-presentation-cache',
-    '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch']);
+    '--slippi-tobj-presentation-cache', '--slippi-particle-presentation-cache', '--correct-predicted-branch',
+    '--correct-predicted-branch-two-window']);
   for (let i = 0; i < argv.length;) {
     const key = argv[i];
     if (flags.has(key)) {
@@ -230,7 +238,7 @@ export function parseArgs(argv) {
     }
     const value = argv[i + 1];
     if (!allowed.has(key) || !value || values[key]) {
-      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
+      throw new Error('Usage: run_write_census.mjs --browser-runtime FILE --assets DIR --manifest FILE --out NEW_DIR [--playwright PACKAGE_DIR] [--aurora-staging-shadow-inventory] [--stage-arena-owner-inventory] [--aggregate-cpu-drawn-reference-two-tick | --aggregate-cpu-drawn-reference-seven-tick] [--correct-predicted-branch | --correct-predicted-branch-two-window] [--slippi-lobj-presentation-cache --slippi-tobj-presentation-cache --slippi-particle-presentation-cache]');
     }
     values[key] = value;
     i += 2;
@@ -288,6 +296,7 @@ function sourceHashes() {
     'tests/native_dat_checkpoint_test.cpp',
     'tests/test_native_dat_checkpoint.py',
     'tests/gameplay_snapshot_probe.cpp',
+    'tests/test_gameplay_cpu_checkpoint.py',
     'tests/gameplay_match_context_trace.c',
     'src/gameplay_match_context.h',
     'src/gameplay_match_context.c',
@@ -312,6 +321,8 @@ function sourceHashes() {
     'src/slippi_profile/tests/cpu_restore_adapter.inc',
     'src/slippi_profile/tests/cpu_corrected_adapter.inc',
     'src/slippi_profile/tests/cpu_corrected_runner.mjs',
+    'src/slippi_profile/tests/cpu_corrected_two_window_runner.mjs',
+    'src/slippi_profile/tests/test_cpu_corrected_two_window_runner.mjs',
     'src/slippi_profile/tests/cpu_endpoint.mjs',
     'src/slippi_profile/tests/test_cpu_endpoint.mjs',
     'src/gameplay_cpu_endpoint.cpp','src/gameplay_cpu_endpoint.hpp',
@@ -435,6 +446,7 @@ export function recordCpuRestoreFailure(report,error) {
   if(error.cpuSevenTickPredictedPartial)report.execution.predictedInstanceProgress=error.cpuSevenTickPredictedPartial;
   if(error.cpuSevenTickPredictedPartialReadError)report.execution.predictedInstanceProgressReadError=error.cpuSevenTickPredictedPartialReadError;
   if(error.cpuCorrectedPartial)report.execution.cpuCorrected=error.cpuCorrectedPartial;
+  if(error.cpuCorrectedTwoWindowPartial)report.execution.correctedTwoWindow=error.cpuCorrectedTwoWindowPartial;
   if(!report.cpuRawSample)report.execution.restorePerformed='unknown-on-failure; inspect native evidence and command records';
   report.execution.cpuOuterValidation='failed';
   return report;
@@ -613,6 +625,8 @@ async function main() {
   const twoTickDrawnReference=options['--aggregate-cpu-drawn-reference-two-tick']===true;
   const sevenTickDrawnReference=options['--aggregate-cpu-drawn-reference-seven-tick']===true;
   const correctedPrediction=options['--correct-predicted-branch']===true;
+  const correctedTwoWindow=options['--correct-predicted-branch-two-window']===true;
+  const correctedRoute=correctedPrediction||correctedTwoWindow;
   const lobjPresentationCache=options['--slippi-lobj-presentation-cache']===true;
   const tobjPresentationCache=options['--slippi-tobj-presentation-cache']===true;
   const particlePresentationCache=options['--slippi-particle-presentation-cache']===true;
@@ -741,6 +755,16 @@ async function main() {
         'No live packet delivery or relay match','No whole-profile, vanilla, H1 or whole-session acceptance',
         'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
     }
+    if(correctedTwoWindow){
+      report.schema='melee-web-independent-browser-correction-two-window-component-v1';
+      report.statement='Two identically prepared private browsers compare two independent wrong-input seven-tick windows on one persistent input timeline. Each window has an independently compared PRE, corrected CPU_END, DRAW_END, and five raw lanes; a bounded literal-neutral source step/draw bridge separates checked capsule retirement. Each restore starts from that window’s pre-capture capsule, never from the speculative after-state. Component evidence only; no live relay, full-world restore, or profile acceptance.';
+      report.execution={status:'incomplete',prefixSamples:300,windows:2,
+        correctedReuse:{enabled:true,status:'not-started'},bridge:{maximumTicks:60,status:'not-started'},
+        restorePerformed:'not-yet-observed'};
+      report.exclusions=['No #341 milestone closure','No live packet delivery or relay match',
+        'No whole-profile, vanilla, H1 or whole-session acceptance','No restoration from a speculative post-window state',
+        'No renderer/host allocator rewind','No #339 nonzero-history/drop workaround'];
+    }
   }
   const writeReport = () => fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
   writeReport();
@@ -836,11 +860,29 @@ async function main() {
       return {evidence: typeof module._melee_web_synctest_cpu_seven_tick_evidence === 'function',
         evidenceBytes: typeof module._melee_web_synctest_cpu_seven_tick_evidence_bytes === 'function'};
     }) : null;
+    const correctedReuseExports = correctedTwoWindow ? await page.evaluate(() => {
+      const {module} = window.__slippiSynctest;
+      return {enable:typeof module._melee_web_synctest_cpu_corrected_reuse_enable==='function',
+        evidence:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence==='function',
+        evidenceBytes:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence_bytes==='function'};
+    }) : null;
     validateBrowserProfileForRoute(init, twoTickDrawnReference, twoTickExports,
       lobjPresentationCache, tobjPresentationCache, particlePresentationCache,
-      sevenTickDrawnReference, sevenTickExports);
+      sevenTickDrawnReference, sevenTickExports, correctedReuseExports);
     if (twoTickDrawnReference) report.profile.twoTickEvidenceExports = twoTickExports;
     if (sevenTickDrawnReference) report.profile.sevenTickEvidenceExports = sevenTickExports;
+    if(correctedTwoWindow){
+      const predictedReuseExports=await predictedPage.evaluate(()=>{
+        const {module}=window.__slippiSynctest;
+        return {enable:typeof module._melee_web_synctest_cpu_corrected_reuse_enable==='function',
+          evidence:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence==='function',
+          evidenceBytes:typeof module._melee_web_synctest_cpu_corrected_reuse_evidence_bytes==='function'};
+      });
+      validateBrowserProfileForRoute(predictedInit,twoTickDrawnReference,twoTickExports,
+        lobjPresentationCache,tobjPresentationCache,particlePresentationCache,
+        sevenTickDrawnReference,sevenTickExports,predictedReuseExports);
+      report.profile.correctedReuseExports={reference:correctedReuseExports,predicted:predictedReuseExports};
+    }
     if (init.source !== fileSha(path.join(ROOT, 'tests/gameplay_snapshot_probe.cpp'))) {
       throw new Error('Runtime fixture identity differs from current gameplay_snapshot_probe.cpp');
     }
@@ -964,6 +1006,20 @@ async function main() {
         decodeDrawSource:decodeDrawDiagnostics.toString()};
       if(sevenTickDrawnReference){
         if(!predictedPage)throw new Error('Seven-tick predicted instance is unavailable');
+        if(correctedTwoWindow){
+          const result=await runBrowserCpuCorrectedTwoWindow(predictedPage,page,cpuWire,checkpoint,
+            expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics);
+          report.execution={status:'completed',prefixSamples:300,correctedTwoWindow:result,
+            windowCount:result.windows.length,bridgeStatus:result.bridge.status,
+            bridgeTicks:result.bridge.ticks.length,restorePerformed:true,
+            scope:'two independent same-match input-correction windows with the same timeline and checked one-capsule retirement'};
+          report.cpuResult={referenceScreenshot:await screenshotRecord(page,options['--out'],'reference-final.png'),
+            correctedScreenshot:await screenshotRecord(predictedPage,options['--out'],'corrected-final.png')};
+          report.inventory={status:'fixed-reviewed-domains-only',completeGameState:false,
+            sourceStateManifestComplete:false,wasmAndMapBound:true,staticRows:cpuWire.length};
+          if(pageErrors.length)throw new Error(`Browser reported an error: ${pageErrors[0]}`);
+          report.result='passed';writeReport();return;
+        }
         if(correctedPrediction){
           const result=await runBrowserCpuCorrectedSeven(predictedPage,page,cpuWire,checkpoint,
             expectedInputMapping,expectedStocks,previousFrame,previousDiagnostics);
@@ -1177,7 +1233,7 @@ async function main() {
     const cleanupFailures = [];
     if(predictedPage){
       try{
-        const closed=await closeBrowser(predictedPage,false,correctedPrediction);
+        const closed=await closeBrowser(predictedPage,false,correctedRoute);
         if(!closed?.closed)cleanupFailures.push({step:'predicted-renderer-close',error:JSON.stringify(closed)});
         report.cleanup={...(report.cleanup||{}),predictedRenderer:closed};
       }catch(error){cleanupFailures.push({step:'predicted-renderer-close',error:String(error)});}

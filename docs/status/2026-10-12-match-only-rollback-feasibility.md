@@ -1513,10 +1513,21 @@ retains one Linux unit failure: GCC rejects misleading indentation in a diagnost
 null-ticket guard. Its dependent aggregate check also fails. The reviewed repair
 splits the guard and assignment onto separate lines with identical tokens and
 operation order; the focused source-memory snapshot control passes locally.
-Repaired-head CI remains pending. The next runtime step is proof-backed retirement of a confirmed checkpoint
-while permanent resident action assets remain live, allowing one bounded owner
-slot to be reused. Generic destructor/retirement guards stay intact. Publication
-validation, repeated corrections, combat, frame-budget, profile admission and
+All 14 checks on repaired head `9e69d37b` complete with 12 successes and two
+expected skips. PR #342 merges as `97764b0f`; the reviewed and merged trees match.
+The browser capture and local validation producers above remain distinct.
+
+The successor component at `8c979087` adds checked retirement of confirmed
+checkpoints while their exact match and permanent resident action owners remain
+live. Focused controls pass for clean-reference and corrected checkpoints,
+refusals before mutation, and old detached-capsule cleanup after a new interval.
+The generic destructor/retirement guards stay intact. The controls execute the
+actual ActionStore and extracted checkpoint/session code with modeled leaves;
+they do not establish a new browser result. Fixture stack, destroyed-store status
+and short-circuit expectation failures remain retained with their reviewed repairs.
+The next experiment is two successive wrong-prediction corrections, using one
+continuing input timeline and one checkpoint slot in the same live match.
+Repeated browser correction, combat, frame-budget, profile admission and
 full-match/online rollback remain open.
 
 
