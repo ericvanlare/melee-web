@@ -10266,7 +10266,7 @@
         }
       },
       "reusable_owner_loop_v1": {
-        "status": "FAILED_BROWSER_MOTOR_EFFECT_REPAIRED_FOCUSED_REVIEW_PASS",
+        "status": "MOTOR_EFFECT_CLEARED_NEXT_CPU_ENDPOINT_OWNER_REFUSED",
         "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
         "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
         "attempts": [
@@ -10303,6 +10303,39 @@
               "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-effect-diagnostic-sol-review-v1.json",
               "sha256": "3dff1a26c49a0b89cb1b5364ca57d80aeef8a2ab996a4bb40ecab65461e97d1a"
             }
+          },
+          {
+            "harness_producer": "7f9ee9988d1c082b3e0def8ca326e4566e6e01a3",
+            "runtime_producer": "7f9ee9988d1c082b3e0def8ca326e4566e6e01a3",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/runner/evidence.json",
+              "sha256": "a691f902a563bd0acd8bea068cf6dc72d49857892ec96993aa7575583fb55ba0"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/first-endpoint-summary.json",
+              "sha256": "187d8021242e7cdb9549c55bcf585f5d3d67481ee71a9e92f07749b7760dbfc3"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/independent-postflight.json",
+              "sha256": "4c88ae97933b86f41ef8a8ca1999fd59387d8dcaea96e931b911d806b3b1a55f"
+            },
+            "build": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v2/artifact-inventory.json",
+              "sha256": "9bb5ffaef7312435a60136d66e6bd943edea0f7c582b562b147c7be957f19fbc"
+            },
+            "linked_configuration": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v2/final-linked-configuration-v1.json",
+              "sha256": "a8974f46988896b1fcde4e83436a25b8ed3753191d1de87da425a64ce9f11270"
+            },
+            "linked_review": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v2/row-review.json",
+              "sha256": "0f219a9e6720c80600cac8d47489c7c9673b0a39d09e8c94e801e31e5d25edfa"
+            },
+            "producer_archive": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v3-producer-archive/archive.json",
+              "sha256": "7ab0f85defd911c04afc8632aa091b5fdef1d5d643939edc93ecf34d70706629"
+            },
+            "result": "MOTOR no longer refuses. Capsule2 consumes all7 source ticks with matched raw-five pairs and identical capture-only motor event [186,1,1,0] in both pages. Reference CPU endpoint begin fails1336 before endpoint comparison. Capsule cleanup refuses; snapshot/renderer and ownedprocess cleanup pass."
           }
         ],
         "observed": {
@@ -10343,7 +10376,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
           "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
         },
-        "next": "Affected build, independently reviewed exact linked configuration, then one unchanged eight-capsule browser run. No successful reusable-loop result yet.",
+        "next": "Failure-only endpoint collect attribution preserves existing admissions; identify exact first rejected leaf, then reduce/fix that ownership boundary. No third-capsule CPU/DRAW agreement or eight-capsule pass.",
         "limitations": [
           "Candidate motor output is explicitly capture-only/unpublished; physical haptic output is not implemented or accepted.",
           "No reusable-loop pass yet; no continuous live packet delivery or full-match rollback.",
@@ -10375,6 +10408,16 @@
             "motor-journal-native-focused-v1/run.log: compatibility typedef compile failure",
             "motor-journal-native-focused-v3/run.log: fixture provider counter expected1 after reset0; assertions were active"
           ]
+        },
+        "endpoint_diagnostic": {
+          "freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/endpoint-failure-attribution-freeze-v1.json",
+            "sha256": "f91163216a9dcea769a874eb0bfa642b230c561ee720ff0e45342c2da4eae14b"
+          },
+          "review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-endpoint-attribution-sol-review-v1.json",
+            "sha256": "4cd56dbe461e66c78b2130787c1c81330b6aff4b657eed9ce29a5b9a44103571"
+          }
         }
       }
     }

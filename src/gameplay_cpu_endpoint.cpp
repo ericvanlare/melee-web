@@ -2,6 +2,7 @@
 #include "gameplay_cpu_checkpoint.hpp"
 #include "gameplay_cpu_interval.h"
 #include <algorithm>
+#include <cstdio>
 #include <initializer_list>
 #include <limits>
 
@@ -12,6 +13,13 @@ using View=GameplayCpuEndpointView;
 using Provenance=GameplayCpuEndpointProvenance;
 using Domain=GameplayCpuEndpointDomain;
 using Kind=GameplayCpuEndpointRowKind;
+
+bool collect_refusal(const char* site,std::uint32_t detail=0) noexcept
+{
+    std::fprintf(stderr,"MELEE_CPU_ENDPOINT_COLLECT_REFUSAL site=%s detail=%u\n",
+                 site,detail);
+    return false;
+}
 
 std::uint64_t address(const void* value) noexcept
 { return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(value)); }
@@ -103,7 +111,7 @@ int collect_audio_range(const MeleeWebAudioOwnedRange* row,void* context)
 
 bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 {
-    if(!session_||!checkpoint_)return false;
+    if(!session_||!checkpoint_)return collect_refusal("owners");
     const auto& checkpoint=*checkpoint_;
     const bool pre=view_==View::Pre;
     if((pre&&(checkpoint.phase_!=GameplayCpuCheckpoint::Phase::Recording||
@@ -113,58 +121,69 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
                (provenance_==Provenance::Corrected&&
                 checkpoint.phase_!=GameplayCpuCheckpoint::Phase::CorrectedSealed)||
                (provenance_!=Provenance::Reference&&provenance_!=Provenance::Corrected))))
-        return false;
+        return collect_refusal("phase");
     if(!checkpoint.same_owner(*session_)||
        !slippi_lobj_anchor_admit(checkpoint.commit_.lobj_anchor)||
        !slippi_tobj_anchor_admit(checkpoint.commit_.tobj_anchor)||
        !slippi_particle_presentation_anchor_admit(checkpoint.commit_.particle_anchor)||
        !checkpoint.commit_.effect_token||
-       !melee_web_cpu_interval_admit(checkpoint.commit_.effect_token))return false;
+       !melee_web_cpu_interval_admit(checkpoint.commit_.effect_token))
+        return collect_refusal("owners");
 
     out.source_frame=session_->source_frames();
     const auto expected_frame=pre?checkpoint.owner_.frame:checkpoint.post_frame_;
-    if(out.source_frame!=expected_frame)return false;
+    if(out.source_frame!=expected_frame)return collect_refusal("frame");
 
-    if(melee_web_action_interval_endpoint_admit(checkpoint.commit_.actions)!=
-       MELEE_WEB_ACTION_ENDPOINT_OK)return false;
+    const auto action_admission=
+        melee_web_action_interval_endpoint_admit(checkpoint.commit_.actions);
+    if(action_admission!=MELEE_WEB_ACTION_ENDPOINT_OK)
+        return collect_refusal("action-admit",action_admission);
     out.actions=melee_web_action_interval_endpoint_header(checkpoint.commit_.actions);
     const auto leaf_view=pre?MELEE_WEB_ACTION_ENDPOINT_PRE:MELEE_WEB_ACTION_ENDPOINT_END;
     const auto leaf_provenance=provenance_==Provenance::Corrected?
         MELEE_WEB_ACTION_ENDPOINT_CORRECTED:MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
     if(out.actions.status!=MELEE_WEB_ACTION_ENDPOINT_OK||out.actions.schema!=1||
        out.actions.view!=leaf_view||out.actions.provenance!=leaf_provenance||
-       out.actions.slots_per_binding!=2)return false;
+       out.actions.slots_per_binding!=2)
+        return collect_refusal("action-header",out.actions.status);
     if(out.actions.binding_count>UINT32_MAX/2u||out.actions.cache_count>UINT32_MAX/2u)
-        return false;
+        return collect_refusal("action-header",out.actions.status);
 
     out.payload=melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload);
     if(out.payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||out.payload.schema!=1||
        out.payload.row_count>UINT32_MAX||out.payload.free_cell_count>UINT32_MAX||
-       out.payload.allocated_cell_count>UINT32_MAX)return false;
+       out.payload.allocated_cell_count>UINT32_MAX)
+        return collect_refusal("payload-header",static_cast<std::uint32_t>(out.payload.status));
 
     const auto* flow_snapshot=pre?checkpoint.commit_.flow_snapshot:checkpoint.post_flow_;
     out.flow=melee_web_match_flow_cpu_endpoint_read(checkpoint.owner_.flow,flow_snapshot);
-    if(out.flow.status!=0)return false;
+    if(out.flow.status!=0)return collect_refusal("flow",out.flow.status);
     if(!melee_web_match_context_snapshot_admit(checkpoint.owner_.context,
-          checkpoint.commit_.context_snapshot,nullptr,0) ||
-       melee_web_match_context_range_read(checkpoint.owner_.context,&out.context,nullptr,0)!=
-          MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE ||
-       out.context.byte_extent>UINT32_MAX)return false;
+          checkpoint.commit_.context_snapshot,nullptr,0))
+        return collect_refusal("context");
+    const auto context_range=melee_web_match_context_range_read(
+        checkpoint.owner_.context,&out.context,nullptr,0);
+    if(context_range!=MELEE_WEB_MATCH_CONTEXT_RANGE_COMPLETE||
+       out.context.byte_extent>UINT32_MAX)
+        return collect_refusal("context",static_cast<std::uint32_t>(context_range));
     if(!melee_web_gameplay_bootstrap_snapshot_admit(checkpoint.commit_.bootstrap,nullptr,0))
-        return false;
+        return collect_refusal("bootstrap");
     out.bootstrap=melee_web_gameplay_bootstrap_cpu_storage();
     if(!out.bootstrap.ticks||!out.bootstrap.disabled_links||
        out.bootstrap.ticks_bytes>UINT32_MAX||out.bootstrap.disabled_links_bytes>UINT32_MAX)
-        return false;
+        return collect_refusal("bootstrap");
 
     if(!melee_web_audio_snapshot_admit(checkpoint.owner_.audio,checkpoint.commit_.audio_snapshot))
-        return false;
+        return collect_refusal("audio-admit");
     out.audio=melee_web_audio_cpu_storage(checkpoint.owner_.audio,checkpoint.audio_generation_);
-    if(!out.audio.command_budget||!out.audio.sound_mode)return false;
+    if(!out.audio.command_budget||!out.audio.sound_mode)
+        return collect_refusal("audio-storage");
     AudioCollector audio{&out.audio_ranges,0,false};
-    if(melee_web_audio_visit_owned_ranges(checkpoint.owner_.audio,checkpoint.audio_generation_,
-          MELEE_WEB_AUDIO_OWNED_RANGE_MAX,collect_audio_range,&audio)!=
-          MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE||audio.failed||!audio.count)return false;
+    const auto audio_visit=melee_web_audio_visit_owned_ranges(
+        checkpoint.owner_.audio,checkpoint.audio_generation_,
+        MELEE_WEB_AUDIO_OWNED_RANGE_MAX,collect_audio_range,&audio);
+    if(audio_visit!=MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE||audio.failed||!audio.count)
+        return collect_refusal("audio-ranges",static_cast<std::uint32_t>(audio_visit));
     out.audio_count=audio.count;
 
     const auto clock=melee_web_source_clock_cpu_storage();
@@ -178,13 +197,15 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
        !cadence_endpoint.alarm||!cadence_endpoint.alarm_bytes||
        clock.record_bytes>UINT32_MAX||clock.process_mask_bytes>UINT32_MAX||
        clock.profile_phase_bytes>UINT32_MAX||cadence.record_bytes>UINT32_MAX||
-       cadence_endpoint.alarm_bytes>UINT32_MAX)return false;
+       cadence_endpoint.alarm_bytes>UINT32_MAX)
+        return collect_refusal("clock");
     out.clock=clock;out.clock_endpoint=clock_endpoint;
     out.cadence=cadence;out.cadence_endpoint=cadence_endpoint;
 
     out.statics=checkpoint.statics_->endpoint_header();
     if(out.statics.status!=CpuStaticEndpointStatus::Ok||out.statics.schema!=1||
-       out.statics.row_count>UINT32_MAX)return false;
+       out.statics.row_count>UINT32_MAX)
+        return collect_refusal("statics",static_cast<std::uint32_t>(out.statics.status));
     return true;
 }
 

@@ -1585,10 +1585,17 @@ rumble interpreter remains unchanged; physical rumble is not published. Review
 caught a raw-step/source-clock mismatch before capture: the bracket now reads the
 same authoritative source frame as its checkpoint, once across interpretation.
 The reduced production-bracket control distinguishes these clocks. Legacy motor,
-file, SSM and HPS barriers remain unchanged. The affected build, exact linked
-configuration and one further browser run remain pending. Focused fixture failures
-are retained in the structured receipt. General rolling correction, combat,
-frame-budget, profile admission and full-match or online rollback remain open.
+file, SSM and HPS barriers remain unchanged. The affected build and independently
+reviewed relink pass. Browser V3 (`7f9ee998`) clears the original MOTOR refusal:
+both pages consume all seven ticks in the third interval with exact raw-five
+agreement and the same captured motor request. The reference CPU endpoint then
+refuses owner admission at source frame 190. Its current error does not identify
+the rejecting leaf; no CPU/DRAW endpoint agreement or retirement is claimed for
+that interval. Failure-only attribution is the next reduced step. Native capsule
+cleanup still refuses, while snapshot/renderer cleanup and owned-process absence
+pass. Focused fixture and browser failures remain retained. General rolling
+correction, combat, frame-budget, profile admission and full-match or online
+rollback remain open.
 
 
 ## Stage decision dependencies, issue #333
