@@ -128,26 +128,8 @@ async function observePageHealth(label,{requireRunning=false}={}){
   return state;
 }
 
-async function observeCss(){
-  const value=await page.evaluate(()=>window.menuObserveCssSetup?.()??null);
-  assert(value&&value.cursors?.length===16&&value.doors?.length===40&&value.geometry?.length===48,
-    'Read-only original CSS source observer is unavailable');
-  return value;
-}
 const door=(setup,port)=>({kind:setup.doors[port*10],slotType:setup.doors[port*10+4],
   character:setup.doors[port*10+3],slot:setup.doors[port*10+6]});
-
-async function waitForCssDoor(port,predicate,label,timeoutMs=10000){
-  const deadline=Date.now()+timeoutMs;
-  let last=null;
-  while(Date.now()<deadline){
-    await observePageHealth(label,{requireRunning:true});
-    last=await observeCss();
-    if(predicate(door(last,port)))return last;
-    await page.waitForTimeout(25);
-  }
-  throw Error(`${label}: expected CSS door state not reached: ${JSON.stringify(door(last,port))}`);
-}
 
 async function waitNativePhase(phase,label,{timeoutMs=30000,deadline=Date.now()+timeoutMs}={}){
   let last=null;
@@ -186,26 +168,6 @@ async function waitInitialCss(deadline){
   throw Error(`Original CSS source observation was not published within entry deadline: ${JSON.stringify(readiness)}`);
 }
 
-async function moveCursorToP2Toggle(){
-  for(let attempt=0;attempt<120;attempt++){
-    const setup=await observeCss();
-    const [x,y]=setup.geometry;
-    const bounds=setup.geometry.slice(12,24);
-    const left=bounds[4],right=bounds[5],targetX=(left+right)/2,targetY=-2.2;
-    if(Number.isFinite(x)&&Number.isFinite(y)&&right>left&&
-      x>left+0.2&&x<right-0.2&&y>-4.4&&y<0)return setup;
-    const keys=[];
-    if(x<targetX-0.25)keys.push('d');else if(x>targetX+0.25)keys.push('a');
-    if(y<targetY-0.35)keys.push('w');else if(y>targetY+0.35)keys.push('s');
-    if(!keys.length)keys.push(x<targetX?'d':'a');
-    await driver.pressChord(keys,{holdMs:24,releaseMs:24});
-    await observePageHealth(`CSS P2 cursor movement ${attempt+1}`,{requireRunning:true});
-  }
-  const setup=await observeCss();
-  throw Error(`Original CSS cursor did not reach P2 source-toggle bounds: ${JSON.stringify({
-    cursor:setup.geometry.slice(0,2),door1:setup.geometry.slice(12,24)})}`);
-}
-
 async function configureControls(){
   await page.locator('#controls-open').click();
   await page.locator('#controls-dialog[open]').waitFor();
@@ -229,24 +191,16 @@ async function configureControls(){
   addCheck('real controls select two-player keyboard for both ports',report.route.controls);
 }
 
-async function joinSecondHuman(initialSetup){
-  let setup=initialSetup;
+function verifyOriginalHumans(setup){
+  // The ordinary two-player menu initializer selects two Human Mario doors.
+  // Read that actual source configuration instead of toggling a presumed CPU.
   report.route.css_before=[0,1,2,3].map(port=>door(setup,port));
   assert.deepEqual(report.route.css_before.map(row=>[row.kind,row.slotType]),
-    [[0,0],[1,1],[3,3],[3,3]],'Original CSS did not present the expected P1 Human/P2 CPU pair');
+    [[0,0],[0,0],[3,3],[3,3]],'Original CSS did not present two Human doors');
   assert.deepEqual(report.route.css_before.slice(0,2).map(row=>row.character),[8,8],
     'Original CSS did not present Mario on both active doors');
-  setup=await moveCursorToP2Toggle();
-  for(const expected of [{kind:3,slotType:3},{kind:0,slotType:0}]){
-    await driver.pressChord(['j'],{holdMs:60,releaseMs:80});
-    setup=await waitForCssDoor(1,row=>row.kind===expected.kind&&row.slotType===expected.slotType,
-      'Original CSS P2 CPU-to-empty-to-Human source transition');
-  }
-  report.route.css_after=[0,1,2,3].map(port=>door(setup,port));
-  assert.deepEqual(report.route.css_after.map(row=>[row.kind,row.slotType]),
-    [[0,0],[0,0],[3,3],[3,3]]);
-  assert.deepEqual(report.route.css_after.slice(0,2).map(row=>row.character),[8,8]);
-  addCheck('P2 joins through two original CSS A key presses',report.route.css_after);
+  report.route.css_after=report.route.css_before;
+  addCheck('original CSS presents two Human Mario doors',report.route.css_after);
 }
 
 async function chooseFinalDestination(){
@@ -489,7 +443,7 @@ try{
   const cssEntryDeadline=Date.now()+90000;
   await page.locator('#launch').click();
   await waitNativePhase(1,'original CSS entry',{deadline:cssEntryDeadline});
-  await joinSecondHuman(await waitInitialCss(cssEntryDeadline));
+  verifyOriginalHumans(await waitInitialCss(cssEntryDeadline));
   await chooseFinalDestination();
   await admitTerminalTakeover();
   report.result='PASS';
