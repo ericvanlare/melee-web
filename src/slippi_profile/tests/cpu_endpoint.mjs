@@ -199,25 +199,28 @@ export function collectCpuEndpointInPage(request) {
   const module = typeof window === 'object' && window && window.__slippiSynctest &&
     window.__slippiSynctest.module;
   if (!module || !(module.HEAPU8 instanceof Uint8Array)) failPage('native module/HEAPU8 is unavailable');
+  const moduleDataValue = name => {
+    const descriptor = Object.getOwnPropertyDescriptor(module,name);
+    return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+  };
   const heap = module.HEAPU8, heapBuffer = heap.buffer, heapLength = heap.byteLength;
   if (!heapBuffer || heapLength <= 0) failPage('Wasm heap is empty');
   const assertHeap = () => {
-    if (module.HEAPU8 !== heap || heap.buffer !== heapBuffer || heap.byteLength !== heapLength ||
-        (module.wasmMemory && module.wasmMemory.buffer !== heapBuffer))
+    if (module.HEAPU8 !== heap || heap.buffer !== heapBuffer || heap.byteLength !== heapLength)
       failPage('Wasm heap identity or extent changed during the endpoint batch');
   };
   const shared = typeof SharedArrayBuffer !== 'undefined' && heapBuffer instanceof SharedArrayBuffer;
-  const memoryBuffer = module.wasmMemory && module.wasmMemory.buffer;
-  const sharedMemory = typeof SharedArrayBuffer !== 'undefined' && memoryBuffer instanceof SharedArrayBuffer;
-  if (shared || sharedMemory) failPage('refused shared/threaded Wasm memory');
-  if (memoryBuffer && memoryBuffer !== heapBuffer) failPage('Module.HEAPU8 is detached from its Wasm memory');
-  if (module.PThread !== undefined || (typeof PThread !== 'undefined' && PThread !== null))
+  // Emscripten may install throwing getters for runtime properties that were
+  // not exported. HEAPU8 and its buffer/extent are the available identity.
+  if (shared) failPage('refused shared/threaded Wasm memory');
+  if (moduleDataValue('PThread') !== undefined || (typeof PThread !== 'undefined' && PThread !== null))
     failPage('refused a threaded Emscripten runtime');
-  if (module.ABORT === true || (typeof ABORT !== 'undefined' && ABORT === true)) failPage('refused an aborted runtime');
-  if (typeof module.calledRun === 'boolean' && !module.calledRun) failPage('refused an uninitialized runtime');
+  if (moduleDataValue('ABORT') === true || (typeof ABORT !== 'undefined' && ABORT === true)) failPage('refused an aborted runtime');
+  const calledRun = moduleDataValue('calledRun');
+  if (typeof calledRun === 'boolean' && !calledRun) failPage('refused an uninitialized runtime');
   let asyncify;
   if (typeof Asyncify !== 'undefined') asyncify = Asyncify;
-  else if (module.Asyncify !== undefined) asyncify = module.Asyncify;
+  else asyncify = moduleDataValue('Asyncify');
   if (asyncify !== undefined && (!asyncify || typeof asyncify !== 'object' || !asyncify.State ||
       typeof asyncify.State.Normal !== 'number' || asyncify.state !== asyncify.State.Normal || asyncify.currData !== null))
     failPage('refused a non-idle Asyncify/runtime boundary');

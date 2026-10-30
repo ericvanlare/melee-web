@@ -1467,9 +1467,25 @@ constructor takes 32.225 ms with a 3,752,672-byte live allocator increase in thi
 single Wasm/Node observation. These are whole-constructor costs, not browser
 timing or an isolated catalog measurement. The probe runtime succeeds; its
 reporting KeyError is repaired and checked offline, retaining the original
-unittest error and both preceding fixture failures. No runtime activation is
-implied. The next bounded change adds explicit corrected action recording while
-retaining exact replay and all borrowed leases. Full regression, publication-head
+unittest error and both preceding fixture failures. That original-domain probe
+alone implies no runtime activation.
+
+The subsequent private V18 diagnostic at `f4ae3dc3` activates the complete
+ordinary-action catalog for its match fixture, adds explicit corrected action
+recording, and exposes a read-only endpoint covering all nine declared CPU
+domains. The host compares an independent clean branch before the corrected
+instance may draw its final frame. Exact replay and retained source leases remain;
+vanilla and the default Legacy policy are unchanged. Focused coordinator,
+adapter and endpoint controls pass with their modeled providers explicitly scoped,
+and the affected browser and manifest builds pass. The first actual run reaches
+matching 300-sample prefixes and command 32 on both instances, then aborts before
+PRE collection because the host reader touches Emscripten's unexported
+`wasmMemory` property. No correction or final present is established. The failed
+capture and all nine producer files are retained. Source and renderer shutdown
+complete and all owned PIDs are absent; CPU CLOSE preserves its incomplete-route
+1073 diagnostic. The repaired reader avoids unexported runtime getters and its
+five focused controls pass, including exposed invalid runtime states and batch
+cleanup. The next step retries the unchanged native runtime. Full regression, publication-head
 CI, profile admission, full-match and working online browser rollback remain open.
 
 

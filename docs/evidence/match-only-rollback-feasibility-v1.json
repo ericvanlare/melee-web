@@ -9789,6 +9789,39 @@
         "limits": "Single Wasm/Node whole-constructor readiness/cost observation, not catalog-only cost, browser frame budget, source animation execution, public profile admission or wrong-branch browser rollback. Default Legacy unchanged; no browser activation.",
         "retained_failures": "Initial fixture variable-name collision; original-domain probe compatibility-header compile failure; final report KeyError after successful runtime. Report repaired/validated offline without rerun; original unittest error remains exit1."
       }
+    },
+    "wrong_prediction_browser_component_v18": {
+      "status": "reader_api_failure_before_precomparison",
+      "runtime_producer": "f4ae3dc39273d105e0d38a862a60d3b0cedb709b",
+      "profile": "slippi-render-dependencies-logical-frame-lobj-tobj-stable-action-assets-v18",
+      "scope": "Private fixed-seven-tick component. Independent clean B versus wrong A restored and corrected with B; no rolling snapshot owner, live relay or full-match claim.",
+      "changes": "Private complete authored action catalog; corrected action recording and local-only CPU sealing; read-only nine-domain endpoint reader; independent host comparison before actual final present. Vanilla/default Legacy unchanged.",
+      "validation": "Reviewed actual coordinator/adapter and endpoint controls with modeled provider leaves; host collector and runner controls; affected browser and manifest builds pass. Those controls do not establish actual browser correction.",
+      "attempts": [
+        {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-corrected-v18-v1/result-receipt.json",
+          "sha256": "ae3a9cab0672ab899e1fd3119c88577184377988d81ce656bd488de25dbbd066"
+        }
+      ],
+      "source_review": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-corrected-host-route-sol-review-v2.json",
+        "sha256": "d84653be3438389f867e5d897ef76b33612a930a63cfec47d43108465b03cf59"
+      },
+      "configuration_review": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-corrected-v18-v1/row-review.json",
+        "sha256": "9625696dbde2d73079d6175a2a7f1269437ae3cb1ca6f039504546a45e16e620"
+      },
+      "early_cleanup_review": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-corrected-early-cleanup-sol-review-v1.json",
+        "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
+      },
+      "observed": "Both 300-sample prefixes agree and command32 succeeds on both instances. Collector then reads unexported wasmMemory and generated Emscripten getter aborts before PRE collection. Source/renderer shutdown completes and all owned PIDs are absent; CPU CLOSE retains incomplete-route1073.",
+      "next": "Fix collector API access and exact focused regression before one unchanged-runtime retry. Full regression/publication CI and working browser rollback remain open.",
+      "reader_api_repair": {
+        "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
+        "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
+        "result": "Five focused host controls pass, including throwing getters and exposed invalid runtime data. Native admission unchanged; no native rebuild."
+      }
     }
   }
 }

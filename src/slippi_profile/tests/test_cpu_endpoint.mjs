@@ -197,6 +197,12 @@ test('collector closes a begun batch on malformed, truncated, overflowed, and re
 });
 
 test('request stamps, runtime modes, and heap identity fail closed before accepting a partial endpoint',async()=>{
+  const hiddenMemory=makeFixture();
+  Object.defineProperty(hiddenMemory.module,'wasmMemory',{configurable:true,get(){throw new Error('wasmMemory was not exported');}});
+  for(const name of ['PThread','ABORT','calledRun','Asyncify'])
+    Object.defineProperty(hiddenMemory.module,name,{configurable:true,get(){throw new Error(`${name} was not exported`);}});
+  const hiddenMemoryEndpoint=await collect(hiddenMemory);
+  assert.equal(hiddenMemoryEndpoint.domains.length,9);
   const badStamp=makeFixture();
   await assert.rejects(()=>collect(badStamp,1,1,{expectedSourceFrame:301}),/source-frame stamp differs/);
   assert.equal(badStamp.calls.at(-1)[0],'end');
@@ -206,6 +212,16 @@ test('request stamps, runtime modes, and heap identity fail closed before accept
   const asyncified=makeFixture();asyncified.module.Asyncify={State:{Normal:0},state:1,currData:{}};
   await assert.rejects(()=>collect(asyncified),/non-idle Asyncify/);
   assert.equal(asyncified.calls.length,0);
+  for(const [name,value,pattern] of [
+    ['PThread',{},/threaded Emscripten runtime/],
+    ['ABORT',true,/aborted runtime/],
+    ['calledRun',false,/uninitialized runtime/],
+    ['Asyncify',{State:{Normal:0},state:1,currData:{}},/non-idle Asyncify/],
+  ]){
+    const exposed=makeFixture();exposed.module[name]=value;
+    await assert.rejects(()=>collect(exposed),pattern,`${name} data property remains checked`);
+    assert.equal(exposed.calls.length,0,`${name} refusal happens before the native batch`);
+  }
   const changedHeap=makeFixture();
   const original=changedHeap.module._melee_web_synctest_cpu_endpoint_record;
   changedHeap.module._melee_web_synctest_cpu_endpoint_record=(...args)=>{
