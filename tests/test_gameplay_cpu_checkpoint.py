@@ -40,6 +40,68 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
         self.assertEqual(run.returncode,0,run.stdout+run.stderr)
         return run.stdout
 
+    @staticmethod
+    def extract_function(text,signature):
+        start=text.index(signature);brace=text.index('{',start);depth=1;end=brace+1
+        while depth:
+            if text[end]=='{':depth+=1
+            elif text[end]=='}':depth-=1
+            end+=1
+        return text[start:end]
+
+    def test_actual_rumble_interpreter_capture_only_journal(self):
+        source=ROOT/'.deps/melee/src/sysdolphin/baselib/rumble.c'
+        actual=self.extract_function(source.read_text(),'void HSD_PadRumbleInterpret(void)')
+        fixture=(ROOT/'tests/cpu_interval_motor_journal_control.c').read_text()
+        self.assertEqual(fixture.count('@ACTUAL_INTERPRETER@'),1)
+        control=self.work/'motor-journal-control.c'
+        control.write_text(fixture.replace('@ACTUAL_INTERPRETER@',actual))
+        output=self.compile_run('motor-journal',[SOURCE/'src/gameplay_cpu_interval.c',control],
+            ['-include',str(ROOT/'src/hsd_probe_compat.h'),
+             '-I'+str(ROOT/'.deps/melee/src'),
+             '-I'+str(ROOT/'.deps/melee/extern/dolphin/include')],cpp=False)
+        self.assertIn('Actual HSD rumble interpreter preserves source state',output)
+        self.assertIn('Legacy MOTOR barrier, token/frame/channel validation and fixed journal bounds passed',output)
+
+    def test_match_rumble_bracket_uses_authoritative_source_clock(self):
+        match_context=(SOURCE/'src/gameplay_match_context.c').read_text()
+        bracket=self.extract_function(match_context,'static int interpret_match_rumble(')
+        control=self.work/'match-rumble-source-clock.c'
+        control.write_text(r'''#include "gameplay_cpu_interval.h"
+#include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+typedef struct MeleeWebMatchContext { uint64_t generation,ticks; } MeleeWebMatchContext;
+static uint64_t owner_epoch=11;
+static uint32_t source_frame=401;
+static unsigned source_frame_reads;
+static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
+uint32_t melee_web_match_source_frames(void){++source_frame_reads;return source_frame;}
+void HSD_PadRumbleInterpret(void){melee_web_cpu_interval_pad_motor(2,1);}
+void PADControlMotor(unsigned channel,unsigned command){(void)channel;(void)command;assert(!"capture-only route dispatched hardware");}
+'''+bracket+r'''
+int main(void){
+ MeleeWebMatchContext context={9,3};char error[160]={0};
+ uint64_t token=melee_web_cpu_interval_begin();assert(token);
+ assert(melee_web_cpu_interval_motor_capture_begin(token,context.generation,&context,
+        owner_epoch,source_frame,1));
+ assert(interpret_match_rumble(&context,error,sizeof(error)));
+ assert(source_frame_reads==1&&context.ticks==3);
+ const MeleeWebCpuMotorEvidence* evidence=melee_web_cpu_interval_motor_evidence();
+ assert(evidence&&evidence->baseline.frames_seen==1&&evidence->baseline.event_count==1);
+ assert(evidence->baseline.events[0].source_frame==401&&
+        evidence->baseline.events[0].channel==2&&evidence->baseline.events[0].command==1);
+ assert(melee_web_cpu_interval_motor_baseline_seal(token,402));
+ assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_NONE);
+ assert(melee_web_cpu_interval_end(token));
+ puts("Production rumble bracket binds one authoritative source-clock frame across interpretation; raw-step counter remains separate");
+}
+''')
+        output=self.compile_run('match-rumble-source-clock',
+            [SOURCE/'src/gameplay_cpu_interval.c',control],cpp=False)
+        self.assertIn('Production rumble bracket binds one authoritative source-clock frame',output)
+
     def test_actual_static_engine_refusal_and_prepared_noalloc_commit(self):
         output=self.compile_run('statics',[SOURCE/'src/gameplay_cpu_statics.cpp',SOURCE/'tests/cpu_statics_control.cpp'],
             ['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0'])
@@ -73,6 +135,46 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
         self.assertIn('eleven admission refusals write zero; light/texture/particle leaves modeled',output)
         self.assertIn('Corrected coordinator preserves all refusal-before-write checks',output)
 
+    def test_actual_interior_hps_frame_capability(self):
+        actual=self.extract_function((SOURCE/'src/gameplay_cpu_checkpoint.cpp').read_text(),
+            'bool GameplayCpuCheckpoint::interior_hps_pending(')
+        control=self.work/'interior-hps.cpp'
+        control.write_text(r"""
+#include <cstdint>
+#include <cassert>
+#include <cstdio>
+#include <initializer_list>
+static bool healthy=true,pending=true;static unsigned reads=0;
+int melee_web_cpu_interval_admit(std::uint64_t token){return healthy&&token==5;}
+int melee_web_audio_snapshot_interval_pending_admit(void*,const void*,std::uint64_t token){++reads;return pending&&token==5;}
+namespace melee_web {
+struct GameplayMatchSession {std::uint32_t frame=101;bool owner=true;std::uint32_t source_frames()const{return frame;}};
+struct GameplayCpuCheckpoint {
+ enum class Phase{Recording,Correcting,Sealed};Phase phase_=Phase::Recording;
+ bool reusable_loop_=true;struct{std::uint32_t frame=100;void* audio=nullptr;}owner_;
+ struct{const void* audio_snapshot=nullptr;std::uint64_t effect_token=5;}commit_;
+ std::uint32_t span_=7;
+ bool same_owner(const GameplayMatchSession& s)const{return s.owner;}
+ bool interior_hps_pending(const GameplayMatchSession&)const noexcept;
+};
+"""+actual+r"""
+}
+int main(){
+ melee_web::GameplayMatchSession s;melee_web::GameplayCpuCheckpoint c;
+ assert(c.interior_hps_pending(s)&&reads==1);
+ for(unsigned frame:{100u,107u,108u}){s.frame=frame;auto n=reads;assert(!c.interior_hps_pending(s)&&reads==n);}
+ s.frame=101;c.reusable_loop_=false;assert(!c.interior_hps_pending(s));c.reusable_loop_=true;
+ s.owner=false;assert(!c.interior_hps_pending(s));s.owner=true;
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Sealed;assert(!c.interior_hps_pending(s));
+ c.phase_=melee_web::GameplayCpuCheckpoint::Phase::Correcting;assert(c.interior_hps_pending(s));
+ healthy=false;auto n=reads;assert(!c.interior_hps_pending(s)&&reads==n);healthy=true;
+ pending=false;assert(!c.interior_hps_pending(s));
+ puts("Actual interior HPS frame capability passed; audio/owner leaves modeled");
+}
+""")
+        self.assertIn('Actual interior HPS frame capability passed',
+            self.compile_run('interior-hps',[control],[]))
+
     def test_actual_effect_barrier_and_inactive_transport_link(self):
         def function(text,needle):
             start=text.index(needle);brace=text.index('{',start);depth=1;end=brace+1
@@ -83,9 +185,19 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
             return text[start:end]+'\n'
         text=(SOURCE/'src/gameplay_audio_stream.c').read_text()
         stream=text[:text.index('static int fail(')]
-        for name in ['static void stop(', 'static const StreamFile* file_at(',
-                     'static const MeleeWebAudioStreamBlock* block_at(', 'int HSD_DevComRequest(']:
+        for name in ['static int fail(', 'static int hps_interval_guard(',
+                     'static void stop(', 'static const StreamFile* file_at(',
+                     'static void probe_record(',
+                     'static const MeleeWebAudioStreamBlock* block_at(',
+                     'static const char* validate_stream_request(',
+                     'static int stream_interval_bound(', 'int HSD_DevComRequest(']:
             stream+=function(text,name)
+        # This closed-barrier fixture never constructs an HPS stream/receipt.
+        # The actual binding helper must short-circuit before its live matcher;
+        # accidental bound-path reach is a hard failure, never modeled success.
+        # The original-HPS trace separately exercises real bound admission.
+        stream+='static int snapshot_matches_live(MeleeWebAudio* a,const MeleeWebAudioStreamSnapshot* p,MeleeWebAudioStream* s){abort();}\n'
+        stream+='int fixture_hps_interval_site(const char* site){return hps_interval_guard(site);}\n'
         stream+='int melee_web_audio_bank_transport_file(int f){return 0;}\nint melee_web_audio_bank_transport_active(void){return 0;}\n'
         stream_file=self.work/'effect-stream.c';stream_file.write_text(stream)
         text=(SOURCE/'src/gameplay_audio_bank_transport.c').read_text()
@@ -108,6 +220,9 @@ void fixture_bank_barrier(void){
             stream_file,bank_file,SOURCE/'tests/cpu_interval_effect_control.c'],
             ['-include',str(ROOT/'src/gameplay_compat.h')],cpp=False)
         self.assertIn('inactive continuation passed',output)
+        run_log=(self.work/'effects/run.log').read_text()
+        self.assertEqual(run_log.count('HPS_INTERVAL_FIRST_REFUSAL site=devcom-request'),1,run_log)
+        self.assertNotIn('HPS_INTERVAL_FIRST_REFUSAL site=later-site',run_log)
         failed=subprocess.run([str(node_runtime()),str(self.work/'effects/control.js'),'invalid'],cwd=ROOT,
             capture_output=True,text=True,timeout=30)
         (self.work/'effects/ended-invalid-request.log').write_text(failed.stdout+failed.stderr)
@@ -161,10 +276,13 @@ int main(void){
             'cpu_restore_runner.mjs','test_cpu_restore_runner.mjs','cpu_two_tick_runner.mjs',
             'test_cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
             'test_cpu_seven_tick_runner.mjs','cpu_corrected_runner.mjs','test_cpu_corrected_runner.mjs',
+            'cpu_corrected_two_window_runner.mjs','test_cpu_corrected_two_window_runner.mjs',
+            'cpu_corrected_loop_runner.mjs','test_cpu_corrected_loop_runner.mjs',
             'cpu_endpoint.mjs','test_cpu_endpoint.mjs','run_synctest.mjs',
             'run_write_census.mjs','runner_contract.mjs','test_write_census_contract.mjs','synctest_browser.cpp']]
         files+=['scripts/browser_tools.mjs','scripts/net_rollback_input_timeline.mjs',
                 'scripts/net_lockstep_core.mjs','tests/quiescent_wasm_snapshot.mjs']
+        files+=['src/gameplay_audio_fx.c','src/gameplay_audio.h','src/gameplay_audio_stream.h']
         for relative in files:
             source=SOURCE/relative
             if not source.is_file():source=ROOT/relative
@@ -173,6 +291,8 @@ int main(void){
         directory=mirror/'src/slippi_profile/tests'
         for module in ['cpu_restore_runner.mjs','cpu_two_tick_runner.mjs','cpu_seven_tick_runner.mjs',
                        'cpu_corrected_runner.mjs','cpu_endpoint.mjs',
+                       'cpu_corrected_two_window_runner.mjs',
+                       'cpu_corrected_loop_runner.mjs',
                        'run_synctest.mjs','run_write_census.mjs']:
             result=subprocess.run([str(node_runtime()),'--check',str(directory/module)],capture_output=True,text=True,timeout=30)
             (mirror/(module+'.syntax.log')).write_text(result.stdout+result.stderr)
@@ -180,6 +300,8 @@ int main(void){
         result=subprocess.run([str(node_runtime()),'--test',str(directory/'test_cpu_restore_runner.mjs'),
                                str(directory/'test_cpu_two_tick_runner.mjs'),str(directory/'test_cpu_seven_tick_runner.mjs'),
                                str(directory/'test_cpu_corrected_runner.mjs'),str(directory/'test_cpu_endpoint.mjs'),
+                               str(directory/'test_cpu_corrected_two_window_runner.mjs'),
+                               str(directory/'test_cpu_corrected_loop_runner.mjs'),
                                str(directory/'test_write_census_contract.mjs')],cwd=mirror,
                               capture_output=True,text=True,timeout=60)
         (mirror/'node-contracts.log').write_text(result.stdout+result.stderr)

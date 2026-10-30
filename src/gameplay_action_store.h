@@ -134,6 +134,12 @@ uint32_t melee_web_action_interval_active_failure(const MeleeWebActionInterval*)
 /* Stops interval callbacks without releasing retained Clip/animation leases.
  * Retire source owners after disarm; destroy the capsule only afterward. */
 void melee_web_action_interval_disarm(MeleeWebActionInterval*);
+/* Pure proof that a clean terminal interval retains only resources covered by
+ * its exact live ResidentOrdinaryActions source catalogs. Confirmed retirement
+ * revokes interval routing without marking generic disarm/failure; it permits
+ * destroying this capsule while those verified source owners remain live. */
+int melee_web_action_interval_retire_admit(const MeleeWebActionInterval*);
+int melee_web_action_interval_retire_confirmed(MeleeWebActionInterval*);
 void melee_web_action_interval_destroy(MeleeWebActionInterval*);
 
 #if defined(MELEE_WEB_ACTION_INTERVAL_TEST)
@@ -141,6 +147,7 @@ uint64_t melee_web_action_interval_test_clip_create_count(void);
 uint64_t melee_web_action_interval_test_clip_destroy_count(void);
 void melee_web_action_interval_test_fail_next_event_push(void);
 void melee_web_action_interval_test_fail_next_seal_capture(void);
+int melee_web_action_interval_test_rehome_first_selection_clip(MeleeWebActionInterval*);
 void melee_web_action_interval_test_set_fighter_table(struct Fighter*, void*);
 void melee_web_action_interval_test_set_fighter_clip_state(struct Fighter*,
     const MeleeWebActionFighterClipState*);

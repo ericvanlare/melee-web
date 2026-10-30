@@ -20,21 +20,29 @@ class AudioCheckpointOwners(OwnedWorkspaceTests):
         cls.work = cls.new_workspace(ROOT, "audio-checkpoint-owner-")
 
     def test_actual_owner_bytes_and_atomic_refusals(self):
-        binary = self.work / "owner-control.js"
+        self.run_control("audio_checkpoint_owner_control.c", "owner-control",
+                         "Actual wasm32 audio owner checkpoint controls passed")
+
+    def test_stream_aggregate_admission_and_failed_interval_cleanup(self):
+        self.run_control("audio_stream_aggregate_control.c", "stream-aggregate-control",
+                         "Actual audio aggregate / synthetic stream lifecycle controls passed")
+
+    def run_control(self, source, name, expected):
+        binary = self.work / (name + ".js")
         command = [str(self.emcc), "-std=c11", "-O1", "-UNDEBUG", "-DTARGET_PC",
                    "-ffunction-sections", "-fdata-sections",
                    "-include", "src/gameplay_compat.h", "-Isrc", "-I.deps/melee/src",
                    "-I.deps/aurora/include", "-I.deps/melee/extern/dolphin/include",
                    "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sASSERTIONS=2",
-                   "tests/audio_checkpoint_owner_control.c", "-o", str(binary)]
+                   "tests/" + source, "-o", str(binary)]
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=120)
-        (self.work / "compile.log").write_text(result.stdout + result.stderr)
+        (self.work / (name + "-compile.log")).write_text(result.stdout + result.stderr)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         result = subprocess.run([str(node_runtime()), str(binary)], cwd=ROOT,
                                 capture_output=True, text=True, timeout=30)
-        (self.work / "run.log").write_text(result.stdout + result.stderr)
+        (self.work / (name + "-run.log")).write_text(result.stdout + result.stderr)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Actual wasm32 audio owner checkpoint controls passed", result.stdout)
+        self.assertIn(expected, result.stdout)
 
 
 if __name__ == "__main__":

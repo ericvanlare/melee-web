@@ -113,9 +113,9 @@ bool payload_admission_inflight=false;
 bool payload_admission_close_requested=false;
 bool payload_admission_shutdown_requested=false;
 
-std::uint32_t payload_admission_boundary(bool require_idle);
+std::uint32_t payload_admission_boundary(bool require_idle,bool owned_hps_pending=false);
 std::uint32_t payload_admission_runtime_boundary();
-std::uint32_t payload_admission_submission_boundary();
+std::uint32_t payload_admission_submission_boundary(bool owned_hps_pending=false);
 MeleeWebClockCpuStorage melee_web_source_clock_cpu_storage(void);
 MeleeWebCadenceCpuStorage melee_web_source_cadence_cpu_storage(void);
 MeleeWebBootstrapCpuStorage melee_web_gameplay_bootstrap_cpu_storage(void);
@@ -234,7 +234,23 @@ GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,
     std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
+    return capture_range(session,std::move(statics),diagnostic,static_cast<std::uint32_t>(span),false);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(
+    const GameplayMatchSession& session,
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,std::uint32_t span) noexcept {
+    return capture_range(session,std::move(statics),diagnostic,span,true);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_range(
+    const GameplayMatchSession& session,
+    std::unique_ptr<GameplayCpuStatics> statics,CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool variable) noexcept {
     diagnostic={};
+    if((variable&&(span<1u||span>7u))||
+       (!variable&&span!=1u&&span!=2u&&span!=7u)){
+        diagnostic.comparison={1,1,UINT32_MAX,UINT32_MAX,0,0,0,0,10u};
+        std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture CPU span refused");
+        return {};
+    }
     if(fail_capture){diagnostic.comparison={7,1,UINT32_MAX,UINT32_MAX,0,0,0,0,5};
         std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"fixture bootstrap capture refusal");return {};}
     if(!statics||!statics->capture()) return {};
@@ -362,14 +378,17 @@ enum : uint32_t { PayloadUnsafeCallBoundary=2,PayloadOwnerUnavailable=3,
                   PayloadTransferBusy=4,PayloadFrameMismatch=7 };
 extern "C" int melee_web_source_memory_healthy(void) { return world_exists ? 1 : 0; }
 extern "C" int melee_web_snapshot_quiescent(void) { return 1; } // modeled no pending source transfers
+extern "C" int melee_web_source_file_drive_busy(void) { return 0; }
+extern "C" int melee_web_audio_bank_transport_busy(void) { return 0; }
 @ACTUAL_PAYLOAD_SOURCE_BOUNDARY@
-std::uint32_t payload_admission_boundary(bool require_idle) {
-    if(const uint32_t failure=payload_admission_source_boundary())return failure;
+std::uint32_t payload_admission_boundary(bool require_idle,bool owned_hps_pending) {
+    if(const uint32_t failure=payload_admission_source_boundary(owned_hps_pending))return failure;
     if(require_idle) { ++idle_boundary_calls; if(pending_submission) return 1; }
     return 0;
 }
 std::uint32_t payload_admission_runtime_boundary() { return 0; }
-std::uint32_t payload_admission_submission_boundary() {
+std::uint32_t payload_admission_submission_boundary(bool owned_hps_pending) {
+    (void)owned_hps_pending; // no pending HPS provider in this model
     ++submission_boundary_calls; return pending_submission&&draw_calls>=1?0u:1u;
 }
 
@@ -423,6 +442,10 @@ int melee_web_cpu_interval_attempt(enum MeleeWebCpuIntervalEffect) { return 1; }
 unsigned melee_web_cpu_interval_failure(void) { return 0; }
 int melee_web_cpu_interval_active_failure(void) { return 0; }
 int melee_web_cpu_interval_end(std::uint64_t token) { return token==0x77u; }
+// Unused motor export dependencies fail loudly; this fixture models no journal.
+std::uint32_t melee_web_cpu_interval_motor_evidence_bytes(void) { std::abort(); }
+const MeleeWebCpuMotorCommitReceipt* melee_web_cpu_interval_motor_commit_receipt(void) { std::abort(); }
+std::uint32_t melee_web_cpu_interval_motor_commit_receipt_bytes(void) { std::abort(); }
 int melee_web_action_interval_begin_record(MeleeWebActionInterval*) { return 1; }
 int melee_web_action_interval_seal_record(MeleeWebActionInterval*) { return 1; }
 int melee_web_action_interval_finish_replay(MeleeWebActionInterval* value) {

@@ -6,6 +6,10 @@
 #include <new>
 #include <cstdlib>
 #include <cstdio>
+extern "C" int melee_web_action_interval_retire_admit(
+    const MeleeWebActionInterval*);
+extern "C" int melee_web_action_interval_retire_confirmed(
+    MeleeWebActionInterval*);
 namespace melee_web {
 namespace {
 bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& b) noexcept {
@@ -16,6 +20,17 @@ bool same_range(const MeleeWebAudioOwnedRange& a,const MeleeWebAudioOwnedRange& 
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,CpuCheckpointSpan span) noexcept {
+    return capture_checked(session,std::move(statics),diagnostic,
+                           static_cast<std::uint32_t>(span),false);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(
+    const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
+    CpuCaptureDiagnostic& diagnostic,std::uint32_t span) noexcept {
+    return capture_checked(session,std::move(statics),diagnostic,span,true);
+}
+std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
+    const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
+    CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool allow_variable) noexcept {
     /* Internal caller supplies fresh private stack storage. No diagnostic
      * pointer is exported and no source owner is written by this attribution. */
     diagnostic={};
@@ -25,12 +40,16 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         std::snprintf(diagnostic.message.data(),diagnostic.message.size(),"%s",text);
     };
     auto code=[](CpuCaptureRefusal value){return static_cast<std::uint32_t>(value);};
-    const auto ticks=static_cast<std::uint32_t>(span);
-    if(span!=CpuCheckpointSpan::OneTick&&span!=CpuCheckpointSpan::TwoTicks&&
-       span!=CpuCheckpointSpan::SevenTicks){
-        refused(stage,code(CpuCaptureRefusal::InvalidSpan),"CPU capsule interval is not one, two, or seven ticks");return {};
+    const auto ticks=span;
+    if((allow_variable&&(ticks==0||ticks>7u))||
+       (!allow_variable&&ticks!=static_cast<std::uint32_t>(CpuCheckpointSpan::OneTick)&&
+        ticks!=static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks)&&
+        ticks!=static_cast<std::uint32_t>(CpuCheckpointSpan::SevenTicks))){
+        refused(stage,code(CpuCaptureRefusal::InvalidSpan),allow_variable?
+            "Reusable CPU capsule interval must be one through seven ticks":
+            "CPU capsule interval is not one, two, or seven ticks");return {};
     }
-    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(span));
+    std::unique_ptr<GameplayCpuCheckpoint> c(new(std::nothrow) GameplayCpuCheckpoint(ticks,allow_variable));
     if(!c){refused(stage,code(CpuCaptureRefusal::CapsuleAllocation),"CPU capsule allocation returned null");return {};}
     if(!statics){refused(CpuComparisonDomain::Statics,code(CpuCaptureRefusal::MissingStatics),"Configured static owner is missing");return {};}
     try {
@@ -54,7 +73,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         c->commit_.context_snapshot=melee_web_match_context_snapshot_capture(c->owner_.context,leaf_error,sizeof(leaf_error));
         if(!c->commit_.context_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),leaf_error[0]?leaf_error:"Match-context snapshot capture returned null without error text");return {};}
         stage=CpuComparisonDomain::Audio;
-        c->commit_.audio_snapshot=melee_web_audio_snapshot_capture(c->owner_.audio);
+        c->commit_.audio_snapshot=allow_variable?
+            melee_web_audio_snapshot_capture_with_stream(c->owner_.audio):
+            melee_web_audio_snapshot_capture(c->owner_.audio);
         if(!c->commit_.audio_snapshot){refused(stage,code(CpuCaptureRefusal::NullSnapshot),"Audio snapshot capture returned null (opaque capture API)");return {};}
         stage=CpuComparisonDomain::Payload;
         auto payload=melee_web_source_memory_payload_snapshot_capture();
@@ -89,17 +110,17 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
         // memory, and its serial/table are never captured or restored.
         c->class_piece_anchor_=melee_web_class_piece_arm();
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-        if(span==CpuCheckpointSpan::TwoTicks)
+        if(span==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
             (void)melee_web_source_memory_slist_target_trace_arm(
                 c->commit_.payload,c->class_piece_anchor_,0x80d349c0u,8u,0u);
-        if(span==CpuCheckpointSpan::TwoTicks)
+        if(span==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
             melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_CAPTURE);
 #endif
 #if !(defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE)
-        c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==CpuCheckpointSpan::TwoTicks?8u:1u);
+        c->lobj_writer_session_=melee_web_lobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,span==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks)?8u:1u);
 #endif
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE && !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
-        if(span==CpuCheckpointSpan::TwoTicks)
+        if(span==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
             c->tobj_writer_session_=melee_web_tobj_writer_arm(c->commit_.payload,c->class_piece_anchor_,8,c->owner_.frame);
 #endif
         // v9 uses stack-local texture matrices: the historical source-writer
@@ -125,13 +146,31 @@ bool GameplayCpuCheckpoint::begin_record(const GameplayMatchSession& session) no
        (!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor))||
        session.source_frames()!=owner_.frame)return false;
     commit_.effect_token=melee_web_cpu_interval_begin();
+    motor_token_=commit_.effect_token;
     if(!commit_.effect_token||melee_web_action_interval_begin_record(commit_.actions)!=1){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    if(!melee_web_audio_snapshot_interval_begin(owner_.audio,commit_.audio_snapshot,
+                                               commit_.effect_token)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    if(reusable_loop_&&!melee_web_cpu_interval_motor_capture_begin(
+       commit_.effect_token,owner_.world,owner_.context,owner_.context_epoch,
+       static_cast<std::uint32_t>(owner_.frame),span_)){
         disarm();phase_=Phase::Failed;return false;
     }
     phase_=Phase::Recording;
     /* The next ordinary fixture step can replace source Clip borrowers. From
      * here on cleanup retains both pre and first-pass leases until teardown. */
     source_step_possible_=true;return true;
+}
+bool GameplayCpuCheckpoint::interior_hps_pending(const GameplayMatchSession& session) const noexcept {
+    return reusable_loop_&&(phase_==Phase::Recording||phase_==Phase::Correcting)&&
+        same_owner(session)&&session.source_frames()>owner_.frame&&
+        session.source_frames()<owner_.frame+span_&&
+        melee_web_cpu_interval_admit(commit_.effect_token)&&
+        melee_web_audio_snapshot_interval_pending_admit(owner_.audio,commit_.audio_snapshot,
+                                                       commit_.effect_token)==1;
 }
 bool GameplayCpuCheckpoint::interval_boundary(const GameplayMatchSession& session) noexcept {
     comparison_={};
@@ -193,10 +232,12 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
         if(!same_owner(session)||(!slippi_lobj_anchor_admit(commit_.lobj_anchor)||!slippi_tobj_anchor_admit(commit_.tobj_anchor))||
            session.source_frames()!=owner_.frame+static_cast<std::uint32_t>(span_)||
            !melee_web_cpu_interval_admit(commit_.effect_token)||
+           (reusable_loop_&&!melee_web_cpu_interval_motor_baseline_seal(
+               commit_.effect_token,session.source_frames()))||
            melee_web_action_interval_seal_record(commit_.actions)!=1){disarm();phase_=Phase::Failed;return false;}
         auto payload=melee_web_source_memory_payload_snapshot_capture();post_payload_=payload.snapshot;
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-        if(span_==CpuCheckpointSpan::TwoTicks)
+        if(span_==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
             melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_BASELINE_SEAL);
 #endif
         post_flow_=melee_web_match_flow_cpu_snapshot_capture(owner_.flow,nullptr,0);
@@ -212,7 +253,13 @@ bool GameplayCpuCheckpoint::seal_post(const GameplayMatchSession& session) noexc
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore(const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
         return GameplayCpuCommitResult::MissingOwner;
+    if(!melee_web_cpu_interval_motor_restore_admit(
+       commit_.effect_token,MELEE_WEB_CPU_MOTOR_LANE_REPLAY))
+        return GameplayCpuCommitResult::Effect;
     const auto result=gameplay_cpu_commit(commit_);
+    if(result==GameplayCpuCommitResult::Ok)
+        melee_web_cpu_interval_motor_restore_commit(commit_.effect_token,
+            MELEE_WEB_CPU_MOTOR_LANE_REPLAY);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(result==GameplayCpuCommitResult::Ok&&
        !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
@@ -234,7 +281,13 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
     const GameplayMatchSession& session) noexcept {
     if(phase_!=Phase::Sealed||!same_owner(session)||session.source_frames()!=post_frame_)
         return GameplayCpuCommitResult::MissingOwner;
+    if(!melee_web_cpu_interval_motor_restore_admit(
+       commit_.effect_token,MELEE_WEB_CPU_MOTOR_LANE_CORRECTED))
+        return GameplayCpuCommitResult::Effect;
     const auto result=gameplay_cpu_commit_corrected(commit_);
+    if(result==GameplayCpuCommitResult::Ok)
+        melee_web_cpu_interval_motor_restore_commit(commit_.effect_token,
+            MELEE_WEB_CPU_MOTOR_LANE_CORRECTED);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(result==GameplayCpuCommitResult::Ok&&
        !slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
@@ -266,6 +319,8 @@ bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session
                       (slippi_lobj_failure()|(slippi_tobj_failure()<<16)));
     if(!melee_web_cpu_interval_admit(commit_.effect_token))
         return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
+    if(!melee_web_cpu_interval_motor_selected_finish(commit_.effect_token,session.source_frames()))
+        return refuse(CpuComparisonDomain::Effects,melee_web_cpu_interval_failure());
     const auto action_failure=melee_web_action_interval_active_failure(commit_.actions);
     if(action_failure)
         return refuse(CpuComparisonDomain::Actions,action_failure);
@@ -274,6 +329,14 @@ bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session
                       melee_web_action_interval_failure_code(commit_.actions));
     phase_=Phase::CorrectedSealed;
     return true;
+}
+const MeleeWebCpuMotorEvidence* GameplayCpuCheckpoint::motor_evidence(
+    const GameplayMatchSession& session) const noexcept {
+    if(!reusable_loop_||!motor_token_||!owner_.context||!owner_.world||
+       !owner_.context_epoch||commit_.effect_token!=motor_token_||
+       melee_web_cpu_interval_token()!=motor_token_||!same_owner(session))return nullptr;
+    return melee_web_cpu_interval_motor_evidence_for(motor_token_,owner_.world,
+        owner_.context,owner_.context_epoch,owner_.frame,span_);
 }
 bool GameplayCpuCheckpoint::matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>& bytes,const AudioRanges& ranges,std::size_t count) noexcept {
     struct Visit {const AudioRanges* ranges;std::size_t count,n;bool failed;};Visit visit{&ranges,count,0,false};
@@ -317,6 +380,8 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
     };
     if(!check(CpuComparisonDomain::Owner,phase_==Phase::Replaying&&same_owner(session)&&
         session.source_frames()==post_frame_&&slippi_lobj_anchor_admit(commit_.lobj_anchor)==1&&slippi_tobj_anchor_admit(commit_.tobj_anchor)==1,(slippi_lobj_failure()|(slippi_tobj_failure()<<16))))return false;
+    if(!melee_web_cpu_interval_motor_selected_finish(commit_.effect_token,session.source_frames()))
+        return check(CpuComparisonDomain::Effects,false,melee_web_cpu_interval_failure());
     if(!check(CpuComparisonDomain::Effects,melee_web_cpu_interval_admit(commit_.effect_token)==1,melee_web_cpu_interval_failure()))return false;
     const int action_result=melee_web_action_interval_finish_replay(commit_.actions);
     if(!check(CpuComparisonDomain::Actions,action_result==1,
@@ -335,7 +400,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
             class_piece_capture_witness_=melee_web_source_memory_class_piece_capture_witness(commit_.payload,post_payload_,payload,class_piece_anchor_);
         }
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-        if(span_==CpuCheckpointSpan::TwoTicks)
+        if(span_==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
             melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_REPLAY_FINAL);
 #endif
         melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
@@ -345,7 +410,7 @@ bool GameplayCpuCheckpoint::finish_replay(const GameplayMatchSession& session) n
             payload.requested_bytes,payload.status==1?payload.admission_status:payload.source_address};phase_=Phase::Failed;return false;
     }
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
-    if(span_==CpuCheckpointSpan::TwoTicks)
+    if(span_==static_cast<std::uint32_t>(CpuCheckpointSpan::TwoTicks))
         melee_web_lobj_slist_trace_sample(MELEE_WEB_SLIST_TRACE_REPLAY_FINAL);
 #endif
     melee_web_source_memory_class_piece_slab_trace_finalize(commit_.payload,post_payload_,payload);
@@ -418,7 +483,71 @@ bool GameplayCpuCheckpoint::matches_drawn_reference(const GameplayMatchSession& 
     if(comparison_.status)return false;
     matched_domains_|=1u<<static_cast<unsigned>(CpuComparisonDomain::Statics);return true;
 }
+bool GameplayCpuCheckpoint::retire_confirmed(
+    const GameplayMatchSession& session) noexcept {
+    // A host-side result is not restore or ownership authority. It must first
+    // complete the CPU/DRAW/raw comparison and GPU/Asyncify idle boundary;
+    // this method independently proves only live native release safety.
+    // Exact-replay Finished carries its full accepted native comparison.
+    // Sealed and CorrectedSealed carry no comparison claim and require zero
+    // native comparison masks before release.
+    constexpr std::uint32_t full_domain_mask=(1u<<
+        (static_cast<std::uint32_t>(CpuComparisonDomain::Statics)+1u))-2u;
+    const bool exact_terminal=phase_==Phase::Finished&&
+                              checked_domains_==full_domain_mask&&
+                              matched_domains_==full_domain_mask;
+    const bool clean_uncompared_terminal=
+                                  (phase_==Phase::Sealed||
+                                   phase_==Phase::CorrectedSealed)&&
+                                  checked_domains_==0&&matched_domains_==0;
+    if((!exact_terminal&&!clean_uncompared_terminal)||!source_step_possible_||
+       comparison_.status!=0)
+        return false;
+
+    // Verify the complete checkpoint owner tuple and endpoint before asking
+    // the live session to check its exact source RuntimeFiles scope.
+    const auto live=session.diagnostic_cpu_owners();
+    if(!live.storage||live.storage!=owner_.storage||live.context!=owner_.context||
+       live.flow!=owner_.flow||live.audio!=owner_.audio||live.world!=owner_.world||
+       live.context_epoch!=owner_.context_epoch||live.frame!=post_frame_||
+       session.source_frames()!=post_frame_)
+        return false;
+    if(!session.diagnostic_source_files_quiescent())
+        return false;
+
+    if(melee_web_cpu_interval_admit(commit_.effect_token)!=1)
+        return false;
+    if(!melee_web_cpu_interval_motor_commit_admit(commit_.effect_token,owner_.world,
+       owner_.context,owner_.context_epoch,static_cast<std::uint32_t>(owner_.frame),span_))
+        return false;
+    if(slippi_lobj_anchor_admit(commit_.lobj_anchor)!=1||
+       slippi_tobj_anchor_admit(commit_.tobj_anchor)!=1||
+       slippi_particle_presentation_anchor_admit(commit_.particle_anchor)!=1)
+        return false;
+
+    // ActionStore first performs a pure, exact-catalog release-safety proof.
+    // Its commit operation must leave all leases intact when it refuses.
+    if(!commit_.actions||
+       melee_web_action_interval_retire_admit(commit_.actions)!=1)
+        return false;
+    if(melee_web_action_interval_retire_confirmed(commit_.actions)!=1)
+        return false;
+
+    // The private reusable route captures only the already admitted selected
+    // motor transcript. This bookkeeping never dispatches a hardware command.
+    melee_web_cpu_interval_motor_capture_commit(commit_.effect_token);
+
+    // All remaining operations revoke routing/anchors and are non-failing.
+    // Keep this terminal distinct from source-owner teardown: the match stays
+    // live and may begin a later, independently captured interval.
+    disarm();
+    confirmed_disarmed_=true;
+    phase_=Phase::ConfirmedDetached;
+    source_step_possible_=false;
+    return true;
+}
 void GameplayCpuCheckpoint::disarm() noexcept {
+    if(confirmed_disarmed_)return;
     melee_web_source_memory_class_piece_slab_trace_early_close();
     // Cleanup revokes host routing even after a failed interval. Its result is
     // not a source comparison or successful rollback assertion.
@@ -431,6 +560,9 @@ void GameplayCpuCheckpoint::disarm() noexcept {
     melee_web_tobj_writer_disarm(tobj_writer_session_);
     melee_web_class_piece_disarm(class_piece_anchor_);
     if(commit_.actions)melee_web_action_interval_disarm(commit_.actions);
+    if(commit_.effect_token&&commit_.audio_snapshot)
+        (void)melee_web_audio_snapshot_interval_end(owner_.audio,commit_.audio_snapshot,
+                                                  commit_.effect_token);
     if(commit_.effect_token){melee_web_cpu_interval_end(commit_.effect_token);commit_.effect_token=0;}
 }
 bool GameplayCpuCheckpoint::source_owners_retired(const GameplayMatchSession* session) noexcept {

@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Browser exercised / Historical one-tick restore-replay-and-present passed. V14 moves the observed effect-joint matrix writes into simulation, with exact two-tick target-matrix and raw-sample agreement. Strict source-payload equality now fails at an eight-byte SList-pool allocation. Two-tick final present and full browser rollback remain unproven.**
+**A private fixed-seven-tick component now passes two separate wrong-input correction windows on one persistent timeline, including the neutral bridge, both final presents, and checked capsule retirement. This remains bounded component evidence; continuous rollback and full-match acceptance are unproven.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -1513,11 +1513,202 @@ retains one Linux unit failure: GCC rejects misleading indentation in a diagnost
 null-ticket guard. Its dependent aggregate check also fails. The reviewed repair
 splits the guard and assignment onto separate lines with identical tokens and
 operation order; the focused source-memory snapshot control passes locally.
-Repaired-head CI remains pending. The next runtime step is proof-backed retirement of a confirmed checkpoint
-while permanent resident action assets remain live, allowing one bounded owner
-slot to be reused. Generic destructor/retirement guards stay intact. Publication
-validation, repeated corrections, combat, frame-budget, profile admission and
-full-match/online rollback remain open.
+All 14 checks on repaired head `9e69d37b` complete with 12 successes and two
+expected skips. PR #342 merges as `97764b0f`; the reviewed and merged trees match.
+The browser capture and local validation producers above remain distinct.
+
+The successor component at `8c979087` adds checked retirement of confirmed
+checkpoints while their exact match and permanent resident action owners remain
+live. Focused controls pass for clean-reference and corrected checkpoints,
+refusals before mutation, and old detached-capsule cleanup after a new interval.
+The generic destructor/retirement guards stay intact. The controls execute the
+actual ActionStore and extracted checkpoint/session code with modeled leaves;
+they do not establish a new browser result. Fixture stack, destroyed-store status
+and short-circuit expectation failures remain retained with their reviewed repairs.
+The two-window successor now has four separately retained browser attempts.
+V1 stops in host startup ordering because reuse validation dereferences
+`predictedPage` before that page is initialized; no correction window runs.
+Its native producer is `4a13106d`, and the host repair is recorded at
+`41822a85`. V2 reuses that native producer with the repaired host: its
+first seven-tick correction and the following 35-neutral-tick bridge complete,
+but the second PRE comparison refuses because raw `ParticleAnchor.Serial`
+is 2103 versus 2127. The historical schema-312 comparator remains strict at
+that boundary.
+
+V3 adds a typed, local particle-cell receipt sidecar while keeping the original
+schema-312 rows and all unrelated comparisons strict. Its first correction,
+bridge and second PRE all pass; PRE agrees across nine domains and 25 live and
+captured particle cells. The second corrected CPU comparison then finds changed
+bytes in PayloadRow 2366 at offset 140 and PayloadRow 3303. Offline comparison
+finds all 35 raw per-tick lanes equal, but cannot identify the changed payload
+owner or type. The run stops before the second final present. Independent
+postflight confirms all recorded process IDs absent, and all nine v3 producer
+artifacts are archived. Component-control reporting is scoped in the structured
+receipt: the combined host run had 13 passes and one negative-fixture failure,
+then the repaired sidecar test passed alone; this is not a single 14/14 run.
+Native helper, aggregate and adapter review receipts are retained there as well.
+V4 uses the V19 TEV scratch profile as a changed source hypothesis. It passes
+both actual wrong-prediction windows on the same persistent input timeline: the
+first starts at sample 300 (source frames 176–183), then 35 literal-neutral
+bridge ticks advance the same timeline to sample 342, where the second window
+runs (source frames 218–225). For each window, PRE, corrected CPU_END and
+DRAW_END compare equal across all nine declared domains; typed particle-cell
+identity/provenance and the five raw lanes are retained and checked. Each
+window also completes its corrected final present and checked retirement, with
+at most one capsule active. The two final screenshots are byte-identical. The
+run retains the original schema-312 endpoint and validates differing local
+particle serial provenance through the typed sidecar; it does not normalize
+other endpoint fields. The nine producer artifacts are archived, recorded PIDs
+are absent, and independent offline review replayed the retained endpoint
+comparisons. The V19 hypothesis passes this run but does not establish the exact
+owner or type of the two payload rows that differed in V3. This is not a
+continuous rolling rollback, relay, whole-profile, or full-match result.
+
+The following retained attempts precede the passing V9 component result below.
+The reusable-owner loop now has a native/host implementation and retained failed
+browser evidence in `reusable_owner_loop_v1` in the structured receipt. It uses
+eight contiguous capsules over the same literal input history, with no external
+bridge. The first corrected capsule and the following confirmed capsule compare
+and retire successfully. The third capsule stops at reference sample 310: an
+original motor request trips the existing CPU-interval effect barrier. A second
+run uses the unchanged runtime and a reviewed, read-only diagnostic to identify
+MOTOR (effect 4), epoch 3; the predicted page has not executed that sample. The
+particle-token error is a downstream failed-admission message, not evidence of
+a stale particle owner. Both failures and exact producer identities are retained.
+Owned processes are absent after cleanup; native teardown refusals remain explicit.
+
+The token-owned motor-request journal now passes focused source and host controls
+and independent ownership review. It retains ordered source-frame/channel/command
+requests, preserves the predicted baseline, replaces selected output only after a
+successful restore, and records a confirmed capture-only receipt. The original
+rumble interpreter remains unchanged; physical rumble is not published. Review
+caught a raw-step/source-clock mismatch before capture: the bracket now reads the
+same authoritative source frame as its checkpoint, once across interpretation.
+The reduced production-bracket control distinguishes these clocks. Legacy motor,
+file, SSM and HPS barriers remain unchanged. The affected build and independently
+reviewed relink pass. Browser V3 (`7f9ee998`) clears the original MOTOR refusal:
+both pages consume all seven ticks in the third interval with exact raw-five
+agreement and the same captured motor request. The reference CPU endpoint then
+refuses owner admission at source frame 190. V4 (`47f1d8e6`) identifies the first rejecting leaf as
+`payload-header`, status `TOPOLOGY_CHANGED` (5). The reader uses the PRE snapshot
+for END evidence even though the confirmed interval changes allocation topology.
+A smaller actual-source allocator control reproduces the stale-PRE refusal and
+successful fresh-POST enumeration. The repair adds allocation-free current-END
+reads for both reference and corrected execution; PRE restore admission stays
+strict. The actual-source leaf control and all three endpoint controls pass;
+the initial fixture watermark expectation failure remains retained. Independent
+source and focused-result review passes. V5 (`3644999f`) now compares and retires
+four contiguous intervals on both pages, including the third interval's complete
+payload growth from 3,467 to 3,471 rows. Independent review replays all declared
+nine-domain endpoints, 21 per-tick raw-five pairs, four final draws, motor records
+and exact native retirement metadata. This does not implement restoring a
+speculative topology change.
+
+The fifth interval stops at sample 322, reference command 34/source frame 199,
+with HPS effect 3 in epoch 5. V6 (`cf122de6`) retains the first-refusal marker
+`site=devcom-request`; cancellation dispatch is not this failure. The complete
+request tuple remains unrecorded. After these two HPS-boundary experiments,
+a smaller original HPS scheduler/transport reproducer now demonstrates the
+missing stream owner. It observes a real header-to-payload callback chain replacing
+occupied slot 2; mixer restore succeeds while the slot and PCM remain at their
+post-refill values. This is a stream-owner omission result, not playback-wide
+restore equivalence or attribution of the browser request tuple. The producer,
+raw event order and initial launcher failure are retained in the structured
+receipt. Its PRE has a pending transfer and loading flag; POST is quiescent.
+The new quiescent-only snapshot must refuse that PRE rather than drain it.
+The mixer snapshot does not own the HPS stream queue or slot buffers, so this
+failure cannot be repaired by simply allowing speculative HPS mutations. Source
+review finds the known original HPS headers and callback targets already covered
+by strict static rows. The conditional repair is limited to the missing host
+stream owner, reusing the original scheduler and immutable authored data; it is
+being implemented and is not admitted. The aggregate wiring has independent
+source review and two focused controls using a synthetic stream leaf. Only an
+active interval binding holds stream lifetime; failed-interval disarm releases
+it before source retirement, and receipt copies can be destroyed afterwards.
+The host inventory retains the old six/nine-row forms and adds bounded typed
+stream rows without changing the endpoint wire. Its initial legacy-compatibility
+review failure and repair are retained; the repaired host has 12 passing checks,
+three passing native endpoint controls and independent source review. The actual
+HPS leaf now restores all 68 typed ranges (885,476 bytes, including six PCM
+buffers) after the first occupied-slot refill. Pending-capture, wrong-token,
+capacity and failed-binding cleanup controls pass. This compares stream storage,
+not source scheduler/AX state or replay output. A second bounded control now
+crosses that refill under an exact healthy snapshot/token binding, restores the
+same leaf bytes, and verifies that relay initialization and cancellation remain
+forbidden without changing stream storage. The actual closed-barrier control
+also passes. The first composed attempt, V7 (`bba581a4`), stops at PRE before
+advancing a capsule: the new host validator incorrectly forces FX ranges 7–9
+to use the mixer owner and generation. The native FX contract already specifies
+a separate owner. The repaired validator preserves that distinction and exact
+cross-lane metadata/byte comparisons; 13 focused checks pass with independent
+review. V7's CPU-close refusals remain retained; both snapshot and renderer
+shutdowns succeed, all 13 recorded PIDs are absent and nine producer pins match.
+V8 (native `bba581a4`, host `5005dd6f`) passes the first four intervals,
+then stops at reference command 34/sample 322, source frame 199, with
+`PayloadTransferBusy` (1044). The CPU interval remains healthy. The retained
+transfer bytes show an idle drive before and after the source tick, then a busy
+drive after audio; file and bank owners stay idle. The source queues HPS work
+inside its audio callback, after the scheduled transport pump. Completing that
+work early would change callback ordering. The reviewed repair separates
+validated in-flight HPS work at intermediate ticks from strict quiescent
+capture/restore boundaries. Its reduced original-source trace passes: the
+pending query preserves request, slot and loading state, capture/restore still
+refuse, and the next scheduled 160-sample block pumps naturally. The focused
+frame/audio/payload/adapter controls and five configured translation-unit syntax
+checks pass; fixture setup/import/link failures remain retained. At V8, composed
+refill completion remained unproved. V8
+retains CPU-close refusals 1073/1044; both snapshot and renderer shutdowns
+succeed, all recorded PIDs are absent and nine native producer pins match.
+The initial leaf review findings, bounded Sol repair and corrected reviewer
+finding are retained with the exact producer. Earlier native capsule
+cleanup refused; in V5 the reference snapshot close also aborts and renderer
+shutdown fails. Owned-process absence and all nine producer pins pass. Focused
+fixture and browser failures remain retained. General rolling
+correction, combat, frame-budget, profile admission and full-match or online
+rollback remain open.
+
+
+V9 at runtime and harness `8f846b45` passes the complete reusable-owner
+component in 102.73 seconds: eight contiguous intervals over 44 literal inputs,
+eight captures and checked retirements per page, and at most one owned capsule.
+Both wrong predictions take different actual action/motion branches and correct
+without source draw. These corrections span one and two ticks; the earlier V4
+result separately covers two seven-tick corrections. Independent retained-byte
+review reproduces all 24 nine-domain PRE/CPU/DRAW comparisons and 260 raw-lane
+comparisons, verifies actual presents and the two capture-only motor events, and
+checks the final fully confirmed timeline. The 2,171 canonical policy rows and
+all comparison fields remain unchanged.
+
+The observed HPS refill is in confirmed interval 4. Work queued after audio at
+sample 322 completes during the next scheduled audio block at sample 323, with
+all 77 typed Audio ranges and raw/source comparisons equal at the sealed
+boundaries. This is not a correction-across-refill proof. Both native CPU closes,
+snapshot closes and renderer shutdowns succeed; all 12 recorded PIDs are absent
+and nine native producer pins are unchanged. Final screenshots are byte-identical;
+this does not compare original-game pixels or establish live output timing.
+
+Source integration and independent V9 result reviews pass. The first full suite
+at `8f846b45` ran 3,077 tests with 238 skips and four fixture link/import failures:
+missing audio stream declarations, incomplete JavaScript/source mirror inputs,
+and missing original rumble-helper/source-clock dependencies in two extracted
+controls. The four focused tests now pass after reviewed fixture repairs; the
+original failure log and subsequent fixture enum/include/rebind failures remain
+retained. Runtime and harness code are unchanged. Final local regression at
+`d0865eec` passes all 3,077 tests with 238 skips; the ordinary Release build also
+passes at that source. Initial Linux CI exposed a truncated dependency download
+before the effects build and a missing explicit `<cstdint>` include in the
+snapshot test trace. The test-only include repair passes both focused snapshot
+controls locally. Those failures are retained; complete publication-head CI
+remains required and is tracked in PR #358. No additional browser capture is
+needed for these fixture-only changes. All runtime, harness, build, linked policy,
+review, comparison, cleanup and validation hashes are in `passing_browser_v9`
+in the existing structured receipt.
+
+The next experiment routes the same input recipe through the existing own Worker
+relay, queues asynchronous arrivals and applies them at a safe native boundary.
+Its initial Node-held sockets will establish only packet-backed browser component
+evidence. Rolling history, correction across refill, combat/KO breadth, combined
+frame budget, full-match play and public profile admission remain open.
 
 
 ## Stage decision dependencies, issue #333

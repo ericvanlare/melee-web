@@ -2,6 +2,8 @@
  * checkpoint corrected writer and endpoint reader are explicit phase models;
  * no aggregate admission, source-world replay or browser equality claim. */
 @BASE_CONTROL@
+bool confirmed_retire_ok=true;
+unsigned confirmed_retire_calls=0;
 
 namespace melee_web {
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore_corrected(
@@ -10,6 +12,11 @@ bool GameplayCpuCheckpoint::finish_corrected(const GameplayMatchSession& session
     if(phase_!=Phase::Replaying||session.source_frames()!=post_frame_||
        !melee_web_cpu_interval_admit(effect_token_)||fail_replay)return false;
     phase_=Phase::Finished;return true;
+}
+bool GameplayCpuCheckpoint::retire_confirmed(const GameplayMatchSession&) noexcept {
+    ++confirmed_retire_calls;
+    if(!confirmed_retire_ok)return false;
+    disarm();return true;
 }
 /* Explicit reader phase model only: actual reader/leaf admission has a separate
  * control. Native adapter's guard and begin/end lifetime execute unchanged. */
@@ -26,6 +33,9 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
     r.view=static_cast<uint32_t>(view_);r.provenance=static_cast<uint32_t>(provenance_);
     r.count=1;return r;
 }
+// This phase model does not grant particle-sidecar ownership.
+bool GameplayCpuEndpointReader::particle_header(SlippiParticleCellEndpointHeader& out) const noexcept {out={};return false;}
+bool GameplayCpuEndpointReader::particle_row(uint32_t,uint32_t,SlippiParticleCellEndpointRow& out) const noexcept {out={};return false;}
 bool GameplayCpuEndpointReader::revalidate() noexcept {bool prior=active_;active_=false;return prior;}
 }
 namespace {

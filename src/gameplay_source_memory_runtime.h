@@ -155,6 +155,33 @@ melee_web_source_memory_payload_endpoint_free_cell(
 MeleeWebSourcePayloadEndpointCell
 melee_web_source_memory_payload_endpoint_allocated_cell(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot, uint64_t index);
+/* Read-only current-END view, authenticated by a live owner snapshot. Unlike
+ * the PRE snapshot getters above, these getters do not require its saved
+ * topology to equal the current allocator topology. The header performs a
+ * complete live ledger/heap-cell check; pass that returned header unchanged
+ * to the indexed getters. Indexed reads are O(1), verify the header's current
+ * owner/topology fence, and return only an actual current row/cell by index.
+ * This API never allocates, copies payload bytes, restores, or accepts an
+ * arbitrary caller-selected range. It does not grant restore authority.
+ */
+MeleeWebSourcePayloadEndpointHeader
+melee_web_source_memory_payload_current_endpoint_header(
+    const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot);
+MeleeWebSourcePayloadEndpointRow
+melee_web_source_memory_payload_current_endpoint_row(
+    const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot,
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header,
+    uint64_t index);
+MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_current_endpoint_free_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot,
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header,
+    uint64_t index);
+MeleeWebSourcePayloadEndpointCell
+melee_web_source_memory_payload_current_endpoint_allocated_cell(
+    const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot,
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header,
+    uint64_t index);
 MeleeWebSourceMemoryPayloadSnapshotStatus
 melee_web_source_memory_payload_snapshot_restore(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot);

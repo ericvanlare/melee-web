@@ -23,6 +23,8 @@ from owned_test_workspace import OwnedWorkspaceTests
 STUB_CHECKPOINT_HEADER = r'''#pragma once
 #include "gameplay_cpu_commit.hpp"
 #include "gameplay_cpu_statics.hpp"
+#include "gameplay_cpu_interval.h"
+#include <cstdlib>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -49,9 +51,13 @@ class GameplayCpuCheckpoint final {
 public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_span(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool interval_boundary(const GameplayMatchSession&) noexcept;
+    bool interior_hps_pending(const GameplayMatchSession&) const noexcept {return false;} // no stream in this model
+    const MeleeWebCpuMotorEvidence* motor_evidence(const GameplayMatchSession&) const noexcept {std::abort();} // motor export is not modeled
     bool seal_post(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
@@ -70,8 +76,11 @@ public:
     bool source_owners_retired(const GameplayMatchSession*) noexcept;
 private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Finished, Failed, Retired };
-    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span) {}
-    const CpuCheckpointSpan span_;
+    explicit GameplayCpuCheckpoint(std::uint32_t span):span_(span) {}
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_range(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,
+        std::uint32_t,bool) noexcept;
+    const std::uint32_t span_;
     std::unique_ptr<GameplayCpuStatics> statics_;
     GameplayCpuCommitOwners commit_{};
     MeleeWebActionInterval* actions_{};
@@ -214,7 +223,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         # Extract the real shared source/frame admission predicate: modeled
         # owner/runtime/transfer leaves remain explicit in the control.
         browser_source = (CANDIDATE_ROOT / "src/slippi_profile/tests/synctest_browser.cpp").read_text()
-        start = browser_source.index("uint32_t payload_admission_source_boundary()")
+        start = browser_source.index("uint32_t payload_admission_source_boundary(")
         end = browser_source.index("uint32_t payload_admission_boundary(", start)
         actual_source_boundary = browser_source[start:end].rstrip()
         generated = generated.replace("@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@", actual_source_boundary)

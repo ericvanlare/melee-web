@@ -72,7 +72,13 @@ export function recordPredictedActionDivergence(reference, predicted) {
 
 // This callback performs source work only for the explicitly issued command.
 // Endpoint reads have their own synchronous callback with no await or source work.
-async function operateInPage(plan){
+export function correctedPageDefaults(mapping,stocks){
+  return {mapping,stocks,waitSource:waitForAuroraSubmission.toString(),
+    decodeDrawSource:decodeDrawDiagnostics.toString(),inputMappingSource:validateSourceInputMapping.toString(),
+    inspectSource:inspectInteractiveObservation.toString()};
+}
+
+export async function operateCorrectedInPage(plan){
   const {module}=window.__slippiSynctest;
   const progress=window.__slippiSynctest.cpuCorrectedProgress??=
     {status:'running',commands:[],nativeEvidenceBase64:null};
@@ -89,9 +95,41 @@ async function operateInPage(plan){
       throw new Error('Corrected evidence size drift');
     return encode(read(module._melee_web_synctest_cpu_corrected_evidence(),93512));
   };
+  const readReuseEvidence=()=>{
+    if(module._melee_web_synctest_cpu_corrected_reuse_evidence_bytes()!==40)
+      throw new Error('Corrected reuse evidence size drift');
+    return encode(read(module._melee_web_synctest_cpu_corrected_reuse_evidence(),40));
+  };
+  const readLoopEvidence=()=>{
+    if(typeof module._melee_web_synctest_cpu_corrected_loop_evidence_bytes!=='function'||
+       typeof module._melee_web_synctest_cpu_corrected_loop_evidence!=='function'||
+       module._melee_web_synctest_cpu_corrected_loop_evidence_bytes()!==40)
+      throw new Error('Corrected loop evidence size drift');
+    return encode(read(module._melee_web_synctest_cpu_corrected_loop_evidence(),40));
+  };
+  const readLoopMotor=(commit=false)=>{
+    const prefix='_melee_web_synctest_cpu_corrected_loop_motor_'+(commit?'commit_receipt':'evidence');
+    const size=commit?64:1016;
+    if(typeof module[prefix]!=='function'||typeof module[prefix+'_bytes']!=='function'||
+       module[prefix+'_bytes']()!==size)throw new Error('Corrected loop motor receipt export/extent');
+    return encode(read(module[prefix](),size));
+  };
   try{
     if(typeof SharedArrayBuffer!=='undefined'&&module.HEAPU8.buffer instanceof SharedArrayBuffer)
       throw new Error('Corrected route refuses shared Wasm memory');
+    if(plan.reuseEnable){
+      if(typeof module._melee_web_synctest_cpu_corrected_reuse_enable!=='function')
+        throw new Error('Corrected reuse enable export is unavailable');
+      const result=module._melee_web_synctest_cpu_corrected_reuse_enable();
+      progress.reuseEnableResult=result;if(result!==0)throw new Error(`Corrected reuse enable refused ${result}`);
+    }
+    if(plan.loopEnableSchema!==undefined){
+      if(typeof module._melee_web_synctest_cpu_corrected_loop_enable!=='function')
+        throw new Error('Corrected loop enable export is unavailable');
+      const result=module._melee_web_synctest_cpu_corrected_loop_enable(plan.loopEnableSchema);
+      progress.loopEnableResult=result;
+      if(result!==0)throw new Error(`Corrected loop enable refused ${result}`);
+    }
     if(plan.wire){
       const wire=new Uint8Array(plan.wire.length*16),view=new DataView(wire.buffer);
       plan.wire.forEach((row,i)=>row.forEach((value,j)=>view.setUint32(i*16+j*4,value,true)));
@@ -102,6 +140,13 @@ async function operateInPage(plan){
         progress.configurationResult=result;if(result!==0)throw new Error(`CPU configuration refused ${result}`);
       }finally{module._free(pointer);}
     }
+    if(plan.selectSpan!==undefined){
+      if(typeof module._melee_web_synctest_cpu_corrected_loop_select_span!=='function')
+        throw new Error('Corrected loop span export is unavailable');
+      const result=module._melee_web_synctest_cpu_corrected_loop_select_span(plan.selectSpan);
+      progress.spanResult=result;
+      if(result!==0)throw new Error(`Corrected loop span ${plan.selectSpan} refused ${result}`);
+    }
     if(plan.pad!==undefined){
       const pad=Uint8Array.from(atob(plan.pad),value=>value.charCodeAt(0));
       if(pad.length!==44)
@@ -110,9 +155,36 @@ async function operateInPage(plan){
     }
     entry.result=await module.ccall('melee_web_synctest_cpu_corrected_command','number',
       ['number'],[plan.command],{async:true});
-    entry.outcome='returned';progress.nativeEvidenceBase64=readEvidence();
+    entry.outcome='returned';
     if(entry.result!==0)throw new Error(`Corrected command ${plan.command} refused ${entry.result}: `+
       module.UTF8ToString(module._melee_web_snapshot_error()));
+    if(plan.command===53){
+      if(plan.readLoopMotorEvidence){
+        entry.motorCommitReceiptBase64=readLoopMotor(true);
+        progress.motorCommitReceiptBase64=entry.motorCommitReceiptBase64;
+      }
+      if(plan.readLoopEvidence){
+        entry.loopEvidenceBase64=readLoopEvidence();
+        progress.loopEvidenceBase64=entry.loopEvidenceBase64;
+        return {loopEvidenceBase64:entry.loopEvidenceBase64,
+          motorCommitReceiptBase64:entry.motorCommitReceiptBase64??null};
+      }
+      entry.reuseEvidenceBase64=readReuseEvidence();
+      progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
+      return {reuseEvidenceBase64:entry.reuseEvidenceBase64};
+    }
+    progress.nativeEvidenceBase64=readEvidence();
+    if(plan.readLoopMotorEvidence){
+      entry.motorEvidenceBase64=readLoopMotor();progress.motorEvidenceBase64=entry.motorEvidenceBase64;
+    }
+    if(plan.readReuseEvidence){
+      entry.reuseEvidenceBase64=readReuseEvidence();
+      progress.reuseEvidenceBase64=entry.reuseEvidenceBase64;
+    }
+    if(plan.readLoopEvidence){
+      entry.loopEvidenceBase64=readLoopEvidence();
+      progress.loopEvidenceBase64=entry.loopEvidenceBase64;
+    }
     let status=null;
     if(plan.draw){
       const wait=new Function(`return (${plan.waitSource})`)();status=await wait(module,plan.command);
@@ -127,10 +199,19 @@ async function operateInPage(plan){
       isMarioKind:value=>module._melee_web_synctest_is_mario_kind(value)===1,
       slotCount:decodeDraw(draw).slotCount,expectedInputMapping:plan.mapping,expectedStocks:plan.stocks});
     if(!boundary.interactive)throw new Error(`Corrected route lost interactive boundary: ${JSON.stringify(boundary.refusalReasons)}`);
-    return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64:encode(draw),boundary,status};
+    return {evidenceBase64:progress.nativeEvidenceBase64,drawDiagnosticsBase64:encode(draw),boundary,status,
+      reuseEvidenceBase64:entry.reuseEvidenceBase64??null,
+      loopEvidenceBase64:entry.loopEvidenceBase64??null,
+      motorEvidenceBase64:entry.motorEvidenceBase64??null};
   }catch(error){
     entry.error=String(error);progress.status='failed';
     try{progress.nativeEvidenceBase64=readEvidence();}catch(readError){progress.readError=String(readError);}
+    if(plan.readLoopMotorEvidence){
+      try{
+        if(plan.command===53)progress.motorCommitReceiptBase64=readLoopMotor(true);
+        else progress.motorEvidenceBase64=readLoopMotor();
+      }catch(readError){progress.motorReadError=String(readError);}
+    }
     throw error;
   }
 }
@@ -153,7 +234,7 @@ export async function runBrowserCpuCorrectedSeven(predictedPage,referencePage,wi
   const gpu=new Map([[referencePage,previousFrame],[predictedPage,previousFrame]]);
   const diagnostics=new Map([[referencePage,beforeDiagnostics],[predictedPage,beforeDiagnostics]]);
   const operate=async(page,command,options={})=>{
-    const result=await page.evaluate(operateInPage,{...defaults,...options,command});
+    const result=await page.evaluate(operateCorrectedInPage,{...defaults,...options,command});
     const evidence=decodeCpuSevenTickEvidence(bytes(result.evidenceBase64),2);
     validateCorrectedCommandEvidence(evidence,command,pre);
     const state=stateFor(page);state.nativeEvidence=evidence;state.commands.push({command,result:0,state:evidence.state});

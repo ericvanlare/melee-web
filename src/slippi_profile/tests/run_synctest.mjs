@@ -1538,11 +1538,11 @@ export async function runBrowserInit(page, origin, runtimeName) {
 }
 
 export async function runBrowserSample(page, sample, expectedInputMapping, expectedStocks,
-  writeCensus = null, payloadAdmissionPlan = null) {
+  writeCensus = null, payloadAdmissionPlan = null, sourceInput = null) {
   let evaluation;
   try {
     evaluation = await page.evaluate(async ({sample, expectedInputMapping, expectedStocks, checkedSource, inspectSource,
-    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus, payloadAdmissionPlan,
+    inputMappingSource, diagnosticSizeSource, drawDiagnosticBytes, writeCensus, payloadAdmissionPlan, sourceInput,
     diffHeapRangesSource, classifyHeapRangesSource, decodeAudioInventorySource,
     validateAudioOwnerRangesSource, requireStableAudioInventorySource,
     decodeMatchContextRangeInventorySource, validateMatchContextRangeDisjointnessSource,
@@ -1611,6 +1611,24 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
         throw error;
       }
     };
+    if (sourceInput !== null && (writeCensus !== null || payloadAdmissionPlan !== null)) {
+      throw new Error('Literal source input is isolated from census and payload-admission routes');
+    }
+    if (sourceInput !== null) {
+      if (!sourceInput || typeof sourceInput.pad44Base64 !== 'string' ||
+          sourceInput.pad44Base64.length === 0 || sourceInput.captureRawFiveLanes !== true) {
+        throw new Error('Literal source input requires one explicit PAD44 and raw-five capture');
+      }
+      const pad = Uint8Array.from(atob(sourceInput.pad44Base64), value => value.charCodeAt(0));
+      if (pad.length !== 44 || typeof module._melee_web_snapshot_step_raw !== 'function') {
+        throw new Error('Literal source input PAD ABI or raw source-step export is unavailable');
+      }
+      const inputPointer = module._melee_web_snapshot_input();
+      if (!Number.isSafeInteger(inputPointer) || inputPointer < 0 || inputPointer + 44 > module.HEAPU8.byteLength) {
+        throw new Error('Literal source input range is outside Wasm memory');
+      }
+      module.HEAPU8.set(pad, inputPointer);
+    }
     if (payloadAdmissionPlan !== null) {
       if (sample !== 300 || !writeCensus || payloadAdmissionPlan.checkpointSample !== 299 ||
           !Number.isSafeInteger(payloadAdmissionPlan.checkpointSourceFrame) ||
@@ -1896,6 +1914,8 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     }
     if (payloadAdmissionPlan !== null) {
       await payloadAdmissionCommand(2, 'STEP_AND_ADMIT(sample 300)');
+    } else if (sourceInput !== null) {
+      await checked(`literal raw-PAD source tick ${sample}`, 'melee_web_snapshot_step_raw');
     } else {
       await checked(`draw-reference source tick ${sample}`,
         'melee_web_snapshot_step', ['number'], [sample]);
@@ -2005,6 +2025,13 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       heapAfterStep = null;
     }
     const read = (pointer, size) => module.HEAPU8.slice(pointer, pointer + size);
+    const encode = bytes => {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x6000) {
+        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + 0x6000, bytes.length)));
+      }
+      return btoa(binary);
+    };
     const observationSize = module._melee_web_snapshot_observation_size();
     const pcmSize = module._melee_web_snapshot_pcm_size();
     if (observationSize !== 1280 || pcmSize !== 4272) {
@@ -2013,6 +2040,21 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     const observation = read(module._melee_web_snapshot_observation(), observationSize);
     const pcm = read(module._melee_web_snapshot_pcm(), pcmSize);
     const pad = read(module._melee_web_snapshot_input(), 44);
+    let rawFiveLanes = null;
+    if (sourceInput !== null) {
+      const rngSize = module._melee_web_snapshot_rng_profile_observation_size();
+      const transferSize = module._melee_web_snapshot_transfer_diagnostic_size();
+      if (rngSize !== 32 || transferSize !== 40 ||
+          typeof module._melee_web_snapshot_rng_profile_observation !== 'function' ||
+          typeof module._melee_web_snapshot_transfer_diagnostic !== 'function') {
+        throw new Error('Literal source input raw-five lane ABI is unavailable');
+      }
+      rawFiveLanes = {
+        observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
+        rngProfile: encode(read(module._melee_web_snapshot_rng_profile_observation(), rngSize)),
+        transfer: encode(read(module._melee_web_snapshot_transfer_diagnostic(), transferSize)),
+      };
+    }
     const checkDrawDiagnosticSize = new Function(`return (${diagnosticSizeSource})`)();
     const diagnosticSize = checkDrawDiagnosticSize(
       module._melee_web_synctest_draw_diagnostics_size(), drawDiagnosticBytes);
@@ -2030,13 +2072,6 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
       slotCount: diagnosticView.getUint32(0, true),
       expectedInputMapping, expectedStocks,
     });
-    const encode = bytes => {
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 0x6000) {
-        binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + 0x6000, bytes.length)));
-      }
-      return btoa(binary);
-    };
     if (payloadAdmissionProgress) {
       payloadAdmissionProgress.sample300 = {
         observation: encode(observation), pcm: encode(pcm), pad44Base64: encode(pad),
@@ -2104,8 +2139,9 @@ export async function runBrowserSample(page, sample, expectedInputMapping, expec
     }
     return {observation: encode(observation), pcm: encode(pcm), pad: encode(pad),
       drawDiagnostics: encode(diagnostics), boundary, status, heapCensus,
-      payloadAdmission: payloadAdmissionResult};
+      payloadAdmission: payloadAdmissionResult, rawFiveLanes};
   }, {sample, expectedInputMapping, expectedStocks, payloadAdmissionPlan,
+    sourceInput,
     checkedSource: checkedAsyncCcall.toString(),
     inputMappingSource: validateSourceInputMapping.toString(),
     diagnosticSizeSource: requireDrawDiagnosticSize.toString(),

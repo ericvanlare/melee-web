@@ -113,7 +113,7 @@ class SelectedTraceBuildTests(unittest.TestCase):
         cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         self.assertIn(
             'option(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE\n'
-            '  "Enable the private v18 stable-action-assets and particle-preparation profile" OFF)', cmake)
+            '  "Enable the private v19 TEV stage scratch profile" OFF)', cmake)
         self.assertIn(
             "if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND\n"
             "   NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)", cmake)

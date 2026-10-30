@@ -1,5 +1,6 @@
 #pragma once
 #include "gameplay_cpu_commit.hpp"
+#include "gameplay_cpu_interval.h"
 #include "gameplay_match_session.hpp"
 #include <array>
 #include <memory>
@@ -9,8 +10,8 @@ class GameplayCpuEndpointReader;
 /* Private fixed one/two/seven-tick CPU capsule. It owns pre/post evidence and typed
  * snapshots, never a renderer or arbitrary Wasm-memory snapshot. The fixture
  * owns input/PCM/phase comparison and enforces runtime/Asyncify/GPU boundaries.
- * After begin_record, disarm BEFORE ordinary source teardown; retain this
- * capsule until source_owners_retired succeeds, then destroy it. */
+ * After begin_record, retain this capsule through ordinary teardown unless a
+ * clean confirmed endpoint proves its action leases have permanent owners. */
 /* Private capture-only refusal evidence. status1 is a refusal, not a byte
  * mismatch. detail is CpuCaptureRefusal except Payload domain, where it is
  * the actual MeleeWebSourceMemoryPayloadSnapshotStatus. Opaque null results
@@ -31,10 +32,17 @@ public:
     static std::unique_ptr<GameplayCpuCheckpoint> capture(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&,CpuCheckpointSpan=CpuCheckpointSpan::OneTick) noexcept;
+    /* Private reusable-loop entry point. The legacy enum API above retains its
+     * historical 1/2/7 whitelist; this checked path admits actual spans 1..7. */
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_span(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&,std::uint32_t span) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
     /* Intermediate boundary only: no final slot/cache or typed-byte claim. */
+    /* Pure owned pending HPS proof, only between the PRE and END frames. */
+    bool interior_hps_pending(const GameplayMatchSession&) const noexcept;
     bool interval_boundary(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore(const GameplayMatchSession&) noexcept;
     bool finish_replay(const GameplayMatchSession&) noexcept;
@@ -42,7 +50,14 @@ public:
     bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool seal_drawn_reference(const GameplayMatchSession&) noexcept;
     bool matches_drawn_reference(const GameplayMatchSession&) noexcept;
+    // Release-safety proof only; host independently admits CPU/DRAW/raw
+    // comparisons and GPU/Asyncify idle before calling this method.
+    bool retire_confirmed(const GameplayMatchSession&) noexcept;
     void disarm() noexcept;
+    /* Read-only current-endpoint evidence, bound to this live capsule's exact
+     * interval identity. A detached capsule never exposes process-global state. */
+    const MeleeWebCpuMotorEvidence* motor_evidence(
+        const GameplayMatchSession&) const noexcept;
     const MeleeWebTObjWriterEvidence* tobj_writer_witness() const noexcept {return melee_web_tobj_writer_evidence(tobj_writer_session_);}
     const MeleeWebLObjWriterEvidence* lobj_writer_witness() const noexcept {return melee_web_lobj_writer_evidence(lobj_writer_session_);}
     const CpuComparison& comparison() const noexcept {return comparison_;}
@@ -59,10 +74,18 @@ private:
     friend struct GameplayCpuEndpointTestFixture;
 #endif
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
-                       Finished, Failed, Retired };
+                       Finished, Failed, ConfirmedDetached, Retired };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
-    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):span_(span){}
-    const CpuCheckpointSpan span_;
+    explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop)
+        :span_(span),reusable_loop_(reusable_loop){}
+    explicit GameplayCpuCheckpoint(CpuCheckpointSpan span)
+        :GameplayCpuCheckpoint(static_cast<std::uint32_t>(span),false){}
+    static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(
+        const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
+        CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable) noexcept;
+    const std::uint32_t span_;
+    const bool reusable_loop_;
+    std::uint64_t motor_token_{};
     bool same_owner(const GameplayMatchSession&) const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);
@@ -88,6 +111,7 @@ private:
     std::uint32_t post_frame_{};
     Phase phase_=Phase::Captured;
     bool source_step_possible_=false;
+    bool confirmed_disarmed_=false;
     CpuComparison comparison_{};
     std::uint64_t lobj_writer_session_=0,tobj_writer_session_=0;
     MeleeWebClassPieceAnchor class_piece_anchor_{};

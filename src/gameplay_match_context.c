@@ -9,7 +9,7 @@
 #include "slippi_profile/profile.h"
 _Static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY ==
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
-                   SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18,
+                   SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19,
 #else
                    SLIPPI_PROFILE_IDENTITY_LOBJ_CURRENT_SET_V15,
 #endif
@@ -53,6 +53,9 @@ extern u16 staleAttackInstance, unk_804D6480;
 extern PadLibData default_libinfo_data;
 extern HSD_PadStatus default_status_data;
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
+/* Same authoritative match source frame used by the live match-flow owner.
+ * MatchContext::ticks is only its raw-step lifetime counter. */
+extern uint32_t melee_web_match_source_frames(void);
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 static int post_effect_matrices(void* context, char* error, size_t error_size)
 {
@@ -409,6 +412,22 @@ static int sample_valid(const MeleeWebControllerSample* s)
         isfinite(s->trigger_l)&&s->trigger_l>=0&&s->trigger_l<=1&&
         isfinite(s->trigger_r)&&s->trigger_r>=0&&s->trigger_r<=1;
 }
+static int interpret_match_rumble(MeleeWebMatchContext* h,char* e,size_t n)
+{
+    /* The journal key is the original source-clock frame, not the host-side
+     * raw-step lifetime counter. Keep one value across this exact interpreter
+     * call so its begin/end boundary cannot drift. */
+    const uint64_t source_frame=melee_web_match_source_frames();
+    const uint64_t token=melee_web_cpu_interval_token();
+    if(!melee_web_cpu_interval_motor_frame_begin(
+       token,h,h->generation,owner_epoch,source_frame))
+        return fail(e,n,"Capture-only motor journal rejected the source pre-tick boundary");
+    HSD_PadRumbleInterpret();
+    if(!melee_web_cpu_interval_motor_frame_end(token,h,h->generation,
+       owner_epoch,source_frame))
+        return fail(e,n,"Capture-only motor journal rejected the source post-interpret boundary");
+    return 1;
+}
 int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char* e,size_t n)
 {
     return melee_web_match_step_raw_phased(h,raw,NULL,NULL,NULL,NULL,e,n);
@@ -450,7 +469,7 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     HSD_PadLibData.qread=HSD_PadLibData.qwrite=0;HSD_PadLibData.qcount=1;
     /* Raw replay samples replace PADRead, not the source rumble interpreter
      * that precedes it in HSD_PadRenewRawStatus. One sample is supplied per tick. */
-    HSD_PadRumbleInterpret();
+    if(!interpret_match_rumble(h,e,n))return 0;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     memset(&h->pad_queue_observation,0,sizeof(h->pad_queue_observation));
     h->pad_queue_observation.source_generation=h->generation;

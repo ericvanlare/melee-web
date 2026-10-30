@@ -92,9 +92,21 @@ class ParticlePresentationTests(unittest.TestCase):
             self.assertNotIn('ACTUAL_PREPARE', fixture)
             control = scratch / 'control.c'
             control.write_text(fixture)
+            helper_text = (PROFILE / 'particle_presentation.c').read_text()
+            row_text = function(helper_text,
+                                'int slippi_particle_presentation_cell_endpoint_row(')
+            self.assertIn('value.extent=(uint32_t)extent', row_text)
+            self.assertIn('value.stride=c->identity.stride', row_text)
+            for marker in (
+                    'static int cell_endpoint_admit(',
+                    'int slippi_particle_presentation_cell_endpoint_header(',
+                    'int slippi_particle_presentation_cell_endpoint_row('):
+                self.assertNotRegex(function(helper_text, marker),
+                                    r'\b(?:malloc|calloc|realloc|free)\s*\(')
             argv = [str(emcc), '-std=gnu11', '-O1', '-ffp-contract=off',
                     '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1',
                     '-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1', '-DTARGET_PC', '-DAURORA',
+                    '-Dcalloc=particle_test_calloc',
                     '-I' + str(ROOT / 'src'), '-I' + str(prepared),
                     '-I' + str(ROOT / '.deps/aurora/include'),
                     '-I' + str(ROOT / '.deps/melee/extern/dolphin/include'),
@@ -140,7 +152,13 @@ class ParticlePresentationTests(unittest.TestCase):
             else:
                 self.run_command('compile', argv, ROOT, scratch)
             node = node_runtime(ROOT)
-            modes = ('positive', 'wrap') if actual_math else ('positive', 'stale', 'kind', 'foreign', 'changed', 'wrong', 'repeat', 'lifetime', 'wrap', 'poolbusy', 'first-error', 'first-camera', 'first-bare')
+            endpoint_modes = ('endpoint', 'endpoint-stale', 'endpoint-generation',
+                              'endpoint-descriptor', 'endpoint-stride',
+                              'endpoint-duplicate', 'endpoint-index')
+            modes = (('positive', 'wrap') if actual_math else
+                     ('positive', 'stale', 'kind', 'foreign', 'changed', 'wrong',
+                      'repeat', 'lifetime', 'wrap', 'poolbusy', 'first-error',
+                      'first-camera', 'first-bare')) + endpoint_modes
             if os.environ.get('MELEE_PARTICLE_PRESENTATION_MODE'):
                 modes = (os.environ['MELEE_PARTICLE_PRESENTATION_MODE'],)
             for mode in modes:
@@ -165,6 +183,7 @@ class ParticlePresentationTests(unittest.TestCase):
                       PROFILE / 'patches/melee-profile-hooks.patch',
                       PROFILE / 'particle_presentation.c', PROFILE / 'particle_presentation.h',
                       PROFILE / 'particle_presentation_source.h',
+                      ROOT / 'src/gameplay_source_memory_runtime.h',
                       PROFILE / 'tests/particle_presentation_control.c.in', Path(__file__)]
             (scratch / 'pins.json').write_text(json.dumps({
                 'scope': __doc__, 'actual_archived_math': actual_math,

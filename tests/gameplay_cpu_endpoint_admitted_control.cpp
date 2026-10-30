@@ -32,6 +32,9 @@ std::uint32_t context_bytes[2]={0x10203040,0x50607080};
 std::uint32_t bootstrap_ticks=37,bootstrap_disabled=0;
 std::uint32_t command_budget=12,sound_mode=2;
 std::uint32_t payload_data[2]={0xfeed1234,0x76543210};
+std::array<unsigned,4> strict_payload_calls{},current_payload_calls{};
+bool payload_pre_topology_changed=false;
+std::uint64_t current_payload_revision=3;
 std::uint8_t symbol_a[]={'a','t','k','1'};
 std::uint8_t symbol_b[]={'a','t','k','2'};
 std::uint8_t symbol_event[]={'c','u','r'};
@@ -170,11 +173,12 @@ void emit(GameplayCpuEndpointReader& reader,std::uint32_t& emitted,
     ++emitted;
 }
 
-struct BatchResult {std::uint64_t cache_next{},clock_unk4{},cadence_x0_0_x8{};std::uint32_t rows{};};
+struct BatchResult {std::uint64_t cache_next{},clock_unk4{},cadence_x0_0_x8{};std::uint32_t rows{},payload_value{};};
 BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& checkpoint,
                            V view,P provenance,std::uint32_t frame)
 {
     live_frame=frame;
+    const auto strict_before=strict_payload_calls,current_before=current_payload_calls;
     GameplayCpuEndpointReader reader;
     watch_new=true;watched_new=0;
     assert(reader.begin(session,checkpoint,view,provenance));
@@ -206,9 +210,20 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
     emit(reader,n,view,provenance,D::Actions,K::ActionEvent,0,1,21,
         symbol_event,sizeof(symbol_event));
     emit(reader,n,view,provenance,D::Payload,K::Header,0,1,13);
-    emit(reader,n,view,provenance,D::Payload,K::PayloadRow,0,1,5,payload_data,sizeof(std::uint32_t));
-    emit(reader,n,view,provenance,D::Payload,K::PayloadFreeCell,0,1,4);
-    emit(reader,n,view,provenance,D::Payload,K::PayloadAllocatedCell,0,1,4);
+    const unsigned payload_count=view==V::Pre?1:2;
+    for(unsigned i=0;i<payload_count;++i){
+        emit(reader,n,view,provenance,D::Payload,K::PayloadRow,i,payload_count,5,
+             &payload_data[i],sizeof(std::uint32_t));
+        const auto row=reader.record(D::Payload,K::PayloadRow,i);
+        result.payload_value=*reinterpret_cast<const std::uint32_t*>(row.borrowed_address);
+        assert(result.payload_value==payload_data[i]);
+        if(view!=V::Pre){
+            assert(row.fields[GameplayCpuEndpointField::PayloadRow::SourceAddress]==0x700+i*4);
+            assert(row.fields[GameplayCpuEndpointField::PayloadRow::AllocationGeneration]==40+i);
+        }
+        emit(reader,n,view,provenance,D::Payload,K::PayloadFreeCell,i,payload_count,4);
+        emit(reader,n,view,provenance,D::Payload,K::PayloadAllocatedCell,i,payload_count,4);
+    }
     emit(reader,n,view,provenance,D::Flow,K::Header,0,1,10);
     const auto clock=reader.record(D::Flow,K::FlowClockRecord,0);
     assert(clock.status==0&&clock.metadata_bytes==GameplayCpuEndpointField::FlowClock::Count*8);
@@ -246,7 +261,9 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
     emit(reader,n,view,provenance,D::Audio,K::AudioSoundMode,0,1,2,&sound_mode,sizeof(sound_mode));
     emit(reader,n,view,provenance,D::Statics,K::Header,0,1,2);
     emit(reader,n,view,provenance,D::Statics,K::StaticRow,0,1,5,&source_word,sizeof(source_word));
-    assert(n==32);
+    assert(n==(view==V::Pre?32:35));
+    assert(reader.record(D::Payload,K::PayloadRow,payload_count).status==
+        static_cast<std::uint32_t>(GameplayCpuEndpointStatus::InvalidIndex));
     const auto invalid=reader.record(D::Actions,K::ActionBinding,1);
     assert(invalid.status==static_cast<std::uint32_t>(GameplayCpuEndpointStatus::InvalidIndex));
     assert(invalid.flags==0&&invalid.reserved==0&&invalid.metadata_bytes==0);
@@ -254,6 +271,13 @@ BatchResult complete_batch(GameplayMatchSession& session,GameplayCpuCheckpoint& 
     assert(reader.revalidate()&&reader.status()==GameplayCpuEndpointStatus::Ok&&!reader.active());
     watch_new=false;
     assert(watched_new==0);
+    if(view==V::Pre){
+        assert(current_payload_calls==current_before);
+        for(unsigned i=0;i<4;++i)assert(strict_payload_calls[i]>strict_before[i]);
+    }else{
+        assert(strict_payload_calls==strict_before);
+        for(unsigned i=0;i<4;++i)assert(current_payload_calls[i]>current_before[i]);
+    }
     result.rows=n;
     return result;
 }
@@ -272,14 +296,65 @@ MeleeWebActionEndpointCache melee_web_action_interval_endpoint_cache(const Melee
 { MeleeWebActionEndpointCache x{};x.status=0;x.index=index;x.next=cache_next;x.root=0x301;x.owner=0x302;x.cache=0x303;x.runtime=0x304;x.interval_owner=0x305;x.hit_callback=0x306;x.miss_replay_callback=0x307;x.miss_record_callback=0x308;for(unsigned i=0;i<2;++i){auto& e=x.entries[i];e.offset=0x400+i;e.archive_bytes=16;e.native_action=1;e.symbol_bytes=i?sizeof(symbol_b):sizeof(symbol_a);e.animation=0x500+i;e.symbol_data=reinterpret_cast<uintptr_t>(i?symbol_b:symbol_a);}return x; }
 MeleeWebActionEndpointEvent melee_web_action_interval_endpoint_event(const MeleeWebActionInterval*,uint32_t index)
 { MeleeWebActionEndpointEvent x{};x.status=0;x.index=index;x.kind=2;x.policy=1;x.cache_hit=0;x.motion=3;x.slot=1;x.result_domain=0;x.offset=0x600;x.archive_bytes=8;x.symbol_bytes=sizeof(symbol_event);x.cache=0x601;x.runtime=0x602;x.row=0x603;x.animation=0x604;x.destination=0x605;x.source=0x606;x.destination_generation=1;x.source_generation=2;x.source_table=0x607;x.row_owner=0x608;x.clip=0x609;x.command_owner=0x610;x.symbol_data=reinterpret_cast<uintptr_t>(symbol_event);return x; }
-MeleeWebSourcePayloadEndpointHeader melee_web_source_memory_payload_endpoint_header(const MeleeWebSourceMemoryPayloadSnapshot*)
-{ MeleeWebSourcePayloadEndpointHeader x{};x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);x.source_heap_handle=3;x.heap_bytes=16;x.owner_epoch=8;x.world_generation=55;x.allocation_watermark=7;x.topology_revision=2;x.arena_begin=0x700;x.arena_end=0x710;x.row_count=1;x.free_cell_count=1;x.allocated_cell_count=1;x.payload_bytes=sizeof(payload_data[0]);return x; }
+// Named payload providers model distinct captured PRE and grown current END
+// ledgers. Actual ledger/allocator admission is covered by its leaf control.
+MeleeWebSourcePayloadEndpointHeader payload_fixture_header(bool current)
+{
+ MeleeWebSourcePayloadEndpointHeader x{};
+ x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);
+ x.source_heap_handle=3;x.heap_bytes=32;x.owner_epoch=8;x.world_generation=55;
+ x.allocation_watermark=current?9:7;x.topology_revision=current?current_payload_revision:2;
+ x.arena_begin=0x700;x.arena_end=0x720;x.row_count=current?2:1;
+ x.free_cell_count=current?2:1;x.allocated_cell_count=current?2:1;
+ x.payload_bytes=x.row_count*sizeof(payload_data[0]);return x;
+}
+MeleeWebSourcePayloadEndpointHeader melee_web_source_memory_payload_endpoint_header(const MeleeWebSourceMemoryPayloadSnapshot* owner)
+{
+ ++strict_payload_calls[0];assert(owner==const_handle<MeleeWebSourceMemoryPayloadSnapshot>(0x10a));
+ if(payload_pre_topology_changed){MeleeWebSourcePayloadEndpointHeader x{};x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;return x;}
+ return payload_fixture_header(false);
+}
 MeleeWebSourcePayloadEndpointRow melee_web_source_memory_payload_endpoint_row(const MeleeWebSourceMemoryPayloadSnapshot*,uint64_t index)
-{ MeleeWebSourcePayloadEndpointRow x{};x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);x.source_address=0x701;x.requested_bytes=sizeof(payload_data[0]);x.index=index;x.host_address=reinterpret_cast<uintptr_t>(payload_data);x.allocation_generation=4;return x; }
+{ ++strict_payload_calls[1];assert(!payload_pre_topology_changed&&index==0);MeleeWebSourcePayloadEndpointRow x{};x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);x.source_address=0x701;x.requested_bytes=sizeof(payload_data[0]);x.index=index;x.host_address=reinterpret_cast<uintptr_t>(payload_data);x.allocation_generation=4;return x; }
 MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_endpoint_free_cell(const MeleeWebSourceMemoryPayloadSnapshot*,uint64_t index)
-{ return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,1,sizeof(MeleeWebSourcePayloadEndpointCell),MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL,0x702,8,index}; }
+{ ++strict_payload_calls[2];assert(!payload_pre_topology_changed&&index==0);return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,1,sizeof(MeleeWebSourcePayloadEndpointCell),MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL,0x702,8,index}; }
 MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_endpoint_allocated_cell(const MeleeWebSourceMemoryPayloadSnapshot*,uint64_t index)
-{ return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,1,sizeof(MeleeWebSourcePayloadEndpointCell),MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL,0x703,8,index}; }
+{ ++strict_payload_calls[3];assert(!payload_pre_topology_changed&&index==0);return {MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,1,sizeof(MeleeWebSourcePayloadEndpointCell),MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL,0x703,8,index}; }
+MeleeWebSourcePayloadEndpointHeader melee_web_source_memory_payload_current_endpoint_header(const MeleeWebSourceMemoryPayloadSnapshot* owner)
+{ ++current_payload_calls[0];assert(owner==const_handle<MeleeWebSourceMemoryPayloadSnapshot>(0x10a));return payload_fixture_header(true); }
+bool current_payload_header_matches(const MeleeWebSourcePayloadEndpointHeader* header)
+{
+ const auto live=payload_fixture_header(true);
+ return header&&header->schema==live.schema&&header->source_heap_handle==live.source_heap_handle&&
+  header->heap_bytes==live.heap_bytes&&header->owner_epoch==live.owner_epoch&&
+  header->world_generation==live.world_generation&&header->allocation_watermark==live.allocation_watermark&&
+  header->topology_revision==live.topology_revision&&header->arena_begin==live.arena_begin&&
+  header->arena_end==live.arena_end&&header->row_count==live.row_count&&
+  header->free_cell_count==live.free_cell_count&&header->allocated_cell_count==live.allocated_cell_count&&
+  header->payload_bytes==live.payload_bytes;
+}
+MeleeWebSourcePayloadEndpointRow melee_web_source_memory_payload_current_endpoint_row(const MeleeWebSourceMemoryPayloadSnapshot* owner,const MeleeWebSourcePayloadEndpointHeader* header,uint64_t index)
+{
+ ++current_payload_calls[1];assert(owner==const_handle<MeleeWebSourceMemoryPayloadSnapshot>(0x10a));
+ MeleeWebSourcePayloadEndpointRow x{};
+ if(!current_payload_header_matches(header)){x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;return x;}
+ assert(index<2);x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);
+ x.index=index;x.source_address=0x700+index*4;x.requested_bytes=sizeof(payload_data[0]);
+ x.host_address=reinterpret_cast<uintptr_t>(&payload_data[index]);x.allocation_generation=40+index;return x;
+}
+MeleeWebSourcePayloadEndpointCell payload_fixture_current_cell(const MeleeWebSourceMemoryPayloadSnapshot* owner,const MeleeWebSourcePayloadEndpointHeader* header,uint64_t index,bool free)
+{
+ assert(owner==const_handle<MeleeWebSourceMemoryPayloadSnapshot>(0x10a));
+ MeleeWebSourcePayloadEndpointCell x{};
+ if(!current_payload_header_matches(header)){x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;return x;}
+ assert(index<2);x.status=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;x.schema=1;x.bytes=sizeof(x);
+ x.kind=free?MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_FREE_CELL:MELEE_WEB_SOURCE_PAYLOAD_ENDPOINT_ALLOCATED_CELL;
+ x.source_address=(free?0x710:0x700)+index*4;x.cell_bytes=4;x.index=index;return x;
+}
+MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_current_endpoint_free_cell(const MeleeWebSourceMemoryPayloadSnapshot* owner,const MeleeWebSourcePayloadEndpointHeader* header,uint64_t index)
+{++current_payload_calls[2];return payload_fixture_current_cell(owner,header,index,true);}
+MeleeWebSourcePayloadEndpointCell melee_web_source_memory_payload_current_endpoint_allocated_cell(const MeleeWebSourceMemoryPayloadSnapshot* owner,const MeleeWebSourcePayloadEndpointHeader* header,uint64_t index)
+{++current_payload_calls[3];return payload_fixture_current_cell(owner,header,index,false);}
 int melee_web_match_flow_cpu_snapshot_admit(MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t){return 1;}
 MeleeWebMatchFlowCpuEndpoint melee_web_match_flow_cpu_endpoint_read(MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*)
 { return {0,0x801,8,3,1,0,0}; }
@@ -321,14 +396,34 @@ int main()
     action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
     auto* reference=GameplayCpuEndpointTestFixture::sealed(1,
         statics_at(CpuStaticEndpointPhase::Sealed));
+    payload_pre_topology_changed=true;
     const auto ref_result=complete_batch(*session,*reference,V::CpuEnd,P::Reference,12);
-    assert(ref_result.rows==32);
+    assert(ref_result.rows==35);
+    assert(complete_batch(*session,*reference,V::DrawEnd,P::Reference,12).rows==35);
 
     action_provenance=MELEE_WEB_ACTION_ENDPOINT_CORRECTED;
     auto* corrected=GameplayCpuEndpointTestFixture::corrected_sealed(2,
         statics_at(CpuStaticEndpointPhase::Restored));
     const auto corrected_result=complete_batch(*session,*corrected,V::CpuEnd,P::Corrected,12);
-    assert(corrected_result.rows==32);
+    assert(corrected_result.rows==35);
+    assert(complete_batch(*session,*corrected,V::DrawEnd,P::Corrected,12).rows==35);
+    const auto original_payload=payload_data[1];
+    payload_data[1]^=0x00010000;
+    const auto changed_payload_bytes=complete_batch(*session,*corrected,V::CpuEnd,P::Corrected,12);
+    assert(changed_payload_bytes.payload_value==payload_data[1]&&
+           changed_payload_bytes.payload_value!=corrected_result.payload_value);
+    payload_data[1]=original_payload;
+    // A changed current topology invalidates both indexed reads and end-of-batch
+    // validation, rather than being silently refreshed under an active batch.
+    GameplayCpuEndpointReader changed_payload;
+    assert(changed_payload.begin(*session,*corrected,V::CpuEnd,P::Corrected));
+    ++current_payload_revision;
+    const auto stale_payload=changed_payload.record(D::Payload,K::PayloadRow,1);
+    assert(stale_payload.status==static_cast<std::uint32_t>(GameplayCpuEndpointStatus::LeafRefused));
+    assert(!stale_payload.metadata_bytes&&!stale_payload.borrowed_address&&!stale_payload.borrowed_bytes);
+    assert(!changed_payload.revalidate());
+    --current_payload_revision;
+    payload_pre_topology_changed=false;
 
     cache_next=22;
     action_view=MELEE_WEB_ACTION_ENDPOINT_PRE;
@@ -387,5 +482,6 @@ int main()
     GameplayCpuEndpointTestFixture::release_statics(*reference);
     GameplayCpuEndpointTestFixture::release_statics(*corrected);
     GameplayCpuEndpointTestFixture::release_statics(*unsealed);
+    puts("Current END payload routing enumerates grown rows/cells for Reference and Corrected CPU/DRAW without allocation; PRE and stale-header refusals stay strict");
     puts("Admitted nine-domain PRE/reference/corrected batches, named flow fields, cache next, and read-only revalidation passed");
 }

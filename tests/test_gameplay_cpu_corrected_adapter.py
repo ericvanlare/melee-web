@@ -37,12 +37,24 @@ class GameplayCpuCorrectedAdapterTests(OwnedWorkspaceTests):
         stubs=out/'stubs';stubs.mkdir()
         header=STUB_CHECKPOINT_HEADER.replace('    bool finish_replay(',
             '    GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;\n'
-            '    bool finish_corrected(const GameplayMatchSession&) noexcept;\n    bool finish_replay(')
+            '    bool finish_corrected(const GameplayMatchSession&) noexcept;\n'
+            '    bool retire_confirmed(const GameplayMatchSession&) noexcept;\n    bool finish_replay(')
+        self.assertEqual(header.count('bool retire_confirmed('),1)
         (stubs/'gameplay_cpu_checkpoint.hpp').write_text(header)
         base=(REPO_ROOT/'tests/cpu_restore_adapter_control.cpp.in').read_text().split('\nint main() {')[0]
+        owner_fixture=('    struct CpuOwners {MeleeWebAudio* audio;};\n'
+            '    CpuOwners diagnostic_cpu_owners() const noexcept {return {reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102))};}')
+        self.assertEqual(base.count(owner_fixture),1)
+        base=base.replace(owner_fixture,
+            '    struct CpuOwners {const void* storage; MeleeWebMatchContext* context; MeleeWebMatchFlow* flow; '
+            'MeleeWebAudio* audio; std::uint64_t world,context_epoch; std::uint32_t frame;};\n'
+            '    CpuOwners diagnostic_cpu_owners() const noexcept {return {reinterpret_cast<const void*>(std::uintptr_t(0x100)), '
+            'reinterpret_cast<MeleeWebMatchContext*>(std::uintptr_t(0x101)), '
+            'reinterpret_cast<MeleeWebMatchFlow*>(std::uintptr_t(0x104)), '
+            'reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102)),0x103u,0x105u,frame_};}')
         base=base.replace('@ACTUAL_FIXTURE_OBSERVATIONS@',extract_fixture_observations(REPO_ROOT/'tests/gameplay_snapshot_probe.cpp'))
         browser=(REPO_ROOT/'src/slippi_profile/tests/synctest_browser.cpp').read_text()
-        start=browser.index('uint32_t payload_admission_source_boundary()')
+        start=browser.index('uint32_t payload_admission_source_boundary(')
         end=browser.index('uint32_t payload_admission_boundary(',start)
         base=base.replace('@ACTUAL_PAYLOAD_SOURCE_BOUNDARY@',browser[start:end].rstrip())
         base=base.replace('#include "cpu_restore_adapter.inc"',

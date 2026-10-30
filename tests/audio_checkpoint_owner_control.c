@@ -163,7 +163,7 @@ int main(void){
  /* Capacity and callback failures never report a complete inventory. Capacity
   * is rejected before any callback; visitor refusal reports a failed prefix. */
  RangeCollector rejected={0};
- result=guarded_visit(&audio,17,MELEE_WEB_AUDIO_OWNED_RANGE_MAX-1,collect_range,&rejected);
+ result=guarded_visit(&audio,17,ranges.count-1,collect_range,&rejected);
  assert(result==MELEE_WEB_AUDIO_RANGE_VISIT_INSUFFICIENT_CAPACITY&&rejected.count==0);
  result=guarded_visit(&audio,17,MELEE_WEB_AUDIO_OWNED_RANGE_MAX,NULL,NULL);
  assert(result==MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_ARGUMENT);

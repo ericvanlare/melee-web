@@ -63,6 +63,10 @@ uint32_t renderer_error_count = 0;
 std::array<unsigned char, 64 * 1024> fifo_buffer{};
 std::string submission_json;
 
+/* Historical version-1 census wire. Keep it at its original nine-row
+ * capacity; the CPU endpoint owns the expanded HPS snapshot inventory. */
+constexpr uint32_t kAudioRangeWireCapacity = 9;
+
 struct AudioRangeWireRow {
     uint32_t kind;
     uint32_t address;
@@ -82,7 +86,7 @@ struct AudioRangeWireInventory {
     uint32_t audio_owner;
     uint32_t generation_low;
     uint32_t generation_high;
-    AudioRangeWireRow rows[MELEE_WEB_AUDIO_OWNED_RANGE_MAX];
+    AudioRangeWireRow rows[kAudioRangeWireCapacity];
 };
 
 struct MatchContextRangeWireRow {
@@ -172,7 +176,7 @@ uint64_t match_context_range_anchor_owner_epoch = 0;
 bool match_context_range_anchor_set = false;
 
 struct AudioRangeCapture {
-    AudioRangeWireRow rows[MELEE_WEB_AUDIO_OWNED_RANGE_MAX]{};
+    AudioRangeWireRow rows[kAudioRangeWireCapacity]{};
     uint32_t count = 0;
     bool valid = true;
 };
@@ -236,7 +240,7 @@ bool stage_arena_wire_anchor_matches(const uint32_t* anchor,
 int capture_audio_range(const MeleeWebAudioOwnedRange *range, void *context)
 {
     auto *capture = static_cast<AudioRangeCapture *>(context);
-    if (!capture || !range || capture->count >= MELEE_WEB_AUDIO_OWNED_RANGE_MAX ||
+    if (!capture || !range || capture->count >= kAudioRangeWireCapacity ||
         range->kind < MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER ||
         range->kind > MELEE_WEB_AUDIO_RANGE_EFFECTS_DELAY_HEAP ||
         !range->byte_extent || range->byte_extent > UINT32_MAX ||
@@ -311,7 +315,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_audio_range_inventory_query(void)
     audio_range_wire.version = 1;
     audio_range_wire.size = sizeof(audio_range_wire);
     audio_range_wire.row_size = sizeof(AudioRangeWireRow);
-    audio_range_wire.capacity = MELEE_WEB_AUDIO_OWNED_RANGE_MAX;
+    audio_range_wire.capacity = kAudioRangeWireCapacity;
     if (!match) {
         audio_range_wire.status = MELEE_WEB_AUDIO_RANGE_VISIT_INVALID_OWNER;
         return 0;
@@ -332,7 +336,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_synctest_audio_range_inventory_query(void)
         audio_range_generation_anchor : current_generation;
     const MeleeWebAudioRangeVisitResult result =
         melee_web_audio_visit_owned_ranges(current_audio, expected_generation,
-            MELEE_WEB_AUDIO_OWNED_RANGE_MAX, capture_audio_range, &capture);
+            kAudioRangeWireCapacity, capture_audio_range, &capture);
     audio_range_wire.status = static_cast<uint32_t>(result);
     if (result != MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE || !capture.valid ||
         (capture.count != 6 && capture.count != 9)) {
@@ -756,7 +760,7 @@ uint32_t payload_admission_runtime_boundary()
 #endif
 }
 
-uint32_t payload_admission_source_boundary()
+uint32_t payload_admission_source_boundary(bool owned_hps_pending = false)
 {
     if (payload_admission_runtime_boundary() != 0) return PayloadUnsafeCallBoundary;
     if (!renderer_ready || renderer_error_count != 0 || !match ||
@@ -764,7 +768,12 @@ uint32_t payload_admission_source_boundary()
         !melee_web_source_memory_healthy()) {
         return PayloadOwnerUnavailable;
     }
-    if (melee_web_snapshot_quiescent() != 1) return PayloadTransferBusy;
+    // The explicit proof is supplied only by the exact capsule's interior
+    // predicate. It does not claim DVD idle or snapshot-safe quiescence.
+    if (owned_hps_pending) {
+        if (melee_web_source_file_drive_busy() || melee_web_audio_bank_transport_busy())
+            return PayloadTransferBusy;
+    } else if (melee_web_snapshot_quiescent() != 1) return PayloadTransferBusy;
     if (match->source_frames() != observation.frame || observation.ready != 1 ||
         observation.complete != 0 || observation.paused != 0) {
         return PayloadFrameMismatch;
@@ -772,9 +781,9 @@ uint32_t payload_admission_source_boundary()
     return 0;
 }
 
-uint32_t payload_admission_boundary(bool require_new_completed_draw)
+uint32_t payload_admission_boundary(bool require_new_completed_draw, bool owned_hps_pending = false)
 {
-    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+    if (const uint32_t failure = payload_admission_source_boundary(owned_hps_pending)) return failure;
 #if defined(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY)
     const auto *descriptor = static_cast<const AuroraBrowserQuiescenceDescriptor *>(
         aurora_browser_quiescence_observe_descriptor());
@@ -819,9 +828,9 @@ uint32_t payload_admission_boundary(bool require_new_completed_draw)
 #endif
 }
 
-uint32_t payload_admission_submission_boundary()
+uint32_t payload_admission_submission_boundary(bool owned_hps_pending = false)
 {
-    if (const uint32_t failure = payload_admission_source_boundary()) return failure;
+    if (const uint32_t failure = payload_admission_source_boundary(owned_hps_pending)) return failure;
     if (last_completed_frame_id <= payload_admission_capture_end_frame) {
         return PayloadFrameMismatch;
     }

@@ -9820,7 +9820,7 @@
         "sha256": "1323c27db629b931159241184e9e51ffc3f14955655f877f02729f18d20bc181"
       },
       "observed": "The repaired host run restores wrong predicted A, then executes seven authoritative B ticks without drawing and matches independent clean B across strict PRE/CPU_END/DRAW_END for all nine declared state domains. Actual remote motion and action requests differ under prediction. All five raw lanes per tick plus final drawn pair agree; final present/GPU idle and source/renderer teardown pass. All owned PIDs absent and nine producer pins unchanged.",
-      "next": "Publication-head CI and integration; then proof-backed confirmed checkpoint retirement/reuse in the same match. Continuous rolling/live relay/full-match/profile admission remain open.",
+      "next": "The two-window v4 actual run passes both fixed seven-tick wrong-prediction windows, the 35-tick neutral bridge, each corrected final present and confirmed retirement. This is bounded component evidence, not continuous rollback or #341 closure. The next boundary is a reusable-owner loop under root design review; it is not implemented.",
       "reader_api_repair": {
         "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/cpu-endpoint-host-control-luna-v1/optional-getter-followup.json",
         "sha256": "76c57f952a09d97df4c783cd1f082fab129e58d8559fd22902eae02a2e7f9386",
@@ -9882,7 +9882,7 @@
           "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/integration-readiness-sol-v1.json",
           "sha256": "18c8ba1bfcccd086b4a73815b0e26f4803af1cdb879dab907bcd80154e767896"
         },
-        "status": "Local validation passes: 3,069 tests with 238 skips and ordinary Release runtime build. Exact publication-head CI remains pending. Runtime f4ae3dc3 and capture harness 6a52264d remain distinct.",
+        "status": "Merged in PR #342 as 97764b0f after all 14 checks on publication head 9e69d37b (12 successes, two expected skips), independent review, 3,069-test regression with 238 skips and affected builds. Reviewed and merged trees match. Runtime f4ae3dc3, capture harness 6a52264d and validation source 16c4824d remain distinct.",
         "first_publication_ci": {
           "result": {
             "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-initial-complete.json",
@@ -9898,6 +9898,908 @@
             "sha256": "8d6c43bd4d29d9aef5c17e5cf72dbeefce2ee8910e41b7653fcd607176cbb2b4"
           },
           "scope": "Whitespace-only split; tokens/order unchanged. The focused source-memory snapshot control passes locally. Exact repaired-head CI remains required."
+        },
+        "publication_ci": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/ci-repaired-complete.json",
+          "sha256": "41c3a331c01862eb1010c74705076d0ac4e0b13a697192a8e877629518ce57d8"
+        },
+        "merge": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/github-v18-boundary/merge-receipt.json",
+          "sha256": "afc7ee5fc632dd83aeca4e80ad5ef44b5dea0c145bb1b7259dc8211b13db57c2"
+        }
+      },
+      "confirmed_retirement_component": {
+        "source": "8c9790876654057a06d0e35db0ed3575120d61cd",
+        "receipt": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/confirmed-retirement-component-receipt-v1.json",
+          "sha256": "202af4bbe0606a847ab80c0880210d3c658786b5360626fc3c921feb0537c970"
+        },
+        "status": "Focused component controls pass; clean-reference and corrected checkpoints retire with their exact match owners live, and later cleanup of an old detached capsule cannot disturb a new interval. Generic fallback retirement guards remain. Not yet built or exercised in the actual browser.",
+        "next_interface_review": {
+          "external_run_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c/corrected-two-window-interface-sol-review-v1.json",
+          "sha256": "6a0badc6244e4df5b3166c9a2b3837c68d7afa983d652ca1e8800b57e3308e55"
+        },
+        "failures": "Retain the ActionStore fixture stack overflow and derived destroyed-store status failure, plus the extracted coordinator short-circuit order expectation failure. Reviewed fixture-only repairs preserve production checks."
+      },
+      "successive_wrong_prediction_windows_v1": {
+        "status": "v4_two_actual_wrong_prediction_windows_pass",
+        "scope": "Two wrong-input seven-tick windows on one persistent input timeline, separated by a bounded neutral bridge, with one reusable checkpoint slot. This remains a private fixed-window component.",
+        "attempts": [
+          {
+            "id": "two_window_v1_startup_order_failure",
+            "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+            "host_startup_order_repair_head": "41822a85",
+            "result": "Stopped during host startup: reuse validation tried to evaluate predictedPage before the seven-tick initialization created it. No correction window or bridge executed.",
+            "evidence": {
+              "path": "browser-two-window-v1/runner/evidence.json",
+              "sha256": "e5abcc0af9de71a266c30c0c4aca6303733cd6d8f2f5ef02a4057966646dd0e8"
+            },
+            "postflight": {
+              "path": "browser-two-window-v1/independent-postflight.json",
+              "sha256": "ea77eec50ae85b1ce8f342d2cbc3258acd2d99549c6d6e87c8e2a17b56684f3d",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v1-producer-archive/archive.json",
+              "sha256": "519daf3a0bdfee3464ac1d55a0c9ee07c80cbee69b2379ed7bb2e47d9c6d9abb",
+              "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+              "artifact_count": 9
+            },
+            "host_repair_control": {
+              "path": "two-window-init-order-repair-v1/result.json",
+              "sha256": "414aff57768a49896006e8f30dd7c2231389efe3cdfb9e83faace05c17ac37f4",
+              "focused_tests": 7,
+              "passed": 7
+            }
+          },
+          {
+            "id": "two_window_v2_particle_serial_refusal",
+            "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+            "host_source_head": "41822a85970a51a5fc107fd8841c340f6aebed0e",
+            "result": "First correction window and 35-tick neutral bridge passed; second PRE was refused by the historical raw schema-312 serial comparison.",
+            "first_window": {
+              "status": "complete",
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "raw_lane_comparison": "passed"
+            },
+            "second_pre": {
+              "status": "strict_schema312_refusal",
+              "reference_particle_anchor_serial": 2103,
+              "corrected_particle_anchor_serial": 2127,
+              "anchor_token_remained_equal": true,
+              "second_correction_started": false
+            },
+            "evidence": {
+              "path": "browser-two-window-v2/runner/evidence.json",
+              "sha256": "ccd9a0abd7f030e1c324cca29cf1bd6d427579366a0e02b2abb0dbe2889854a0"
+            },
+            "postflight": {
+              "path": "browser-two-window-v2/independent-postflight.json",
+              "sha256": "218c54672d6e15cdbfbb5963fff81923fe6a67543c7821db69984457a547667b",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v1-producer-archive/archive.json",
+              "sha256": "519daf3a0bdfee3464ac1d55a0c9ee07c80cbee69b2379ed7bb2e47d9c6d9abb",
+              "native_source_head": "4a13106d6e04a266a5c71274f9052033b7ce1fb1",
+              "artifact_count": 9
+            }
+          },
+          {
+            "id": "two_window_v3_second_cpu_payload_mismatch",
+            "native_and_host_source_head": "05da291653afd5a764d89257481d84ecccfc5b34",
+            "result": "First correction and bridge pass; second PRE passes; second corrected CPU endpoint comparison fails before final present.",
+            "first_window": {
+              "status": "complete",
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "raw_lane_comparison": "passed"
+            },
+            "second_pre": {
+              "status": "passed",
+              "source_frame": 218,
+              "domain_count": 9,
+              "live_particle_cells": 25,
+              "captured_particle_cells": 25,
+              "incarnation_relations": 25
+            },
+            "second_corrected_cpu": {
+              "status": "failed",
+              "source_frame": 225,
+              "first_mismatch": {
+                "domain": "Payload",
+                "kind": "PayloadRow",
+                "index": 2366,
+                "byte_offset": 140
+              },
+              "additional_mismatch_row": 3303,
+              "raw_five_lanes_equal": 35,
+              "payload_identity_fields_equal": true,
+              "owner_type": "unknown"
+            },
+            "second_final_present": {
+              "ran": false,
+              "reason": "The runner stopped at the corrected CPU endpoint comparison."
+            },
+            "evidence": {
+              "path": "browser-two-window-v3/runner/evidence.json",
+              "sha256": "f6daf09c8188d1aa89f0033cd471c15d0a17b556c828e9bf80d031a6806373b3"
+            },
+            "postflight": {
+              "path": "browser-two-window-v3/independent-postflight.json",
+              "sha256": "e977c322e93fb74707ef54c0a766a05985e1c692133cd2f67a034305871b65b9",
+              "all_recorded_pids_absent": true
+            },
+            "producer_archive": {
+              "path": "two-window-v3-producer-archive/archive.json",
+              "sha256": "2587f7e54068dd74b92466ffdd82cc8283b74f4edb9b3fc37e19d60ecf29cef3",
+              "native_source_head": "05da291653afd5a764d89257481d84ecccfc5b34",
+              "artifact_count": 9
+            },
+            "offline_diagnosis": {
+              "path": "two-window-second-cpu-payload-luna-v1/diagnosis.json",
+              "sha256": "28ad5cf3bd0cd3db30261589590be216c71635220def1e589b04c95175c0cf37",
+              "status": "owner_type_not_proven"
+            }
+          },
+          {
+            "id": "two_window_v4_two_actual_wrong_prediction_windows_pass",
+            "native_and_host_source_head": "d6bb480ecf43f3899b940bb54ff5b72cf3878177",
+            "profile_identity": "slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19",
+            "elapsed_seconds": 42.072778,
+            "result": "Both wrong-prediction correction windows pass on one persistent input timeline. Each PRE, corrected CPU_END and DRAW_END comparison matches all nine declared domains, raw lanes match, actual corrected presents complete, and each capsule is confirmed retired. This is a changed V19 TEV scratch hypothesis; it does not identify the owner/type of the earlier V3 payload mismatch.",
+            "first_window": {
+              "status": "complete",
+              "start_sample": 300,
+              "source_frames": [
+                176,
+                183
+              ],
+              "pre_cpu_draw_domains": 9,
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true,
+              "confirmed_retirement": true
+            },
+            "bridge": {
+              "status": "passed",
+              "neutral_ticks": 35,
+              "sample_ticks": [
+                307,
+                341
+              ],
+              "same_persistent_timeline": true,
+              "raw_lane_comparison": "passed"
+            },
+            "second_window": {
+              "status": "complete",
+              "start_sample": 342,
+              "source_frames": [
+                218,
+                225
+              ],
+              "pre_cpu_draw_domains": 9,
+              "pre_particle_cells": {
+                "live": 25,
+                "captured": 25,
+                "incarnation_relations": 25
+              },
+              "cpu_and_draw_particle_cells": {
+                "live": 27,
+                "captured": 25,
+                "incarnation_relations": 27
+              },
+              "seven_tick_raw_five_lanes_equal": true,
+              "drawn_pair_equal": true,
+              "confirmed_retirement": true
+            },
+            "particle_serial_provenance": {
+              "first_window_reference_and_predicted": "1879",
+              "second_pre_reference": "2103",
+              "second_pre_predicted": "2127",
+              "historical_schema312_unchanged": true,
+              "typed_local_sidecar_validation": "passed",
+              "other_endpoint_metadata_remains_strict": true
+            },
+            "reuse": {
+              "windows_captured": 2,
+              "windows_retired": 2,
+              "active_capsules": 0,
+              "maximum_active_capsules": 1,
+              "same_match_pages": 2,
+              "match_closed": false
+            },
+            "final_present": {
+              "both_pages_completed": true,
+              "corrected_present_command": 50,
+              "gpu_idle_command": 51,
+              "screenshot_bytes_identical": true,
+              "screenshot_sha256": "43b1a4f434f61bf1e5d8d1873856955fd6bc7fc836da9cdd8e344ef539694f8a"
+            },
+            "evidence": {
+              "path": "browser-two-window-v4/runner/evidence.json",
+              "sha256": "e6f101b96b619881c60a10e2b06aa714ca4425750fdcdbc363018ebff93136cf"
+            },
+            "postflight": {
+              "path": "browser-two-window-v4/independent-postflight.json",
+              "sha256": "87e8e3de10ad0d7cc969e9394e49289347a3bf7dfd7e8f6745787fba73eeba70",
+              "all_recorded_pids_absent": true,
+              "nine_producer_pins_unchanged": true
+            },
+            "producer_archive": {
+              "path": "two-window-v4-producer-archive/archive.json",
+              "sha256": "85faf7c0440cc070f868632a594ed73b600466d350ace867a8ab87360c0116b3",
+              "native_source_head": "d6bb480ecf43f3899b940bb54ff5b72cf3878177",
+              "artifact_count": 9,
+              "verified_copied": true
+            },
+            "independent_review": {
+              "path": "two-window-v4-independent-sol-review.json",
+              "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4",
+              "decision": "GO_SCOPED_TWO_WINDOW_COMPONENT_RESULT",
+              "raw_lane_comparisons": 255,
+              "bridge_ticks": 35,
+              "interpretation": "Offline replay of retained envelopes and complete native evidence; no browser replay. The prior V3 mismatching payload nodes remain without exact historical type/owner attribution."
+            },
+            "configuration": {
+              "path": "linked-config-two-window-v3/final-linked-configuration-v1.json",
+              "sha256": "52ea790f323d94bce405309c0b4bd19c504c38075ec2be1a5a98018db4fdab4e"
+            }
+          }
+        ],
+        "host_typed_particle_endpoint_v2": {
+          "native_wire_schema312_unchanged": true,
+          "raw_comparison": "All schema-312 fields/bytes remain strict except raw ParticleAnchor.Serial is checked against the typed page-local sidecar; AnchorToken and all other fields remain cross-instance exact.",
+          "typed_provenance": "Local history and receipt serials prove local order and live-to-captured incarnation relation; numeric local serials are not compared across instances.",
+          "freeze": {
+            "path": "particle-cell-endpoint-host-v1/freeze.json",
+            "sha256": "8b4c6b78cc003ef6fdf9b7b623bddd521241860585abc8da5fecb1c77599e1ef"
+          },
+          "focused_controls": {
+            "combined_run": {
+              "path": "particle-cell-endpoint-host-v1/focused-final.log",
+              "sha256": "972b397459a252db8048754eee8abee1facd43d121a6c508097eb8955706ddf8",
+              "passed": 13,
+              "failed": 1,
+              "failure": "Negative fixture changed PRE live allocation but not captured allocation, so the stronger PRE identity refusal correctly occurred before the intended payload-join assertion."
+            },
+            "reduced_repair": {
+              "path": "particle-cell-endpoint-host-v1/sidecar-repair-control.log",
+              "sha256": "15af3949f154b6862051e2fb8b5b3f791bb879efbfc99095cb5300d68516efb4",
+              "tests": 1,
+              "passed": 1,
+              "failed": 0
+            },
+            "scope_note": "The whole 14-test combined invocation was not rerun after the negative-fixture-only repair."
+          }
+        },
+        "review_receipts": {
+          "particle_native_helper": {
+            "path": "particle-cell-endpoint-native-sol-review-v1.json",
+            "sha256": "772cacb5d51c51415ce340f39a76c142e41e90fc1be1d19777e4dbacefcb2ba4",
+            "decision": "GO_NATIVE_HELPER_CONTROL_PENDING_HOST_COMPOSITION"
+          },
+          "aggregate_reader": {
+            "path": "particle-sidecar-aggregate-root-review-v1.json",
+            "sha256": "549e8d1d9335a82ec320197a2b342c3757f689154e91c1c84ed28e391b1e7359",
+            "decision": "GO_AGGREGATE_WIRING_ONLY_PENDING_HELPER_HOST_REVIEW"
+          },
+          "composed_host": {
+            "path": "particle-cell-endpoint-host-sol-review-v1.json",
+            "sha256": "a92346d818f5571dbee2700d6ce5c25aa6a1f0fca3179bd47114c4e345fce4ae",
+            "decision": "GO_COMPOSED_AFFECTED_BUILD_PENDING_LINKED_REVIEW"
+          },
+          "two_window_native_adapter": {
+            "path": "corrected-two-window-native-sol-review-v1.json",
+            "sha256": "295152c0f48d5865816b51005167e591ea4ae02981d258642d16a90c483f0c30",
+            "decision": "GO_FOCUSED_NATIVE_HOST_COMPOSITION_CONTROLS"
+          },
+          "adapter_first_cause": {
+            "path": "adapter-and-particle-first-cause-luna-review-v1.json",
+            "sha256": "31cab6fb33b94b0be7d5b59a0e6a04365ec0858541943a20a4352baea5fe35a7",
+            "decision": "GO"
+          },
+          "two_window_v4_independent_sol": {
+            "path": "two-window-v4-independent-sol-review.json",
+            "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4",
+            "decision": "GO_SCOPED_TWO_WINDOW_COMPONENT_RESULT"
+          }
+        },
+        "validation": {
+          "successor_full_regression": "not run",
+          "successor_ci": "not run",
+          "branch_status": "unmerged",
+          "acceptance": "No #341 closure, full rollback, online match or whole-session acceptance."
+        },
+        "external_run_root_relative_path": "rollback-renderer-resume-20261028-155740-eef0524c",
+        "tev_stage_scratch_v19_candidate": {
+          "scope": "Direct source-dependency repair tested as a changed hypothesis; exact ownership of the two prior mismatching payload nodes remains unproven. Full source payload comparison is unchanged.",
+          "source_behavior": "One byte-copied local HSD_TevDesc per actual setup iteration; resolve map then coord from current TObj, preserve SetReg, original iteration, AssignTev and SetupStage ordering. Default-off body unchanged.",
+          "review": {
+            "path": "two-window-second-payload-sol-review-v1/review-and-next-contract.json",
+            "sha256": "bfcb081263c120308c1ddc5552a740e9b753a54dfb2e23544a151841aac9111e"
+          },
+          "focused_freeze": {
+            "path": "texp-stage-scratch-sol-v1/freeze.json",
+            "sha256": "e081c84e5add5673d0c3b0fb8368566a868d0a0059646ded40a0aed44af21fd7"
+          },
+          "identity_review": {
+            "path": "profile-v19-identity-sol-review-v1.json",
+            "sha256": "935d6f1b9b6ae42efd69b244cab1bf8c8269bd2ce17dbf2f309dafaf9ba4c1bb"
+          },
+          "retained_fixture_failures": [
+            "texp-stage-scratch-v1",
+            "texp-stage-scratch-v2",
+            "texp-stage-scratch-v3",
+            "texp-stage-scratch-v4"
+          ],
+          "browser_result": {
+            "status": "passed_as_changed_hypothesis",
+            "evidence": {
+              "path": "browser-two-window-v4/runner/evidence.json",
+              "sha256": "e6f101b96b619881c60a10e2b06aa714ca4425750fdcdbc363018ebff93136cf"
+            },
+            "independent_review": {
+              "path": "two-window-v4-independent-sol-review.json",
+              "sha256": "42d43c3125815e50a2804671696a08a1733fc53b6e1024ab64a947009ca0d9e4"
+            },
+            "limitation": "Passing V4 does not prove the V3 changed PayloadRow bytes belonged to this TEV dependency; the two earlier payload nodes remain unattributed."
+          }
+        }
+      },
+      "reusable_owner_loop_v1": {
+        "status": "EIGHT_INTERVAL_BROWSER_COMPONENT_PASS_LOCAL_VALIDATION_COMPLETE",
+        "scope": "Eight contiguous one-capsule intervals, literal samples300..343, spans1/6/7/7/7/7/7/2. Independent drawn authority and persistent input timeline. No external bridge.",
+        "runtime_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
+        "attempts": [
+          {
+            "harness_producer": "3e107d9ecc08a4b4187bb6e40a80da5a294eaaf8",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/runner/evidence.json",
+              "sha256": "aad94102893b5b20db7ad5f106919c8dc858607fc5a24988dc4010a9f3208148"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/first-failure-summary.json",
+              "sha256": "d9ad8f033c57c57eba99b4b4ab569335ef2c0bcb2fd38210dad5e529052538e2"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v1/independent-postflight.json",
+              "sha256": "959951ff09cc25ba50e27da8f24f05f988242c9481eff6be90aee005b50057bc"
+            }
+          },
+          {
+            "harness_producer": "36942a379fc00bf9e396a8128365020e3a2f1c5e",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/runner/evidence.json",
+              "sha256": "081159749c5c8e3a1f59d85c09c1506528fcbe45672c8c35e859fa8d37531ad9"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/first-effect-summary.json",
+              "sha256": "f9eace058e2563017d7223dcbf0174b3bfc08eb2d7e3a2ada62fc3b153b2fbc9"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v2/independent-postflight.json",
+              "sha256": "d2b86761beb6be350444deeb1dfc8daefe5efa3ab49d33989f450d7b6f1c7fd3"
+            },
+            "diagnostic_review": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-effect-diagnostic-sol-review-v1.json",
+              "sha256": "3dff1a26c49a0b89cb1b5364ca57d80aeef8a2ab996a4bb40ecab65461e97d1a"
+            }
+          },
+          {
+            "harness_producer": "7f9ee9988d1c082b3e0def8ca326e4566e6e01a3",
+            "runtime_producer": "7f9ee9988d1c082b3e0def8ca326e4566e6e01a3",
+            "capture": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/runner/evidence.json",
+              "sha256": "a691f902a563bd0acd8bea068cf6dc72d49857892ec96993aa7575583fb55ba0"
+            },
+            "summary": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/first-endpoint-summary.json",
+              "sha256": "187d8021242e7cdb9549c55bcf585f5d3d67481ee71a9e92f07749b7760dbfc3"
+            },
+            "postflight": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v3/independent-postflight.json",
+              "sha256": "4c88ae97933b86f41ef8a8ca1999fd59387d8dcaea96e931b911d806b3b1a55f"
+            },
+            "build": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v2/artifact-inventory.json",
+              "sha256": "9bb5ffaef7312435a60136d66e6bd943edea0f7c582b562b147c7be957f19fbc"
+            },
+            "linked_configuration": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v2/final-linked-configuration-v1.json",
+              "sha256": "a8974f46988896b1fcde4e83436a25b8ed3753191d1de87da425a64ce9f11270"
+            },
+            "linked_review": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v2/row-review.json",
+              "sha256": "0f219a9e6720c80600cac8d47489c7c9673b0a39d09e8c94e801e31e5d25edfa"
+            },
+            "producer_archive": {
+              "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v3-producer-archive/archive.json",
+              "sha256": "7ab0f85defd911c04afc8632aa091b5fdef1d5d643939edc93ecf34d70706629"
+            },
+            "result": "MOTOR no longer refuses. Capsule2 consumes all7 source ticks with matched raw-five pairs and identical capture-only motor event [186,1,1,0] in both pages. Reference CPU endpoint begin fails1336 before endpoint comparison. Capsule cleanup refuses; snapshot/renderer and ownedprocess cleanup pass."
+          },
+          {
+            "harness_producer": "47f1d8e6900474e629093d31689436443908cf40",
+            "runtime_producer": "47f1d8e6900474e629093d31689436443908cf40",
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v4/runner/evidence.json",
+              "sha256": "0b8f6c52fa8959562ed7f24d0cd873169c6cb32dac54850502c92c0386b55353"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v4/payload-endpoint-summary.json",
+              "sha256": "7203ab762d8003d4943a0011400513182cffc9f7b9dea2eed9be51b0ac9ceeb7"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v4/independent-postflight.json",
+              "sha256": "783e939509f463281a349c2b4276540d2be94ef9ced8e0f1f4636700d01b024b"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v4-producer-archive/archive.json",
+              "sha256": "6e0b5e7ae2e55b6e0970d874ec48789f0dc4ddfae0be304ef96b1addf5376701"
+            },
+            "result": "Failure-only attribution identifies payload-header TOPOLOGY_CHANGED (5) at reference CPU_END source frame190. Both pages consumed the third capsule with raw-five and motor agreement. The reader incorrectly checks PRE topology for END evidence. Native capsule cleanup still refuses; snapshot/renderer cleanup and recorded-process absence pass."
+          },
+          {
+            "runtime_producer": "3644999fe945fa74c69c480777191f9b66756165",
+            "harness_producer": "3644999fe945fa74c69c480777191f9b66756165",
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/runner/evidence.json",
+              "sha256": "255bc34f7737bd5d9441647887cf0f338a4c73d4dd9351c0720ac374da31477d"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/first-hps-summary.json",
+              "sha256": "9397871b6d8d2b14733d3cfd0008c8e345891d2b4a0cfc746619b848053c3f72"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/independent-prefix-review-v1.json",
+              "sha256": "e29b8759509e98a5b06272e4d180cdae231748922a296fa57dd970b1eec5b138"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v5/independent-postflight.json",
+              "sha256": "bd6374b836623b4c3694005b3bd45dd7b1b1e39a145b0e27643a7706ae1ab654"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v5-producer-archive/archive.json",
+              "sha256": "1f40899d64941a79e3fdcc430491a7e55130d7bf667608e756baa376c55b7ffe"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v4/artifact-inventory.json",
+              "sha256": "57642e2d38c9957136b4783e6c1936a2333af30a9398975b367103f06e12ccf3"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v4/final-linked-configuration-v1.json",
+              "sha256": "582ed91e747d2dd57940fafaa96289aa809514ca7def5cb0dc62a33b71c79f75"
+            },
+            "linked_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v4/row-review.json",
+              "sha256": "2795af8928eabb00b2d2e588bf8c6520e4bfd486cd66a31885f4b1355ce40412"
+            },
+            "result": "Four contiguous intervals compare and retire on both pages; complete current payload topology grows3467->3471 rows in interval2. Independent strict9domain/raw-five/motor/retirement replay passes. Fifth interval reference command34/sample322 reaches sourceframe199 then refuses HPS effect3 epoch5; exact operation not yet attributed. 12 ownedPIDs absent/9producerpins unchanged; native teardown failed and reference snapshot close abort is retained."
+          },
+          {
+            "runtime_producer": "cf122de67f3d31a22f66999228eef96f3b29f70c",
+            "harness_producer": "cf122de67f3d31a22f66999228eef96f3b29f70c",
+            "capture": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/runner/evidence.json",
+              "sha256": "57e23741e31dc069e02a32abeb729bb7a24b52b043f50036a7b79d4376ee4f53"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/first-hps-site-summary.json",
+              "sha256": "9c304799bdba527521ef8d3519f520046fb390fe75bdd073401908bcf62c26eb"
+            },
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v6/independent-postflight.json",
+              "sha256": "d2f2518f233acd46fdde23e4f27f01f4ae11c89a8e6b77c9a563c7b4b8839465"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v6-producer-archive/archive.json",
+              "sha256": "23ad4ff4cad61acf1d3743074d727c165ac8ad517577d216d69c29b71b4ec5dd"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v5/artifact-inventory.json",
+              "sha256": "26401bf070d3e1873ea7aeca4553705f912872c467be2575fcde8528f8feaa23"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v5/final-linked-configuration-v1.json",
+              "sha256": "5d97e907e65eb9ed71eac11608bd69add3c76743a4c45bf58b4c8e0073d9ad40"
+            },
+            "linked_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v5/row-review.json",
+              "sha256": "3267284b8aead4fc99d8baaee21f351f6ffebdd9b72e042d71d26a44103a0641"
+            },
+            "result": "Failure-only marker proves first guard is HPS DevCom request, not cancellation dispatch. Same sample322/capsule4/referencecommand34 refusal. Full request tuple not recorded. Owned processes absent and producer pins unchanged; native cleanup still fails."
+          }
+        ],
+        "observed": {
+          "completed_capsules": [
+            0,
+            1
+          ],
+          "first_failure": {
+            "capsule": 2,
+            "sample": 310,
+            "reference_command": 36,
+            "effect_enum": 4,
+            "effect": "MOTOR",
+            "reference_epoch": 3,
+            "predicted_effect_enum": 0,
+            "predicted_epoch": 3
+          },
+          "source_effect_semantics": "Original HSD rumble interpreter attempted a motor request before source PAD renewal; legacy interval barrier latched MOTOR, then particle preparation observed failed interval admission. No HPS/source-file/SSM attribution.",
+          "cleanup": "Owned browser/server process retirement confirmed; native capsule/snapshot/renderer refusal details retained and are not a native-cleanup pass."
+        },
+        "producer_archive": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v1-producer-archive/archive.json",
+          "sha256": "5ac52ba8ed058c7bdfdafbcbd6e15331eff67031874b52a0fa80c674547edaea"
+        },
+        "focused_source_freeze": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-combined-freeze-v1.json",
+          "sha256": "19b177b958910707f84e8d9c46d78a5d8c9ba0a14dae454f46c0cf8850b03898"
+        },
+        "linked_configuration": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v1/final-linked-configuration-v1.json",
+          "sha256": "5942ddc995edcea0be95e60d4f23292394ab4de1bfefaae86ac3d3e9daf59688"
+        },
+        "next_contract": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-abi-root-v1.json",
+          "sha256": "cc64021d0e26ec3b812cc8945fb95fff5b349b24153be73fff106a191544919c"
+        },
+        "design_review": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-journal-design-sol-review-v1.json",
+          "sha256": "ebe1cac423832bdd55e959b3ec371a46e3a81a4f458ac762cdeab92035c0855f"
+        },
+        "next": "Complete exact publication-head CI and integrate PR358, then route the same authoritative PAD rows through the existing own Worker relay. No unchanged browser repeat.",
+        "limitations": [
+          "Capture-only motor publication; physical haptics remain unimplemented.",
+          "V9 spans eight intervals and 44 inputs with one- and two-tick wrong branches. The earlier V4 independently covers two seven-tick corrections. No rolling history, complete match or live network result.",
+          "HPS refill is observed in confirmed interval4; correction across refill is not composed. Pending capture/restore/END/retirement stays refused.",
+          "Incomplete private profile only; real-time budget, physical input, uninterrupted audio output and public profile admission remain open.",
+          "V9 source/result review, repaired focused fixtures, full3077-test regression with238skips and ordinary Release pass. Publication-head CI and merge are tracked in PR358; local/capture producers remain distinct."
+        ],
+        "motor_candidate": {
+          "native_freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/motor-journal-final-focused-v1/freeze.json",
+            "sha256": "3e5a34c8e2e7c9572cec34a4bbb48c2ba232aedb3a54d8093fcf9ab1ce8cb13a"
+          },
+          "native_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-native-independent-sol-review-v1.json",
+            "sha256": "d08f9b8759540bcd3a31ad8e1c5e9398df7ccf198aca631522f16ee00a0471d1"
+          },
+          "host_freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-host-sol-v1/report.json",
+            "sha256": "8d247f1de58dd215a2b914a9d0cc33cb476871ffb4df24fef8811ba9ef9f773c"
+          },
+          "host_review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-host-independent-sol-review-v1.json",
+            "sha256": "552bb90c5605ccb74b4095769e2962ed23b113ef248a4d7db4b9d459418d4198"
+          },
+          "clock_binding": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-motor-clock-binding-review-v1.json",
+            "sha256": "781fc8366548e306016e13956164e15ba4e120bee03245c3cace81003736332f"
+          },
+          "scope": "Actual original direct-status rumble interpreter and production bracket with distinct raw/source clocks; native adapter/capture controls and 41 host tests pass. Explicit capture-only with no physical motor publication. Current source and exact ownership reviewed; the third interval now consumes its original motor request in browser V3/V4, before the separate END payload-view refusal.",
+          "additional_retained_failures": [
+            "motor-journal-native-focused-v1/run.log: compatibility typedef compile failure",
+            "motor-journal-native-focused-v3/run.log: fixture provider counter expected1 after reset0; assertions were active"
+          ]
+        },
+        "endpoint_diagnostic": {
+          "freeze": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/endpoint-failure-attribution-freeze-v1.json",
+            "sha256": "f91163216a9dcea769a874eb0bfa642b230c561ee720ff0e45342c2da4eae14b"
+          },
+          "review": {
+            "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-endpoint-attribution-sol-review-v1.json",
+            "sha256": "4cd56dbe461e66c78b2130787c1c81330b6aff4b657eed9ce29a5b9a44103571"
+          }
+        },
+        "endpoint_view_repair": {
+          "reduced_actual_source_proof": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/source-memory-post-endpoint-control-freeze-v1.json",
+            "sha256": "5371d152dc2b1a75a3cf1d8a12a1bb2691464b6f977b166a7ec8ed2d0ba563dd"
+          },
+          "contract": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-payload-end-view-sol-contract-v1.json",
+            "sha256": "ea4a550867657cca318b569f230d2c967d48d6e535cc5e96854e78a94c8a754e"
+          },
+          "state": "BROWSER_GROWTH_BOUNDARY_AND_INDEPENDENT_RAW_REVIEW_PASS",
+          "scope": "Current END read-only enumeration for both reference and corrected provenance; PRE snapshot admission and restoration remain strict. This does not implement restoring a speculative allocation topology change.",
+          "leaf_freeze": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/source-memory-current-end-view-freeze-v1.json",
+            "sha256": "93f11a735486b03818e45b96ee5b8d29682ff6bf512f3c14189150526e33c489"
+          },
+          "aggregate_freeze": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/payload-end-view-aggregate-sol-v1/freeze.json",
+            "sha256": "61dfc358a2c9b932ca95d84a4010a2009f517474a65b665c9aabf708c12e674d"
+          },
+          "focused": "Actual source-memory control: 1 passed. Actual aggregate endpoint syntax/schema/phase-routing controls: 3 passed, no skips. New current getters directly cover null/inactive/prior-world/topology/index/null-header refusals; other existing PRE refusal controls remain distinct.",
+          "retained_failure": "First leaf fixture expected the pre-probe allocation watermark after its deliberate allocate/free probe. Failed evidence retained; repaired expected post-probe state passes without changing production admission.",
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-payload-end-independent-host-review-v1.json",
+            "sha256": "1666acd75fab6d029a3d3e3acfb27310c528e180dd5be42fc6a272028b06933a"
+          }
+        },
+        "hps_failure_attribution": {
+          "state": "BROWSER_FIRST_SITE_AND_REDUCED_STREAM_OMISSION_OBSERVED_REPAIR_IN_PROGRESS",
+          "freeze": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-site-attribution-freeze-v1.json",
+            "sha256": "e27e5419e0422756a81544e0505c56383999a8367b54fa52443f44808786b38c"
+          },
+          "architecture_assessment": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-architecture-sol-v1.json",
+            "sha256": "b808edb8f951742fd50d79f6552711efbddc42e77afa06b42060c39a3a46655d"
+          },
+          "scope": "Constant first-refusal site tag at existing five HPS guards. No request, PCM, source order, admission, cleanup or comparison change. Actual DevCom request guard control passes; V6 identifies devcom-request, but not its complete request tuple.",
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-site-attribution-independent-review-v1.json",
+            "sha256": "8672fd64e6a2cc4d36040a0cfc74defc0d27af5edd66cd516390b29e45f70496"
+          },
+          "speculative_repair_contract": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-speculative-repair-sol-v1.json",
+            "sha256": "92bf47f9b0c54aa4165096fa75054cf9d7a6bd13413a49c2274b9a8c625d1df2",
+            "scope": "Conditional source-only design: typed quiescent stream snapshots and stable authored-bound PCM slots, preserving original requests/callback order. Actual refill/slot-reuse proof required before admission."
+          },
+          "source_header_coverage": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-source-coverage-sol-v1.json",
+            "sha256": "a60b518ca443f3c89dbe7277f60c67e40ce9425af76a84e257e8775472850aea",
+            "scope": "Known source HPS headers and callback targets have existing full strict rows; missing host stream owner remains. Source review, not observed sample322 request coverage."
+          },
+          "reduced_stream_omission": {
+            "source_freeze": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-source-v2/freeze.json",
+              "sha256": "5aec71c3214cf35f02ad25a3eedde8597be337ad1b5ba48f0793fb9ca733dbc2"
+            },
+            "independent_source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-source-v2/independent-source-review.json",
+              "sha256": "63bf9f61a6f6569bf84b456188e398bf5412b806deb256073aa9dd489b4d770b"
+            },
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-run-v1/result-corrected-v2.json",
+              "sha256": "e1aa3c064814869df5c69aafacce2856fa0653dbb5b8ae868a85c7375e34c609"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-first-refill-probe-run-v1/producer-archive/archive.json",
+              "sha256": "1c2a1f9dca470eaa5e428649b4db0a962bfe673cdba2347b620eb5369045e239"
+            },
+            "observed": "Original sp_end scheduler:361 calls of160samples; queued0x21 header id28 -> actual same-pump0x23 payload id32 replacing occupiedslot2 block128 with196832. Mixer restore succeeds but slot identity, PCM addresses/extents/hashes and completed counter remain post-refill. PRE pending1/loading1; POSTpending0/loading0.31events/nooverflow; process group absent.",
+            "scope": "Reduced stream-owner omission only. Original source globals are not restored; no playback-wide PCM replay equivalence or exact attribution of browser sample322 tuple. Quiescent-only stream snapshot cannot admit this pending PRE.",
+            "retained_failure": "Initial build launcher could not resolve cmake; no compiler ran. Corrected launcher uses existing configured absolute executable. No default100second trace or browser rerun."
+          },
+          "integration_contract": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-hps-audio-integration-sol-v2.json",
+            "sha256": "c7700dae9f0f85c63b4e5ffa2c5d2bc05e23da1225326feed0b4cf258d701be7",
+            "scope": "Exact active interval binding alone holds stream lifetime. Failed disarm releases it before source retirement; snapshot copies may outlive the stream. Existing Audio domain/312 ABI; source+PCM composed replay remains required."
+          },
+          "aggregate_candidate": {
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-audio-aggregate-root-v1/independent-review.json",
+              "sha256": "d72dc5ff535cc68f1baf6cefbd610a666d58043793272fef0be5aa5ec1b4596c"
+            },
+            "scope": "Root aggregate wiring source GO. Two actual aggregate tests use a synthetic stream leaf; unchanged legacy factory, absence/presence refusal, no writes on failed stream/FX admission, allocation-free restore and failed binding cleanup. No actual HPS or browser replay claim."
+          },
+          "host_candidate": {
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-host-contract-luna-v1/independent-review-v2.json",
+              "sha256": "b630bf8e22acc1f6ad5a929a4fbea83a86249553b15a1e5daaa74d5661f6fd55"
+            },
+            "scope": "12 host checks and3 admitted CPU endpoint controls pass. Legacy6/9 row forms retained, typed stream cap77 total. Historical census remains9rows/252bytes; CPU endpoint remains312bytes. Initial legacy-completeness HOLD and failed correction test retained."
+          },
+          "stream_leaf_restore": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-leaf-run-v1/result.json",
+              "sha256": "111fe157a1bc72a4d3656c678e1e79636f32d3a5f323a4a78309fb54d0d8df09"
+            },
+            "scope": "Actual original HPS advances361calls torefillid32/slot2/block196832;68typedrange identities and885476bytes incl6PCM buffers restored exactly to naturallyquiescentPRE. Pendingcapture, wrongtoken, capacitywithoutcallbacks and real failedbindingcleanup pass. No source scheduler/AX/HSD/output replay equivalence or browser claim.",
+            "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-leaf-sol-repair-v1/root-review.json",
+            "retained_findings": "Initial independent HOLD: stream visitor ABI mismatch, early stalehandle dereference and pendingadmit test inversion repaired by Sol; countercapture allegation withdrawn as reviewer readingerror. Originalfreeze/HOLD/delta preserved."
+          },
+          "interval_leaf_restore": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-stream-interval-run-v1/result.json",
+              "sha256": "7e1d2c31a062aec836ace1ee7935c66740a6c8d479b4428e7199973e1a78853d"
+            },
+            "source_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interval-authorization-sol-v1/root-review.json",
+            "scope": "The same actual HPS first refill completes under the exact healthy stream snapshot/token binding. All68stream ranges restore exactly. Valid0x22 relay and cancellation attempts remain refused before changing stream bytes; failed exact bindings clean up. Focused actual closed-barrier control passes. Original scheduler globals/AX/output replay and browser composition remain unproven.",
+            "retained_failure": "First trace syntax check failed on original ssize_t/callback ABI; fixed with existing compatibility header and actual source boolean ABI; logs retained."
+          },
+          "browser_host_owner_failure": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v7/first-audio-owner-failure.json",
+              "sha256": "d48248eac1439f5e2723a407012032c05da6d4859460e79c957c059a6c77e5b6"
+            },
+            "scope": "V7sourcebba581a4 failed at firstPRE hostvalidation before capsule source advances. FX ranges7..9 own a separate object/generation; newhostvalidator incorrectlyrequired baseaudioidentity. Exactnativecontract repaired without weakening cross-lane comparison;13focusedJS controls pass and rootindependentdelta reviewGO.",
+            "cleanup": "13recordedPIDsabsent and9producerpinsunchanged. BothnativeCPUclose return1073; snapshotclose andrenderershutdown return1. Failednativeclose retained.",
+            "repair_review": "rollback-renderer-resume-20261028-155740-eef0524c/hps-host-fx-owner-sol-v1/root-review.json"
+          },
+          "browser_pending_transfer_failure": {
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v8/first-transfer-busy-summary.json",
+              "sha256": "02252f7ff336be9c4aad0b0f6511c0ba11bde1234edef852854f5892a5bdfef6"
+            },
+            "runtime_source": "bba581a48e9751d76c7d6174b10c704e2fdb0f5f",
+            "harness_source": "5005dd6fd3d67f261cf7c6be4ce7b0036a078689",
+            "scope": "V8 retains four compared intervals, then reference command34/sample322 reaches sourceframe199 and refuses1044 (PayloadTransferBusy). CPU interval failure0/epoch5. Actual transfer tuple [198,0,0,0,0,0,0,1,0,0] isolates busy drive after audio only; source-file and bank owners idle. No composed refill completion or complete loop claim.",
+            "cleanup": "CPU closes1073/1044 retained; both snapshot closes and renderer shutdowns return1. Supervisor cleanuptrue; all recordedPIDs absent and all9nativepins unchanged.",
+            "postflight": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v8/independent-postflight.json",
+              "sha256": "c06c6d6e7c3b0e6ba010255200cf20db7ecfee4ecd63d94a6ac8afdec81bae57"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v8-producer-archive/archive.json",
+              "sha256": "4afe4d842ca319f9e95335c626215085f3936dab40c05269adfde31e547ad03c"
+            }
+          },
+          "interior_pending_repair": {
+            "freeze": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interior-pending-sol-v1/freeze.json",
+              "sha256": "5f37c8927bd7143dbdb717941280617909fa73f23ba1e3245d8d1289a947448a"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-interior-pending-sol-v1/root-review.json",
+              "sha256": "6a3bdd374b41879b8e31e7d647dc28fd10225e83f6c0a60a322967628d1db020"
+            },
+            "reduced_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/hps-pending-boundary-run-v1/result.json",
+              "sha256": "a5d4f2aa0004c5d8f3bf237ecb1ee2304c9da02bab7a938735ade16a72da50e6"
+            },
+            "scope": "Pure exact-bound HPS pending proof is usable only between PRE and END during reusable recording/correction. Actual original trace admits pending without mutation and still refuses capture/restore; next scheduled160sample block pumps naturally, then all68typedleaf ranges restore. Source-file/SSM/runtime/Aurora guards unchanged. Configured5TU syntax and focused frame/audio/payload/adapter controls pass. No browser composition yet.",
+            "retained_failures": "New payload fixture omitted capture fence; single-module import path failed; older modeled adapter motor exports missing. Exact fixture repairs retain failing logs; unsupported motor model exports abort rather than return success."
+          }
+        },
+        "passing_browser_v9": {
+          "runtime_producer": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+          "harness_producer": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+          "capture": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/runner/evidence.json",
+            "sha256": "9d369a1e26cfa8df6346d53ed0df69df67e16ebee3fa3f9ef13ea8e06fb8836d"
+          },
+          "launch": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/launch-result.json",
+            "sha256": "f77cf828077dd4c805a09d3336d2bc4e260756a54a63b9fdb10d260929e7ef80"
+          },
+          "independent_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/independent-result-review.json",
+            "sha256": "314b6227c2e62a0012d37d25473829aca8e2c63e2bfca2e4480175ff1306fe79"
+          },
+          "postflight": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-reusable-loop-v9/independent-postflight.json",
+            "sha256": "0e6757e7f5b390152ca4d260517f0d5567009af17fbe6dfbc99659b973eacbee"
+          },
+          "producer_archive": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-v9-producer-archive/archive.json",
+            "sha256": "92c1685e7afb3deb441890b01a0db51bc9ab361c68b435b0706ddeab39b9fe57"
+          },
+          "build": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/browser-build-reusable-loop-v7/artifact-inventory.json",
+            "sha256": "208f357d6cc44c779fcc1aac8889be6ae186038d43024823bf20c1ca7d854040"
+          },
+          "linked_configuration": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v7/final-linked-configuration-v1.json",
+            "sha256": "d042e8dccfa561640f6a735ebd9dc71f5b7f329a3dbfa8dd20f3d17380f84a05"
+          },
+          "linked_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/linked-config-reusable-loop-v7/row-review.json",
+            "sha256": "ee74dd82d2697a92031edffcf3ab5df464367e7613ea0bd7cf516e6313f0a4dc"
+          },
+          "source_integration_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/integration-review.json",
+            "sha256": "201e097151fcc9e6c7ce39f88c9bcaf92b0768b7b566e886c3f4befad8565954"
+          },
+          "elapsed_seconds": 102.72561612492427,
+          "counts": {
+            "intervals": 8,
+            "literal_samples": 44,
+            "spans": [
+              1,
+              6,
+              7,
+              7,
+              7,
+              7,
+              7,
+              2
+            ],
+            "endpoint_comparisons": 24,
+            "raw_pairs": 52,
+            "raw_lanes": 260,
+            "captures_per_page": 8,
+            "retirements_per_page": 8,
+            "max_owned_capsules": 1,
+            "reference_draws": 44,
+            "predicted_draws": 46,
+            "motor_events_capture_only": 2
+          },
+          "wrong_branches": [
+            {
+              "sample": 300,
+              "span": 1,
+              "reference_motion": 60,
+              "predicted_motion": 14
+            },
+            {
+              "sample": 342,
+              "span": 2,
+              "reference_motion": 343,
+              "predicted_motion": 14
+            }
+          ],
+          "hps_scope": "Confirmed interval4 queues HPS work after sample322 audio and completes naturally in sample323 audio. All77 Audio ranges and raw/source lanes compare. This is not correction across refill.",
+          "cleanup": "Both CPU close0, snapshot close1 and renderer shutdown1. All12 recorded PIDs absent;9 native producer pins unchanged. Final screenshots byte-identical, not an original-game pixel comparison.",
+          "integration": {
+            "failed_full_regression": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v1/result.json",
+              "sha256": "6f75ef818e60226231d5446606da607fd7dbdb56f9d29898fc00fe9f23c737f8"
+            },
+            "source_head": "8f846b45fad1b62379378cdf81c9be80f8ce9162",
+            "tests": 3077,
+            "skipped": 238,
+            "failures": 4,
+            "failure_kind": "Four fixture declarations/import/source-helper dependencies repaired; all focused tests and final local regression pass. No runtime change. Initial Linux CI header omission repaired with explicit cstdint include; final current-head CI tracked in PR358.",
+            "fixture_repair_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-regression-repair-v1/root-review.json",
+              "sha256": "b5d08a51f190c49e33d271dcb28a756dfa4ea9113009daf262f9785a4d469c82"
+            },
+            "full_regression": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v2/result.json",
+              "sha256": "72ab4b3ac4049634c565d0115cddaab1e3c463d91123ba30fcb59962269694a0"
+            },
+            "full_regression_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-full-regression-v2/unittest.log",
+              "sha256": "c591821b390cd6d33260112b7f10f8aa40e6c4faee1f2e9574c9861fdf01ae59"
+            },
+            "ordinary_release": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-ordinary-release-v1/result.json",
+              "sha256": "5c29ec4d9e152135d3454f79122ed04fd2b3cef4f285fab3f212d3b78e1e6ba1"
+            },
+            "validation_source_head": "d0865eecf3b635d8fb1f985efcbcbdea456011f4",
+            "final_local_result": {
+              "tests": 3077,
+              "skipped": 238,
+              "failures": 0,
+              "elapsed_seconds": 697.6404376248829
+            },
+            "fixture_repair_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-regression-repair-v1/receipt.json",
+              "sha256": "132022416b086d1c7decd8bb0709db757122e5beca1fe3241152e61f05f38d71"
+            },
+            "ci_initial_attempt": {
+              "run_id": 41071359479,
+              "head": "d0865eecf3b635d8fb1f985efcbcbdea456011f4",
+              "effects_setup_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/ci-effects-failed.log",
+                "sha256": "e4fe86c5d8c319877c672295a685be4fa7a3b95a34198b85209fdebeee1e1ea8"
+              },
+              "unit1_fixture_compile_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/ci-unit1-failed.log",
+                "sha256": "3e1ed85ea230d3681d2cef3bf70e75df80fc64792cc9c2ce08f4141ab3d0aca7"
+              },
+              "explanation": "Effects dependency download ended early before compilation. Unit1 snapshot test used std integer types without explicit cstdint; explicit test-only include added, both focused snapshot controls pass. No runtime change; final current-head CI required."
+            },
+            "cstdint_focused": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/reusable-loop-integration-v1/cstdint-focused.log",
+              "sha256": "c3dd920456911eb5abb49358114ffd567ff3f3650f605aa0e698a542b574b420"
+            },
+            "pull_request": "https://github.com/ericvanlare/melee-web/pull/358"
+          }
         }
       }
     }

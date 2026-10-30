@@ -256,3 +256,22 @@ strict CPU comparison. Unsupported lifetime cases refuse; presentation
 selection is reset only after checked source restoration. V14 remains a
 historical identity and is refused by the V15 lane. This candidate is not a
 completed browser rollback or an admitted online profile.
+
+
+### Private TEV stage scratch v19
+
+The existing particle-presentation diagnostic option now selects
+`slippi-render-dependencies-logical-frame-lobj-tobj-tev-stage-scratch-v19`.
+Historical V18 artifacts keep their original identity. V19 preserves the
+resident action catalog and typed particle ownership prerequisites, and resolves
+texture-stage map/coordinate fields in a local descriptor for each original
+`HSD_TExpSetupTev` submission. The original register setup, iteration order,
+stage assignment and synchronous GX arguments remain. Source descriptors and
+the default-off path are unchanged by this adaptation.
+
+This is a source-port dependency repair supporting no-draw corrections, not a
+claim of equivalence to a separate Slippi gameplay patch. The GPL helper is
+[texp_stage_scratch.h](texp_stage_scratch.h). The focused control compares actual
+source setup bodies through modeled GX sinks; browser results, exact producer
+identities and remaining gates belong to the
+[rollback boundary](../../docs/status/2026-10-12-match-only-rollback-feasibility.md).

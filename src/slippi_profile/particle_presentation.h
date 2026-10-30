@@ -18,6 +18,30 @@ typedef struct SlippiParticlePresentationAnchor {
     uint32_t particle_count, appsrt_count;
 } SlippiParticlePresentationAnchor;
 
+/* Fixed, lossless endpoint wire rows for the existing constructor receipts.
+ * Local receipt/history serials remain explicit provenance; they are not
+ * cross-instance particle semantics. Reserved fields must remain zero. */
+#define SLIPPI_PARTICLE_CELL_ENDPOINT_SCHEMA 1u
+typedef enum SlippiParticleCellRowKind {
+    SLIPPI_PARTICLE_CELL_ROW_LIVE = 1,
+    SLIPPI_PARTICLE_CELL_ROW_CAPTURED = 2,
+} SlippiParticleCellRowKind;
+typedef enum SlippiParticleCellObjectKind {
+    SLIPPI_PARTICLE_CELL_OBJECT_PARTICLE = 0,
+    SLIPPI_PARTICLE_CELL_OBJECT_APPSRT = 1,
+} SlippiParticleCellObjectKind;
+typedef struct SlippiParticleCellEndpointHeader {
+    uint32_t schema, bytes, live_count, captured_count;
+    uint64_t world, anchor_serial, anchor_token, history_serial;
+    uint32_t reserved[4];
+} SlippiParticleCellEndpointHeader;
+typedef struct SlippiParticleCellEndpointRow {
+    uint32_t schema, bytes, row_kind, index, object_kind, extent;
+    uint64_t receipt_serial, object;
+    uint64_t world, epoch, allocation, pool, descriptor;
+    uint32_t source, cell_offset, stride, reserved;
+} SlippiParticleCellEndpointRow;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +62,12 @@ int slippi_particle_presentation_world_end(uint64_t world_generation);
 SlippiParticlePresentationAnchor slippi_particle_presentation_anchor_capture(void);
 int slippi_particle_presentation_anchor_admit(
     SlippiParticlePresentationAnchor anchor);
+int slippi_particle_presentation_cell_endpoint_header(
+    SlippiParticlePresentationAnchor anchor,
+    SlippiParticleCellEndpointHeader* out);
+int slippi_particle_presentation_cell_endpoint_row(
+    SlippiParticlePresentationAnchor anchor, uint32_t row_kind,
+    uint32_t index, SlippiParticleCellEndpointRow* out);
 void slippi_particle_presentation_anchor_disarm(
     SlippiParticlePresentationAnchor anchor);
 
@@ -102,6 +132,34 @@ slippi_particle_presentation_anchor_capture(void)
 static inline int slippi_particle_presentation_anchor_admit(
     SlippiParticlePresentationAnchor anchor)
 { (void) anchor; return 1; }
+static inline int slippi_particle_presentation_cell_endpoint_header(
+    SlippiParticlePresentationAnchor anchor,
+    SlippiParticleCellEndpointHeader* out)
+{
+    (void) anchor;
+    if (out) {
+#ifdef __cplusplus
+        *out = SlippiParticleCellEndpointHeader{};
+#else
+        *out = (SlippiParticleCellEndpointHeader){0};
+#endif
+    }
+    return 0;
+}
+static inline int slippi_particle_presentation_cell_endpoint_row(
+    SlippiParticlePresentationAnchor anchor, uint32_t row_kind,
+    uint32_t index, SlippiParticleCellEndpointRow* out)
+{
+    (void) anchor; (void) row_kind; (void) index;
+    if (out) {
+#ifdef __cplusplus
+        *out = SlippiParticleCellEndpointRow{};
+#else
+        *out = (SlippiParticleCellEndpointRow){0};
+#endif
+    }
+    return 0;
+}
 static inline void slippi_particle_presentation_anchor_disarm(
     SlippiParticlePresentationAnchor anchor)
 { (void) anchor; }

@@ -38,6 +38,7 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         temporary=out/'tmp';temporary.mkdir();env=dict(os.environ,TMPDIR=str(temporary))
         src=(SOURCE/'src/gameplay_cpu_checkpoint.cpp').read_text()
         header=(SOURCE/'src/gameplay_cpu_checkpoint.hpp').read_text()
+        session_src=(SOURCE/'src/gameplay_match_session.cpp').read_text()
         def source(relative):
             p=SOURCE/relative
             return (p if p.is_file() else ROOT/relative).read_text()
@@ -47,6 +48,9 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         diag=header[header.index('enum class CpuCaptureRefusal'):header.index('class GameplayCpuCheckpoint final')]
         generated=source('tests/cpu_capture_refusal_control.cpp.in')
         capture=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(')
+        capture_span=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(')
+        capture_checked=function(src,'std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(')
+        capture='\n'.join((capture,capture_span,capture_checked))
         capture=capture.replace('slippi_particle_presentation_anchor_capture','fixture_particle_anchor_capture')
         capture=capture.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
         restore=function(src,'GameplayCpuCommitResult GameplayCpuCheckpoint::restore(')
@@ -61,8 +65,17 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         restore_corrected=restore_corrected.replace('slippi_particle_source_reset_after_restore','fixture_particle_source_reset_after_restore')
         finish_corrected=function(src,'bool GameplayCpuCheckpoint::finish_corrected(')
         finish_corrected=finish_corrected.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
+        retire_confirmed=function(src,'bool GameplayCpuCheckpoint::retire_confirmed(')
+        retire_confirmed=retire_confirmed.replace('slippi_particle_presentation_anchor_admit','fixture_particle_anchor_admit')
+        retire_confirmed=retire_confirmed.replace('slippi_particle_presentation_anchor_disarm','fixture_particle_anchor_disarm')
+        retire_confirmed=retire_confirmed.replace('slippi_particle_source_interval_end','fixture_particle_source_interval_end')
         disarm=function(src,'void GameplayCpuCheckpoint::disarm()')
         disarm=disarm.replace('slippi_particle_presentation_anchor_disarm','fixture_particle_anchor_disarm')
+        disarm=disarm.replace('slippi_particle_source_interval_end','fixture_particle_source_interval_end')
+        source_quiescent=function(session_src,'bool GameplayMatchSession::diagnostic_source_files_quiescent() const noexcept')
+        self.assertIn('storage_->world->ensure_source_files_quiescent();',source_quiescent)
+        self.assertIn('catch(...)',source_quiescent)
+        self.assertLess(source_quiescent.index('diagnostic_cpu_owners()'),source_quiescent.index('ensure_source_files_quiescent()'))
         replacements={
             '@ACTUAL_COMPARISON@':comparison,'@ACTUAL_CAPTURE_DIAGNOSTIC@':diag,
             '@ACTUAL_PAYLOAD_RESULT@':payload,
@@ -72,8 +85,11 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
             '@ACTUAL_RESTORE@':restore,
             '@ACTUAL_RESTORE_CORRECTED@':restore_corrected,
             '@ACTUAL_FINISH_CORRECTED@':finish_corrected,
+            '@ACTUAL_SESSION_SOURCE_QUIESCENT@':source_quiescent,
+            '@ACTUAL_RETIRE_CONFIRMED@':retire_confirmed,
             '@ACTUAL_DRAWN_SEAL@':function(src,'bool GameplayCpuCheckpoint::seal_drawn_reference('),
             '@ACTUAL_DRAWN_MATCH@':function(src,'bool GameplayCpuCheckpoint::matches_drawn_reference('),
+            '@ACTUAL_SOURCE_OWNERS_RETIRED@':function(src,'bool GameplayCpuCheckpoint::source_owners_retired('),
             '@ACTUAL_RELEASE_FUNCTION@':function(src,'void GameplayCpuCheckpoint::release()'),
             '@ACTUAL_DISARM_FUNCTION@':disarm,
             '@ACTUAL_DESTRUCTOR@':function(src,'GameplayCpuCheckpoint::~GameplayCpuCheckpoint()'),
@@ -81,11 +97,18 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
         for name,value in replacements.items():generated=generated.replace(name,value)
         self.assertNotIn('@ACTUAL_',generated)
         cpp=out/'control.cpp';cpp.write_text(generated)
-        # Same actual extracted source in both relevant profiles. The owner
-        # leaves remain modeled; this is not a live TObj/lifecycle control.
-        for profile,tobj_define in [('v7',[]),('v8',['-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1'])]:
+        # Same actual extracted source through the private V16 profile. Named
+        # presentation/action/world leaves remain modeled; this is not a live
+        # renderer, ActionStore catalog, or network-confirmation control.
+        profiles=[
+            ('v7',[]),
+            ('v8',['-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1']),
+            ('v16',['-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1',
+                    '-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1']),
+        ]
+        for profile,profile_defines in profiles:
             lane=out/profile;lane.mkdir()
-            cmd=[compiler,'-std=c++20','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1',*tobj_define,'-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(lane/'control')]
+            cmd=[compiler,'-std=c++20','-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE=1',*profile_defines,'-Wall','-Wextra','-Werror','-O1','-UNDEBUG','-I'+str(SOURCE/'src'),str(cpp),'-o',str(lane/'control')]
             result=subprocess.run(cmd,cwd=lane,env=env,text=True,capture_output=True,timeout=60)
             (lane/'compile.json').write_text(json.dumps({'profile':profile,'argv':cmd,'exit_code':result.returncode,'stdout':result.stdout,'stderr':result.stderr},indent=2)+'\n')
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
@@ -95,6 +118,9 @@ class GameplayCpuCaptureControls(OwnedWorkspaceTests):
             self.assertIn('eight first-leaf refusals',result.stdout)
             self.assertIn('restore commit/reset lifecycle guards passed',result.stdout)
             self.assertIn('corrected restore selects its dedicated writer',result.stdout)
+            self.assertIn('confirmed retirement refuses before detaching and permits bounded live-owner reuse',result.stdout)
+            self.assertIn('retained confirmed disarm cannot clear a newer live interval route',result.stdout)
+            self.assertIn('clean Sealed reference releases with zero comparison masks; nonzero mask refuses',result.stdout)
             print('Actual capture control profile/output:',profile,lane)
             print(result.stdout.strip())
 

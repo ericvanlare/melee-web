@@ -837,7 +837,7 @@ struct GameplayWorld::Storage {
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
         // This private profile requires stable borrowed animation identities.
         // Results remain local and use their existing separate archive policy.
-        static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY==SLIPPI_PROFILE_IDENTITY_STABLE_ACTION_ASSETS_V18);
+        static_assert(SLIPPI_PROFILE_ACTIVE_IDENTITY==SLIPPI_PROFILE_IDENTITY_TEV_STAGE_SCRATCH_V19);
         if(purpose==GameplayWorldPurpose::Match)
             action_policy=GameplayActionStorePolicy::ResidentOrdinaryActions;
 #endif

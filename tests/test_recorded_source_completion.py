@@ -63,6 +63,7 @@ class RecordedCompletionTests(unittest.TestCase):
   s=(ROOT/'src/gameplay_match_context.c').read_text();h=(ROOT/'src/gameplay_match_context.h').read_text()
   hooktype=h[h.index('typedef int (*MeleeWebMatchRecordedPreconsume)'):h.index(';',h.index('typedef int (*MeleeWebMatchRecordedPreconsume)'))+1]
   observation=h[h.index('typedef struct MeleeWebStadiumPadQueueObservation'):h.index('} MeleeWebStadiumPadQueueObservation;')+len('} MeleeWebStadiumPadQueueObservation;')]
+  rumble=body(s,'static int interpret_match_rumble(')
   fallback=s[s.index('#else\nstatic int match_gameplay_step'):]
   fallback=fallback[:fallback.index('#endif')]
   match_step=body(fallback,'static int match_gameplay_step(char* error, size_t error_size)')
@@ -72,6 +73,7 @@ class RecordedCompletionTests(unittest.TestCase):
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include "gameplay_cpu_interval.h"
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
 #define MELEE_WEB_MATCH_MAX_PLAYERS 4u
 typedef struct { int button; signed char err; } PADStatus;
@@ -89,17 +91,21 @@ static MeleeWebMatchContext* owner;
 static struct {Queue* queue;unsigned qnum,qcount,qread,qwrite;} HSD_PadLibData;
 static void* HSD_GObj_804D781C;static void* HSD_GObj_804D7814;
 static int events[20],count,mode;static uint64_t generation=7;
+static uint64_t owner_epoch=11;static uint32_t source_cursor=300,source_frame_reads,source_frame_last;
 static uint64_t melee_web_gameplay_generation(void){return generation;}
+static uint32_t melee_web_match_source_frames(void)
+{++source_frame_reads;source_frame_last=source_cursor;return source_cursor;}
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
 static int ok(char*e,size_t n){if(e&&n)*e=0;return 1;}
 static int owned(MeleeWebMatchContext*h,char*e,size_t n){return h==owner&&h->generation==generation?1:fail(e,n,"modeled owner");}
 static int live(MeleeWebMatchContext*h,char*e,size_t n){return owned(h,e,n);}
 static struct {void* player_entity[1];} player={{(void*)(uintptr_t)1}};
 static __typeof__(player)* Player_GetPtrForSlot(unsigned slot){(void)slot;return &player;}
-static void HSD_PadRumbleInterpret(void){events[count++]=1;assert(HSD_PadLibData.qcount==1);}
+static void HSD_PadRumbleInterpret(void){assert(source_frame_reads==1&&source_frame_last==source_cursor);events[count++]=1;assert(HSD_PadLibData.qcount==1);}
+'''+rumble+r'''
 static void HSD_PadRenewMasterStatus(void){events[count++]=3;assert(HSD_PadLibData.qcount==1);HSD_PadLibData.qcount=0;}
 static void HSD_PadRenewCopyStatus(void){}static void HSD_PadRenewGameStatus(void){}
-static int melee_web_gameplay_step(char*e,size_t n){(void)e;(void)n;events[count++]=4;return 1;}
+static int melee_web_gameplay_step(char*e,size_t n){(void)e;(void)n;events[count++]=4;++source_cursor;return 1;}
 '''+match_step+'\n'+body(s,'int melee_web_match_recorded_preconsume_arm(')+'\n'+body(s,'int melee_web_match_step_raw_phased(')+'\nstatic int alternative_admission(MeleeWebMatchContext* h,char* e,size_t n){\n'+alt+'\nreturn 1; }\n'+r'''
 static int hook(void* context,uint64_t cursor,char*e,size_t n){
  MeleeWebMatchContext* h=context;assert(h==owner&&cursor==h->ticks&&HSD_PadLibData.qcount==1);events[count++]=2;
@@ -109,14 +115,14 @@ static int hook(void* context,uint64_t cursor,char*e,size_t n){
 }
 int main(void){char e[160];PADStatus raw[4]={{0}};raw[0].button=42;
  for(mode=0;mode<3;mode++){
-  MeleeWebMatchContext h={0};owner=&h;h.generation=7;h.player_count=1;HSD_PadLibData.queue=&h.input_queue;HSD_PadLibData.qnum=1;HSD_PadLibData.qcount=0;count=0;
+  MeleeWebMatchContext h={0};owner=&h;h.generation=7;h.player_count=1;HSD_PadLibData.queue=&h.input_queue;HSD_PadLibData.qnum=1;HSD_PadLibData.qcount=0;count=0;source_cursor=300;source_frame_reads=0;source_frame_last=0;
   assert(alternative_admission(&h,e,sizeof(e)));
   assert(melee_web_match_recorded_preconsume_arm(&h,hook,&h,e,sizeof(e)));
   assert(!alternative_admission(&h,e,sizeof(e)));
   assert(!melee_web_match_recorded_preconsume_arm(&h,hook,&h,e,sizeof(e)));
   int result=melee_web_match_step_raw_phased(&h,raw,0,0,0,0,e,sizeof(e));
-  if(!mode){assert(result&&h.ticks==1&&count==4&&events[0]==1&&events[1]==2&&events[2]==3&&events[3]==4);assert(h.pad_queue_observation_complete);}
-  else{assert(!result&&!h.ticks&&h.recorded_preconsume_failed&&count==2);}
+  if(!mode){assert(result&&h.ticks==1&&count==4&&events[0]==1&&events[1]==2&&events[2]==3&&events[3]==4);assert(h.pad_queue_observation_complete&&source_frame_reads==1&&source_frame_last==300&&source_cursor==301);}
+  else{assert(!result&&!h.ticks&&h.recorded_preconsume_failed&&count==2&&source_frame_reads==1&&source_frame_last==300&&source_cursor==300);}
  }
  return 0;
 }

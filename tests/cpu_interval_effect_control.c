@@ -11,6 +11,7 @@ static unsigned motors,callbacks;
 void PADControlMotor(unsigned c,unsigned v){assert(c==2&&v==1);++motors;}
 _Noreturn void melee_web_platform_unavailable(const char* message){fprintf(stderr,"UNEXPECTED provider: %s\n",message);abort();}
 void fixture_bank_barrier(void);
+int fixture_hps_interval_site(const char* site);
 static void callback(int r,int args,void* p,int cancelled){assert(!cancelled);++callbacks;}
 int main(int argc,char** argv){
  unsigned char bytes[64]={1,2,3};
@@ -44,6 +45,7 @@ int main(int argc,char** argv){
  token=melee_web_cpu_interval_begin();assert(token);
  assert(HSD_DevComRequest(-1,0,0,0,0,0,NULL,NULL)==-1);
  assert(melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_HPS);
+ assert(!fixture_hps_interval_site("later-site")); /* Preserve and report only the first refusing site. */
  assert(melee_web_cpu_interval_end(token));
  token=melee_web_cpu_interval_begin();assert(token);
  melee_web_cpu_interval_pad_motor(2,1);assert(motors==1&&melee_web_cpu_interval_failure()==MELEE_WEB_CPU_EFFECT_MOTOR);

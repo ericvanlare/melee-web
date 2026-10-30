@@ -10,10 +10,122 @@ export const CPU_ENDPOINT_STATUS = Object.freeze({
   ok: 0, invalid: 1, wrongPhase: 2, ownerRefused: 3, leafRefused: 4,
   invalidIndex: 5, overflow: 6, incomplete: 7,
 });
+export const CPU_PARTICLE_ENDPOINT_SCHEMA = 2;
+export const CPU_PARTICLE_ENDPOINT_HEADER_BYTES = 64;
+export const CPU_PARTICLE_ENDPOINT_ROW_BYTES = 96;
 export const CPU_ENDPOINT_DOMAIN = Object.freeze({
   owner: 1, effects: 2, actions: 3, payload: 4, flow: 5,
   context: 6, bootstrap: 7, audio: 8, statics: 9,
 });
+/* The audio leaf still uses schema 312. These limits and enum values mirror
+ * gameplay_audio.h and gameplay_audio_stream.h; the row count itself comes
+ * from Audio.Header.OwnedRangeCount. The leaf may omit PCM byte rows for
+ * absent channels; required structural rows and every present kind/index are
+ * checked against the authored stream shape. */
+export const CPU_ENDPOINT_AUDIO_RANGE = Object.freeze({
+  maxOwnedRanges: 77,
+  maxStreamRanges: 68,
+  streamBase: 0x100,
+  streamKindStride: 8,
+  legacyKinds: Object.freeze([1,2,3,4,5,6,7,8,9]),
+  streamKinds: Object.freeze({
+    SELECTED_FILE:1, HEADERS:2, SLOTS:3, SLOT_FILES:4,
+    CHANNEL_PCM:5, CHANNEL_FRAMES:6, CHANNEL_LOOP_PCM:7,
+    CHANNEL_LOOP_AND_NIBBLES:8, CHANNEL_COEFFICIENTS:9,
+    CHANNEL_PREDICTORS:10, CHANNEL_HISTORIES:11, CHANNEL_LOOPING:12,
+    PCM_POINTERS:13, PCM_BYTES:14, PCM_CAPACITIES:15, PREPARED:16,
+    VISITED_POINTER:17, VISITED_BYTES:18, PROGRESS:19, AUX_HANDLE:20,
+    AUX_BYTES:21, RELAY_HANDLE:22, RELAY_BYTES:23,
+  }),
+});
+const AUDIO_STREAM_CHANNEL_KINDS = new Set([
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PCM,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_FRAMES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_PCM,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOP_AND_NIBBLES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_COEFFICIENTS,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_PREDICTORS,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_HISTORIES,
+  CPU_ENDPOINT_AUDIO_RANGE.streamKinds.CHANNEL_LOOPING,
+]);
+
+function validateAudioOwnedRanges(records, generation, audioOwner, failWith) {
+  if (!Array.isArray(records) || records.length < 1 ||
+      records.length > CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges)
+    failWith('audio owned-range count is outside its authored bound');
+  if (audioOwner === 0n || audioOwner > BigInt(U32_MAX))
+    failWith('audio owner identity is invalid');
+  const seen = new Set(), legacyKinds = new Set(), streamRows = new Map();
+  let streamOwner = null, streamGeneration = null, effectsOwner = null, effectsGeneration = null;
+  for (const record of records) {
+    const field = name => {
+      const index = record.fieldNames.indexOf(name);
+      if (index < 0) failWith(`AudioOwnedRange is missing ${name}`);
+      return canonicalU64(record.fields[index], `AudioOwnedRange.${name}`);
+    };
+    const kind = field('Kind'), address = field('Address'), extent = field('Extent');
+    const owner = field('OwnerIdentity'), rowGeneration = field('Generation');
+    if (seen.has(kind.toString(10))) failWith('audio owned-range kind is duplicated');
+    seen.add(kind.toString(10));
+    if (address === 0n || address > BigInt(U32_MAX) || extent === 0n ||
+        extent > BigInt(U32_MAX) || address + extent > 0x1_0000_0000n ||
+        owner === 0n || owner > BigInt(U32_MAX) || rowGeneration === 0n)
+      failWith('audio owned-range address, extent, owner, or generation is invalid');
+    if (CPU_ENDPOINT_AUDIO_RANGE.legacyKinds.includes(Number(kind))) {
+      legacyKinds.add(Number(kind));
+      if (kind <= 6n) {
+        if (owner !== audioOwner) failWith('base audio owned-range owner differs from the CPU owner row');
+        if (rowGeneration !== generation)
+          failWith('base audio owned-range generation differs from its header');
+      } else {
+        if (effectsOwner === null) { effectsOwner=owner;effectsGeneration=rowGeneration; }
+        else if (effectsOwner!==owner || effectsGeneration!==rowGeneration)
+          failWith('audio effects ranges disagree on owner identity or generation');
+        if (kind === 7n && address !== owner)
+          failWith('audio effects owner range address differs from its owner identity');
+      }
+      continue;
+    }
+    const encoded = kind - BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase);
+    const streamKind = Number(encoded / BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamKindStride));
+    const index = Number(encoded % BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamKindStride));
+    const knownKinds = Object.values(CPU_ENDPOINT_AUDIO_RANGE.streamKinds);
+    const allowedIndex = AUDIO_STREAM_CHANNEL_KINDS.has(streamKind) ||
+      streamKind === CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES
+      ? index < 6 : index === 0;
+    if (kind < BigInt(CPU_ENDPOINT_AUDIO_RANGE.streamBase) ||
+        !knownKinds.includes(streamKind) || !allowedIndex)
+      failWith(`audio stream range kind/index is not authored (${kind})`);
+    if (streamOwner === null) { streamOwner=owner;streamGeneration=rowGeneration; }
+    else if (streamOwner!==owner || streamGeneration!==rowGeneration)
+      failWith('audio stream ranges disagree on owner identity or generation');
+    if (!streamRows.has(streamKind)) streamRows.set(streamKind,new Set());
+    streamRows.get(streamKind).add(index);
+  }
+  if (legacyKinds.size > 1) {
+    for (let kind=1;kind<=6;kind++) if(!legacyKinds.has(kind))
+      failWith(`audio stream snapshot is missing base audio range kind ${kind}`);
+    if (legacyKinds.size!==6 && legacyKinds.size!==9)
+      failWith('audio base/effects range set is incomplete');
+    for (let kind=7;kind<=9;kind++) if(legacyKinds.has(kind)!==(legacyKinds.size===9))
+      failWith('audio effects range set is incomplete');
+  }
+  if (streamRows.size > 0) {
+    if (legacyKinds.size!==6 && legacyKinds.size!==9)
+      failWith('audio base/effects range set is incomplete');
+    for (const kind of Object.values(CPU_ENDPOINT_AUDIO_RANGE.streamKinds)) {
+      const actual=streamRows.get(kind);
+      if (kind===CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES) continue;
+      const expected=AUDIO_STREAM_CHANNEL_KINDS.has(kind)?[0,1,2,3,4,5]:[0];
+      if (!actual || actual.size!==expected.length || expected.some(index=>!actual.has(index)))
+        failWith(`audio stream snapshot has an incomplete ${kind} row set`);
+    }
+    const streamCount=[...streamRows.values()].reduce((total,indexes)=>total+indexes.size,0);
+    const pcmBytesCount=streamRows.get(CPU_ENDPOINT_AUDIO_RANGE.streamKinds.PCM_BYTES)?.size??0;
+    if (streamCount!==62+pcmBytesCount||streamCount>CPU_ENDPOINT_AUDIO_RANGE.maxStreamRanges)
+      failWith('audio stream owned-range count is outside its authored row set');
+  }
+}
 
 const MAX_ENDPOINT_RECORDS = 65_536;
 const MAX_ENDPOINT_BORROWED_BYTES = 128 * 1024 * 1024;
@@ -139,7 +251,12 @@ export function collectCpuEndpointInPage(request) {
     count:record.count,fieldNames:record.fieldNames,fields:record.fields.map(value=>value.toString(10)),
     metadataBytes:record.metadataBytes,borrowedBytes:record.borrowedBytes,bytesBase64:encodePageBase64(record.copiedBytes)});
   const recordBytes = 312, schema = 1, maxRecords = 65536;
+  const particleV2Schema=2, particleHeaderBytes=64, particleRowBytes=96;
   const maxBorrowedBytes = 128 * 1024 * 1024, u32max = 0xffff_ffff;
+  const maxAudioOwnedRanges=77,maxAudioStreamRanges=68,audioStreamBase=0x100,audioStreamStride=8;
+  const audioLegacyKinds=new Set([1,2,3,4,5,6,7,8,9]);
+  const audioStreamKinds=new Set(Array.from({length:23},(_,index)=>index+1));
+  const audioChannelKinds=new Set([5,6,7,8,9,10,11,12]);
   const row = (kind, kindName, fields, borrowField = null) => ({kind,kindName,fields,borrowField});
   const domain = (id, name, header, groups) => ({id,name,header,groups});
   // Keep the page callback self-contained for page.evaluate. This is the
@@ -184,8 +301,11 @@ export function collectCpuEndpointInPage(request) {
     ]),
   ];
   const view = request && request.view, provenance = request && request.provenance;
-  if (!request || Object.keys(request).some(key=>!['view','provenance','expectedSourceFrame'].includes(key)))
+  if (!request || Object.keys(request).some(key=>!['view','provenance','expectedSourceFrame','particleCellEndpoint'].includes(key)))
     failPage('request contains unsupported fields');
+  if (request.particleCellEndpoint !== undefined && typeof request.particleCellEndpoint !== 'boolean')
+    failPage('particle-cell endpoint option must be boolean');
+  const includeParticleCells = request.particleCellEndpoint === true;
   if (![1,2,3].includes(view) || ![1,2,3].includes(provenance) ||
       ((view === 1) !== (provenance === 1)))
     failPage('view/provenance request is invalid');
@@ -227,6 +347,13 @@ export function collectCpuEndpointInPage(request) {
   const required = ['_melee_web_synctest_cpu_endpoint_begin','_melee_web_synctest_cpu_endpoint_record',
     '_melee_web_synctest_cpu_endpoint_data','_melee_web_synctest_cpu_endpoint_bytes',
     '_melee_web_synctest_cpu_endpoint_end'];
+  if (includeParticleCells) required.push(
+    '_melee_web_synctest_cpu_particle_endpoint_header',
+    '_melee_web_synctest_cpu_particle_endpoint_header_data',
+    '_melee_web_synctest_cpu_particle_endpoint_header_bytes',
+    '_melee_web_synctest_cpu_particle_endpoint_row',
+    '_melee_web_synctest_cpu_particle_endpoint_row_data',
+    '_melee_web_synctest_cpu_particle_endpoint_row_bytes');
   if (required.some(name => typeof module[name] !== 'function')) failPage('native direct endpoint exports are unavailable');
   const wasmPointer = (value, name) => {
     if (!Number.isInteger(value) || value < -0x8000_0000 || value > u32max)
@@ -262,6 +389,70 @@ export function collectCpuEndpointInPage(request) {
     const index = row.fieldNames.indexOf(fieldName);
     if (index < 0) failPage(`native schema has no named field ${fieldName}`);
     return row.fields[index];
+  };
+  const validateAudioRanges = (rows, generation, audioOwner) => {
+    const ranges=rows.filter(item=>item.kindName==='AudioOwnedRange');
+    if(ranges.length<1||ranges.length>maxAudioOwnedRanges)
+      failPage('audio owned-range count is outside its authored bound');
+    if(audioOwner===0n||audioOwner>BigInt(u32max))failPage('audio owner identity is invalid');
+    const seen=new Set(),legacyKinds=new Set(),streamRows=new Map();
+    let streamOwner=null,streamGeneration=null,effectsOwner=null,effectsGeneration=null;
+    for(const item of ranges){
+      const value=name=>fieldValue(item,name);
+      const kind=value('Kind'),address=value('Address'),extent=value('Extent');
+      const owner=value('OwnerIdentity'),rowGeneration=value('Generation');
+      if(seen.has(kind.toString(10)))failPage('audio owned-range kind is duplicated');
+      seen.add(kind.toString(10));
+      if(address===0n||address>BigInt(u32max)||extent===0n||extent>BigInt(u32max)||
+         address+extent>0x1_0000_0000n||owner===0n||owner>BigInt(u32max)||rowGeneration===0n)
+        failPage('audio owned-range address, extent, owner, or generation is invalid');
+      if(audioLegacyKinds.has(Number(kind))){
+        legacyKinds.add(Number(kind));
+        if(kind<=6n){
+          if(owner!==audioOwner)failPage('base audio owned-range owner differs from the CPU owner row');
+          if(rowGeneration!==generation)failPage('base audio owned-range generation differs from its header');
+        }else{
+          if(effectsOwner===null){effectsOwner=owner;effectsGeneration=rowGeneration;}
+          else if(effectsOwner!==owner||effectsGeneration!==rowGeneration)
+            failPage('audio effects ranges disagree on owner identity or generation');
+          if(kind===7n&&address!==owner)
+            failPage('audio effects owner range address differs from its owner identity');
+        }
+        continue;
+      }
+      const encoded=kind-BigInt(audioStreamBase);
+      const streamKind=Number(encoded/BigInt(audioStreamStride));
+      const index=Number(encoded%BigInt(audioStreamStride));
+      const allowedIndex=audioChannelKinds.has(streamKind)||streamKind===14?index<6:index===0;
+      if(kind<BigInt(audioStreamBase)||!audioStreamKinds.has(streamKind)||!allowedIndex)
+        failPage(`audio stream range kind/index is not authored (${kind})`);
+      if(streamOwner===null){streamOwner=owner;streamGeneration=rowGeneration;}
+      else if(streamOwner!==owner||streamGeneration!==rowGeneration)
+        failPage('audio stream ranges disagree on owner identity or generation');
+      if(!streamRows.has(streamKind))streamRows.set(streamKind,new Set());
+      streamRows.get(streamKind).add(index);
+    }
+    if(legacyKinds.size>1){
+      for(let kind=1;kind<=6;kind++)if(!legacyKinds.has(kind))
+        failPage(`audio stream snapshot is missing base audio range kind ${kind}`);
+      if(legacyKinds.size!==6&&legacyKinds.size!==9)failPage('audio base/effects range set is incomplete');
+      for(let kind=7;kind<=9;kind++)if(legacyKinds.has(kind)!==(legacyKinds.size===9))
+        failPage('audio effects range set is incomplete');
+    }
+    if(streamRows.size>0){
+      if(legacyKinds.size!==6&&legacyKinds.size!==9)failPage('audio base/effects range set is incomplete');
+      for(const streamKind of audioStreamKinds){
+        const actual=streamRows.get(streamKind);
+        if(streamKind===14)continue;
+        const expected=audioChannelKinds.has(streamKind)?[0,1,2,3,4,5]:[0];
+        if(!actual||actual.size!==expected.length||expected.some(index=>!actual.has(index)))
+          failPage(`audio stream snapshot has an incomplete ${streamKind} row set`);
+      }
+      const streamCount=[...streamRows.values()].reduce((total,indexes)=>total+indexes.size,0);
+      const pcmBytesCount=streamRows.get(14)?.size??0;
+      if(streamCount!==62+pcmBytesCount||streamCount>maxAudioStreamRanges)
+        failPage('audio stream owned-range count is outside its authored row set');
+    }
   };
   const resolveCount = (group, header) => {
     const expression = group.count;
@@ -350,6 +541,11 @@ export function collectCpuEndpointInPage(request) {
         header = readRow(domainSpec,{...domainSpec.header},0,1);
         rows.push(header);
       }
+      if(domainSpec.id===8){
+        const ownedRangeCount=fieldValue(header,'OwnedRangeCount');
+        if(ownedRangeCount<1n||ownedRangeCount>BigInt(maxAudioOwnedRanges))
+          failPage('audio owned-range count is outside its authored bound');
+      }
       for (const group of domainSpec.groups) {
         const count = resolveCount(group,header);
         for (let index=0; index<count; ++index) rows.push(readRow(domainSpec,group.row,index,count));
@@ -372,9 +568,11 @@ export function collectCpuEndpointInPage(request) {
         failPage('flow named-field schema count is invalid');
       if (domainSpec.id===7 && rowValue('Header','RangeCount')!==2n)
         failPage('bootstrap range count is invalid');
-      if (domainSpec.id===8 && (rowValue('Header','OwnedRangeCount')===undefined ||
-          rowValue('Header','OwnedRangeCount')<1n || rowValue('Header','OwnedRangeCount')>9n))
-        failPage('audio owned-range count is outside its authored bound');
+      if (domainSpec.id===8) {
+        const ownerRecord=domains[0]?.records.find(item=>item.kindName==='Owner');
+        if(!ownerRecord)failPage('owner audio identity is missing from the endpoint');
+        validateAudioRanges(rows,rowValue('Header','Generation'),fieldValue(ownerRecord,'Audio'));
+      }
       if (domainSpec.id===3) {
         for (const item of rows) {
           if (item.kindName==='ActionSlot') {
@@ -410,7 +608,91 @@ export function collectCpuEndpointInPage(request) {
     if (typeof ownerSourceFrame !== 'bigint') failPage('owner source-frame field is not a u64');
     if (expectedSourceFrame !== undefined && expectedSourceFrame !== ownerSourceFrame)
       failPage('owner source-frame stamp differs from the requested frame');
-    captured = {schema,recordBytes,view,provenance,sourceFrame:ownerSourceFrame,domains};
+    let particleCells = null;
+    if (includeParticleCells) {
+      const readFixedBuffer = (pointerExport, bytesExport, expectedBytes, label) => {
+        const pointer = wasmPointer(module[pointerExport](), `${label} buffer`);
+        assertHeap();
+        const extent = module[bytesExport]();
+        assertHeap();
+        if (extent !== expectedBytes || pointer + extent > heapLength)
+          failPage(`${label} extent is not exactly ${expectedBytes}`);
+        const copied = heap.slice(pointer,pointer+extent);
+        if (copied.byteLength !== expectedBytes) failPage(`${label} was truncated`);
+        return copied;
+      };
+      const readParticleHeader = () => {
+        const status = nativeCall(module._melee_web_synctest_cpu_particle_endpoint_header,
+          'particle header');
+        if (status !== 0) failPage(`particle header refused with status ${status}`);
+        const copied = readFixedBuffer('_melee_web_synctest_cpu_particle_endpoint_header_data',
+          '_melee_web_synctest_cpu_particle_endpoint_header_bytes',particleHeaderBytes,
+          'particle header');
+        const data = new DataView(copied.buffer,copied.byteOffset,copied.byteLength);
+        if (data.getUint32(0,true)!==1 || data.getUint32(4,true)!==particleHeaderBytes ||
+            data.getUint32(48,true)!==0 || data.getUint32(52,true)!==0 ||
+            data.getUint32(56,true)!==0 || data.getUint32(60,true)!==0)
+          failPage('particle header schema/extent/reserved fields are invalid');
+        return {copied,schema:1,bytes:particleHeaderBytes,
+          liveCount:data.getUint32(8,true),capturedCount:data.getUint32(12,true),
+          world:data.getBigUint64(16,true),anchorSerial:data.getBigUint64(24,true),
+          anchorToken:data.getBigUint64(32,true),historySerial:data.getBigUint64(40,true)};
+      };
+      const beforeHeader = readParticleHeader();
+      if (beforeHeader.liveCount>maxRecords || beforeHeader.capturedCount>maxRecords ||
+          beforeHeader.liveCount+beforeHeader.capturedCount>maxRecords)
+        failPage('particle cell row count exceeds the bounded endpoint cap');
+      const readParticleRows = (rowKind,count) => {
+        const result=[];
+        for(let index=0;index<count;index++){
+          const status=nativeCall(module._melee_web_synctest_cpu_particle_endpoint_row,
+            'particle row',[rowKind,index]);
+          if(status!==0)failPage(`particle row ${rowKind}[${index}] refused with status ${status}`);
+          const copied=readFixedBuffer('_melee_web_synctest_cpu_particle_endpoint_row_data',
+            '_melee_web_synctest_cpu_particle_endpoint_row_bytes',particleRowBytes,
+            `particle row ${rowKind}[${index}]`);
+          const data=new DataView(copied.buffer,copied.byteOffset,copied.byteLength);
+          if(data.getUint32(0,true)!==1||data.getUint32(4,true)!==particleRowBytes||
+             data.getUint32(8,true)!==rowKind||data.getUint32(12,true)!==index||
+             data.getUint32(92,true)!==0)
+            failPage(`particle row ${rowKind}[${index}] schema/order/reserved fields are invalid`);
+          result.push({kind:rowKind,index,objectKind:data.getUint32(16,true),extent:data.getUint32(20,true),
+            receiptSerial:data.getBigUint64(24,true).toString(10),object:data.getBigUint64(32,true).toString(10),
+            world:data.getBigUint64(40,true).toString(10),epoch:data.getBigUint64(48,true).toString(10),
+            allocation:data.getBigUint64(56,true).toString(10),pool:data.getBigUint64(64,true).toString(10),
+            descriptor:data.getBigUint64(72,true).toString(10),source:data.getUint32(80,true),
+            cellOffset:data.getUint32(84,true),stride:data.getUint32(88,true)});
+        }
+        return result;
+      };
+      const liveRows=readParticleRows(1,beforeHeader.liveCount);
+      const capturedRows=readParticleRows(2,beforeHeader.capturedCount);
+      const afterHeader=readParticleHeader();
+      if(afterHeader.copied.length!==beforeHeader.copied.length ||
+         afterHeader.copied.some((byte,index)=>byte!==beforeHeader.copied[index]))
+        failPage('particle header changed while cell rows were read');
+      const particleAnchor=domains[1].records.find(item=>item.kindName==='ParticleAnchor');
+      if(!particleAnchor)failPage('raw Effects.ParticleAnchor row is missing');
+      const anchorField=name=>particleAnchor.fields[particleAnchor.fieldNames.indexOf(name)];
+      if(beforeHeader.world!==anchorField('World')||beforeHeader.anchorSerial!==anchorField('Serial')||
+         beforeHeader.anchorToken!==anchorField('AnchorToken'))
+        failPage('particle sidecar authority differs from the raw particle anchor');
+      const capturedKinds={particle:capturedRows.filter(row=>row.objectKind===0).length,
+        appsrt:capturedRows.filter(row=>row.objectKind===1).length};
+      if(capturedRows.some(row=>row.objectKind!==0&&row.objectKind!==1)||
+         BigInt(capturedKinds.particle)!==anchorField('ParticleCount')||
+         BigInt(capturedKinds.appsrt)!==anchorField('AppsrtCount'))
+        failPage('captured particle row membership differs from the raw anchor counts');
+      particleCells={schema:1,headerBytes:particleHeaderBytes,
+        rowBytes:particleRowBytes,liveCount:beforeHeader.liveCount,
+        capturedCount:beforeHeader.capturedCount,world:beforeHeader.world.toString(10),
+        anchorSerial:beforeHeader.anchorSerial.toString(10),anchorToken:beforeHeader.anchorToken.toString(10),
+        historySerial:beforeHeader.historySerial.toString(10),liveRows,capturedRows};
+    }
+    captured = includeParticleCells
+      ? {schema:particleV2Schema,rawSchema:schema,recordBytes,view,provenance,
+        sourceFrame:ownerSourceFrame,revalidated:true,domains,particleCells}
+      : {schema,recordBytes,view,provenance,sourceFrame:ownerSourceFrame,domains};
   } catch (error) {
     firstFailure = error instanceof Error ? error : new Error(String(error));
   } finally {
@@ -435,11 +717,14 @@ export function collectCpuEndpointInPage(request) {
   }
   if (!captured) failPage('batch produced no endpoint');
   // Encode/serialize only after end() has revalidated and closed the batch.
-  return {
-    schema:captured.schema,recordBytes:captured.recordBytes,view:captured.view,
-    provenance:captured.provenance,sourceFrame:captured.sourceFrame.toString(10),revalidated:true,
+  const wire={
+    schema:captured.schema,...(captured.rawSchema===undefined?{}:{rawSchema:captured.rawSchema}),
+    recordBytes:captured.recordBytes,view:captured.view,provenance:captured.provenance,
+    sourceFrame:captured.sourceFrame.toString(10),revalidated:true,
     domains:captured.domains.map(item=>({id:item.id,name:item.name,records:item.records.map(wirePageRecord)})),
   };
+  if(captured.particleCells)wire.particleCells=captured.particleCells;
+  return wire;
 }
 
 function compareRecord(left, right, path) {
@@ -549,6 +834,11 @@ export function validateCpuEndpointEnvelope(value) {
       if (index < 0) fail(`${domain.name} lacks named count field ${name}`);
       return canonicalU64(record.fields[index], `${domain.name}.${name}`);
     };
+    if (domain.id === 8) {
+      const ownedRangeCount = readField(header, 'OwnedRangeCount');
+      if (ownedRangeCount < 1n || ownedRangeCount > BigInt(CPU_ENDPOINT_AUDIO_RANGE.maxOwnedRanges))
+        fail('audio owned-range count is outside its authored bound');
+    }
     const expected = [];
     if (domainSpec.header) expected.push({row:domainSpec.header,index:0,count:1});
     for (const group of domainSpec.groups) {
@@ -619,8 +909,13 @@ export function validateCpuEndpointEnvelope(value) {
     } else if (domain.id === 7) {
       if (readRowField('Header','RangeCount') !== 2n) fail('bootstrap range count is invalid');
     } else if (domain.id === 8) {
-      const count = readRowField('Header','OwnedRangeCount');
-      if (count < 1n || count > 9n) fail('audio range count exceeds its authored bound');
+      const ownerRecord=value.domains[0]?.records.find(record=>record.kindName==='Owner');
+      if(!ownerRecord)fail('owner audio identity is missing from the endpoint');
+      const ownerAudioIndex=ownerRecord.fieldNames.indexOf('Audio');
+      if(ownerAudioIndex<0)fail('owner row has no audio identity');
+      validateAudioOwnedRanges(domain.records.filter(record=>record.kindName==='AudioOwnedRange'),
+        readRowField('Header','Generation'),
+        canonicalU64(ownerRecord.fields[ownerAudioIndex],'Owner.Audio'),fail);
     } else if (domain.id === 9) {
       for (const item of domain.records) if (item.kindName === 'StaticRow' && BigInt(item.fields[0]) !== BigInt(item.index))
         fail(`static row index mismatch at ${item.index}`);
@@ -636,3 +931,312 @@ export function decodeCpuEndpointResult(value) {
 
 // Historical local name retained for existing focused controls.
 export const decodeCpuEndpointEnvelope = decodeCpuEndpointResult;
+
+const PARTICLE_ROW_FIELDS = Object.freeze([
+  'kind','index','objectKind','extent','receiptSerial','object','world','epoch',
+  'allocation','pool','descriptor','source','cellOffset','stride',
+]);
+const PARTICLE_SEMANTIC_FIELDS = Object.freeze([
+  'objectKind','extent','object','world','epoch','allocation','pool','descriptor',
+  'source','cellOffset','stride',
+]);
+const PARTICLE_POINTER_FIELDS = Object.freeze(['object','pool','descriptor']);
+
+function rawParticleEndpoint(value) {
+  return {schema:1,recordBytes:value.recordBytes,view:value.view,provenance:value.provenance,
+    sourceFrame:value.sourceFrame,revalidated:value.revalidated,domains:value.domains};
+}
+
+function readParticleAnchor(endpoint) {
+  const domain=endpoint.domains[1];
+  const record=domain?.records.find(item=>item.kindName==='ParticleAnchor');
+  if(!record)fail('particle sidecar has no raw ParticleAnchor row');
+  const result={};
+  for(const name of ['World','Serial','AnchorToken','ParticleCount','AppsrtCount']){
+    const index=record.fieldNames.indexOf(name);
+    if(index<0)fail(`raw ParticleAnchor is missing ${name}`);
+    result[name]=canonicalU64(record.fields[index],`raw ParticleAnchor.${name}`);
+  }
+  return record;
+}
+
+function particleAnchorFields(record) {
+  return Object.fromEntries(['World','Serial','AnchorToken','ParticleCount','AppsrtCount'].map(name=>
+    [name,canonicalU64(record.fields[record.fieldNames.indexOf(name)],`raw ParticleAnchor.${name}`)]));
+}
+
+function sameParticleRow(left,right,{includeReceiptSerial=true,ignoreKind=false,ignoreIndex=false}={}) {
+  if((!ignoreKind&&left.kind!==right.kind)||(!ignoreIndex&&left.index!==right.index))return false;
+  if(includeReceiptSerial&&left.receiptSerial!==right.receiptSerial)return false;
+  return PARTICLE_SEMANTIC_FIELDS.every(name=>left[name]===right[name]);
+}
+
+function particleIdentityRelation(endpoint) {
+  const capturedBySerial=new Map(endpoint.particleCells.capturedRows.map(row=>[row.receiptSerial,row]));
+  const relation=[];
+  for(const live of endpoint.particleCells.liveRows){
+    const capturedIndex=endpoint.particleCells.capturedRows.findIndex(row=>row.receiptSerial===live.receiptSerial);
+    if(capturedIndex>=0&&!sameParticleRow(live,endpoint.particleCells.capturedRows[capturedIndex],
+      {includeReceiptSerial:true,ignoreKind:true,ignoreIndex:true}))
+      fail(`particle receipt ${live.receiptSerial} names conflicting live/captured identities`);
+    relation.push(capturedIndex);
+  }
+  if(capturedBySerial.size!==endpoint.particleCells.capturedRows.length)
+    fail('captured particle receipts are not unique');
+  return relation;
+}
+
+function validateParticleRows(endpoint, anchor) {
+  const cells=endpoint.particleCells;
+  if(!cells||cells.schema!==1||cells.headerBytes!==CPU_PARTICLE_ENDPOINT_HEADER_BYTES||
+     cells.rowBytes!==CPU_PARTICLE_ENDPOINT_ROW_BYTES||!Number.isInteger(cells.liveCount)||
+     !Number.isInteger(cells.capturedCount)||cells.liveCount<0||cells.capturedCount<0||
+     cells.liveCount>MAX_ENDPOINT_RECORDS||cells.capturedCount>MAX_ENDPOINT_RECORDS||
+     cells.liveCount+cells.capturedCount>MAX_ENDPOINT_RECORDS||
+     !Array.isArray(cells.liveRows)||!Array.isArray(cells.capturedRows)||
+     cells.liveRows.length!==cells.liveCount||cells.capturedRows.length!==cells.capturedCount)
+    fail('particle sidecar header/count/row extent is invalid');
+  const world=canonicalU64(cells.world,'particle sidecar world');
+  const anchorSerial=canonicalU64(cells.anchorSerial,'particle sidecar anchor serial');
+  const anchorToken=canonicalU64(cells.anchorToken,'particle sidecar anchor token');
+  const historySerial=canonicalU64(cells.historySerial,'particle sidecar history serial');
+  if(world===0n||anchorToken===0n||historySerial<anchorSerial)
+    fail('particle sidecar local authority watermark is invalid');
+  if(world!==anchor.World||anchorSerial!==anchor.Serial||anchorToken!==anchor.AnchorToken)
+    fail('particle sidecar authority differs from raw ParticleAnchor');
+  const validateList=(list,kind,label)=>{
+    let priorSerial=null;const serials=new Set(),objects=new Set(),counts=[0,0];
+    for(let index=0;index<list.length;index++){
+      const row=list[index];
+      if(!row||Object.keys(row).sort().join(',')!==[...PARTICLE_ROW_FIELDS].sort().join(',')||
+         row.kind!==kind||row.index!==index||!Number.isInteger(row.objectKind)||
+         (row.objectKind!==0&&row.objectKind!==1)||!Number.isInteger(row.extent)||row.extent<=0||
+         !Number.isInteger(row.source)||row.source<=0||row.source>U32_MAX||
+         !Number.isInteger(row.cellOffset)||row.cellOffset<0||row.cellOffset>U32_MAX||
+         !Number.isInteger(row.stride)||row.stride<=0||row.stride>U32_MAX)
+        fail(`${label}[${index}] has invalid typed row metadata`);
+      const serial=canonicalU64(row.receiptSerial,`${label}[${index}].receiptSerial`);
+      const object=canonicalU64(row.object,`${label}[${index}].object`);
+      const rowWorld=canonicalU64(row.world,`${label}[${index}].world`);
+      const epoch=canonicalU64(row.epoch,`${label}[${index}].epoch`);
+      const allocation=canonicalU64(row.allocation,`${label}[${index}].allocation`);
+      const pool=canonicalU64(row.pool,`${label}[${index}].pool`);
+      const descriptor=canonicalU64(row.descriptor,`${label}[${index}].descriptor`);
+      if(serial===0n||serial>historySerial||(kind===2&&serial>anchorSerial)||
+         (priorSerial!==null&&serial>=priorSerial))
+        fail(`${label}[${index}] receipt serial is outside its local constructor order`);
+      if(rowWorld!==world||epoch===0n||allocation===0n||pool===0n||descriptor===0n||object===0n)
+        fail(`${label}[${index}] source identity is incomplete or belongs to another world`);
+      for(const field of PARTICLE_POINTER_FIELDS){
+        const value=canonicalU64(row[field],`${label}[${index}].${field}`);
+        if(value===0n||value>BigInt(U32_MAX))fail(`${label}[${index}].${field} is outside wasm32`);
+      }
+      if(row.extent!==row.stride||row.cellOffset%row.stride!==0)
+        fail(`${label}[${index}] extent/stride/cell alignment is invalid`);
+      const sourceCell=BigInt(row.source);
+      const hostCell=pool+BigInt(row.cellOffset);
+      if(sourceCell<=BigInt(row.cellOffset)||hostCell>BigInt(U32_MAX)||object!==hostCell)
+        fail(`${label}[${index}] object/source cell address is inconsistent`);
+      const identity=`${row.objectKind}/${row.object}`;
+      if(objects.has(identity)||serials.has(serial.toString(10)))
+        fail(`${label} contains duplicate cell identity or receipt serial`);
+      objects.add(identity);serials.add(serial.toString(10));
+      counts[row.objectKind]++;priorSerial=serial;
+    }
+    return counts;
+  };
+  const liveKinds=validateList(cells.liveRows,1,'particle live rows');
+  const capturedKinds=validateList(cells.capturedRows,2,'particle captured rows');
+  if(BigInt(capturedKinds[0])!==anchor.ParticleCount||BigInt(capturedKinds[1])!==anchor.AppsrtCount)
+    fail('captured particle membership differs from raw ParticleAnchor counts');
+  if(endpoint.view===CPU_ENDPOINT_VIEW.pre){
+    if(liveKinds[0]!==capturedKinds[0]||liveKinds[1]!==capturedKinds[1]||
+       cells.liveRows.some((row,index)=>!sameParticleRow(row,cells.capturedRows[index],
+         {includeReceiptSerial:true,ignoreKind:true})))
+      fail('PRE live particle cells do not exactly match the captured anchor membership');
+  }
+  return {world,anchorSerial,anchorToken,historySerial,liveKinds,capturedKinds};
+}
+
+function payloadRows(endpoint) {
+  const rows=endpoint.domains[3].records.filter(row=>row.kindName==='PayloadRow');
+  return rows.map(row=>({
+    source:canonicalU64(row.fields[row.fieldNames.indexOf('SourceAddress')],'PayloadRow.SourceAddress'),
+    requested:canonicalU64(row.fields[row.fieldNames.indexOf('RequestedBytes')],'PayloadRow.RequestedBytes'),
+    host:canonicalU64(row.fields[row.fieldNames.indexOf('HostAddress')],'PayloadRow.HostAddress'),
+    allocation:canonicalU64(row.fields[row.fieldNames.indexOf('AllocationGeneration')],'PayloadRow.AllocationGeneration'),
+    bytes:decodeBase64(row.bytesBase64,'PayloadRow.bytes'),
+  }));
+}
+
+function requireParticlePayloadCoverage(endpoint, rows, label) {
+  const payloadHeader=endpoint.domains[3].records.find(row=>row.kindName==='Header');
+  if(!payloadHeader)fail(`${label} has no payload header`);
+  const payloadWorld=canonicalU64(payloadHeader.fields[payloadHeader.fieldNames.indexOf('World')],
+    'Payload.Header.World');
+  const payloadEpoch=canonicalU64(payloadHeader.fields[payloadHeader.fieldNames.indexOf('OwnerEpoch')],
+    'Payload.Header.OwnerEpoch');
+  const payload=payloadRows(endpoint);
+  for(const row of rows){
+    const offset=BigInt(row.cellOffset),extent=BigInt(row.extent),stride=BigInt(row.stride);
+    const source=BigInt(row.source),host=canonicalU64(row.pool,`${label}.pool`);
+    const allocation=canonicalU64(row.allocation,`${label}.allocation`),
+      world=canonicalU64(row.world,`${label}.world`),epoch=canonicalU64(row.epoch,`${label}.epoch`);
+    const matches=payload.filter(item=>item.source+offset===source&&item.host===host&&
+      item.allocation===allocation);
+    if(matches.length!==1)fail(`${label} does not join exactly one payload allocation by source/host/generation`);
+    const match=matches[0];
+    if(world!==payloadWorld||epoch!==payloadEpoch||offset%stride!==0n||offset+extent>match.requested||
+       BigInt(row.object)!==match.host+offset||match.bytes.length!==Number(match.requested))
+      fail(`${label} cell extent escapes its exact payload allocation`);
+  }
+}
+
+function compareParticleAnchorRecord(left,right,{localSerial=false}={}) {
+  const label='Effects.ParticleAnchor[0]';
+  for(const key of ['kind','kindName','index','count','metadataBytes','borrowedBytes'])
+    if(left[key]!==right[key])fail(`${label}.${key} differs`);
+  if(left.fieldNames.join('\0')!==right.fieldNames.join('\0')||left.fields.length!==right.fields.length)
+    fail(`${label}.fieldNames differ`);
+  for(let index=0;index<left.fields.length;index++){
+    const name=left.fieldNames[index];
+    const a=canonicalU64(left.fields[index],`${label}.${name}`),
+      b=canonicalU64(right.fields[index],`${label}.${name}`);
+    if(!(localSerial&&name==='Serial')&&a!==b)
+      fail(`${label}.metadata[${name}] differs (${a} vs ${b})`);
+  }
+  const aBytes=decodeBase64(left.bytesBase64,`${label}.bytes`),
+    bBytes=decodeBase64(right.bytesBase64,`${label}.bytes`);
+  if(aBytes.length!==bBytes.length||aBytes.some((byte,index)=>byte!==bBytes[index]))
+    fail(`${label}.bytes differ`);
+}
+
+function compareParticleRows(leftRows,rightRows,label,{includeReceiptSerial=false,ignoreKind=false}={}) {
+  if(leftRows.length!==rightRows.length)fail(`${label} membership count differs`);
+  for(let index=0;index<leftRows.length;index++){
+    const a=leftRows[index],b=rightRows[index];
+    if((!ignoreKind&&a.kind!==b.kind)||a.index!==b.index)fail(`${label}[${index}] order differs`);
+    if(includeReceiptSerial&&a.receiptSerial!==b.receiptSerial)
+      fail(`${label}[${index}] local receipt differs from its captured PRE identity`);
+    for(const field of PARTICLE_SEMANTIC_FIELDS)
+      if(a[field]!==b[field])fail(`${label}[${index}].${field} differs`);
+  }
+}
+
+function compareEndpointWithLocalParticleSerial(left,right,{allowReferenceReference=false}={}) {
+  const a=rawParticleEndpoint(left),b=rawParticleEndpoint(right);
+  validateCpuEndpointEnvelope(a);validateCpuEndpointEnvelope(b);
+  if(a.view!==b.view)fail('comparison views differ');
+  if(a.view===CPU_ENDPOINT_VIEW.pre){
+    if(a.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre||b.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre)
+      fail('PRE comparison requires SharedPre on both instances');
+  }else if(a.view===CPU_ENDPOINT_VIEW.cpuEnd||a.view===CPU_ENDPOINT_VIEW.drawEnd){
+    const correctedPair=a.provenance===CPU_ENDPOINT_PROVENANCE.reference&&b.provenance===CPU_ENDPOINT_PROVENANCE.corrected;
+    const referencePair=allowReferenceReference&&a.provenance===CPU_ENDPOINT_PROVENANCE.reference&&
+      b.provenance===CPU_ENDPOINT_PROVENANCE.reference;
+    if(!correctedPair&&!referencePair)
+      fail(allowReferenceReference?'CPU/DRAW comparison requires Reference/Reference or Reference/Corrected':
+        'CPU/DRAW comparison requires Reference then Corrected');
+  }else fail(`unknown comparison view ${a.view}`);
+  if(a.sourceFrame!==b.sourceFrame)fail('source-frame stamps differ');
+  for(let di=0;di<9;di++){
+    const ad=a.domains[di],bd=b.domains[di];
+    if(ad.id!==di+1||bd.id!==ad.id||ad.name!==bd.name||ad.records.length!==bd.records.length)
+      fail(`${ad.name} record count/order differs`);
+    for(let ri=0;ri<ad.records.length;ri++){
+      const ar=ad.records[ri],br=bd.records[ri];
+      if(di===1&&ar.kindName==='ParticleAnchor')compareParticleAnchorRecord(ar,br,{localSerial:true});
+      else compareRecord(ar,br,ad.name);
+    }
+  }
+}
+
+/** Decode the opt-in v2 envelope while retaining the complete raw schema-312 rows. */
+export function decodeCpuParticleEndpointResult(value) {
+  if(!value||value.schema!==CPU_PARTICLE_ENDPOINT_SCHEMA||value.rawSchema!==CPU_ENDPOINT_SCHEMA||
+     value.recordBytes!==CPU_ENDPOINT_RECORD_BYTES||value.revalidated!==true||
+     ![1,2,3].includes(value.view)||![1,2,3].includes(value.provenance)||
+     !Array.isArray(value.domains)||value.domains.length!==9)
+    fail('particle envelope header/schema/refinalization invalid');
+  const keys=['schema','rawSchema','recordBytes','view','provenance','sourceFrame','revalidated','domains','particleCells'];
+  if(Object.keys(value).sort().join(',')!==keys.sort().join(','))fail('particle envelope has missing or unrecognized fields');
+  const raw=rawParticleEndpoint(value);
+  validateCpuEndpointEnvelope(raw);
+  const anchor=particleAnchorFields(readParticleAnchor(raw));
+  const authority=validateParticleRows(value,anchor);
+  requireParticlePayloadCoverage(raw,value.particleCells.liveRows,'particle live row');
+  if(value.view===CPU_ENDPOINT_VIEW.pre)
+    requireParticlePayloadCoverage(raw,value.particleCells.capturedRows,'particle captured PRE row');
+  particleIdentityRelation(value);
+  return value;
+}
+
+/** Within-page continuity: captured rows remain the original PRE receipts. */
+export function validateCpuParticleEndpointAgainstPre(current,pre) {
+  decodeCpuParticleEndpointResult(current);decodeCpuParticleEndpointResult(pre);
+  if(pre.view!==CPU_ENDPOINT_VIEW.pre||current.view===CPU_ENDPOINT_VIEW.pre||
+     pre.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre)
+    fail('captured particle continuity requires a PRE endpoint and a later view');
+  const currentAnchor=particleAnchorFields(readParticleAnchor(rawParticleEndpoint(current)));
+  const preAnchor=particleAnchorFields(readParticleAnchor(rawParticleEndpoint(pre)));
+  for(const name of ['World','Serial','AnchorToken','ParticleCount','AppsrtCount'])
+    if(currentAnchor[name]!==preAnchor[name])fail(`particle anchor ${name} changed after captured PRE`);
+  const a=current.particleCells,b=pre.particleCells;
+  if(a.world!==b.world||a.anchorSerial!==b.anchorSerial||a.anchorToken!==b.anchorToken||
+     a.capturedCount!==b.capturedCount)
+    fail('particle local anchor changed after captured PRE');
+  compareParticleRows(a.capturedRows,b.capturedRows,'captured PRE particle rows',{includeReceiptSerial:true});
+  return {equal:true,capturedRows:a.capturedCount};
+}
+
+/** Two-page v2 comparison; local receipt counters authenticate membership but are not identity keys. */
+function compareCpuParticleEndpointsInternal(left,right,{preLeft=null,preRight=null,
+  allowReferenceReference=false}={}) {
+  decodeCpuParticleEndpointResult(left);decodeCpuParticleEndpointResult(right);
+  compareEndpointWithLocalParticleSerial(left,right,{allowReferenceReference});
+  const a=left.particleCells,b=right.particleCells;
+  const localA=validateParticleRows(left,particleAnchorFields(readParticleAnchor(rawParticleEndpoint(left))));
+  const localB=validateParticleRows(right,particleAnchorFields(readParticleAnchor(rawParticleEndpoint(right))));
+  if(localA.world!==localB.world||a.anchorToken!==b.anchorToken||
+     a.liveCount!==b.liveCount||a.capturedCount!==b.capturedCount)
+    fail('particle semantic header/membership differs');
+  compareParticleRows(a.liveRows,b.liveRows,'live particle rows');
+  if(left.view===CPU_ENDPOINT_VIEW.pre){
+    compareParticleRows(a.capturedRows,b.capturedRows,'captured PRE particle rows');
+    compareParticleRows(a.liveRows,a.capturedRows,'left PRE live/captured rows',
+      {includeReceiptSerial:true,ignoreKind:true});
+    compareParticleRows(b.liveRows,b.capturedRows,'right PRE live/captured rows',
+      {includeReceiptSerial:true,ignoreKind:true});
+    const relationA=particleIdentityRelation(left),relationB=particleIdentityRelation(right);
+    if(relationA.some((index,i)=>index!==relationB[i]))fail('PRE live/captured incarnation relation differs');
+    requireParticlePayloadCoverage(rawParticleEndpoint(left),a.capturedRows,'left captured PRE particle row');
+    requireParticlePayloadCoverage(rawParticleEndpoint(right),b.capturedRows,'right captured PRE particle row');
+  }else{
+    if(!preLeft||!preRight)fail('CPU/DRAW particle comparison requires both captured PRE endpoints');
+    validateCpuParticleEndpointAgainstPre(left,preLeft);
+    validateCpuParticleEndpointAgainstPre(right,preRight);
+    compareCpuParticleEndpoints(preLeft,preRight);
+    const relationA=particleIdentityRelation(left),relationB=particleIdentityRelation(right);
+    if(relationA.length!==relationB.length||relationA.some((index,i)=>index!==relationB[i]))
+      fail('live/captured particle incarnation relation differs');
+  }
+  return {equal:true,view:left.view,sourceFrame:left.sourceFrame,domains:9,
+    particleCells:{live:a.liveCount,captured:a.capturedCount,incarnationRelations:particleIdentityRelation(left).length}};
+}
+
+export function compareCpuParticleEndpoints(left,right,{preLeft=null,preRight=null}={}) {
+  return compareCpuParticleEndpointsInternal(left,right,{preLeft,preRight});
+}
+
+/** Strict independent-page comparison for two confirmed reference endpoints. */
+export function compareCpuReferenceParticleEndpoints(left,right,{preLeft=null,preRight=null}={}) {
+  decodeCpuParticleEndpointResult(left);decodeCpuParticleEndpointResult(right);
+  if(left.view===CPU_ENDPOINT_VIEW.pre){
+    if(left.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre||
+       right.provenance!==CPU_ENDPOINT_PROVENANCE.sharedPre)
+      fail('confirmed PRE comparison requires SharedPre on both instances');
+  }else if(left.provenance!==CPU_ENDPOINT_PROVENANCE.reference||
+           right.provenance!==CPU_ENDPOINT_PROVENANCE.reference)
+    fail('confirmed CPU/DRAW comparison requires Reference on both instances');
+  return compareCpuParticleEndpointsInternal(left,right,{preLeft,preRight,allowReferenceReference:true});
+}
