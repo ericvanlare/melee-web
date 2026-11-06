@@ -167,26 +167,28 @@ function episodeFixture(){
     pollSerial,lastPlan,enableCalls,ticketPointer,rowPointer})};
 }
 
-function confirmedPrefixFixture({failCommand=0}={}){
+function confirmedPrefixFixture({failCommand=0,oldIncarnation=1,originIncarnation=1,
+  boundaryIncarnation=1}={}){
   const f=episodeFixture(),{module,put,view}=f;
   const stringPointer=2048,ticketPointer=16384,originPointer=16768,boundaryPointer=16960,checksumPointer=17152;
   const rows=[2,3].map((sourceFrame,index)=>{
     const raw=Uint8Array.from({length:44},(_,offset)=>(index*53+offset*11+7)&255);
     const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
-    [1,176,700+index,sourceFrame,1,0,1,1]
+    [1,176,700+index,sourceFrame,originIncarnation,0,1,1]
       .forEach((value,field)=>data.setUint32(field*4,value,true));
     data.setBigUint64(32,9007199254741001n+BigInt(index),true);
     bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
-    return {bytes,ticketId:700+index,sourceFrame,incarnation:1,localPort:0,remotePort:1,
+    return {bytes,ticketId:700+index,sourceFrame,incarnation:originIncarnation,localPort:0,remotePort:1,
       pollSerial:(9007199254741001n+BigInt(index)).toString(),raw};
   });
   const state={ownerState:0,firstFailure:0,pending:0,lastCommand:0,requestSequence:0,completeSequence:0,
     expectedFrame:0,localPort:0,remotePort:1,phase:0,preFrame:0,currentFrame:0,sealedEnd:0,
     incarnation:0,restoreCount:0,endpointMask:0,forwardSteps:0,replaySteps:0,pollSerial:0n,
+    identityFrame:0,handoffCleared:false,
     inputReady:0,gpuPending:0,endpointActive:0,rendererErrors:0,confirmedFrame:2,
     latestTicketId:0,latestRaw:new Uint8Array(44),forwarded:[],descriptor:{
       schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
-      selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:0,rebaseRequestSequence:0,
+      selectedEndFrame:4,oldIncarnation,finishRequestSequence:0,rebaseRequestSequence:0,
       suffixCount:2,suffixCursor:0,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
       ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
       ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'}};
@@ -214,7 +216,7 @@ function confirmedPrefixFixture({failCommand=0}={}){
   };
   const sourceBoundary=()=>{
     const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
-    [1,176,500,1,1,0,1,2].forEach((value,field)=>data.setUint32(field*4,value,true));
+    [1,176,500,1,boundaryIncarnation,0,1,2].forEach((value,field)=>data.setUint32(field*4,value,true));
     data.setBigUint64(32,8800n,true);
     const raw=Uint8Array.from({length:44},(_,offset)=>(offset*9+5)&255);
     bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
@@ -236,7 +238,8 @@ function confirmedPrefixFixture({failCommand=0}={}){
       else if(command===23){state.expectedFrame=state.confirmedFrame;state.preFrame=state.confirmedFrame;
         state.currentFrame=state.confirmedFrame;state.sealedEnd=0;state.phase=0;state.incarnation=0;
         state.restoreCount=0;state.endpointMask=0;state.forwardSteps=0;state.replaySteps=0;
-        state.pollSerial=0n;state.inputReady=0;state.descriptor.rebaseRequestSequence=state.requestSequence;}
+        state.pollSerial=0n;state.inputReady=0;state.identityFrame=state.confirmedFrame;
+        state.descriptor.rebaseRequestSequence=state.requestSequence;}
       else if(command===24){
         const origin=rows[state.descriptor.suffixCursor];
         if(origin){state.latestTicketId=origin.ticketId;state.latestRaw=origin.raw.slice();
@@ -251,6 +254,12 @@ function confirmedPrefixFixture({failCommand=0}={}){
       }else if(command===13){
         state.currentFrame++;state.phase=21;state.forwardSteps++;state.inputReady=1;
         state.descriptor.suffixCursor++;
+      }else if(command===11){
+        state.expectedFrame=state.confirmedFrame;state.preFrame=state.confirmedFrame;
+        state.currentFrame=state.confirmedFrame;state.sealedEnd=0;state.phase=0;state.incarnation=0;
+        state.restoreCount=0;state.endpointMask=0;state.forwardSteps=0;state.replaySteps=0;
+        state.pollSerial=0n;state.inputReady=0;state.identityFrame=state.confirmedFrame;
+        state.handoffCleared=true;
       }
       if(command===10)state.ownerState=2;
       writeStatus();
@@ -262,6 +271,7 @@ function confirmedPrefixFixture({failCommand=0}={}){
     state.localPort=local;state.remotePort=remote;writeStatus();return 1;
   };
   module[prefix+'request']=request;
+  module[prefix+'request_rebase']=end=>{state.confirmedFrame=end;return request(11);};
   module[prefix+'request_prefix_finish']=frame=>{state.confirmedFrame=frame;return request(20);};
   module[prefix+'request_prefix_rebase']=frame=>{state.confirmedFrame=frame;return request(23);};
   module[prefix+'episode_enable']=()=>1;module[prefix+'arena_enable']=()=>1;
@@ -269,11 +279,12 @@ function confirmedPrefixFixture({failCommand=0}={}){
   module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
   module[prefix+'identity_json']=()=>writeString(JSON.stringify({...host,source_frame:0,
     current_rng:'fedcba98',selection:{stage:2}}));
-  module[prefix+'rebase_identity_json']=()=>writeString(JSON.stringify({...host,source_frame:2,
+  module[prefix+'rebase_identity_json']=()=>writeString(JSON.stringify({...host,source_frame:state.identityFrame,
     current_rng:'01234567',selection:{stage:2}}));
-  module[prefix+'prefix_handoff_json']=()=>writeString(JSON.stringify(state.descriptor));
-  module[prefix+'prefix_origin_row_bytes']=()=>176;
+  module[prefix+'prefix_handoff_json']=()=>state.handoffCleared?0:writeString(JSON.stringify(state.descriptor));
+  module[prefix+'prefix_origin_row_bytes']=()=>state.handoffCleared?0:176;
   module[prefix+'prefix_origin_row_data']=ordinal=>{
+    if(state.handoffCleared)return 0;
     const row=rows[ordinal];if(!row)return 0;
     module.HEAPU8.set(row.bytes,originPointer);return originPointer;
   };
@@ -297,12 +308,14 @@ function confirmedPrefixFixture({failCommand=0}={}){
   ticketReads:()=>({bytes:ticketBytesReads,data:ticketDataReads})};
 }
 
-async function preparePrefixAdoption({failCommand=0}={}){
-  const f=confirmedPrefixFixture({failCommand}),owner=createRuntimeMatchHistoryController(f.module);
+async function preparePrefixAdoption({failCommand=0,oldIncarnation=1,originIncarnation=1,
+  boundaryIncarnation=1}={}){
+  const f=confirmedPrefixFixture({failCommand,oldIncarnation,originIncarnation,boundaryIncarnation}),
+    owner=createRuntimeMatchHistoryController(f.module);
   owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
   owner.identity(host);owner.enableArenaHistory();
   await owner.command('capture');
-  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:1,
+  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:oldIncarnation,
     restoreCount:1,forwardSteps:4,replaySteps:2,pollSerial:990n,inputReady:1});
   await owner.command('finishPrefix',2);
   f.setPhase(24);
@@ -673,6 +686,62 @@ test('confirmed-prefix ticket adoption refusal does not read or repeat the nativ
   assert.deepEqual(f.ticketReads(),{bytes:0,data:0});
   assert.throws(()=>owner.adoptedTicket(origins[0]),/Native history refused/);
   assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24]);
+});
+
+test('confirmed-prefix origin and C−1 receipts may come from an earlier bounded incarnation',async()=>{
+  const {f,owner,origins,checksum}=await preparePrefixAdoption({
+    oldIncarnation:2,originIncarnation:1,boundaryIncarnation:1});
+  assert.equal(owner.prefixHandoff().oldIncarnation,2);
+  assert.equal(origins[0].incarnation,1,'native origin preserves the original 176-byte row');
+  assert.equal(new DataView(checksum.buffer).getUint32(0,true),1,
+    'the selected C−1 checksum accepts the prior source incarnation');
+  await owner.command('adoptNextPrefixTicket');
+  const ticket=owner.adoptedTicket(origins[0]);
+  assert.equal(ticket.incarnation,1,'the adopted ticket binds to the fresh capsule incarnation');
+  assert.deepEqual(ticket.raw,origins[0].raw);
+  assert.equal(f.state.descriptor.suffixCursor,0,'adoption alone does not consume the suffix row');
+});
+
+test('confirmed-prefix C−1 checksum rejects a row newer than its current owner',async()=>{
+  await assert.rejects(preparePrefixAdoption({oldIncarnation:2,boundaryIncarnation:3}),
+    /exact old-incarnation selected C−1 input row/);
+});
+
+test('whole-END rebase clears exhausted prefix latches only after native cleanup succeeds',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption();
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    await owner.forwardTicket(ticket.ticketId,ticket.raw);
+  }
+  f.setPhase(18,{expectedFrame:2,preFrame:2,currentFrame:4,sealedEnd:4,incarnation:1,
+    restoreCount:1,endpointMask:40,forwardSteps:2,replaySteps:2,pollSerial:990n,inputReady:1});
+  const result=await owner.command('rebase',4);
+  assert.equal(result.status.expectedFrame,4);
+  assert.equal(f.state.handoffCleared,true);
+  assert.equal(f.module[prefix+'prefix_handoff_json'](),0);
+  assert.equal(f.module[prefix+'prefix_origin_row_bytes'](),0);
+  await owner.command('capture');await owner.command('beginEpisode');
+  f.setPhase(4,{expectedFrame:4,preFrame:4,currentFrame:4,sealedEnd:0,incarnation:1,
+    restoreCount:0,endpointMask:40,forwardSteps:0,replaySteps:0,pollSerial:0n,inputReady:0});
+  await owner.command('pollTicket');
+  assert.equal(owner.ticket().ticketId,f.state.requestSequence,
+    'normal tickets resume after native clears the exhausted handoff');
+});
+
+test('failed whole-END rebase preserves the active prefix handoff',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption({failCommand:11});
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    await owner.forwardTicket(ticket.ticketId,ticket.raw);
+  }
+  f.setPhase(18,{expectedFrame:2,preFrame:2,currentFrame:4,sealedEnd:4,incarnation:1,
+    restoreCount:1,endpointMask:40,forwardSteps:2,replaySteps:2,pollSerial:990n,inputReady:1});
+  await assert.rejects(owner.command('rebase',4),/Native history refused/);
+  assert.equal(f.state.handoffCleared,false);
+  assert.notEqual(f.module[prefix+'prefix_handoff_json'](),0);
+  assert.equal(f.module[prefix+'prefix_origin_row_bytes'](),176);
 });
 
 test('agreed-start forwards host identities and seed while returning exact native bytes and held-frame receipt',()=>{
