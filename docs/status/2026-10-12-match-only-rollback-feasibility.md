@@ -2115,9 +2115,24 @@ The observed serialized controller durations expose a history-work bottleneck:
 forward steps stay below 1.7 ms and no-draw replay below 1.1 ms, while capture
 ranges from 36–74 ms, seal 19–25 ms and restore 57–69 ms. These are command wall
 durations from this diagnostic, not native-only or foreground cadence evidence.
-The exact samples live in `continuous_366.inline_dispatch_v1`. The next experiment
-attributes those expensive commands before attempting a longer paced run; no
-frame-budget success is inferred.
+The exact samples live in `continuous_366.inline_dispatch_v1`.
+
+A bounded CPU attribution run uses the same native producer with harness
+`c91bedc8`. The full eight-tick proof passes again, and all three owned profiles
+(first alpha capture, seal and restore) save without errors and detach cleanly.
+Four allocation-shadow paths dominate the disjoint self samples: live-range
+validation, heap-cell overlap checks, endpoint row-to-cell joins, and exact-host
+allocation lookup. They account for 394/518 capture samples, 119/133 seal samples
+and 310/430 restore samples. Profile elapsed time includes instrumentation;
+these are attribution counts, not exact native durations. The raw profiles,
+producer identities and independent review are pinned in
+`continuous_366.history_cpu_attribution_v1`.
+
+The next experiment replaces repeated scans with freshly rebuilt sorted indexes
+owned by the typed arena history, retaining overlap, generation, lease and owner
+checks. The same unprofiled eight-tick witness will check semantics and command
+cost before a longer paced run. Continuous advancement under persistent remote
+input lag remains separate; no frame-budget success is inferred.
 
 ## Stage decision dependencies, issue #333
 

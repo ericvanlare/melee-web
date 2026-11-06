@@ -13165,6 +13165,81 @@
               },
               "scope": "Same8tick functional semantics under explicit Asyncify-aware inline dispatch. Timings are serialized controller wall durations, not foreground/native-only or cadence acceptance. Actual conditional cache service now exercised twice; original v3 renderer timeout attribution remains unproven.",
               "retained_failure": "Old queued rAF fixture lacked defaultfalse inline_dispatch control field; one-line repair independently reviewed, full7 focused methods pass."
+            },
+            "history_cpu_attribution_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE; all three owned CPU profiles saved without errors",
+              "native_producer": "dfc0acb27c046a1cdbf2aa0c4728e456369ab7d8",
+              "harness_producer": "c91bedc8b84f3d98da7e8ac321150d75ac02a66b",
+              "harness_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-history-cpu-profile-root-review-v1.json",
+                "sha256": "de99a2d2af024a078b9688cef3d42fb322aefefb813ad8fbae634c8b389a215d"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/result-summary.json",
+                "sha256": "f1a3df23566fef459c437675485ae60951675f2d1b54c06e4695d43196743573"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/result.json",
+                "sha256": "4fbd53561f14061d1ff969ea13db32714b991f7336cc0176b33cf11ed69dd3c7"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/owner.json",
+                "sha256": "94cd8e8de090d1934a96e177414e2df574604131fd779913bb7359e9bed8cdfc"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/independent-profile-review.json",
+                "sha256": "7da5454ce3eadcc4e4442c783a7be9dc2d76e4680bffc69c440c0860f5bb167c"
+              },
+              "profiles": {
+                "capture": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-capture.cpuprofile",
+                    "sha256": "b5e0dff48786c9f8d5719bbacdf9486e15402234003afbc1e918080c650f1980"
+                  },
+                  "samples": 518,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 143,
+                    "current_heap_state_valid": 74,
+                    "melee_web_source_memory_payload_current_endpoint_header": 159,
+                    "melee_web_source_memory_allocation_read": 18
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                },
+                "seal": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-seal.cpuprofile",
+                    "sha256": "f56780f24217589938649e505c5b5c0fbded105e3400ea83ba8b5cab9b7b97ca"
+                  },
+                  "samples": 133,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 39,
+                    "current_heap_state_valid": 29,
+                    "melee_web_source_memory_payload_current_endpoint_header": 35,
+                    "melee_web_source_memory_allocation_read": 16
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                },
+                "restore": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-restore.cpuprofile",
+                    "sha256": "80217385629dba700e73535599ec275eb49b2cb47332d25a456747983e1b50e2"
+                  },
+                  "samples": 430,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 124,
+                    "current_heap_state_valid": 80,
+                    "melee_web_source_memory_payload_current_endpoint_header": 72,
+                    "melee_web_source_memory_allocation_read": 34
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                }
+              },
+              "interpretation": "The four quadratic shadow paths account for most exclusive samples in all three command profiles. Inclusive sample counts overlap. Profile elapsed includes CDP overhead and sample counts are not exact durations.",
+              "next_change": "Use fresh per-admission sorted validation with preallocated typed-owner scratch for both range and cell checks; reuse those same checked orders for endpoint row-to-cell and SDK exact-host joins. Leave ordinary and legacy paths unchanged. Retain arena byte copies/comparisons and all owner checks.",
+              "scope": "Same eight-tick functional witness with first-alpha capture/seal/restore CDP attribution only. Sampling overhead and browser scheduling prevent treating these profiles as frame-budget measurements. No paced, persistent-lag, whole-match or Internet rollback result."
             }
           }
         }
