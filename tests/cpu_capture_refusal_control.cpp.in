@@ -24,9 +24,12 @@
 namespace melee_web {
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
-    Statics, UnexpectedWriterFailure, LObj, TObj, Particle
+    Statics, UnexpectedWriterFailure, LObj, TObj, Particle, TextureBounds
 };
 }
+struct MeleeWebTextureBoundsSnapshot;
+extern "C" MeleeWebTextureBoundsSnapshot* melee_web_texture_bounds_capture(std::uint64_t);
+extern "C" void melee_web_texture_bounds_snapshot_destroy(MeleeWebTextureBoundsSnapshot*);
 namespace { void retirement_step(unsigned); }
 @ACTUAL_COMPARISON@
 static unsigned class_arms=0,class_disarms=0;
@@ -75,6 +78,18 @@ using MeleeWebSourceMemoryPayloadSnapshot=Snapshot;
 using MeleeWebAudioSnapshot=Snapshot;using MeleeWebMatchFlowCpuSnapshot=Snapshot;
 using MeleeWebMatchContextSnapshot=Snapshot;using MeleeWebGameplayBootstrapSnapshot=Snapshot;
 using MeleeWebActionInterval=Snapshot;
+static bool texture_capture_ok=true;
+static unsigned texture_capture_calls=0,texture_snapshot_captures=0,texture_snapshot_destroys=0,texture_snapshot_live=0;
+static std::uint64_t texture_capture_world=0;
+extern "C" MeleeWebTextureBoundsSnapshot* melee_web_texture_bounds_capture(std::uint64_t world){
+ ++texture_capture_calls;texture_capture_world=world;
+ if(!texture_capture_ok||!world)return nullptr;
+ ++texture_snapshot_captures;++texture_snapshot_live;
+ return reinterpret_cast<MeleeWebTextureBoundsSnapshot*>(std::uintptr_t(0x77a));
+}
+extern "C" void melee_web_texture_bounds_snapshot_destroy(MeleeWebTextureBoundsSnapshot* snapshot){
+ if(snapshot){assert(texture_snapshot_live);--texture_snapshot_live;++texture_snapshot_destroys;}
+}
 @ACTUAL_PAYLOAD_RESULT@
 enum FixtureSListTraceBoundary : std::uint32_t {
     MELEE_WEB_SLIST_TRACE_CAPTURE=1,
@@ -244,7 +259,8 @@ class GameplayActionStoreHistory{public:
  void disarm()noexcept{std::abort();}
 };
 struct Commit{GameplayCpuStatics* statics{};MeleeWebAudio* audio{};MeleeWebMatchFlow* flow{};MeleeWebMatchContext* context{};
- const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};SlippiParticlePresentationAnchor particle_anchor{};};
+ const Snapshot *bootstrap{},*flow_snapshot{},*context_snapshot{},*audio_snapshot{},*payload{};Snapshot* actions{};std::uint64_t effect_token{};SlippiLObjAnchor lobj_anchor{};SlippiTObjAnchor tobj_anchor{};SlippiParticlePresentationAnchor particle_anchor{};
+ const MeleeWebTextureBoundsSnapshot* texture_bounds{};std::uint64_t texture_world{};};
 GameplayCpuCommitResult gameplay_cpu_commit(const Commit&) noexcept {
  ++commit_calls;
  return modeled_commit_result;
@@ -364,7 +380,7 @@ int main(){
 #if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
  const auto disabled_tobj=slippi_tobj_anchor_capture();assert(disabled_tobj.token==0&&slippi_tobj_anchor_admit(disabled_tobj)==1&&slippi_tobj_failure()==0);slippi_tobj_anchor_disarm(disabled_tobj);
 #endif
- auto reset=[](){assert(live_capsules==0&&live_action_intervals==0&&audio_interval_token==0&&audio_interval_owner==nullptr&&audio_interval_snapshot==nullptr);live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;audio_scalar_capture_calls=audio_stream_capture_calls=audio_interval_begin_calls=audio_interval_end_calls=audio_interval_end_refusals=0;audio_interval_owner=nullptr;audio_interval_snapshot=nullptr;live_action_intervals=max_live_action_intervals=0;live_capsules=max_live_capsules=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;source_quiescent=runtime_files_owner_live=world_live=true;session_complete=session_match=session_flow=session_bank=true;source_quiescence_calls=0;active_source_interval=0;source_interval_end_calls=source_interval_end_mismatches=0;retirement_trace=false;retire_admit_ok=retire_confirm_ok=true;retire_admit_calls=retire_confirm_calls=action_disarm_calls=0;retirement_order.fill(0);retirement_order_count=0;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=corrected_commit_calls=profile_reset_calls=particle_reset_calls=particle_anchor_disarms=corrected_seal_calls=finish_replay_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;modeled_corrected_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=particle_anchor_ok=particle_reset_ok=corrected_action_ok=true;last_profile_reset_anchor={};};
+ auto reset=[](){assert(live_capsules==0&&live_action_intervals==0&&audio_interval_token==0&&audio_interval_owner==nullptr&&audio_interval_snapshot==nullptr&&texture_snapshot_live==0);live_frame=176;effect_ok=action_ok=payload_ok=flow_ok=bytes_ok=true;refuse_leaf=throw_leaf=created=destroyed=static_destroys=count=0;audio_scalar_capture_calls=audio_stream_capture_calls=audio_interval_begin_calls=audio_interval_end_calls=audio_interval_end_refusals=0;audio_interval_owner=nullptr;audio_interval_snapshot=nullptr;live_action_intervals=max_live_action_intervals=0;live_capsules=max_live_capsules=0;trace={};capsule_alloc_failure=owner_missing=frame_wrap=false;source_quiescent=runtime_files_owner_live=world_live=true;session_complete=session_match=session_flow=session_bank=true;source_quiescence_calls=0;active_source_interval=0;source_interval_end_calls=source_interval_end_mismatches=0;retirement_trace=false;retire_admit_ok=retire_confirm_ok=true;retire_admit_calls=retire_confirm_calls=action_disarm_calls=0;retirement_order.fill(0);retirement_order_count=0;class_arms=class_disarms=0;class_unavailable=false;lobj_ok=true;lobj_disarms=0;reset_tobj_owner_model();source_bytes.fill(0x5a);tobj_arms=tobj_mark_post=tobj_mark_drawn=tobj_disarms=0;slist_trace_arm_calls=slist_capture_samples=slist_trace_early_closes=class_piece_trace_early_closes=0;commit_calls=corrected_commit_calls=profile_reset_calls=particle_reset_calls=particle_anchor_disarms=corrected_seal_calls=finish_replay_calls=0;modeled_commit_result=GameplayCpuCommitResult::Ok;modeled_corrected_commit_result=GameplayCpuCommitResult::Ok;profile_reset_ok=particle_anchor_ok=particle_reset_ok=corrected_action_ok=true;last_profile_reset_anchor={};texture_capture_ok=true;texture_capture_calls=texture_snapshot_captures=texture_snapshot_destroys=0;texture_capture_world=0;};
  const auto unchanged=[](){for(auto b:source_bytes)assert(b==0x5a);};
  reset();
  const auto source_calls_before=source_quiescence_calls;
@@ -403,6 +419,10 @@ int main(){
  reset();owner_missing=true;CpuCaptureDiagnostic owner;
  assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),owner));
  assert(owner.comparison.domain==1&&owner.comparison.detail==3&&count==0&&static_destroys==1);unchanged();
+ reset();texture_capture_ok=false;CpuCaptureDiagnostic missing_texture;
+ assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),missing_texture));
+ assert(missing_texture.comparison.domain==1&&missing_texture.comparison.detail==static_cast<unsigned>(CpuCaptureRefusal::TextureBoundsOwner));
+ assert(texture_capture_calls==1&&texture_capture_world==1&&texture_snapshot_live==0&&count==0&&static_destroys==1);unchanged();
  reset();frame_wrap=true;CpuCaptureDiagnostic frame;
  assert(!GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),frame));assert(frame.comparison.domain==1&&frame.comparison.detail==4&&count==0);unchanged();
  reset();capsule_alloc_failure=true;CpuCaptureDiagnostic allocation;
@@ -423,7 +443,9 @@ int main(){
  auto c=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),success);
  assert(class_arms==1&&class_disarms==0&&tobj_arms==0&&tobj_disarms==0);
  assert(c&&success.comparison.domain==0&&success.comparison.status==0&&success.message[0]==0&&count==8&&created==6&&destroyed==0);
+ assert(texture_capture_calls==1&&texture_snapshot_captures==1&&texture_snapshot_live==1&&texture_capture_world==1);
  assert(std::equal(trace.begin(),trace.begin()+count,order.begin()));unchanged();c.reset();assert(destroyed==6&&static_destroys==1&&class_disarms==1&&tobj_disarms==1);
+ assert(texture_snapshot_live==0&&texture_snapshot_destroys==1);
  reset();class_unavailable=true;CpuCaptureDiagnostic unavailable;
  auto unavailable_capsule=GameplayCpuCheckpoint::capture(session,std::make_unique<GameplayCpuStatics>(),unavailable);
  assert(unavailable_capsule&&unavailable.comparison.status==0&&class_arms==1);unavailable_capsule.reset();assert(class_disarms==0);

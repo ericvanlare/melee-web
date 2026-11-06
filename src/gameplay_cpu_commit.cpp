@@ -7,7 +7,12 @@ GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners& o) no
     using R=GameplayCpuCommitResult;
     if (!o.actions || !o.audio || !o.audio_snapshot || !o.flow || !o.flow_snapshot ||
         !o.bootstrap || !o.context || !o.context_snapshot || !o.payload || !o.statics ||
-        !o.effect_token) return R::MissingOwner;
+        !o.effect_token || !o.texture_bounds || !o.texture_world) return R::MissingOwner;
+    std::unique_ptr<MeleeWebTextureBoundsPrepared,
+        decltype(&melee_web_texture_bounds_prepared_destroy)>
+        texture(nullptr,melee_web_texture_bounds_prepared_destroy);
+    texture.reset(melee_web_texture_bounds_prepare(o.texture_bounds,o.texture_world));
+    if(!texture)return R::TextureBounds;
     if (!slippi_lobj_anchor_admit(o.lobj_anchor)) return R::LObj;
     if (!slippi_tobj_anchor_admit(o.tobj_anchor)) return R::TObj;
     if (!slippi_particle_presentation_anchor_admit(o.particle_anchor)) return R::Particle;
@@ -20,6 +25,7 @@ GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners& o) no
     if (melee_web_source_memory_payload_snapshot_admit(o.payload)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return R::Payload;
     if (!o.statics->prepare_commit()) return R::Statics;
+    if(!melee_web_texture_bounds_admit(texture.get(),o.texture_world))return R::TextureBounds;
     /* There is no yield/callback/allocation after the final admission. See the
      * fixed read/write dependency table: each remaining writer's predicates
      * concern owner/lifetime/topology and are unchanged by earlier writes.
@@ -35,6 +41,7 @@ GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners& o) no
         return R::UnexpectedWriterFailure;
     if (melee_web_source_memory_payload_snapshot_restore(o.payload)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return R::UnexpectedWriterFailure;
+    melee_web_texture_bounds_commit_prevalidated(texture.get());
     if (!o.statics->commit_prevalidated()) return R::UnexpectedWriterFailure;
     return R::Ok;
 }
@@ -42,7 +49,12 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwn
     using R=GameplayCpuCommitResult;
     if (!o.actions || !o.audio || !o.audio_snapshot || !o.flow || !o.flow_snapshot ||
         !o.bootstrap || !o.context || !o.context_snapshot || !o.payload || !o.statics ||
-        !o.effect_token) return R::MissingOwner;
+        !o.effect_token || !o.texture_bounds || !o.texture_world) return R::MissingOwner;
+    std::unique_ptr<MeleeWebTextureBoundsPrepared,
+        decltype(&melee_web_texture_bounds_prepared_destroy)>
+        texture(nullptr,melee_web_texture_bounds_prepared_destroy);
+    texture.reset(melee_web_texture_bounds_prepare(o.texture_bounds,o.texture_world));
+    if(!texture)return R::TextureBounds;
     if (!slippi_lobj_anchor_admit(o.lobj_anchor)) return R::LObj;
     if (!slippi_tobj_anchor_admit(o.tobj_anchor)) return R::TObj;
     if (!slippi_particle_presentation_anchor_admit(o.particle_anchor)) return R::Particle;
@@ -55,6 +67,7 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwn
     if (melee_web_source_memory_payload_snapshot_admit(o.payload)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return R::Payload;
     if (!o.statics->prepare_commit()) return R::Statics;
+    if(!melee_web_texture_bounds_admit(texture.get(),o.texture_world))return R::TextureBounds;
     /* Match the original dependency order exactly. Corrected ActionStore
      * changes private slots/cache only; Fighter payload remains its owner. */
     if (melee_web_action_interval_restore_corrected(o.actions)!=1) return R::UnexpectedWriterFailure;
@@ -67,6 +80,7 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwn
         return R::UnexpectedWriterFailure;
     if (melee_web_source_memory_payload_snapshot_restore(o.payload)!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return R::UnexpectedWriterFailure;
+    melee_web_texture_bounds_commit_prevalidated(texture.get());
     if (!o.statics->commit_prevalidated()) return R::UnexpectedWriterFailure;
     return R::Ok;
 }
@@ -117,11 +131,20 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
         }
         return R::Payload;
     };
+    const auto texture_refusal=[&](const char* stage){
+        if(refusal&&refusal_bytes)
+            std::snprintf(refusal,refusal_bytes,"leaf=texture-bounds-%s status=0",stage);
+        return R::TextureBounds;
+    };
     if (!o.action_history || !o.audio || !o.audio_snapshot || !o.flow || !o.flow_snapshot ||
         !o.bootstrap || !o.context || !o.context_snapshot || !o.payload || !o.statics ||
         !o.effect_token || !o.history_incarnation || !o.history_end_frame ||
-        (bool(o.arena)!=bool(o.shadow)))
+        !o.texture_bounds || !o.texture_world || (bool(o.arena)!=bool(o.shadow)))
         return R::MissingOwner;
+
+    std::unique_ptr<MeleeWebTextureBoundsPrepared,
+        decltype(&melee_web_texture_bounds_prepared_destroy)>
+        texture(nullptr,melee_web_texture_bounds_prepared_destroy);
 
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     std::unique_ptr<MeleeWebGameplayHeapHistoryPrepared,
@@ -146,6 +169,9 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
 #else
     if(o.arena||o.shadow)return R::MissingOwner;
 #endif
+
+    texture.reset(melee_web_texture_bounds_prepare(o.texture_bounds,o.texture_world));
+    if(!texture)return texture_refusal("prepare");
 
     /* Allocate/select all prepared banks before the final all-leaf check. */
     if (!o.action_history->prepare_restore(o.history_incarnation)) return R::Action;
@@ -185,6 +211,8 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
     }
     if (!o.statics->history_admit_commit(o.history_incarnation,o.history_end_frame))
         return R::Statics;
+    if(!melee_web_texture_bounds_admit(texture.get(),o.texture_world))
+        return texture_refusal("admit");
 
     /* No callbacks or allocations after final admission. Preserve the original
      * fixed dependency order; ActionStore changes only its private banks, and
@@ -207,6 +235,7 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
 #endif
     if(melee_web_source_memory_payload_snapshot_restore(o.payload)!=
              MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) return R::UnexpectedWriterFailure;
+    melee_web_texture_bounds_commit_prevalidated(texture.get());
     o.statics->history_commit_prevalidated();
     melee_web_cpu_interval_motor_history_restore_commit(
         o.effect_token,o.history_incarnation,o.history_end_frame);

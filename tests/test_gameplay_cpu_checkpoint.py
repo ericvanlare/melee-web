@@ -25,6 +25,16 @@ class GameplayCpuCheckpointControls(OwnedWorkspaceTests):
     def compile_run(self,name,sources,extra=(),cpp=True):
         directory=self.work/name;directory.mkdir();temporary=directory/'tmp';temporary.mkdir()
         binary=directory/'control.js'
+        sources=list(sources)
+        if any(Path(source).name=='gameplay_cpu_commit.cpp' for source in sources):
+            texture_object=directory/'texture-bounds-owner.o'
+            texture_compile=[str(self.emcc),'-std=gnu11','-O1','-DTARGET_PC','-I'+str(SOURCE/'src'),
+                '-Dmelee_web_texture_bounds_commit_prevalidated=melee_web_texture_bounds_commit_prevalidated_impl',
+                '-c',str(SOURCE/'src/hsd_texture_bounds.c'),'-o',str(texture_object)]
+            texture_result=subprocess.run(texture_compile,cwd=ROOT,capture_output=True,text=True,timeout=60)
+            (directory/'texture-bounds-owner-compile.log').write_text(texture_result.stdout+texture_result.stderr)
+            self.assertEqual(texture_result.returncode,0,texture_result.stdout+texture_result.stderr)
+            sources.append(texture_object)
         command=[str(self.emxx if cpp else self.emcc),'-std=c++20' if cpp else '-std=gnu11','-O1','-UNDEBUG','-DTARGET_PC',
                  '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-ffp-contract=off','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
                  '-I'+str(SOURCE/'src'),'-I'+str(ROOT/'src'),'-I'+str(ROOT/'build/gameplay-source/src'),

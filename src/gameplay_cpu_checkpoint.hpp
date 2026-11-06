@@ -22,7 +22,7 @@ enum class CpuCaptureRefusal : std::uint32_t {
     CapsuleAllocation=1, MissingStatics=2, OwnerTuple=3, SourceFrameWrap=4,
     NullSnapshot=5, StaticCapture=6, AudioGeneration=7, AllocationException=8,
     UnexpectedException=9, InvalidSpan=10, LObjOwner=11, TObjOwner=12,
-    ParticleOwner=13
+    ParticleOwner=13, TextureBoundsOwner=14
 };
 struct CpuCaptureDiagnostic {
     CpuComparison comparison{};

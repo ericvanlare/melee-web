@@ -8,6 +8,7 @@
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_cpu_statics.hpp"
 #include "gameplay_heap.h"
+#include "hsd_texture_bounds.h"
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
 #include "slippi_profile/particle_presentation.h"
@@ -39,10 +40,12 @@ struct GameplayCpuCommitOwners {
     MeleeWebSourceMemoryHistory* shadow{};
     const void* arena_base{};
     std::size_t arena_bytes{};
+    const MeleeWebTextureBoundsSnapshot* texture_bounds{};
+    std::uint64_t texture_world{};
 };
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
-    Statics, UnexpectedWriterFailure, LObj, TObj, Particle
+    Statics, UnexpectedWriterFailure, LObj, TObj, Particle, TextureBounds
 };
 /* Caller must perform no callback/await/source work between admit and commit.
  * This method itself repeats every admission, then prepares the statics last.

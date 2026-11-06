@@ -197,6 +197,14 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
         out.history_effect_token=checkpoint.commit_.effect_token;
     }
 
+    // Texture-bounds identity is a PRE fact. END may legitimately have a
+    // changed registry; compare only the captured, armed, or restored PRE.
+    if(pre&&(!checkpoint.commit_.texture_bounds||!checkpoint.owner_.world||
+       checkpoint.commit_.texture_world!=checkpoint.owner_.world||
+       !melee_web_texture_bounds_matches_current(checkpoint.commit_.texture_bounds,
+                                                  checkpoint.owner_.world)))
+        return collect_refusal("texture-bounds-pre");
+
     out.source_frame=session_->source_frames();
     const auto expected_frame=history_mode_?
         (pre?checkpoint.owner_.frame:checkpoint.history_end_frame_):

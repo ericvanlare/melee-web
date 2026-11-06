@@ -52,6 +52,8 @@ MeleeWebCadenceCpuEndpoint cadence_values={1,100,7,1,200,9,0,300,400,500,0,
     alarm_bytes.data(),alarm_bytes.size()};
 std::uint8_t owner_token=0,context_token=0,flow_token=0,audio_token=0;
 std::uint8_t snapshot_token=0,payload_token=0,bootstrap_token=0,action_token=0;
+std::uint8_t texture_pre_key=0,texture_end_key=0;
+MeleeWebTextureBoundsSnapshot* texture_snapshot=nullptr;
 std::uint32_t marker=0;
 std::uint8_t session_storage[256]{};
 MeleeWebCpuMotorEvidence history_motor_evidence{};
@@ -228,6 +230,8 @@ struct GameplayCpuEndpointTestFixture {
         value->commit_.particle_anchor={live_owners.world,7,8,9,10};
         value->statics_=std::move(statics);
         value->commit_.statics=value->statics_.get();
+        value->commit_.texture_bounds=texture_snapshot;
+        value->commit_.texture_world=live_owners.world;
         value->audio_generation_=11;
         value->post_frame_=12;
         value->phase_=phase;
@@ -717,11 +721,21 @@ int main()
     audio_ranges[1]={MELEE_WEB_AUDIO_RANGE_AUDIO_PROGRAMS,audio_bytes_b,sizeof(audio_bytes_b),
         &audio_token,11};
     auto* session=GameplayCpuEndpointTestFixture::session();
+    melee_web_texture_bounds_bind(&texture_pre_key,2,1);
+    texture_snapshot=melee_web_texture_bounds_capture(live_owners.world);
+    assert(texture_snapshot);
 
     auto* pre=GameplayCpuEndpointTestFixture::recording(0,
         statics_at(CpuStaticEndpointPhase::Captured));
     const auto pre_result=complete_batch(*session,*pre,V::Pre,P::SharedPre,10);
     assert(pre_result.rows==32&&pre_result.cache_next==cache_next);
+
+    // Restoring source bytes cannot prove PRE while the external bounds owner
+    // is still in END, even with the same registry cardinality.
+    melee_web_texture_bounds_remove(&texture_pre_key);
+    melee_web_texture_bounds_bind(&texture_end_key,2,1);
+    GameplayCpuEndpointReader texture_mismatch;
+    assert(!texture_mismatch.begin(*session,*pre,V::Pre,P::SharedPre));
 
     action_view=MELEE_WEB_ACTION_ENDPOINT_END;
     action_provenance=MELEE_WEB_ACTION_ENDPOINT_REFERENCE;
@@ -731,6 +745,8 @@ int main()
     const auto ref_result=complete_batch(*session,*reference,V::CpuEnd,P::Reference,12);
     assert(ref_result.rows==35);
     assert(complete_batch(*session,*reference,V::DrawEnd,P::Reference,12).rows==35);
+    melee_web_texture_bounds_remove(&texture_end_key);
+    melee_web_texture_bounds_bind(&texture_pre_key,2,1);
 
     action_provenance=MELEE_WEB_ACTION_ENDPOINT_CORRECTED;
     auto* corrected=GameplayCpuEndpointTestFixture::corrected_sealed(2,
@@ -997,6 +1013,9 @@ int main()
     GameplayCpuEndpointTestFixture::release_history(*history_restored_in_incarnation_two);
     GameplayCpuEndpointTestFixture::release_statics(*stale_restore_count);
     GameplayCpuEndpointTestFixture::release_history(*stale_restore_count);
+    melee_web_texture_bounds_snapshot_destroy(texture_snapshot);
+    melee_web_texture_bounds_remove(&texture_pre_key);
+    assert(melee_web_texture_bounds_live()==0);
     puts("Retained-history captured/armed/restored PRE and predicted/corrected CPU/DRAW endpoint batches passed strict phase/incarnation/restore-count/static/event/source-frame admission");
     puts("Current END payload routing enumerates grown rows/cells for Reference and Corrected CPU/DRAW without allocation; PRE and stale-header refusals stay strict");
     puts("Admitted nine-domain PRE/reference/corrected batches, named flow fields, cache next, and read-only revalidation passed");
