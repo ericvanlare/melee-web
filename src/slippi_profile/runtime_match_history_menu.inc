@@ -717,7 +717,11 @@ melee_web::RuntimeMatchHistoryGateResult history_source_boundary(
   if(!session.construction_complete()||session.paused()||session.ending()||session.complete()||
      std::memcmp(&c.selection,&session.start_selection(),sizeof(c.selection))!=0)
    return G::IdentityRefused;
-  if(!history_source_idle(session))return G::SourceFilesBusy;
+  if(const char* source_failure=history_source_idle_failure(session)){
+   std::fprintf(stderr,"MATCH_HISTORY_SOURCE_BOUNDARY_REFUSED expected_frame=%u reason=%s\n",
+       frame,source_failure);
+   return G::SourceFilesBusy;
+  }
   if(!history_runtime_idle())return G::RuntimeBusy;
   return G::Admitted;
  }catch(...){return G::IdentityRefused;}

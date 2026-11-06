@@ -146,9 +146,17 @@ bool RuntimeMatchHistory::gate(RuntimeMatchHistoryGatePoint point,
     const auto result=boundary_?boundary_(session_,point,expected,callback_context_):
         RuntimeMatchHistoryGateResult::OtherOwnerRefused;
     if(result!=RuntimeMatchHistoryGateResult::Admitted){
-        char message[128]{};
-        std::snprintf(message,sizeof(message),"Runtime history boundary refused: point=%u reason=%u expected=%u",
-            static_cast<unsigned>(point),static_cast<unsigned>(result),expected);
+        char message[160]{};
+        if(result==RuntimeMatchHistoryGateResult::SourceFilesBusy){
+            const bool owned_pending_hps=checkpoint_&&checkpoint_->interior_hps_pending(session_);
+            std::snprintf(message,sizeof(message),
+                "Runtime history boundary refused: point=%u reason=%u expected=%u owned_pending_hps=%u",
+                static_cast<unsigned>(point),static_cast<unsigned>(result),expected,
+                owned_pending_hps?1u:0u);
+        }else{
+            std::snprintf(message,sizeof(message),"Runtime history boundary refused: point=%u reason=%u expected=%u",
+                static_cast<unsigned>(point),static_cast<unsigned>(result),expected);
+        }
         return fail(RuntimeMatchHistoryFailure::Boundary,message);
     }
     return true;
