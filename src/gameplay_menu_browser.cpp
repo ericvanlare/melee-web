@@ -79,6 +79,13 @@ bool match_history_terminal=false,match_history_in_tick=false;
 unsigned match_history_renderer_errors=0,match_history_pcm_frames=0;
 void match_history_before_close() noexcept;
 void match_history_after_match_close();
+bool history_start_is_enabled() noexcept;
+bool history_start_offer_waiting() noexcept;
+bool history_start_capture_offer(const MeleeWebMenuMatchSelection&);
+bool history_start_asset_match_pending() noexcept;
+void history_start_finish_asset_match();
+bool history_start_ordinary_callback();
+bool history_start_ready_hold_pending() noexcept;
 struct MatchHistoryOrdinaryCallback {
  bool owned=!match_history_in_tick;
  MatchHistoryOrdinaryCallback(){if(owned)match_history_in_tick=true;}
@@ -3188,6 +3195,13 @@ void advance(){
        "Original Training stage selection reached GM_TRAINING state 2. Its one-player simulation, Training HUD/options, item controls, and reset/CPU services are not integrated yet; Eject to recover.");
   }
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  if(history_start_is_enabled()){
+   check(history_start_capture_offer(selection),
+         "Original-menu agreed-start offer could not bind its actual READY selection");
+   return;
+  }
+#endif
   if(replay&&(replay->version==melee_web::kRetailReplayVersion||
               replay->version==melee_web::kRetailReplayFighterVersion||
               replay->version==melee_web::kRetailReplayDrawClosureVersion))
@@ -3464,6 +3478,10 @@ bool finish_asset_handoff(){
   check(replay&&replay->initial_input,"Replay initialization is unavailable");
   match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
       melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ }else if(history_start_asset_match_pending()){
+  history_start_finish_asset_match();
+#endif
  }else{
   const MeleeWebPadState* input=melee_web_menu_host_input(host);
   check(input!=nullptr,"Original SSS did not retain PAD history for asset match handoff");
@@ -3553,6 +3571,9 @@ void begin_transition_construction(double& preparation_ms,int& suppress_draw){
  preparation_profile.construction_started(started);
  advance();
  preparation_ms+=emscripten_get_now()-started;
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ if(history_start_offer_waiting())return;
+#endif
  const bool construction_complete=asset_destination==AssetDestination::None&&!menu_scene_rebuild_pending&&
                                   (!match||match->construction_complete());
  if(!construction_complete)return;
@@ -6501,6 +6522,9 @@ void tick(){
  if(owner_action==1){
   menu_clock.reset();audio_clock.reset();
  }
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ if(history_start_ordinary_callback())return;
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(first_css_browser_draw.mode==FirstCssBrowserMode::ConstructorReturnOnlyV2){
   auto& state=first_css_browser_draw;
@@ -7109,6 +7133,9 @@ void tick(){
   }
   if(preparation.waiting_for_audio()){
    begin_transition_construction(preparation_ms,suppress_draw);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+   if(history_start_offer_waiting())return;
+#endif
   }else if(preparation.phase()==melee_web::MenuPreparationState::Phase::Constructing){
    preparation_started=emscripten_get_now();
    const bool construction_complete=asset_destination!=AssetDestination::None?
@@ -7155,6 +7182,15 @@ void tick(){
     else EM_ASM({window.menuPreparationDone?.();});
     running=!pending;menu_clock.reset();suppress_draw=preparation.suppress_source_draw(pending);
     message=match?match_message:results?"Original Results":prize?"Original unlock notification":source_menu_message();
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+    if(history_start_ready_hold_pending()){
+     // One explicit original source presentation publishes the agreed scene.
+     // Its real effects stay canonical; no tick or extra input is consumed.
+     running=false;suppress_draw=0;
+     history_start_publish_initial_source(present_source);
+     return;
+    }
+#endif
    }else{
     ++preparation_profile.submission_wait_callbacks;
     check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,

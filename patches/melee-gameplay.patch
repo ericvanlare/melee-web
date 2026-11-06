@@ -17450,7 +17450,7 @@ index 67c664b238bef265ad585422c4a48e7cd3b57736..196869cfc0a217b52529dc98d96035f9
  static inline u8 mn_8022F538_GetHoveredSelection(void)
  {
 diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
-index b110ff19ad600be99ac37edc69f8bf26198ccfac..36602fed6ed78b7cd1883708e929a5f3e6b4b0d7 100644
+index b110ff19ad600be99ac37edc69f8bf26198ccfac..bd884a775045164536f37ce995348c5b821dc5af 100644
 --- a/src/melee/mn/mnstagesel.c
 +++ b/src/melee/mn/mnstagesel.c
 @@ -1,5 +1,16 @@
@@ -17556,7 +17556,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..36602fed6ed78b7cd1883708e929a5f3
  skip_randomize:
  
      gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 5, 0x80);
-@@ -851,10 +893,69 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
+@@ -851,10 +893,98 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
  
  int mnStageSel_8025BBD4(void)
  {
@@ -17610,6 +17610,35 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..36602fed6ed78b7cd1883708e929a5f3
 +    geometry[2] = tile.x; geometry[3] = tile.y;
 +    geometry[4] = mnStageSel_803F06D0[target].xC;
 +    geometry[5] = mnStageSel_803F06D0[target].x10;
++    return 1;
++}
++
++/* Source input gate only: no joint setup, animation, input or RNG work. */
++int melee_web_sss_observe_input_gate(int stkind, int* cooldown)
++{
++    HSD_GObj* cursor = NULL;
++    HSD_GObj* g;
++    int target = -1;
++    int i;
++    if (!cooldown || !sss_data || !HSD_GObj_Entities || mnStageSel_804D6CAF)
++        return 0;
++    for (g = HSD_GObj_Entities->x14; g; g = g->next) {
++        HSD_GObjProc* proc;
++        for (proc = g->proc; proc; proc = proc->child) {
++            if (proc->on_invoke == fn_8025A310) {
++                if (cursor) return 0;
++                cursor = g;
++            }
++        }
++    }
++    for (i = 0; i < (int) (sizeof(mnStageSel_803F06D0) /
++                           sizeof(mnStageSel_803F06D0[0])); ++i) {
++        if (mnStageSel_803F06D0[i].xB == stkind &&
++            mnStageSel_803F06D0[i].x8 >= 2) target = i;
++    }
++    if (!cursor || !cursor->hsd_obj || target < 0 ||
++        !mnStageSel_803F06D0[target].x0) return 0;
++    *cooldown = mnStageSel_804D6CA4;
 +    return 1;
 +}
 +#endif

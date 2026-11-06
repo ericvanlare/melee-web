@@ -7,6 +7,8 @@ export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,pr
   idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11;
+const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5;
+const START_HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
 const statusNames=['schema','bytes','ownerState','firstFailure','pendingCommand','lastCompletedCommand',
   'requestSequence','completeSequence','expectedFrame','localPort','remotePort','reserved'];
 const metadataNames=['schema','bytes','phase','firstFailure','preFrame','currentFrame','sealedEnd',
@@ -91,6 +93,87 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(!pointer)throw Error('Runtime history argument allocation failed');
     try{module.HEAPU8.set(bytes,pointer>>>0);return callback(pointer>>>0);}finally{module._free(pointer);}
   };
+  const startExport=name=>{
+    const fn=module[PREFIX+name];
+    if(typeof fn!=='function')throw Error(`Private agreed-start export ${name} is unavailable`);
+    return fn;
+  };
+  const startHostArguments=(host,label='Agreed-start identity')=>{
+    if(!host||START_HOST_FIELDS.some(key=>typeof host[key]!=='string'||!host[key]||host[key].includes('\0')))
+      throw Error(`${label} requires explicit loaded host identities`);
+    const encoder=new TextEncoder();
+    return START_HOST_FIELDS.map(key=>encoder.encode(host[key]+'\0'));
+  };
+  const startHostCall=(name,prefixArguments,encoded)=>{
+    const invoke=(index,pointers)=>{
+      if(index===encoded.length){
+        const pointer=startExport(name)(...prefixArguments,...pointers);
+        if(!pointer)return null;
+        if(!Number.isInteger(pointer)||pointer<=0||pointer>0xffffffff)
+          throw latch(Error(`Native agreed-start ${name} returned an invalid string pointer`));
+        // Native strings are borrowed. Copy their text before allocate() frees
+        // any host argument, since _free is itself a later native call.
+        const value=module.UTF8ToString(pointer);
+        if(typeof value!=='string'||!value)
+          throw latch(Error(`Native agreed-start ${name} returned an empty string`));
+        return value;
+      }
+      return allocate(encoded[index],pointer=>invoke(index+1,[...pointers,pointer]));
+    };
+    return invoke(0,[]);
+  };
+  const startPreflight=(name,{argumentsAllocated=false,inspectState=false}={})=>{
+    active();
+    if(argumentsAllocated&&captured)
+      throw Error('Agreed-start arguments cannot be allocated after match-history capture');
+    startExport(name);
+    if(inspectState)startExport('start_state');
+    check(status());
+  };
+  const startRefusal=(name,detail)=>{
+    let snapshot;
+    try{snapshot=status();}catch(error){throw latch(error);}
+    const nativeError=errorText();
+    throw latch(Error(`Native agreed-start ${name} refused${detail?`: ${detail}`:''}: ${nativeError} (${JSON.stringify(snapshot)})`));
+  };
+  const startStateValue=()=>{
+    const value=startExport('start_state')();
+    if(!Number.isInteger(value)||value<0||value>START_STATE_MAX)
+      throw latch(Error('Native agreed-start state is outside its bounded schema'));
+    check(status());
+    return value;
+  };
+  const readStartState=()=>{
+    active();startExport('start_state');
+    return startStateValue();
+  };
+  const startTextResult=(name,pointer)=>{
+    if(!pointer)startRefusal(name);
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>0xffffffff)
+      throw latch(Error(`Native agreed-start ${name} returned an invalid string pointer`));
+    const value=module.UTF8ToString(pointer);
+    check(status());
+    if(typeof value!=='string'||!value)
+      throw latch(Error(`Native agreed-start ${name} returned an empty string`));
+    return value;
+  };
+  const decodeStartPublication=bytes=>{
+    if(!(bytes instanceof Uint8Array)||bytes.length!==START_PUBLICATION_BYTES)
+      throw Error('Agreed-start publication receipt extent');
+    const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    const result={schema:data.getUint32(0,true),bytes:data.getUint32(4,true),
+      state:data.getUint32(8,true),sourceFrame:data.getUint32(12,true),
+      sourceDraws:data.getUint32(16,true),padPolicy:data.getUint32(20,true),
+      firstUsePending:data.getUint32(24,true),reserved:data.getUint32(28,true),
+      priorSubmission:data.getBigUint64(32,true).toString(),
+      sourceSubmission:data.getBigUint64(40,true).toString(),raw:bytes.slice()};
+    if(result.schema!==1||result.bytes!==START_PUBLICATION_BYTES||result.state!==START_HELD_STATE||
+      result.sourceFrame!==0||result.sourceDraws!==1||result.padPolicy!==1||
+      result.firstUsePending!==0||result.reserved!==0||
+      BigInt(result.sourceSubmission)<=BigInt(result.priorSubmission))
+      throw Error('Agreed-start publication receipt schema or held-frame owner violation');
+    return result;
+  };
   const requireSuccess=(name,...args)=>{
     if(module[PREFIX+name](...args)!==1)throw latch(Error(`Native history ${name} refused: ${errorText()}`));
   };
@@ -152,17 +235,84 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     },
     identity(host){
       active();if(captured)throw Error('Runtime history identity must be read before capture');
-      const strings=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
-      if(!host||strings.some(key=>typeof host[key]!=='string'||!host[key]||host[key].includes('\0')))
-        throw Error('Runtime history identity requires explicit loaded identities');
-      const encoded=strings.map(key=>new TextEncoder().encode(host[key]+'\0'));
+      const encoded=startHostArguments(host,'Runtime history identity');
       const invoke=(index,pointers)=>index===encoded.length
         ?module[PREFIX+'identity_json'](...pointers)
         :allocate(encoded[index],pointer=>invoke(index+1,[...pointers,pointer]));
       const pointer=invoke(0,[]);if(!pointer)throw latch(Error(`Native match identity refused: ${errorText()}`));
       const text=module.UTF8ToString(pointer),identity=JSON.parse(text);
-      if(strings.some(key=>identity[key]!==host[key]))throw latch(Error('Native match identity did not bind supplied host identities'));
+      if(START_HOST_FIELDS.some(key=>identity[key]!==host[key]))throw latch(Error('Native match identity did not bind supplied host identities'));
       return text;
+    },
+    startEnable(){
+      startPreflight('start_enable',{inspectState:true});
+      if(startExport('start_enable')()!==1)startRefusal('start_enable');
+      const state=readStartState();
+      if(state!==1)throw latch(Error(`Native agreed-start enable completed in state ${state}, expected 1`));
+      return state;
+    },
+    startState(){
+      return readStartState();
+    },
+    startOffer(host){
+      startPreflight('start_offer_json',{argumentsAllocated:true,inspectState:true});
+      const result=startHostCall('start_offer_json',[],startHostArguments(host));
+      if(result===null)startRefusal('start_offer_json');
+      check(status());
+      const state=startStateValue();
+      if(state!==2)throw latch(Error(`Native agreed-start offer completed in state ${state}, expected 2`));
+      return result;
+    },
+    startAgreement(seed,host){
+      u32(seed,'Negotiated match seed');
+      startPreflight('start_agreement_json',{argumentsAllocated:true,inspectState:true});
+      const result=startHostCall('start_agreement_json',[seed],startHostArguments(host));
+      if(result===null)startRefusal('start_agreement_json');
+      check(status());
+      const state=startStateValue();
+      if(state!==2)throw latch(Error(`Native agreed-start agreement completed in state ${state}, expected 2`));
+      return result;
+    },
+    startCommit(seed,agreedJSON,host){
+      u32(seed,'Negotiated match seed');
+      startPreflight('start_commit',{argumentsAllocated:true,inspectState:true});
+      if(typeof agreedJSON!=='string'||!agreedJSON||agreedJSON.includes('\0'))
+        throw Error('Agreed-start commit requires the exact nonempty JSON bytes');
+      const encoder=new TextEncoder(),json=encoder.encode(agreedJSON);
+      if(!json.length||json.length>65536)throw Error('Agreed-start JSON byte extent');
+      const argument=new Uint8Array(json.length+1);argument.set(json);
+      const encodedHost=startHostArguments(host);
+      const invokeHost=expectedPointer=>{
+        const invoke=(index,pointers)=>index===encodedHost.length
+          ?startExport('start_commit')(seed,expectedPointer,json.length,...pointers)
+          :allocate(encodedHost[index],pointer=>invoke(index+1,[...pointers,pointer]));
+        return invoke(0,[]);
+      };
+      const result=allocate(argument,invokeHost);
+      if(result!==1)startRefusal('start_commit');
+      check(status());
+      const state=startStateValue();
+      if(state!==3)throw latch(Error(`Native agreed-start commit completed in state ${state}, expected 3`));
+      return state;
+    },
+    startPublication(){
+      const state=readStartState();
+      if(state!==START_HELD_STATE)
+        throw latch(Error(`Agreed-start publication requires held frame zero, observed state ${state}`));
+      const size=startExport('start_publication_bytes')();
+      if(size!==START_PUBLICATION_BYTES)
+        throw latch(Error(`Agreed-start publication ABI is ${size} bytes, expected ${START_PUBLICATION_BYTES}`));
+      const pointer=startExport('start_publication_data')();
+      if(!pointer)startRefusal('start_publication_data','held frame-zero publication unavailable');
+      try{return decodeStartPublication(read(pointer,START_PUBLICATION_BYTES));}
+      catch(error){throw latch(error);}
+    },
+    startLiveIdentity(){
+      const state=readStartState();
+      if(state!==START_HELD_STATE)
+        throw latch(Error(`Agreed-start live identity requires held frame zero, observed state ${state}`));
+      const pointer=startExport('start_live_identity_json')();
+      return startTextResult('start_live_identity_json',pointer);
     },
     validatePad(value){
       active();const bytes=pad(value);const pointer=writePadArgument(bytes);

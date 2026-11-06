@@ -1,0 +1,235 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Fake external owners for extracted runtime start logic.
+// Use the real MenuPreparationState and start/export bodies.
+#include "menu_preparation_state.hpp"
+#include <algorithm>
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+struct MeleeWebMenuMatchSelection {uint32_t random_seed; unsigned authored;};
+struct MeleeWebMenuHost {int phase; int kind;};
+struct RuntimeArchiveCache {};
+namespace melee_web {
+enum class GameplayMatchConstruction {Deferred};
+}
+unsigned default_pad_constructors=0;
+struct GameplayMatchSession {
+ MeleeWebMenuMatchSelection selection;
+ GameplayMatchSession(int,MeleeWebMenuMatchSelection selected,RuntimeArchiveCache&,
+                      melee_web::GameplayMatchConstruction):selection(selected){++default_pad_constructors;}
+ unsigned source_frames() const {return 0;}
+ bool construction_complete() const {return true;}
+ const auto& start_selection() const {return selection;}
+ bool paused() const {return false;}
+ bool ending() const {return false;}
+ bool complete() const {return false;}
+};
+#define SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID "profile"
+namespace melee_web::slippi_profile {
+struct RuntimeMatchIdentityHostAgreement {std::string_view runtime_sha256,asset_identity_sha256,save_profile_sha256,profile_identity;};
+namespace detail {
+void require(bool condition,const char* error){if(!condition)throw std::runtime_error(error);}
+void validate_host_agreement(const RuntimeMatchIdentityHostAgreement& h){require(h.profile_identity=="profile","identity refused");}
+}
+std::string serialize_live_match_identity(const GameplayMatchSession& m,const RuntimeMatchIdentityHostAgreement&){
+ return std::to_string(m.selection.random_seed);
+}
+}
+bool runtime_idle=true,gpu_idle=true,source_idle=true,complete_draws=true;
+bool history_runtime_idle() noexcept {return runtime_idle;}
+bool history_gpu_idle() noexcept {return gpu_idle;}
+bool history_source_idle(const GameplayMatchSession&) noexcept {return source_idle;}
+bool melee_web_cpu_interval_active(){return false;}
+bool aurora_pipeline_complete_draws_enabled(){return complete_draws;}
+constexpr int MELEE_WEB_MENU_CSS=1,MELEE_WEB_MENU_SSS_READY=2,MELEE_WEB_MENU_SSS=3,MELEE_WEB_MENU_READY=5,GM_VS=7;
+bool faulted=false,pending=false,running=false,host_entered=false,world_exposed=false;
+bool replay=false,world=false,results=false,prize=false,scoped_assets=false,asset_selection_valid=false;
+bool first_use_draw_pending=false,source_session_owned=false,match_history_terminal=false,match_history_in_tick=false;
+unsigned match_history_renderer_errors=0,phase_reads=0;
+bool melee_web_net_active(){return false;}
+bool melee_web_gameplay_world_exists(){return world;}
+int melee_web_menu_host_mode_kind(MeleeWebMenuHost* h){return h->kind;}
+int melee_web_menu_host_phase(MeleeWebMenuHost* h){++phase_reads;return h->phase;}
+MeleeWebMenuHost fixture{MELEE_WEB_MENU_CSS,GM_VS},*host=&fixture;
+MeleeWebMenuMatchSelection authored{17,42},asset_selection{};
+bool melee_web_menu_host_selection(MeleeWebMenuHost*,MeleeWebMenuMatchSelection* out,char*,size_t){
+ *out=authored;return true;
+}
+melee_web::MenuPreparationState preparation;
+enum class AssetDestination {None,Match};
+AssetDestination asset_destination=AssetDestination::None;
+uint64_t asset_generation=1;
+void request_assets(AssetDestination dest,const MeleeWebMenuMatchSelection* selection){
+ ++asset_generation;asset_destination=dest;asset_selection=*selection;
+}
+int files=0,prior_vs_source_frames=0,final_sd_source_frames=0,prior_vs_terminal=0;
+std::string match_message,message;
+std::string selected_match_message(const MeleeWebMenuMatchSelection&){return "match";}
+std::unique_ptr<GameplayMatchSession> match;
+auto archive_cache=std::make_unique<RuntimeArchiveCache>();
+struct Clock {void reset(){}} menu_clock,audio_clock;
+double emscripten_get_now(){return 1;}
+uintptr_t emscripten_get_heap_size(){return UINTPTR_MAX;}
+void check(bool okay,const char* error){if(!okay)throw std::runtime_error(error);}
+struct AuroraStats {uint64_t lastBeginFrameId{},lastEndFrameId{};unsigned queuedPipelines{},createdPipelines{};} stats;
+const AuroraStats* aurora_get_stats(){return &stats;}
+AuroraStats aurora_stats_snapshot(){return stats;}
+struct Submitted {unsigned pendingFramePackets{},pendingStagingBuffers{},workerBusy{};} submitted;
+Submitted aurora_browser_submission_status(){return submitted;}
+bool prepare_deferred_pipelines(){return false;}
+unsigned renderer_services=0;
+bool aurora_pipeline_service_preparation(){++renderer_services;return true;}
+void report_construction(const char*,double,double,double,AuroraStats,AuroraStats){}
+std::string history_start_payload(const MeleeWebMenuMatchSelection& s){
+ return std::to_string(s.random_seed)+":"+std::to_string(s.authored);
+}
+using Agreement=melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement;
+std::string history_start_offer_json(const MeleeWebMenuMatchSelection& s,const Agreement&,uint32_t local_seed){
+ assert(s.random_seed==local_seed);return history_start_payload(s);
+}
+std::string history_start_agreement_json(MeleeWebMenuMatchSelection s,uint32_t seed,const Agreement& h){
+ s.random_seed=seed;return history_start_payload(s)+":"+std::string(h.runtime_sha256);
+}
+struct Capsule {void disarm_for_teardown(){}};
+
+@START_TYPES@
+struct {
+ struct {unsigned first_failure{},pending_command{};} status;
+ MatchHistoryStart start;
+ std::array<char,512> error{};
+ Capsule* capsule{};
+ bool dispatching{};
+} match_history;
+
+@START_FUNCTIONS@
+
+void reset(){
+ match_history={};match.reset();authored={17,42};phase_reads=0;
+ runtime_idle=true;gpu_idle=true;source_idle=true;complete_draws=true;
+ running=false;pending=false;faulted=false;host_entered=true;world=true;world_exposed=true;
+ source_session_owned=true;match_history_in_tick=false;first_use_draw_pending=false;
+ fixture.phase=MELEE_WEB_MENU_CSS;host=&fixture;
+ preparation.reset();asset_destination=AssetDestination::None;
+ renderer_services=0;submitted={};stats={};
+}
+void offer(){
+ assert(melee_web_native_menu_match_history_start_enable());
+ host_entered=false;world=false;fixture.phase=MELEE_WEB_MENU_READY;
+ assert(preparation.request());assert(preparation.begin_construction(true));
+ assert(history_start_capture_offer_impl(authored));
+ assert(history_start_ordinary_callback_impl());
+ assert(melee_web_native_menu_match_history_start_state()==MatchHistoryStartOfferReady);
+}
+const char* offer_json(){
+ return melee_web_native_menu_match_history_start_offer_json("runtime","asset","save","profile");
+}
+std::string agreement(){
+ assert(std::string(offer_json())=="17:42");
+ return melee_web_native_menu_match_history_start_agreement_json(99,"runtime","asset","save","profile");
+}
+bool commit(const std::string& bytes){
+ return melee_web_native_menu_match_history_start_commit(99,bytes.c_str(),bytes.size(),
+                                                        "runtime","asset","save","profile");
+}
+void construct(bool deferred){
+ reset();offer();assert(commit(agreement()));
+ assert(history_start_ordinary_callback_impl());
+ assert(!history_start_ordinary_callback_impl());
+ if(deferred){
+  assert(!match);assert(history_start_asset_match_pending_impl());
+  assert(asset_destination==AssetDestination::Match);
+  asset_destination=AssetDestination::None;
+  history_start_finish_asset_match_impl();
+ }
+ assert(match);assert(match->selection.random_seed==99);assert(match->selection.authored==42);
+ assert(authored.random_seed==17);
+ assert(history_start_ready_hold_pending_impl());
+ preparation.reset();first_use_draw_pending=true;
+}
+int main(){
+ reset();runtime_idle=false;assert(!melee_web_native_menu_match_history_start_enable());assert(phase_reads==0);
+ reset();match_history_in_tick=true;assert(!melee_web_native_menu_match_history_start_enable());assert(phase_reads==0);
+ reset();match_history.dispatching=true;assert(!melee_web_native_menu_match_history_start_enable());assert(phase_reads==0);
+ reset();complete_draws=false;assert(!melee_web_native_menu_match_history_start_enable());assert(phase_reads==0);
+ reset();offer();auto bytes=agreement();assert(commit(bytes));assert(!commit(bytes));
+ assert(history_start_ordinary_callback_impl());assert(!match);
+ reset();offer();bytes=agreement();++asset_generation;assert(!commit(bytes));assert(!match);
+ reset();offer();bytes=agreement();++authored.authored;assert(!commit(bytes));assert(!match);
+ reset();offer();bytes=agreement();bytes[0]='x';assert(!commit(bytes));assert(!match);
+ reset();offer();bytes=agreement();match_history_before_close();
+ assert(!commit(bytes));assert(!match);
+ reset();assert(melee_web_native_menu_match_history_start_enable());match_history_before_close();
+ host_entered=false;world=false;fixture.phase=MELEE_WEB_MENU_READY;
+ assert(preparation.request());assert(preparation.begin_construction(true));
+ assert(!history_start_capture_offer_impl(authored));assert(!match);
+ assert(default_pad_constructors==0);
+ for(bool deferred:{false,true}){
+  scoped_assets=deferred;
+  construct(deferred);
+  unsigned draws=0;
+  history_start_publish_initial_source([&]{
+   ++draws;
+   assert(!preparation.busy()&&!running&&first_use_draw_pending);
+   stats.lastBeginFrameId=stats.lastEndFrameId=1;
+   submitted.pendingStagingBuffers=1;
+   return true;
+  });
+  assert(history_start_ordinary_callback_impl());assert(history_start_ordinary_callback_impl());
+  assert(preparation.arming());assert(renderer_services==2);
+  assert(history_start_ordinary_callback_impl());assert(preparation.arming());
+  assert(first_use_draw_pending&&!melee_web_native_menu_match_history_start_publication_data());
+  submitted.pendingStagingBuffers=0;
+  assert(history_start_ordinary_callback_impl());
+  assert(draws==1&&!first_use_draw_pending&&!running);
+  const auto* receipt=static_cast<const MatchHistoryPublication*>(melee_web_native_menu_match_history_start_publication_data());
+  assert(receipt&&receipt->source_frame==0&&receipt->source_draws==1&&receipt->source_submission==1);
+  assert(melee_web_native_menu_match_history_start_publication_bytes()==48);
+  assert(std::string(melee_web_native_menu_match_history_start_live_identity_json())=="99");
+  match_history_in_tick=true;
+  assert(!melee_web_native_menu_match_history_start_publication_data());
+  assert(!melee_web_native_menu_match_history_start_live_identity_json());
+  match_history_in_tick=false;
+  assert(history_start_ordinary_callback_impl());assert(renderer_services==2);
+  match_history_before_close();
+  assert(!melee_web_native_menu_match_history_start_publication_data());
+  assert(!melee_web_native_menu_match_history_start_live_identity_json());
+ }
+ assert(default_pad_constructors==2);
+ scoped_assets=false;
+ construct(false);
+ try {
+  history_start_publish_initial_source([]()->bool{throw std::runtime_error("original source error");});
+  assert(false);
+ } catch(const std::runtime_error& e){assert(std::string(e.what())=="original source error");}
+ assert(history_start_ordinary_callback_impl());
+ assert(std::string(match_history.error.data())=="original source error");
+ assert(!renderer_services&&first_use_draw_pending&&!match_history.start.publication.source_draws);
+ construct(false);
+ try {
+  history_start_publish_initial_source([]{return false;});
+  assert(false);
+ } catch(const std::runtime_error&){}
+ assert(history_start_ordinary_callback_impl());
+ assert(!renderer_services&&first_use_draw_pending&&!match_history.start.publication.source_draws);
+
+ // A completed draw and empty submission counts alone cannot transfer first-use.
+ construct(false);
+ history_start_publish_initial_source([]{
+  stats.lastBeginFrameId=stats.lastEndFrameId=1;
+  return true;
+ });
+ assert(history_start_ordinary_callback_impl());
+ assert(history_start_ordinary_callback_impl());
+ assert(preparation.arming());
+ gpu_idle=false;
+ assert(history_start_ordinary_callback_impl());
+ assert(faulted&&first_use_draw_pending);
+ assert(!melee_web_native_menu_match_history_start_publication_data());
+ std::cout << "Extracted start phase controls passed\n";
+}

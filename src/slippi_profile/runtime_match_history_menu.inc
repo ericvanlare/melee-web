@@ -21,9 +21,48 @@ struct MatchHistoryInput {
 };
 static_assert(sizeof(MatchHistoryStatus)==128);
 static_assert(sizeof(MatchHistoryInput)==168);
+enum MatchHistoryStartState : uint32_t {
+ MatchHistoryStartDisabled=0,
+ MatchHistoryStartEnabled=1,
+ MatchHistoryStartOfferReady=2,
+ MatchHistoryStartAgreed=3,
+ MatchHistoryStartConsumed=4,
+ MatchHistoryStartReadyHeld=5,
+ MatchHistoryStartPublishing=6,
+};
+struct MatchHistoryPublication {
+ uint32_t schema=1,bytes=48,state{},source_frame{},source_draws{},pad_policy=1,first_use_pending{},reserved{};
+ uint64_t prior_submission{},source_submission{};
+};
+static_assert(sizeof(MatchHistoryPublication)==48);
+struct MatchHistoryStart {
+ uint32_t state{};
+ MatchHistoryPublication publication{};
+ double settle_started{};
+ uint32_t local_menu_seed{};
+ uint32_t negotiated_seed{};
+ uint32_t reserved{};
+ uint64_t source_asset_generation{};
+ uint64_t handoff_asset_generation{};
+ MeleeWebMenuHost* enabled_host{};
+ MeleeWebMenuHost* source_host{};
+ GameplayMatchSession* match_owner{};
+ MeleeWebMenuMatchSelection local_selection{};
+ MeleeWebMenuMatchSelection agreed_selection{};
+ bool agreement_candidate_ready{};
+ std::string local_payload;
+ std::string offer_json;
+ std::string agreement_json;
+ std::string live_identity_json;
+ std::string runtime_sha256;
+ std::string asset_identity_sha256;
+ std::string save_profile_sha256;
+ std::string profile_identity;
+};
 struct MatchHistoryControl {
  MatchHistoryStatus status{};
  MatchHistoryInput input{};
+ MatchHistoryStart start{};
  std::array<char,512> error{};
  std::unique_ptr<RuntimeMatchHistory> capsule;
  std::unique_ptr<melee_web::GameplayCpuStatics> statics;
@@ -50,6 +89,393 @@ bool history_refuse(const char* text) noexcept {
  if(!c.status.first_failure){
   c.status.first_failure=1;
   std::snprintf(c.error.data(),c.error.size(),"%s",text?text:"Private match history refused");
+ }
+ return false;
+}
+
+bool history_runtime_idle() noexcept;
+bool history_gpu_idle() noexcept;
+bool history_source_idle(const GameplayMatchSession&) noexcept;
+
+bool history_start_export_idle() noexcept {
+ return !match_history_in_tick&&!match_history.dispatching&&
+  !match_history.status.pending_command&&history_runtime_idle();
+}
+
+void history_write_selection(std::ostringstream& out,
+                             const MeleeWebMenuMatchSelection& selection) {
+ out<<"{\"player_count\":"<<selection.player_count
+    <<",\"random_seed\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(selection.random_seed)<<"\""
+    <<",\"hud_layout\":"<<selection.hud_layout
+    <<",\"unlocked_characters\":"<<selection.unlocked_characters
+    <<",\"unlocked_stages\":"<<selection.unlocked_stages
+    <<",\"save_profile_present\":"<<unsigned(selection.save_profile_present)
+    <<",\"opening_demo\":"<<unsigned(selection.opening_demo)
+    <<",\"sudden_death\":"<<unsigned(selection.sudden_death)
+    <<",\"compatibility_players\":[";
+ for(unsigned index=0;index<4;++index){
+  if(index)out<<',';
+  const auto& player=selection.players[index];
+  out<<"{\"controller\":"<<player.controller
+     <<",\"stocks\":"<<player.stocks
+     <<",\"costume\":"<<player.costume
+     <<",\"sub_color\":"<<player.sub_color<<'}';
+ }
+ out<<"],\"start\":";
+ melee_web::stadium_first_css_diagnostic::write_start(out,selection.start);
+ out<<'}';
+}
+
+std::string history_start_payload(const MeleeWebMenuMatchSelection& selection) {
+ using namespace melee_web::slippi_profile::detail;
+ validate_pointer_free_start(selection.start.rules);
+ validate_ordinary_mario_fd_stock_start(selection);
+ std::ostringstream out;
+ out.imbue(std::locale::classic());
+ history_write_selection(out,selection);
+ return out.str();
+}
+
+std::string history_start_offer_json(const MeleeWebMenuMatchSelection& selection,
+    const melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement& host,
+    uint32_t local_menu_seed) {
+ using namespace melee_web::slippi_profile::detail;
+ validate_host_agreement(host);
+ std::ostringstream out;
+ out.imbue(std::locale::classic());
+ out<<"{\"schema\":\"melee-web-runtime-match-start-offer-v1\""
+    <<",\"runtime_sha256\":\""<<host.runtime_sha256<<'\"'
+    <<",\"asset_identity_sha256\":\""<<host.asset_identity_sha256<<'\"'
+    <<",\"save_profile_sha256\":\""<<host.save_profile_sha256<<'\"'
+    <<",\"profile_identity\":\""<<host.profile_identity<<'\"'
+    <<",\"local_menu_rng_seed_provenance\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(local_menu_seed)<<"\""
+    <<",\"selection\":";
+ history_write_selection(out,selection);
+ out<<'}';
+ return out.str();
+}
+
+std::string history_start_agreement_json(const MeleeWebMenuMatchSelection& source,
+    uint32_t negotiated_seed,
+    const melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement& host) {
+ using namespace melee_web::slippi_profile::detail;
+ validate_host_agreement(host);
+ auto agreed=source;
+ agreed.random_seed=negotiated_seed;
+ std::ostringstream out;
+ out.imbue(std::locale::classic());
+ out<<"{\"schema\":\"melee-web-runtime-match-start-agreement-v1\""
+    <<",\"runtime_sha256\":\""<<host.runtime_sha256<<'\"'
+    <<",\"asset_identity_sha256\":\""<<host.asset_identity_sha256<<'\"'
+    <<",\"save_profile_sha256\":\""<<host.save_profile_sha256<<'\"'
+    <<",\"profile_identity\":\""<<host.profile_identity<<'\"'
+    <<",\"expected_match_source_frame\":0"
+    <<",\"initial_selection_seed\":\""
+    <<melee_web::stadium_first_css_diagnostic::hex32(negotiated_seed)<<"\""
+    <<",\"pad_initialization_policy\":\"source-default-match-pad-v1\""
+    <<",\"selection\":";
+ history_write_selection(out,agreed);
+ out<<'}';
+ return out.str();
+}
+
+std::string_view history_start_string_argument(const char* pointer,size_t bytes) {
+ const uintptr_t begin=reinterpret_cast<uintptr_t>(pointer);
+ if(!pointer||!bytes||bytes>65536||begin+uint64_t(bytes)+1>emscripten_get_heap_size()||
+    begin+uint64_t(bytes)+1<=begin||pointer[bytes]!=0)
+  throw std::runtime_error("Agreed start identity extent refused");
+ return {pointer,bytes};
+}
+
+size_t history_start_c_string_length(const char* pointer,size_t maximum) {
+ const uintptr_t begin=reinterpret_cast<uintptr_t>(pointer);
+ const uintptr_t heap=emscripten_get_heap_size();
+ if(!pointer||begin>=heap||begin+1<=begin)
+  throw std::runtime_error("Match-start host identity string extent refused");
+ const size_t available=static_cast<size_t>(heap-begin);
+ const size_t bounded=std::min(maximum,available-1);
+ for(size_t length=0;length<=bounded;++length)if(pointer[length]==0)return length;
+ throw std::runtime_error("Match-start host identity string is unterminated");
+}
+melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement
+history_start_host_agreement(const char* runtime,const char* assets,
+                            const char* save,const char* profile) {
+ using melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement;
+ const auto runtime_length=history_start_c_string_length(runtime,64);
+ const auto assets_length=history_start_c_string_length(assets,64);
+ const auto save_length=history_start_c_string_length(save,64);
+ const auto profile_length=history_start_c_string_length(
+     profile,sizeof(SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID)-1);
+ return {std::string_view(runtime,runtime_length),
+         std::string_view(assets,assets_length),
+         std::string_view(save,save_length),
+         std::string_view(profile,profile_length)};
+}
+
+void history_start_bind_host_agreement(
+    const melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement& host) {
+ using namespace melee_web::slippi_profile::detail;
+ validate_host_agreement(host);
+ auto& start=match_history.start;
+ if(start.runtime_sha256.empty()) {
+  start.runtime_sha256=host.runtime_sha256;
+  start.asset_identity_sha256=host.asset_identity_sha256;
+  start.save_profile_sha256=host.save_profile_sha256;
+  start.profile_identity=host.profile_identity;
+  return;
+ }
+ require(host.runtime_sha256==start.runtime_sha256&&
+         host.asset_identity_sha256==start.asset_identity_sha256&&
+         host.save_profile_sha256==start.save_profile_sha256&&
+         host.profile_identity==start.profile_identity,
+         "Match-start host identity changed during the one-shot agreement");
+}
+
+melee_web::slippi_profile::RuntimeMatchIdentityHostAgreement
+history_start_bound_host_agreement() {
+ auto& start=match_history.start;
+ return {start.runtime_sha256,start.asset_identity_sha256,
+         start.save_profile_sha256,start.profile_identity};
+}
+
+bool history_start_source_stable(bool source_generation) {
+ auto& start=match_history.start;
+ if(!start.source_host||host!=start.source_host||host_entered||world||match||results||prize||
+    replay||melee_web_net_active()||faulted||running||pending||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Constructing||
+    asset_destination!=AssetDestination::None||
+    melee_web_menu_host_mode_kind(host)!=GM_VS||
+    melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_READY||
+    (source_generation&&asset_generation!=start.source_asset_generation))
+  return false;
+ MeleeWebMenuMatchSelection current{};char error[256]{};
+ if(!melee_web_menu_host_selection(host,&current,error,sizeof(error)))return false;
+ if(current.random_seed!=start.local_menu_seed||
+    history_start_payload(current)!=start.local_payload)return false;
+ return true;
+}
+
+bool history_start_capture_offer_impl(const MeleeWebMenuMatchSelection& selection) {
+ auto& start=match_history.start;
+ if(start.state!=MatchHistoryStartEnabled||!host||host!=start.enabled_host||
+    host_entered||melee_web_menu_host_mode_kind(host)!=GM_VS||
+    melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_READY||
+    replay||melee_web_net_active()||faulted||match||results||prize||
+    pending||running||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Constructing||
+    asset_destination!=AssetDestination::None)
+  return history_refuse("Original-menu agreed-start offer owner refused");
+ try {
+  start.local_selection=selection;
+  start.local_menu_seed=selection.random_seed;
+  start.source_host=host;
+  start.source_asset_generation=asset_generation;
+  start.local_payload=history_start_payload(selection);
+  start.state=MatchHistoryStartOfferReady;
+  running=false;pending=false;menu_clock.reset();audio_clock.reset();
+  return true;
+ }catch(const std::exception& error){return history_refuse(error.what());}
+}
+
+bool history_start_enter_ready_hold_impl() {
+ auto& start=match_history.start;
+ if(start.state!=MatchHistoryStartPublishing||start.publication.source_draws!=1||
+    !history_gpu_idle()||!start.match_owner||
+    match.get()!=start.match_owner||!match->construction_complete()||
+    match->source_frames()!=0||match->start_selection().random_seed!=start.negotiated_seed||
+    history_start_payload(match->start_selection())!=
+       history_start_payload(start.agreed_selection)||pending||faulted||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
+    replay||melee_web_net_active()||asset_destination!=AssetDestination::None||
+    match->paused()||match->ending()||match->complete())
+  return history_refuse("Agreed match did not reach its actual prepared frame-zero owner");
+ try {
+  start.live_identity_json=melee_web::slippi_profile::serialize_live_match_identity(
+      *match,history_start_bound_host_agreement());
+ }catch(const std::exception& error){return history_refuse(error.what());}
+ first_use_draw_pending=false; // Transfer the one proven original source publication.
+ start.publication.state=MatchHistoryStartReadyHeld;
+ start.publication.first_use_pending=0;
+ start.state=MatchHistoryStartReadyHeld;
+ running=false;menu_clock.reset();audio_clock.reset();
+ return true;
+}
+
+bool history_start_publication_begin() {
+ auto& start=match_history.start;
+ if(start.state!=MatchHistoryStartConsumed||start.publication.source_draws||!first_use_draw_pending||
+    !start.match_owner||match.get()!=start.match_owner||!match->construction_complete()||
+    match->source_frames()!=0||pending||running||faulted||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
+    !history_runtime_idle()||!history_gpu_idle()||!history_source_idle(*match)||
+    melee_web_cpu_interval_active()||
+    history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
+  return history_refuse("Agreed original source publication preflight refused");
+ const auto* stats=aurora_get_stats();
+ if(!stats)return history_refuse("Agreed source publication has no actual renderer stats");
+ start.publication.prior_submission=stats->lastEndFrameId;
+ start.publication.source_frame=match->source_frames();
+ start.publication.first_use_pending=first_use_draw_pending;
+ start.publication.state=MatchHistoryStartPublishing;
+ start.state=MatchHistoryStartPublishing;
+ return true;
+}
+
+bool history_start_publication_end() {
+ auto& start=match_history.start;
+ const auto* stats=aurora_get_stats();
+ if(start.state!=MatchHistoryStartPublishing||start.publication.source_draws||
+    !start.match_owner||match.get()!=start.match_owner||match->source_frames()!=0||
+    !stats||stats->lastEndFrameId<=start.publication.prior_submission||
+    stats->lastBeginFrameId!=stats->lastEndFrameId||match_history_renderer_errors||
+    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle)
+  return history_refuse("Agreed original source publication return refused");
+ start.publication.source_submission=stats->lastEndFrameId;
+ start.publication.source_draws=1;
+ if(!preparation.request_render_settle(false))
+  return history_refuse("Agreed source publication could not enter existing render-only settle");
+ start.settle_started=emscripten_get_now();
+ running=false;menu_clock.reset();audio_clock.reset();
+ return true;
+}
+
+template<class Present>
+void history_start_publish_initial_source(const Present& present_source) {
+ try {
+  check(history_start_publication_begin(),"Agreed initial presentation owner refused");
+  check(present_source(),"Agreed initial source presentation did not draw");
+  check(history_start_publication_end(),"Agreed initial source presentation did not complete");
+ }catch(const std::exception& error){
+  history_refuse(error.what());throw;
+ }catch(...){
+  constexpr char error[]="Agreed initial source presentation threw an unknown exception";
+  history_refuse(error);throw std::runtime_error(error);
+ }
+}
+
+bool history_start_service_publication() {
+ auto& start=match_history.start;
+ if(start.state!=MatchHistoryStartPublishing)return false;
+ try {
+  if(start.publication.source_draws!=1||!start.match_owner||match.get()!=start.match_owner||
+     match->source_frames()!=0||pending||running||faulted||melee_web_cpu_interval_active()||
+     emscripten_get_now()-start.settle_started>=10000)
+   throw std::runtime_error("Agreed source publication settle lost its bounded owner");
+  // Reuse renderer-only scene preparation. No aurora_update, input poll,
+  // source tick/draw, audio render, callback or source-file pump occurs here.
+  if(preparation.warming()){
+   const bool deferred=prepare_deferred_pipelines();
+   const auto before=aurora_stats_snapshot();
+   check(aurora_pipeline_service_preparation(),"Agreed renderer-only service refused");
+   const auto after=aurora_stats_snapshot();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+   const bool pipelines_ready=melee_web::pipeline_preparation::status().ready;
+#else
+   const bool pipelines_ready=true;
+#endif
+   const bool activity=deferred||before.queuedPipelines!=after.queuedPipelines||
+    before.createdPipelines!=after.createdPipelines;
+   (void)preparation.observe_render(false,after.queuedPipelines+(pipelines_ready?0u:1u),activity);
+  }else if(preparation.arming()){
+   const auto submitted=aurora_browser_submission_status();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+   const bool pipelines_ready=melee_web::pipeline_preparation::status().ready&&audio_ready_for_preparation();
+#else
+   const bool pipelines_ready=true;
+#endif
+   const bool complete=!submitted.pendingFramePackets&&!submitted.pendingStagingBuffers&&!submitted.workerBusy;
+   if(preparation.arm(complete&&pipelines_ready)){
+    if(!history_start_enter_ready_hold_impl())throw std::runtime_error(match_history.error.data());
+   }
+  }else throw std::runtime_error("Agreed source publication left renderer-only preparation");
+ }catch(const std::exception& error){history_refuse(error.what());faulted=true;running=false;}
+ return true;
+}
+
+bool history_start_is_enabled_impl() noexcept {
+ return match_history.start.state==MatchHistoryStartEnabled;
+}
+bool history_start_offer_waiting_impl() noexcept {
+ return match_history.start.state==MatchHistoryStartOfferReady;
+}
+bool history_start_ready_hold_pending_impl() noexcept {
+ return match_history.start.state==MatchHistoryStartConsumed&&
+        match_history.start.match_owner!=nullptr;
+}
+bool history_start_asset_match_pending_impl() noexcept {
+ const auto& start=match_history.start;
+ return start.state==MatchHistoryStartConsumed&&!start.match_owner&&
+        start.handoff_asset_generation!=0;
+}
+
+bool history_start_begin_agreed_match() {
+ auto& start=match_history.start;
+ try {
+  if(start.state!=MatchHistoryStartAgreed||!history_start_source_stable(true)||
+     !start.agreement_candidate_ready||start.agreement_json.empty())
+   throw std::runtime_error("Agreed match start lost its exact source selection/preparation owner");
+  auto source_equivalent=start.agreed_selection;
+  source_equivalent.random_seed=start.local_menu_seed;
+  if(history_start_payload(source_equivalent)!=start.local_payload)
+   throw std::runtime_error("Agreed match start changed a source-selected field other than its seed");
+  asset_selection=start.agreed_selection;asset_selection_valid=true;
+  match_message=selected_match_message(start.agreed_selection);
+  prior_vs_source_frames=final_sd_source_frames=0;prior_vs_terminal={};
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  melee_web::pipeline_preparation::match(start.agreed_selection);
+#endif
+  start.state=MatchHistoryStartConsumed;
+  start.match_owner=nullptr;
+  if(scoped_assets){
+   request_assets(AssetDestination::Match,&start.agreed_selection);
+   start.handoff_asset_generation=asset_generation;
+   return true;
+  }
+  if(!archive_cache)throw std::runtime_error("Agreed direct match handoff lost its source archive cache");
+  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+  // The private agreement explicitly selects the existing source-default PAD
+  // constructor overload; vanilla keeps its actual menu-history overload.
+  match=std::make_unique<GameplayMatchSession>(files,start.agreed_selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred);
+  start.match_owner=match.get();start.handoff_asset_generation=asset_generation;
+  const double constructed=emscripten_get_now();
+  report_construction("match-enter-step-agreed-start",started,constructed,constructed,
+                      before,aurora_stats_snapshot());
+  running=false;message="Preparing agreed original match...";
+  return true;
+ }catch(const std::exception& error){
+  history_refuse(error.what());faulted=true;running=false;return false;
+ }
+}
+
+void history_start_finish_asset_match_impl() {
+ auto& start=match_history.start;
+ try {
+  if(!history_start_asset_match_pending_impl()||match||!archive_cache||
+     asset_generation!=start.handoff_asset_generation||!asset_selection_valid||
+     history_start_payload(asset_selection)!=history_start_payload(start.agreed_selection)||
+     host!=start.source_host||host_entered||
+     melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_READY||faulted)
+   throw std::runtime_error("Agreed async asset handoff changed its source selection/owner");
+  match=std::make_unique<GameplayMatchSession>(files,start.agreed_selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred);
+  start.match_owner=match.get();
+  running=false;message="Preparing agreed original match...";
+ }catch(const std::exception& error){
+  history_refuse(error.what());faulted=true;running=false;
+ }
+}
+
+bool history_start_ordinary_callback_impl() {
+ auto& start=match_history.start;
+ if(start.state==MatchHistoryStartOfferReady||
+    start.state==MatchHistoryStartReadyHeld||
+    (start.state!=MatchHistoryStartDisabled&&match_history.status.first_failure))return true;
+ if(history_start_service_publication())return true;
+ if(start.state==MatchHistoryStartAgreed){
+  (void)history_start_begin_agreed_match();return true;
  }
  return false;
 }
@@ -214,7 +640,26 @@ EM_BOOL history_dispatch(double,void*) {
 }
 } // namespace
 
+bool history_start_is_enabled() noexcept {return history_start_is_enabled_impl();}
+bool history_start_offer_waiting() noexcept {return history_start_offer_waiting_impl();}
+bool history_start_capture_offer(const MeleeWebMenuMatchSelection& selection) {
+ return history_start_capture_offer_impl(selection);
+}
+bool history_start_asset_match_pending() noexcept {
+ return history_start_asset_match_pending_impl();
+}
+void history_start_finish_asset_match() {history_start_finish_asset_match_impl();}
+bool history_start_ordinary_callback() {return history_start_ordinary_callback_impl();}
+bool history_start_ready_hold_pending() noexcept {
+ return history_start_ready_hold_pending_impl();
+}
+
 void match_history_before_close() noexcept {
+ // Revoke host/session identities before destruction. Keep the one-shot state
+ // consumed so allocator reuse can never adopt a new owner at the same address.
+ match_history.start.enabled_host=nullptr;
+ match_history.start.source_host=nullptr;
+ match_history.start.match_owner=nullptr;
  if(match_history.capsule)match_history.capsule->disarm_for_teardown();
 }
 void match_history_after_match_close() {
@@ -226,11 +671,100 @@ void match_history_after_match_close() {
 }
 
 extern "C" {
+int melee_web_native_menu_match_history_start_enable() {
+ auto& start=match_history.start;
+ try {
+  if(!history_start_export_idle()||start.state!=MatchHistoryStartDisabled||match_history_terminal||
+     match_history.status.first_failure||!source_session_owned||!host||!host_entered||!world||
+     !world_exposed||!melee_web_gameplay_world_exists()||faulted||pending||
+     preparation.busy()||asset_destination!=AssetDestination::None||match||results||prize||
+     replay||melee_web_net_active()||!aurora_pipeline_complete_draws_enabled()||
+     melee_web_menu_host_mode_kind(host)!=GM_VS)
+   return history_refuse("Agreed-start opt-in requires the active original VS menu owner with complete draws");
+  const int phase=melee_web_menu_host_phase(host);
+  if(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_SSS_READY&&phase!=MELEE_WEB_MENU_SSS)
+   return history_refuse("Agreed-start opt-in requires an active CSS or SSS phase");
+  start.enabled_host=host;start.state=MatchHistoryStartEnabled;return 1;
+ }catch(const std::exception& error){return history_refuse(error.what());}
+}
+uint32_t melee_web_native_menu_match_history_start_state(){
+ return match_history.start.state;
+}
+const char* melee_web_native_menu_match_history_start_offer_json(
+    const char* runtime,const char* assets,const char* save,const char* profile) {
+ auto& start=match_history.start;
+ try {
+  if(!history_start_export_idle()||start.state!=MatchHistoryStartOfferReady||match_history.status.first_failure||
+     !history_start_source_stable(true))
+   throw std::runtime_error("Agreed-start offer read phase refused");
+  const auto host_agreement=history_start_host_agreement(runtime,assets,save,profile);
+  history_start_bind_host_agreement(host_agreement);
+  start.offer_json=history_start_offer_json(
+      start.local_selection,history_start_bound_host_agreement(),start.local_menu_seed);
+  return start.offer_json.c_str();
+ }catch(const std::exception& error){history_refuse(error.what());return nullptr;}
+}
+const char* melee_web_native_menu_match_history_start_agreement_json(
+    uint32_t seed,const char* runtime,const char* assets,const char* save,const char* profile) {
+ auto& start=match_history.start;
+ try {
+  if(!history_start_export_idle()||start.state!=MatchHistoryStartOfferReady||match_history.status.first_failure||
+     start.offer_json.empty()||!history_start_source_stable(true))
+   throw std::runtime_error("Agreed-start agreement read phase refused");
+  const auto host_agreement=history_start_host_agreement(runtime,assets,save,profile);
+  history_start_bind_host_agreement(host_agreement);
+  const auto candidate=history_start_agreement_json(
+      start.local_selection,seed,history_start_bound_host_agreement());
+  if(start.agreement_candidate_ready&&
+     (start.negotiated_seed!=seed||start.agreement_json!=candidate))
+   throw std::runtime_error("Agreed-start seed candidate changed after it was first bound");
+  start.negotiated_seed=seed;start.agreement_candidate_ready=true;
+  start.agreement_json=candidate;return start.agreement_json.c_str();
+ }catch(const std::exception& error){history_refuse(error.what());return nullptr;}
+}
+int melee_web_native_menu_match_history_start_commit(
+    uint32_t seed,const char* expected,size_t expected_bytes,
+    const char* runtime,const char* assets,const char* save,const char* profile) {
+ auto& start=match_history.start;
+ try {
+  if(!history_start_export_idle()||start.state!=MatchHistoryStartOfferReady||match_history.status.first_failure||
+     start.offer_json.empty()||!start.agreement_candidate_ready||seed!=start.negotiated_seed||
+     !history_start_source_stable(true))
+   throw std::runtime_error("Agreed-start commit phase refused");
+  const auto expected_agreement=history_start_string_argument(expected,expected_bytes);
+  const auto host_agreement=history_start_host_agreement(runtime,assets,save,profile);
+  history_start_bind_host_agreement(host_agreement);
+  const auto candidate=history_start_agreement_json(
+      start.local_selection,seed,history_start_bound_host_agreement());
+  if(candidate!=start.agreement_json||expected_agreement!=candidate)
+   throw std::runtime_error("Agreed-start peer bytes differ from the source-bound agreement");
+  start.agreed_selection=start.local_selection;
+  start.agreed_selection.random_seed=seed;
+  start.state=MatchHistoryStartAgreed;return 1;
+ }catch(const std::exception& error){return history_refuse(error.what());}
+}
+const char* melee_web_native_menu_match_history_start_live_identity_json(){
+ auto& start=match_history.start;
+ if(!history_start_export_idle()||start.state!=MatchHistoryStartReadyHeld||!start.match_owner||
+    start.match_owner!=match.get()||start.live_identity_json.empty())
+  return nullptr;
+ return start.live_identity_json.c_str();
+}
+const void* melee_web_native_menu_match_history_start_publication_data(){
+ auto& start=match_history.start;
+ if(!history_start_export_idle()||start.state!=MatchHistoryStartReadyHeld||
+    !start.match_owner||match.get()!=start.match_owner||match->source_frames()!=0)return nullptr;
+ return &start.publication;
+}
+unsigned melee_web_native_menu_match_history_start_publication_bytes(){return sizeof(MatchHistoryPublication);}
 int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,unsigned remote) {
  auto& c=match_history;
  try {
-  if(match_history_terminal||match_history_in_tick||c.dispatching||!match||local>=2||remote>=2||local==remote||frame==UINT32_MAX||
-     !running||pending||faulted||preparation.busy()||replay||menu_scene_rebuild_pending||first_use_draw_pending||
+  const bool agreed_ready=c.start.state==MatchHistoryStartReadyHeld&&
+      c.start.match_owner&&c.start.match_owner==match.get()&&frame==0;
+  if(match_history_terminal||match_history_in_tick||c.dispatching||c.status.first_failure||!match||local>=2||remote>=2||local==remote||frame==UINT32_MAX||
+     (!running&&!agreed_ready)||pending||faulted||preparation.busy()||replay||menu_scene_rebuild_pending||
+     first_use_draw_pending||
      asset_destination!=AssetDestination::None||melee_web_net_active()||!history_runtime_idle()||!history_gpu_idle()||
      match->source_frames()!=frame||!match->construction_complete()||match->paused()||match->ending()||match->complete()||
      !history_source_idle(*match))return history_refuse("Terminal takeover admission refused");
