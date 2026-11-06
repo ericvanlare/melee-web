@@ -1978,8 +1978,14 @@ repair for both acceptance and refusal. Ordinary and private Release builds pass
 on `4597f008`; retained regression failures and their build-setup/source-fixture
 repairs are recorded in `runtime_match_start_v1`. The final fixture repair explicitly
 enables the profile that its modeled draw leaves require, preserving assertions
-and the separate default-off control. Integration and final merge checks are tracked
-by [#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
+and the separate default-off control. The full local regression then passed on
+`b4025d3b`: 3,096 tests with 242 skips. The first CI attempt exposed a missing
+historical TObj compiler graph in its clean unit shard; the CI-only repair configures
+that graph with an explicitly empty source-only asset directory. The unchanged
+TObj component and all 15 focused CI controls pass; assertions, test ownership and
+deadlines are unchanged. Integration and exact-head checks are tracked by
+[PR #363](https://github.com/ericvanlare/melee-web/pull/363) and
+[#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
 boundary is confirmed retirement and rebase into adjacent correction windows in
 the same live match.
 

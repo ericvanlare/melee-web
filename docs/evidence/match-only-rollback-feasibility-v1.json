@@ -12349,6 +12349,45 @@
               }
             },
             "integration_gate": "Complete final full regression and exact-head CI before merging; tracking issue #362 owns integration state."
+          },
+          "integration_validation_v3": {
+            "source_head": "b4025d3b2228898adba33c699fc3166319036d55",
+            "result": "PASS_FULL_LOCAL_REGRESSION",
+            "tests": 3096,
+            "skips": 242,
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v3/result.json",
+              "sha256": "55936a6211150bc8dec6de06ace3198234e643c200b4e3688d323c0ad8ccb333"
+            },
+            "log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v3/regression.log",
+              "sha256": "22c8cfc34d178035aed83d18f644683f47235a113d5ad39495262a1b2d42773f"
+            },
+            "independent_source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-final-preci-review-v1.json",
+              "sha256": "2f774e4834e545600d1c7a2d3202ebbd8ae9966ec13071cf4a8f1d021d373e31"
+            },
+            "ci_first_attempt": {
+              "run": 42169861811,
+              "failed_job": 127734958510,
+              "log": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-failure-v1/unit0-complete.log",
+                "sha256": "e816a78327af053e58bf7628f9f678920a59fb7c13dc86912367df9669876c10"
+              },
+              "failure": "Historical TObj component lacked its canonical v7 compile graph in a clean unit shard. All six native shards passed; no product runtime failure is claimed."
+            },
+            "ci_setup_repair": {
+              "freeze": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-v7-setup-repair-v1/freeze.json",
+                "sha256": "4a49767c3695828284f1702c0b3825ab4a88ab84154ef5cd57cd7764cf9c77e1"
+              },
+              "review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-v7-setup-repair-v1/root-review.json",
+                "sha256": "e84ea6f11797a7d665e21bd5a67734c55ad08208136c695ef23ceb9cf720aabe"
+              },
+              "scope": "Configure-only canonical v7 source graph before its owning unit shard, using an explicitly empty assets directory; no asset-bearing build, inventory/test assertion removal or deadline increase. Fifteen focused CI controls and unchanged actual TObj component pass."
+            },
+            "integration": "PR #363; complete all exact-head checks before merge."
           }
         }
       }

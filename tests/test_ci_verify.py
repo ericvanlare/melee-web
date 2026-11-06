@@ -252,6 +252,42 @@ class CiVerifyTests(unittest.TestCase):
         self.assertIn("skipped", {outcome["status"] for outcome in result.outcomes})
         self.assertTrue(any("missing-build" in outcome["test"] for outcome in result.outcomes))
 
+    def test_only_tobj_unit_owner_configures_source_only_v7_before_tests(self):
+        owner = ci_verify.UNIT_GROUPS[ci_verify.unit_shard("profile_tobj_writer_tests")]
+        with tempfile.TemporaryDirectory(prefix="melee ci v7 ") as temporary:
+            root = Path(temporary)
+            assets = root / "work/ci/slippi-v7-source-only-assets"
+            for group in ci_verify.UNIT_GROUPS:
+                with self.subTest(group=group):
+                    events = []
+
+                    def command(argv, **kwargs):
+                        if "--slippi-synctest-assets" in argv:
+                            self.assertTrue(assets.is_dir())
+                            self.assertEqual(list(assets.iterdir()), [])
+                        events.append(argv[2:])
+
+                    with patch.object(ci_verify, "ROOT", root), \
+                            patch.object(ci_verify, "check_inventory"), \
+                            patch.object(ci_verify.platform, "platform", return_value="test-platform"), \
+                            patch.object(ci_verify.subprocess, "check_output", return_value="test-sha\n"), \
+                            patch.object(ci_verify.subprocess, "run", side_effect=command), \
+                            patch.object(ci_verify, "run_tests", side_effect=lambda *_: events.append("tests")):
+                        ci_verify.run_group(group, 2)
+                    expected = [["--configure-only"]]
+                    if group == owner:
+                        expected.append([
+                            "--configure-only", "--trace-target", "gameplay_slippi_synctest",
+                            "--configuration", "Release", "--slippi-logical-frame-clock",
+                            "--slippi-lobj-presentation-cache", "--stage-arena-owner-diagnostic",
+                            "--aurora-staging-shadow-diagnostic", "--slippi-synctest-assets",
+                            str(assets),
+                        ])
+                    expected.append("tests")
+                    if group == "unit-0":
+                        expected.append(["--jobs", "2"])
+                    self.assertEqual(events, expected)
+
     def _run_group_with_command_failure(self, *, fail_on_build):
         temporary = tempfile.TemporaryDirectory(prefix="melee ci verify ")
         root = Path(temporary.name)
