@@ -426,6 +426,35 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
     motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
     pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},
+    checksum(){
+      active();
+      const data=module[PREFIX+'checksum_data'],extent=module[PREFIX+'checksum_bytes'];
+      if(typeof data!=='function'||typeof extent!=='function')
+        throw Error('Private runtime history checksum exports are unavailable');
+      try{
+        const before=check(status()),history=before.metadata;
+        const corrected=history.phase===13; // CorrectedCpuCopied
+        if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
+          before.inputReady!==1||before.completeSequence!==before.requestSequence||
+          (history.phase!==6&&!corrected)||history.preFrame!==before.expectedFrame||
+          history.preFrame===UINT32_MAX||history.currentFrame!==history.preFrame+1||
+          history.currentFrame!==history.sealedEnd||history.pollSerial==='0'||
+          history.forwardSteps!==1||history.replaySteps!==(corrected?1:0))
+          throw Error('Runtime history checksum requires a copied, idle CPU endpoint');
+        const size=extent();
+        if(size!==64)throw Error('Runtime history checksum ABI must be exactly 64 bytes');
+        const pointer=data();
+        if(!pointer)throw Error('Native runtime history checksum refused its copied CPU endpoint');
+        const bytes=read(pointer,size); // Copy borrowed data before another native call.
+        const record=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+        if(record.getUint32(0,true)!==0||record.getUint32(4,true)!==3||
+          record.getUint32(12,true)!==history.currentFrame)
+          throw Error('Runtime history checksum tick, match scene or source frame differs');
+        if(JSON.stringify(check(status()))!==JSON.stringify(before))
+          throw Error('Runtime history checksum changed its native owner status');
+        return bytes;
+      }catch(error){throw latch(error);}
+    },
     async command(name){
       const command=MATCH_HISTORY_COMMAND[name];if(!command)throw Error('Unknown runtime history command');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');

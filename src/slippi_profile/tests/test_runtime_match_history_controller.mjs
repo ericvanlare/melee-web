@@ -372,3 +372,67 @@ test('agreed-start argument paths refuse allocator churn after match-history cap
   assert.equal(f.frees.length,frees);
   await owner.command('cleanup');
 });
+
+function checksumFixture(phase=6){
+  const f=fixture();
+  const owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  f.put(56,phase); // history.phase
+  f.put(68,1); // history.currentFrame
+  f.put(72,1); // history.sealedEnd
+  f.put(88,1); // history.forwardSteps
+  f.put(92,phase===13?1:0); // history.replaySteps
+  f.put(96,17); // history.pollSerial, low word
+  f.put(112,1); // inputReady
+  const pointer=16384;
+  f.view.setUint32(pointer+4,3,true);
+  f.view.setUint32(pointer+12,1,true);
+  f.view.setBigUint64(pointer+56,0xfedcba9876543210n,true);
+  f.module[prefix+'checksum_data']=()=>pointer;
+  f.module[prefix+'checksum_bytes']=()=>64;
+  return {...f,owner,pointer};
+}
+
+test('checksum copies the exact native CPU endpoint bytes before another native call',()=>{
+  for(const phase of [6,13]){
+    const f=checksumFixture(phase);
+    const expected=f.module.HEAPU8.slice(f.pointer,f.pointer+64);
+    const getStatus=f.module[prefix+'status'];
+    let statusReads=0;
+    f.module[prefix+'status']=()=>{
+      if(++statusReads===2)f.module.HEAPU8.fill(0,f.pointer,f.pointer+64);
+      return getStatus();
+    };
+    const allocationCount=f.allocations.length;
+    assert.deepEqual(f.owner.checksum(),expected);
+    assert.equal(statusReads,2);
+    assert.equal(f.allocations.length,allocationCount);
+    assert.equal(f.frees.length,0);
+  }
+});
+
+test('checksum refuses wrong phase, borrowed extent, frame and changed owner status',()=>{
+  const old=checksumFixture();
+  delete old.module[prefix+'checksum_data'];
+  assert.throws(()=>old.owner.checksum(),/checksum exports are unavailable/);
+
+  const phase=checksumFixture(5);
+  phase.module[prefix+'checksum_data']=()=>assert.fail('read before copied CPU endpoint');
+  assert.throws(()=>phase.owner.checksum(),/requires a copied, idle CPU endpoint/);
+
+  const size=checksumFixture();
+  size.module[prefix+'checksum_bytes']=()=>63;
+  assert.throws(()=>size.owner.checksum(),/ABI must be exactly 64 bytes/);
+
+  const extent=checksumFixture();
+  extent.module[prefix+'checksum_data']=()=>extent.module.HEAPU8.length-63;
+  assert.throws(()=>extent.owner.checksum(),/borrowed extent/);
+
+  const frame=checksumFixture();
+  frame.view.setUint32(frame.pointer+12,2,true);
+  assert.throws(()=>frame.owner.checksum(),/source frame differs/);
+
+  const owner=checksumFixture();
+  owner.module[prefix+'checksum_data']=()=>{owner.put(96,18);return owner.pointer;};
+  assert.throws(()=>owner.owner.checksum(),/changed its native owner status/);
+});

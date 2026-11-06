@@ -21,6 +21,7 @@ struct MatchHistoryInput {
 };
 static_assert(sizeof(MatchHistoryStatus)==128);
 static_assert(sizeof(MatchHistoryInput)==168);
+static_assert(sizeof(MeleeWebNetChecksumRecord)==64);
 enum MatchHistoryStartState : uint32_t {
  MatchHistoryStartDisabled=0,
  MatchHistoryStartEnabled=1,
@@ -92,6 +93,7 @@ struct MatchHistoryControl {
  SlippiParticleCellEndpointRow particle_row{};
  MeleeWebCpuMotorEvidence motor{};
  MeleeWebCpuMotorCommitReceipt motor_commit{};
+ MeleeWebNetChecksumRecord checksum{};
 } match_history;
 extern "C" char __global_base, __data_end;
 
@@ -1058,5 +1060,37 @@ const void* melee_web_native_menu_match_history_pcm_data(){
 unsigned melee_web_native_menu_match_history_pcm_bytes(){
  return melee_web_native_menu_match_history_pcm_data()?match_history_pcm_frames*2u*sizeof(float):0u;
 }
+const void* melee_web_native_menu_match_history_checksum_data(){
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ auto& c=match_history;
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    !history_start_export_idle()||!match||!c.capsule||c.capsule->endpoint_active()||
+    c.capsule->first_failure()!=melee_web::RuntimeMatchHistoryFailure::None)
+  return nullptr;
+ const auto phase=c.capsule->phase();
+ const bool corrected=phase==Phase::CorrectedCpuCopied;
+ if(phase!=Phase::PredictedCpuCopied&&!corrected)return nullptr;
+ const auto pre=c.capsule->pre_frame();
+ if(pre!=c.status.expected_frame||pre==UINT32_MAX)return nullptr;
+ const auto frame=pre+1;
+ if(c.capsule->sealed_end()!=frame||!c.capsule->poll_serial()||
+    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)
+  return nullptr;
+ const auto* pads=c.capsule->retained_input(corrected?2:1);
+ if(!pads)return nullptr;
+ // Tick zero is the single match-input ordinal of this private capsule.
+ // Scene three selects the existing match projection, never the menu/ring path.
+ MeleeWebNetChecksumRecord observed{};
+ melee_web_net_checksum_compute(0,3,pads,nullptr,&observed);
+ if(observed.frame!=frame||!(observed.flags&MELEE_WEB_NET_HASHED_FIGHTERS)||
+    c.capsule->phase()!=phase||
+    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)
+  return nullptr;
+ c.checksum=observed;
+ return &c.checksum;
+}
+unsigned melee_web_native_menu_match_history_checksum_bytes(){return sizeof(match_history.checksum);}
 } // extern C
 #endif
