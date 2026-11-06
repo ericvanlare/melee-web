@@ -2144,9 +2144,30 @@ Alpha's observed command medians fall from 54.97 to 15.51 ms for capture,
 are 25.32 ms initially and 5.70 ms at the confirmed rebase; the four restores
 range from 9.83 to 14.41 ms. These are serialized wall durations from one
 before/after witness, not sustained cadence or a combined correction budget.
-The next native boundary is an explicit CPU-only confirmed-prefix transfer that
-retains the already-polled speculative suffix. Its source candidates are not
-runtime evidence. Continuous/paced and full-match rollback remain incomplete.
+The CPU-only confirmed-prefix transfer now passes at native producer `703a0e83`
+and harness `245bdf10`. Alpha restores PRE0, re-simulates authoritative inputs to
+C2 while its old frontier is F4, closes and retires the actual C2 CPU endpoint,
+then captures fresh PRE2. Native-owned original tickets for ticks2/3 are adopted
+without polling or publishing again, and only the rebuilt current frontier is
+drawn. A later late input successfully restores that new PRE2 and corrects to F5.
+
+Independent raw review replays both exact arena/shadow PRE comparisons, all nine
+domains and twelve particle relations, every authoritative 44-byte input row,
+and the complete 64-byte checksums at C2/F5/F8. All agree with the on-time peer.
+There are exactly eight actual polls per peer and 10/8 source presentations;
+none occurs at the older C2 during the handoff. Exact owner, 3,798 static records,
+local audio phase and effect-token retirement/rearm are retained. Native cleanup,
+the Worker and all 19 owned browser processes are clean. The same receipt pins
+all producers, reviews, controls and retained drafts in
+`continuous_366.confirmed_prefix_v1`.
+
+The private Release build and focused leaf, endpoint/coordinator and eight
+integrated host controls pass. Full milestone integration regression and CI are
+still pending. This is one bounded local transfer, with serialized command
+samples only. Repeated transfers, advancing an anchor when prediction was
+correct, paced play, combat/KO and full-match rollback remain incomplete. The
+next experiment covers those two repeat/confirmation boundaries before adding
+a continuous clock-driven loop; it keeps the same snapshot/input/deadline bounds.
 
 ## Stage decision dependencies, issue #333
 

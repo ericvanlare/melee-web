@@ -13015,7 +13015,7 @@
               "renderer_cache_flushes": 0
             },
             "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
-            "next": "Attribute costly capture/seal/restore commands with opt-in first-alpha CPU profiles before a paced run. Source validation pairwise overlap checks are a hypothesis, not yet a measured cause. Persistent-lag confirmed anchor transfer remains open.",
+            "next": "Repeat confirmed-prefix transfer with an already-adopted origin and correct predictions, then paced browser-owned loop under existing clock/debt guards. Keep whole-match/profile/acceptance gaps explicit.",
             "per_forward_present_v1": {
               "state": "TWO_ARENA_EPISODES_COMPLETE",
               "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
@@ -13314,6 +13314,163 @@
                 "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-focused-v1/preflight-refusal.json",
                 "sha256": "4f6b81d1fbc0fcc29405a398cb94bd59fcb5f3b1bc1a0aff381913fd33e27be9"
               }
+            },
+            "confirmed_prefix_v1": {
+              "status": "CONFIRMED_PREFIX_TRANSFER_COMPLETE",
+              "native_producer": "703a0e838953396b7a04c33649fccddfecd6e3df",
+              "harness_producer": "245bdf10d7850dc88c1ae70799ae53fc295292bd",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-controller-candidate-v1/independent-combined-source-review.json",
+                "sha256": "6b25a8bf36535ee49e2d55359d2ef7f22b2377921a7b93721b783c951fc432ab"
+              },
+              "leaf_gcp_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-gcp-candidate-v1/independent-review.json",
+                "sha256": "db8a983d793de83fed1c00d2a7c0022f5225ecd2a6783aca1ab5426ddfce633a"
+              },
+              "leaf_focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-leaves-v2-focused-result.json",
+                "sha256": "ebb138645c5b835ca6fdbef1bf3e69ba42cfce54a0a84be6cab0ea9eb8606687"
+              },
+              "integrated_host_focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-integrated-host-focused-v1.json",
+                "sha256": "648f37662ada17ee455d59865215470efd9108bdada1526ac8d02f5650eab372"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-build-v1/result.json",
+                "sha256": "33f514d983c4a396ecba9dc7a50525067cee88873e74736772a8d5b1faab6149"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-producer-v1/archive.json",
+                "sha256": "771408bc5efba645190d3942bec536c4441edfdcfc36000231a08d9b0e391530"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "50547dbc725d50794f907236d0d5d462eb682ed880e767fdf96c1b1022019bc6"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-root-review-v1.json",
+                "sha256": "b733598e000a8a65680f999c47302705b2409d82b853308dd032b21edbc163ec"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/result-summary.json",
+                "sha256": "50ad95402bd68b1d1d758df4176f4403f26283ea98eec28e991aa452577002b6"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/browser/result.json",
+                "sha256": "a16038e1715692c31fe703b648815aa86385fa1ca1237ac5a6fddc8cccb0b3b4"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/owner.json",
+                "sha256": "9a731603cfc69c7ddbc9b99cb118df8bcf8a422a23651167a34e11b67d8d7000"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/independent-result-review.json",
+                "sha256": "381f7dcd182c7fc572f4a6adb75b49c9c3d427aa7dcea0e380f92233520a608b"
+              },
+              "observed": {
+                "actual_source_inputs_per_peer": 8,
+                "confirmed_prefix": {
+                  "old_pre": 0,
+                  "selected_frontier": 4,
+                  "confirmed_cpu_end": 2,
+                  "suffix_source_ticks": [
+                    2,
+                    3
+                  ],
+                  "original_ticket_ids": [
+                    11,
+                    15
+                  ],
+                  "original_poll_serials": [
+                    "450",
+                    "451"
+                  ],
+                  "no_repoll_or_republication": true,
+                  "no_source_draw_at_old_C_during_transfer": true
+                },
+                "exact_restored_pres": [
+                  0,
+                  2
+                ],
+                "arena_bytes_per_restore": 33554432,
+                "raw_domains_per_restore": 9,
+                "particle_relations_per_restore": 12,
+                "checksum_source_frames": [
+                  2,
+                  5,
+                  8
+                ],
+                "checksum_bytes_each": 64,
+                "all_checksums_equal": true,
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "actual_source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    4,
+                    5,
+                    5,
+                    6,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8
+                  ]
+                },
+                "same_match_and_page_sockets": true,
+                "alpha_prefix_end_to_capture": {
+                  "cpu_only": true,
+                  "exact_static_records": 3798,
+                  "effect_tokens": [
+                    "1",
+                    "0",
+                    "2"
+                  ],
+                  "audio_phase": 40
+                },
+                "beta_whole_end_to_capture": {
+                  "exact_static_records": 3798,
+                  "audio_phase": 20
+                },
+                "owned_browser_pids_absent": 19,
+                "owned_native_worker_server_cleanup": true
+              },
+              "serialized_alpha_commands_ms": {
+                "fresh_capture": 5.07,
+                "restores": [
+                  15.78,
+                  9.77
+                ],
+                "finish_prefix": 0.815,
+                "rebase_prefix": 0.805,
+                "adopt_tickets": [
+                  0.205,
+                  0.05
+                ],
+                "scope": "Observed serialized command samples, not sustained cadence or combined frame budget."
+              },
+              "review_repairs": [
+                "Allow new polls after suffix completion beyond F, retain original adopted-row provenance, preserve legacy explicit-frame refusal and export the five private entry points.",
+                "Dispatch prefix close/retire/adopt/poll commands exactly once. Keep request IDs distinct from original ticket IDs.",
+                "Retain original frozen drafts and the earlier failed leaf controls; correct the new synchronous refusal assertion before executing it."
+              ],
+              "scope": [
+                "One local functional CPU-only prefix transfer and later correction from its new PRE.",
+                "No arbitrary object-lifetime, combat, repeated-transfer, paced-loop, full-match or public-relay rollback claim.",
+                "Full integration regression, ordinary Release and exact-head CI for milestone366 remain pending."
+              ]
             }
           }
         }
