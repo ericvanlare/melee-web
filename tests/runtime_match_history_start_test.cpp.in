@@ -19,6 +19,11 @@ namespace melee_web {
 enum class GameplayMatchConstruction {Deferred};
 }
 unsigned default_pad_constructors=0;
+struct MeleeWebAudio {};
+MeleeWebAudio fixture_audio;
+bool source_files_idle=true,source_memory_healthy=true,bank_pending=false,stream_pending=false;
+bool stream_owned=true,stream_pump_ok=true,stream_completes=true;
+std::string transfer_order;
 struct GameplayMatchSession {
  MeleeWebMenuMatchSelection selection;
  GameplayMatchSession(int,MeleeWebMenuMatchSelection selected,RuntimeArchiveCache&,
@@ -29,6 +34,8 @@ struct GameplayMatchSession {
  bool paused() const {return false;}
  bool ending() const {return false;}
  bool complete() const {return false;}
+ bool diagnostic_source_files_quiescent() const {return source_files_idle;}
+ MeleeWebAudio* audio() const {return &fixture_audio;}
 };
 #define SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID "profile"
 namespace melee_web::slippi_profile {
@@ -60,9 +67,30 @@ const char* history_gpu_idle_failure() noexcept {
  return gpu_idle?nullptr:"fixture renderer busy";
 }
 const char* history_source_idle_failure(const GameplayMatchSession&) noexcept {
+ if(stream_pending)return "fixture HPS still loading";
  return source_idle?nullptr:"fixture source files busy";
 }
 bool melee_web_cpu_interval_active(){return false;}
+bool melee_web_source_file_drive_busy(){return !source_files_idle;}
+bool melee_web_source_memory_healthy(){return source_memory_healthy;}
+bool melee_web_audio_bank_transport_busy(){return bank_pending;}
+bool melee_web_audio_bank_transport_active(){return true;}
+bool melee_web_audio_stream_source_loading(){return stream_pending;}
+bool melee_web_audio_stream_owned(MeleeWebAudio* audio){return stream_owned&&audio==&fixture_audio;}
+void melee_web_audio_bank_transport_pump(){transfer_order+='B';bank_pending=false;}
+bool melee_web_audio_stream_pump_for(MeleeWebAudio* audio,char* error,size_t bytes){
+ assert(melee_web_audio_stream_owned(audio));
+ transfer_order+='H';
+ if(!stream_pump_ok){
+  std::snprintf(error,bytes,"fixture HPS transfer failed");
+  return false;
+ }
+ if(stream_completes)stream_pending=false;
+ return true;
+}
+constexpr int DVD_STATE_END=0;
+int DVDGetDriveStatus(){return bank_pending||stream_pending||!source_files_idle;}
+
 bool aurora_pipeline_complete_draws_enabled(){return complete_draws;}
 constexpr int MELEE_WEB_MENU_CSS=1,MELEE_WEB_MENU_SSS_READY=2,MELEE_WEB_MENU_SSS=3,MELEE_WEB_MENU_READY=5,GM_VS=7;
 bool faulted=false,pending=false,running=false,host_entered=false,world_exposed=false;
@@ -135,6 +163,8 @@ void reset(){
  preparation.reset();asset_destination=AssetDestination::None;
  renderer_services=0;submitted={};stats={};
  cache_status=AURORA_PIPELINE_CACHE_READY;cache_flushes=0;cache_flush_ok=true;
+ source_files_idle=true;source_memory_healthy=true;bank_pending=false;stream_pending=false;
+ stream_owned=true;stream_pump_ok=true;stream_completes=true;transfer_order.clear();
 }
 void offer(){
  assert(melee_web_native_menu_match_history_start_enable());
@@ -192,9 +222,11 @@ int main(){
   construct(deferred);
   unsigned draws=0;
   cache_status=AURORA_PIPELINE_CACHE_PENDING;
+  bank_pending=true;stream_pending=true;
   history_start_publish_initial_source([&]{
    ++draws;
    assert(cache_flushes==1&&cache_status==AURORA_PIPELINE_CACHE_READY);
+   assert(transfer_order=="BH"&&!bank_pending&&!stream_pending);
    cache_status=AURORA_PIPELINE_CACHE_PENDING;
    assert(!preparation.busy()&&!running&&first_use_draw_pending);
    stats.lastBeginFrameId=stats.lastEndFrameId=1;
@@ -209,6 +241,7 @@ int main(){
   submitted.pendingStagingBuffers=0;
   assert(history_start_ordinary_callback_impl());
   assert(draws==1&&!first_use_draw_pending&&!running&&cache_flushes==2);
+  assert(transfer_order=="BH");
   const auto* receipt=static_cast<const MatchHistoryPublication*>(melee_web_native_menu_match_history_start_publication_data());
   assert(receipt&&receipt->source_frame==0&&receipt->source_draws==1&&receipt->source_submission==1);
   assert(melee_web_native_menu_match_history_start_publication_bytes()==48);
@@ -268,6 +301,31 @@ int main(){
           "Agreed source publication renderer cache flush failed"));
   }
   assert(cache_flushes==(busy?0u:1u)&&first_use_draw_pending);
+ }
+
+ // Initial transfers cannot dispatch through an unknown owner, touch an
+ // unrelated file request, or draw after failure or incomplete HPS work.
+ const char* transfer_errors[]{
+  "Agreed initial audio transfer lost its exact audio owner",
+  "Agreed initial audio transfer requires quiescent match source files",
+  "fixture HPS transfer failed",
+  "fixture HPS still loading",
+ };
+ for(unsigned index=0;index<4;++index){
+  construct(false);
+  stream_pending=true;
+  stream_owned=index!=0;
+  source_files_idle=index!=1;
+  stream_pump_ok=index!=2;
+  stream_completes=false;
+  try {
+   history_start_publish_initial_source([]{assert(false);return true;});
+   assert(false);
+  }catch(const std::runtime_error& error){
+   assert(std::string(error.what())==transfer_errors[index]);
+  }
+  assert(transfer_order==(index<2?"":"H"));
+  assert(cache_flushes==0&&first_use_draw_pending);
  }
 
  // A preflight refusal retains the first specific boundary error. The failed

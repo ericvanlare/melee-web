@@ -335,6 +335,30 @@ bool history_start_enter_ready_hold_impl() {
  return true;
 }
 
+bool history_start_complete_initial_transfers(const GameplayMatchSession& session) {
+ // The original match constructor starts its resident music asynchronously.
+ // Complete only its existing DevCom work, in the transport order used by
+ // the audio renderer, before admitting the strict source-idle boundary.
+ if(!session.diagnostic_source_files_quiescent()||melee_web_source_file_drive_busy())
+  return history_refuse("Agreed initial audio transfer requires quiescent match source files");
+ if(!melee_web_source_memory_healthy())
+  return history_refuse("Agreed initial audio transfer requires healthy source memory");
+ const bool bank_pending=melee_web_audio_bank_transport_busy();
+ const bool stream_pending=melee_web_audio_stream_source_loading();
+ if(!bank_pending&&!stream_pending&&DVDGetDriveStatus()==DVD_STATE_END)return true;
+ auto* audio=session.audio();
+ if(!audio||!melee_web_audio_bank_transport_active()||
+    (stream_pending&&!melee_web_audio_stream_owned(audio)))
+  return history_refuse("Agreed initial audio transfer lost its exact audio owner");
+ if(bank_pending)melee_web_audio_bank_transport_pump();
+ if(melee_web_audio_stream_owned(audio)){
+  char error[256]{};
+  if(!melee_web_audio_stream_pump_for(audio,error,sizeof(error)))
+   return history_refuse(error[0]?error:"Agreed initial HPS transfer failed");
+ }
+ return true;
+}
+
 bool history_start_publication_begin() {
  auto& start=match_history.start;
  if(start.state!=MatchHistoryStartConsumed||start.publication.source_draws)
@@ -349,11 +373,12 @@ bool history_start_publication_begin() {
   return history_refuse("Agreed source publication requires stopped, idle scene preparation");
  if(!history_runtime_idle())
   return history_refuse("Agreed source publication requires the idle main-thread Asyncify runtime");
- if(const auto* error=history_source_idle_failure(*match))return history_refuse(error);
  if(melee_web_cpu_interval_active())
   return history_refuse("Agreed source publication requires an unarmed CPU interval");
  if(history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
   return history_refuse("Agreed source publication selection differs from its agreement");
+ if(!history_start_complete_initial_transfers(*match))return false;
+ if(const auto* error=history_source_idle_failure(*match))return history_refuse(error);
  if(!history_start_finish_renderer_persistence())return false;
  if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
  const auto* stats=aurora_get_stats();
