@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: GPL-3.0-or-later
-/* Two separately owned headless pages stop at the agreed frame-zero source
- * boundary. This phase compares the exact reviewed static row bytes before
- * any history capture/begin command; it makes no rollback claim. */
+/* Two independently owned headless pages share the original ordinary route.
+ * The held-statics phase retains exact configured rows before capture; the
+ * peer-correction phase performs one asymmetric actual-input correction. */
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createReadStream} from 'node:fs';
@@ -10,22 +10,34 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
+import {createRoomId} from './net_lockstep_websocket_relay.mjs';
+import {parseNetChecksum} from './net_lockstep_core.mjs';
+import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions,loadBrowserTools} from './browser_tools.mjs';
 import {createRuntimeMatchAdmission} from './runtime_match_history_admission.mjs';
 import {validateCpuRestoreConfiguration} from '../src/slippi_profile/tests/cpu_restore_runner.mjs';
+import {compareCpuReferenceParticleEndpoints,CPU_ENDPOINT_PROVENANCE,CPU_ENDPOINT_VIEW,
+  decodeCpuParticleEndpointResult} from '../src/slippi_profile/tests/cpu_endpoint.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
+// SDL two-keyboard layout: KeyD and ArrowLeft map to signed main-stick X.
+const P1_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
+const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase'];
 const {values}=parseArgs({options:Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),strict:true});
 for(const name of optionNames)if(!values[name])throw Error(`--${name} is required`);
-assert.equal(values.phase,'held-statics','This driver currently supports only the bounded held-statics phase');
+assert(['held-statics','peer-correction'].includes(values.phase),
+  'Supported bounded phases are held-statics and peer-correction');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
 assert(['127.0.0.1','localhost','[::1]'].includes(baseUrl.hostname),'The runtime server must be local');
+if(values.phase==='peer-correction')
+  assert(['http://127.0.0.1:8787','http://localhost:8787'].includes(baseUrl.origin),
+    'Peer correction needs a loopback runtime origin allowed by the pinned Worker on port 8787');
 const discPath=path.resolve(values.disc),out=path.resolve(values.out);
 for(const file of [discPath,values['linked-config'],values.manifest,values.map])await fs.access(path.resolve(file));
 try{await fs.access(out);throw Error(`Refusing to overwrite evidence directory ${out}`);}
@@ -91,21 +103,57 @@ assert.equal(joined.length,wire.length,'Reviewed typed clock/cadence exclusions 
 
 const controllerPath=path.join(ROOT,'src/slippi_profile/runtime_match_history_controller.mjs');
 const endpointPath=path.join(ROOT,'src/slippi_profile/tests/cpu_endpoint.mjs');
+const peerProbePath=path.join(ROOT,'src/slippi_profile/tests/runtime_peer_history_probe.mjs');
+const peerModulePath=path.join(ROOT,'src/slippi_profile/runtime_match_history_peer.mjs');
+const lockstepCorePath=path.join(ROOT,'scripts/net_lockstep_core.mjs');
+const websocketRelayPath=path.join(ROOT,'scripts/net_lockstep_websocket_relay.mjs');
 const profilePath=path.join(ROOT,'src/slippi_profile/profile.h');
-const [controllerBytes,endpointBytes,profileSource]=await Promise.all([
-  fs.readFile(controllerPath),fs.readFile(endpointPath),fs.readFile(profilePath,'utf8'),
+const [controllerBytes,endpointBytes,peerProbeBytes,peerModuleBytes,lockstepCoreBytes,
+  websocketRelayBytes,profileSource]=await Promise.all([
+  fs.readFile(controllerPath),fs.readFile(endpointPath),fs.readFile(peerProbePath),
+  fs.readFile(peerModulePath),fs.readFile(lockstepCorePath),fs.readFile(websocketRelayPath),
+  fs.readFile(profilePath,'utf8'),
 ]);
 assert(profileSource.includes(`"${PROFILE}"`),'Source profile header no longer pins V20');
 const diagnosticBindings=[
-  {url:new URL('/__melee_diag__/runtime_match_history_controller.mjs',baseUrl).href,
+  {url:new URL('/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs',baseUrl).href,
     checkout_path:path.relative(ROOT,controllerPath),sha256:sha256(controllerBytes)},
-  {url:new URL('/__melee_diag__/tests/cpu_endpoint.mjs',baseUrl).href,
+  {url:new URL('/__melee_diag__/src/slippi_profile/tests/cpu_endpoint.mjs',baseUrl).href,
     checkout_path:path.relative(ROOT,endpointPath),sha256:sha256(endpointBytes)},
+  {url:new URL('/__melee_diag__/src/slippi_profile/tests/runtime_peer_history_probe.mjs',baseUrl).href,
+    checkout_path:path.relative(ROOT,peerProbePath),sha256:sha256(peerProbeBytes)},
+  {url:new URL('/__melee_diag__/src/slippi_profile/runtime_match_history_peer.mjs',baseUrl).href,
+    checkout_path:path.relative(ROOT,peerModulePath),sha256:sha256(peerModuleBytes)},
+  {url:new URL('/__melee_diag__/scripts/net_lockstep_core.mjs',baseUrl).href,
+    checkout_path:path.relative(ROOT,lockstepCorePath),sha256:sha256(lockstepCoreBytes)},
+  {url:new URL('/__melee_diag__/scripts/net_lockstep_websocket_relay.mjs',baseUrl).href,
+    checkout_path:path.relative(ROOT,websocketRelayPath),sha256:sha256(websocketRelayBytes)},
 ];
+const diagnosticModuleBodies=new Map([
+  [diagnosticBindings[0].url,controllerBytes],[diagnosticBindings[1].url,endpointBytes],
+  [diagnosticBindings[2].url,peerProbeBytes],[diagnosticBindings[3].url,peerModuleBytes],
+  [diagnosticBindings[4].url,lockstepCoreBytes],[diagnosticBindings[5].url,websocketRelayBytes],
+]);
+const diagnosticImportResolutions=[];
+for(const binding of diagnosticBindings){
+  const source=diagnosticModuleBodies.get(binding.url).toString('utf8');
+  const specifiers=[...source.matchAll(/\b(?:from\s*|import\s*)['"]([^'"]+)['"]/g)]
+    .map(match=>match[1]).filter(specifier=>specifier.startsWith('./')||specifier.startsWith('../'));
+  for(const specifier of specifiers){
+    const resolved=new URL(specifier,binding.url).href;
+    assert(diagnosticModuleBodies.has(resolved),
+      `Routed browser module ${binding.checkout_path} imports an unmapped relative module ${specifier} -> ${resolved}`);
+    diagnosticImportResolutions.push({from:binding.url,specifier,to:resolved});
+  }
+}
 
-const report={schema:'melee-web-runtime-match-history-paired-held-statics-v1',
-  scope:'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim',
-  result:'RUNNING',started_at:new Date().toISOString(),phase:'held-statics',
+const report={schema:values.phase==='held-statics'?
+    'melee-web-runtime-match-history-paired-held-statics-v1':
+    'melee-web-runtime-match-history-paired-peer-correction-v1',
+  scope:values.phase==='held-statics'?
+    'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim':
+    'two independently owned headless browser pages; exact shared source card and agreed frame-zero start; browser-owned page WebSocket peers; one alpha speculative actual P1 step using beta held-prefix P2 prediction, beta on-time actual P2 after receiving alpha actual P1, then one alpha typed restore/replay/correction; strict alpha Armed vs Restored PRE and all-64-byte CPU semantic checksum agreement against beta; local nine-domain/particle endpoints retained without cross-peer full endpoint equality',
+  result:'RUNNING',started_at:new Date().toISOString(),phase:values.phase,
   runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
   disc:{image_sha256:discImageHash},
   linked_configuration:{path:configPath,sha256:configSha256,policy_path:policyPath,
@@ -113,6 +161,7 @@ const report={schema:'melee-web-runtime-match-history-paired-held-statics-v1',
     map_path:mapPath,map_sha256:mapSha256,wire_rows:wire.length,
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
   diagnostic_module_bindings:diagnosticBindings,
+  diagnostic_relative_import_resolutions:diagnosticImportResolutions,
   coordination:{type:'Node-local diagnostic offer/agreement exchange only',seed_source:'alpha native CSS/SSS offer',
     gameplay_input_or_relay_transport:false,shared_profile_input:null},
   pages:{alpha:{route:{},disc:{},checks:[],cleanup:{native_owner:'not_started',browser:'not_started'}},
@@ -120,7 +169,7 @@ const report={schema:'melee-web-runtime-match-history-paired-held-statics-v1',
   startup_comparison:null,static_comparison:null,checks:[],failure:null,
   cleanup_failures:[],finished_at:null};
 const addCheck=(name,details=null)=>report.checks.push({name,details});
-const owned=[];let resultError=null;
+const owned=[];let resultError=null,relayRuntime=null;
 // All launched operations must settle before cleanup can inspect their owners.
 async function joinOwned(label,operations){
   let firstFailure=null;
@@ -241,10 +290,13 @@ async function startOwnedPage(role,chromium,browserConfig,browserPath,playwright
         item.externalRequests.push({url:url.origin,resource:request.resourceType()});
     });
     const diagBase=new URL('/__melee_diag__/',baseUrl).href;
-    await item.page.route('**/__melee_diag__/runtime_match_history_controller.mjs',route=>route.fulfill({
-      status:200,contentType:'text/javascript; charset=utf-8',body:controllerBytes}));
-    await item.page.route('**/__melee_diag__/tests/cpu_endpoint.mjs',route=>route.fulfill({
-      status:200,contentType:'text/javascript; charset=utf-8',body:endpointBytes}));
+    for(const binding of diagnosticBindings){
+      const source=diagnosticModuleBodies.get(binding.url);
+      if(!source)throw Error(`Diagnostic module source is unavailable for ${binding.checkout_path}`);
+      const pathname=new URL(binding.url).pathname;
+      await item.page.route(`**${pathname}`,route=>route.fulfill({
+        status:200,contentType:'text/javascript; charset=utf-8',body:source}));
+    }
     item.driver=createBrowserDriver(item.page,{surface:'development',timeoutMs:90000});
     const response=await item.page.goto(baseUrl.href,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);
     await item.driver.waitForImport();
@@ -255,7 +307,7 @@ async function startOwnedPage(role,chromium,browserConfig,browserPath,playwright
       const {createRuntimeMatchHistoryController,validateRuntimeMatchStartPrefix}=await import(url);
       globalThis.__meleeRuntimeMatchHistory=createRuntimeMatchHistoryController(globalThis.Module);
       globalThis.__meleeValidateRuntimeMatchStartPrefix=validateRuntimeMatchStartPrefix;
-    },new URL('runtime_match_history_controller.mjs',diagBase).href);
+    },new URL('src/slippi_profile/runtime_match_history_controller.mjs',diagBase).href);
     item.controllerInstalled=true;
     const preRouteOwners=await item.page.evaluate(()=>({lockstep:window.meleeNetRuntimeLockstepSnapshot?.()??null,
       replay:!!document.querySelector('#retail-replay-file')?.files?.length}));
@@ -526,6 +578,381 @@ async function captureBrowserProcessInventory(item){
   }
 }
 
+function heldPortPad(held,port,label){
+  const prefix=JSON.parse(held.prefix_json),row=prefix.rows.at(-1);
+  assert(row&&typeof row.pad_hex==='string'&&/^[0-9a-f]{88}$/.test(row.pad_hex),
+    `${label} held prefix omitted its literal four-port PAD`);
+  const frame=Buffer.from(row.pad_hex,'hex');
+  return {pollSerial:row.poll_serial,pad:frame.subarray(port*11,(port+1)*11)};
+}
+async function peerOperation(item,operation,value=null){
+  return item.page.evaluate(async ({operation,value})=>{
+    const bridge=globalThis.__meleeRuntimePeerHistoryProbe;
+    if(!bridge)throw Error('Page-owned runtime peer-history bridge is unavailable');
+    return bridge.call(operation,value);
+  },{operation,value});
+}
+function requireHistoryStatus(status,label,{phase,sourceFrame,restoreCount,forwardSteps,replaySteps,gpuIdle,pollSerial}={}){
+  assert(status&&status.ownerState===1&&status.firstFailure===0&&status.pendingCommand===0&&
+    status.completeSequence===status.requestSequence&&status.rendererErrors===0&&status.endpointActive===0&&
+    status.metadata?.schema===1&&status.metadata.bytes===64&&status.metadata.firstFailure===0&&
+    status.metadata.preFrame===0&&status.expectedFrame===0,
+    `${label} native history owner/status is unhealthy: ${JSON.stringify(status)}`);
+  const expected={phase,currentFrame:sourceFrame,restoreCount,forwardSteps,replaySteps,pollSerial};
+  for(const [key,value] of Object.entries(expected))if(value!==undefined)
+    assert.equal(status.metadata[key],value,`${label} native metadata ${key} differs`);
+  if(gpuIdle!==undefined)assert.equal(status.gpuPending,gpuIdle?0:1,`${label} GPU pending state differs`);
+  return status;
+}
+async function recordHistoryStatus(item,label,expected){
+  const status=await peerOperation(item,'status');
+  report.pages[item.role].match_history.statuses.push({label,value:status});
+  return requireHistoryStatus(status,`${item.role} ${label}`,expected);
+}
+async function historyCommand(item,name,expected){
+  const journal=report.pages[item.role].match_history.commands;
+  const entry={name,before:await recordHistoryStatus(item,`before:${name}`)};
+  journal.push(entry);
+  try{
+    entry.after=await peerOperation(item,'command',name);
+    return requireHistoryStatus(entry.after,`${item.role} after:${name}`,expected);
+  }catch(error){
+    entry.error=String(error?.message||error);
+    try{entry.failure_status=await peerOperation(item,'status');}
+    catch(statusError){entry.failure_status_error=String(statusError);}
+    throw error;
+  }
+}
+async function retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,phase}){
+  const wire=await peerOperation(item,'endpoint',{view,provenance,
+    expectedSourceFrame:String(sourceFrame),particleCellEndpoint:true});
+  const file=`${item.role}-${label}-endpoint.json`,content=JSON.stringify(wire,null,2)+'\n';
+  await fs.writeFile(path.join(out,file),content,{flag:'wx'});
+  const retained={file,bytes:Buffer.byteLength(content),sha256:sha256(Buffer.from(content)),
+    view,provenance,source_frame:String(sourceFrame),domains:9,
+    provenance_note:'full locally copied native raw nine-domain and particle endpoint envelope'};
+  const pageHistory=report.pages[item.role].match_history;
+  pageHistory.endpoints[label]=retained;
+  const decoded=decodeCpuParticleEndpointResult(wire);
+  assert.equal(decoded.view,view,`${item.role} ${label} endpoint view differs`);
+  assert.equal(decoded.provenance,provenance,`${item.role} ${label} endpoint provenance differs`);
+  assert.equal(decoded.sourceFrame,String(sourceFrame),`${item.role} ${label} endpoint frame differs`);
+  await recordHistoryStatus(item,`after-endpoint:${label}`,{
+    phase,sourceFrame,gpuIdle:true});
+  return decoded;
+}
+function effectToken(endpoint){
+  const row=endpoint.domains[1].records.find(record=>record.kindName==='EffectToken'&&record.index===0);
+  assert(row?.fields.length===1&&/^(0|[1-9][0-9]*)$/.test(row.fields[0]),'PRE effect token is missing');
+  return row.fields[0];
+}
+function decodeInput(receipt,item,label,{remotePad,forwardRemotePad=remotePad,status,corrected=false,priorPollSerial}){
+  const raw=Buffer.from(receipt?.rawBase64||'','base64');
+  const forward=Buffer.from(receipt?.forwardBase64||'','base64');
+  const correctedBytes=Buffer.from(receipt?.correctedBase64||'','base64');
+  assert.equal(receipt?.schema,1,`${item.role} ${label} input schema differs`);
+  assert.equal(receipt?.bytes,168,`${item.role} ${label} input receipt extent differs`);
+  assert.equal(receipt?.inputReady,1,`${item.role} ${label} input is not ready`);
+  assert.equal(receipt?.localPort,item.role==='alpha'?0:1,`${item.role} ${label} local port differs`);
+  assert.equal(receipt?.remotePort,item.role==='alpha'?1:0,`${item.role} ${label} remote port differs`);
+  assert.equal(raw.length,44,`${item.role} ${label} raw PAD is not 44 bytes`);
+  assert.equal(forward.length,44,`${item.role} ${label} forward PAD is not 44 bytes`);
+  assert.equal(correctedBytes.length,44,`${item.role} ${label} corrected PAD is not 44 bytes`);
+  assert.match(receipt.pollSerial,/^[1-9][0-9]{0,19}$/,`${item.role} ${label} poll serial is not canonical`);
+  if(priorPollSerial!==undefined)assert(BigInt(receipt.pollSerial)>BigInt(priorPollSerial),
+    `${item.role} ${label} poll did not advance beyond the actual held prefix`);
+  const localPort=item.role==='alpha'?0:1,remotePort=1-localPort;
+  const localPad=raw.subarray(localPort*11,(localPort+1)*11);
+  assert.equal(receipt.pollSerial,status.metadata.pollSerial,`${item.role} ${label} PAD poll differs from command receipt`);
+  assert.deepEqual(localPad,item.role==='alpha'?P1_RIGHT:P2_LEFT,
+    `${item.role} ${label} actual keyboard PAD differs from the source mapping`);
+  const expectedForward=overwritePort(raw,remotePort,forwardRemotePad);
+  assert(forward.equals(expectedForward),`${item.role} ${label} forward changed bytes outside its expected remote PAD`);
+  if(corrected){
+    assert.equal(receipt.correctedReady,1,`${item.role} ${label} correction is not ready`);
+    const expected=overwritePort(raw,remotePort,remotePad);
+    assert(correctedBytes.equals(expected),`${item.role} ${label} corrected PAD differs from retained local plus actual peer PAD`);
+  }else assert.equal(receipt.correctedReady,0,`${item.role} ${label} corrected PAD appeared before restore`);
+  return {raw,forward,corrected:correctedBytes,localPad:Buffer.from(localPad)};
+}
+async function retainHistoryInput(item,label,expected){
+  const receipt=await peerOperation(item,'input');
+  const file=`${item.role}-${label}-input.json`,content=JSON.stringify(receipt,null,2)+'\n';
+  await fs.writeFile(path.join(out,file),content,{flag:'wx'});
+  const retained={file,bytes:Buffer.byteLength(content),sha256:sha256(Buffer.from(content)),
+    poll_serial:receipt.pollSerial,local_port:receipt.localPort,remote_port:receipt.remotePort,
+    raw_base64:receipt.rawBase64,forward_base64:receipt.forwardBase64,
+    corrected_base64:receipt.correctedBase64,corrected_ready:receipt.correctedReady};
+  const pageHistory=report.pages[item.role].match_history;
+  pageHistory.inputs[label]=retained;
+  const decoded=decodeInput(receipt,item,label,expected);
+  return {receipt,decoded};
+}
+async function retainChecksum(item,label){
+  const encoded=await peerOperation(item,'checksum'),raw=Buffer.from(encoded,'base64');
+  assert.equal(raw.length,64,`${item.role} ${label} native checksum is not exactly64 bytes`);
+  const parsed=parseNetChecksum(raw);
+  assert.equal(parsed.tick,0,`${item.role} ${label} checksum match-input ordinal differs`);
+  assert.equal(parsed.scene,3,`${item.role} ${label} checksum is not the match scene`);
+  assert.equal(parsed.frame,1,`${item.role} ${label} checksum source frame differs`);
+  const file=`${item.role}-${label}-native-checksum.bin`;
+  await fs.writeFile(path.join(out,file),raw,{flag:'wx'});
+  const retained={file,bytes:raw.length,sha256:sha256(raw),base64:raw.toString('base64'),parsed,
+    provenance:'copied local 64-byte native scene checksum at the checked CPU_END history phase'};
+  const pageHistory=report.pages[item.role].match_history;
+  pageHistory.checksums[label]=retained;
+  return {raw,parsed,retained};
+}
+function checksumDifference(left,right){
+  const result=byteDifference(left.raw,right.raw);
+  // Use the existing lockstep channel order and also retain the first raw byte.
+  const channels=[
+    ['header',0,16],['input',24,32],['master_pad',32,40],
+    ['scene_state',16,20],['scene_state',40,48],['total',56,64],
+    ['objects',20,24],['objects',48,56],
+  ];
+  result.first_mismatch_channel=channels.find(([,from,to])=>
+    !left.raw.subarray(from,to).equals(right.raw.subarray(from,to)))?.[0]??null;
+  return result;
+}
+function overwritePort(frame,port,pad){
+  assert.equal(frame.length,44);assert.equal(pad.length,11);
+  const result=Buffer.from(frame);pad.copy(result,port*11);return result;
+}
+function byteDifference(left,right){
+  const length=Math.max(left.length,right.length);let first=null,count=0;
+  for(let offset=0;offset<length;offset++)if(left[offset]!==right[offset]){
+    first??={offset,left:left[offset]??null,right:right[offset]??null};count++;
+  }
+  return {equal:count===0,bytes_left:left.length,bytes_right:right.length,different_byte_count:count,first_mismatch:first};
+}
+async function installPeerHistoryBridge(item,relayUrl,roomId){
+  const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity})=>{
+    const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity});
+  },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
+      new URL('/__melee_diag__/',baseUrl)).href,
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host});
+}
+async function runPeerCorrection(alpha,beta){
+  const alphaHeld=report.pages.alpha.route.agreed_start.held;
+  const betaHeld=report.pages.beta.route.agreed_start.held;
+  const alphaPrior=heldPortPad(alphaHeld,0,'Alpha');
+  const betaPrior=heldPortPad(betaHeld,1,'Beta');
+  const predP2=betaPrior.pad;
+  for(const item of [alpha,beta]){
+    report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
+    const initial=await recordHistoryStatus(item,'initial',{phase:0,sourceFrame:0,
+      restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
+    assert.equal(initial.localPort,item.role==='alpha'?0:1);
+    assert.equal(initial.remotePort,1-initial.localPort);
+    assert.equal(initial.inputReady,0);
+  }
+  const peerReport=report.peer_correction={
+    claim:'one actual asymmetric wrong-prediction correction against one on-time peer CPU_END reference',
+    checksum_exchange:'none; both native 64-byte receipts are copied locally and compared by the Node driver',
+    initial_prediction:{role:'alpha',source:'beta actual held-prefix final row, port 1',bytes_base64:predP2.toString('base64'),
+      source_poll_serial:betaPrior.pollSerial},
+    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
+    endpoint_comparison_scope:'all raw nine-domain and particle endpoints are retained per page; only alpha Armed PRE vs Restored PRE is strictly compared within one source owner; no cross-peer endpoint equality claim',
+  };
+  const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
+    diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));}});
+  const roomId=createRoomId();
+  const relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
+  peerReport.relay={base:roomRelay.base,port:roomRelay.port,relay_url:relayUrl,room_id:roomId,
+    owner_process:roomRelay.ownerProcess,runtime_identity:roomRelay.runtimeIdentity,hashes:roomRelay.hashes,
+    transport:'existing pinned local Worker relay; page peers own the only diagnostic WebSockets'};
+  await joinOwned('peer-bridge-install',[
+    installPeerHistoryBridge(alpha,relayUrl,roomId).then(value=>{alpha.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(beta,relayUrl,roomId).then(value=>{beta.peerInstalled=true;return value;}),
+  ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
+  const [alphaPeer,betaPeer]=await joinOwned('peer-start',[
+    peerOperation(alpha,'peerStart'),peerOperation(beta,'peerStart')]);
+  peerReport.pages.alpha.peer_start=alphaPeer;peerReport.pages.beta.peer_start=betaPeer;
+  assert(alphaPeer.ready&&betaPeer.ready&&alphaPeer.agreement_hash);
+  assert.equal(alphaPeer.agreement_hash,betaPeer.agreement_hash);
+  for(const item of [alpha,beta]){
+    assert.equal(item.websockets.length,1,`${item.role} must own exactly one actual peer WebSocket`);
+    assert.equal(item.websockets[0],`${relayUrl}/v1/rooms/${roomId}/socket`,
+      `${item.role} WebSocket is not the selected local relay room`);
+  }
+  peerReport.pages.alpha.websocket=alpha.websockets[0];peerReport.pages.beta.websocket=beta.websockets[0];
+
+  await joinOwned('capture-history',[historyCommand(alpha,'capture',{phase:1,sourceFrame:0,
+    restoreCount:0,forwardSteps:0,replaySteps:0}),historyCommand(beta,'capture',{phase:1,sourceFrame:0,
+    restoreCount:0,forwardSteps:0,replaySteps:0})]);
+  const captured=await joinOwned('capture-pre-endpoints',[
+    retainHistoryEndpoint(alpha,'capture-pre',{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:2}),
+    retainHistoryEndpoint(beta,'capture-pre',{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:2})]);
+  await joinOwned('begin-history',[historyCommand(alpha,'begin',{phase:3,sourceFrame:0,
+    restoreCount:0,forwardSteps:0,replaySteps:0}),historyCommand(beta,'begin',{phase:3,sourceFrame:0,
+    restoreCount:0,forwardSteps:0,replaySteps:0})]);
+  const armed=await joinOwned('armed-pre-endpoints',[
+    retainHistoryEndpoint(alpha,'armed-pre',{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:4}),
+    retainHistoryEndpoint(beta,'armed-pre',{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:4})]);
+  for(const [index,item] of [alpha,beta].entries()){
+    const captureToken=effectToken(captured[index]),armedToken=effectToken(armed[index]);
+    peerReport.pages[item.role].effect_token={captured:captureToken,armed:armedToken};
+    assert.equal(captureToken,'0',`${item.role} capture PRE must have the pre-arm effect token`);
+    assert(BigInt(armedToken)>0n,`${item.role} Armed PRE must have an incarnation effect token`);
+  }
+  await peerOperation(alpha,'remotePad',[...predP2]);
+  peerReport.prediction_staged_before_alpha_forward=true;
+
+  const alphaForwardStatus=await historyCommandWithKey(alpha,'KeyD','forward',{
+    phase:5,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
+  const alphaInput=await retainHistoryInput(alpha,'forward',{remotePad:predP2,status:alphaForwardStatus,
+    priorPollSerial:alphaPrior.pollSerial});
+  const alphaP1=alphaInput.decoded.localPad;
+  const alphaPeerReceipt=await peerOperation(alpha,'peerPublish',{port:0,tick:0,
+    pollSerial:alphaInput.receipt.pollSerial,pad:[...alphaP1]});
+  peerReport.pages.alpha.local_publish=alphaPeerReceipt;
+  peerReport.pages.alpha.predicted_remote={port:1,pad_base64:predP2.toString('base64'),
+    provenance:'actual beta held-prefix last raw port-1 sample; used as alpha native prediction'};
+  await retainHistoryEndpoint(alpha,'predicted-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
+      provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:6});
+  const alphaPredChecksum=await retainChecksum(alpha,'predicted-cpu');
+  peerReport.pages.alpha.predicted_cpu={endpoint:report.pages.alpha.match_history.endpoints['predicted-cpu'],
+    checksum:alphaPredChecksum.retained};
+  await historyCommand(alpha,'present',{phase:7,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
+  await historyCommand(alpha,'idle',{phase:8,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0,gpuIdle:true});
+  await retainHistoryEndpoint(alpha,'predicted-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:9});
+  peerReport.pages.alpha.predicted_draw=report.pages.alpha.match_history.endpoints['predicted-draw'];
+
+  const alphaRemote=await peerOperation(beta,'peerWaitRemote');
+  peerReport.pages.beta.alpha_actual_received=alphaRemote;
+  const receivedAlpha=Buffer.from(alphaRemote.receipt.pad);
+  assert.deepEqual(receivedAlpha,alphaP1,'Beta page peer received a different actual alpha native P1 poll');
+  await peerOperation(beta,'remotePad',[...receivedAlpha]);
+  const betaForwardStatus=await historyCommandWithKey(beta,'ArrowLeft','forward',{
+    phase:5,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
+  const betaInput=await retainHistoryInput(beta,'forward',{remotePad:receivedAlpha,status:betaForwardStatus,
+    priorPollSerial:betaPrior.pollSerial});
+  const betaP2=betaInput.decoded.localPad;
+  assert(!predP2.equals(betaP2),
+    'Actual beta ArrowLeft P2 sample equals alpha prediction; wrong-prediction control is vacuous');
+  const betaPeerReceipt=await peerOperation(beta,'peerPublish',{port:1,tick:0,
+    pollSerial:betaInput.receipt.pollSerial,pad:[...betaP2]});
+  peerReport.pages.beta.local_publish=betaPeerReceipt;
+  peerReport.pages.beta.actual_remote={port:0,pad_base64:receivedAlpha.toString('base64'),
+    provenance:'alpha actual KeyD native P1 poll received before beta on-time forward'};
+  peerReport.differing_prediction={predicted_p2_base64:predP2.toString('base64'),
+    actual_p2_base64:betaP2.toString('base64'),pad_comparison:byteDifference(predP2,betaP2),
+    beta_poll_serial:betaInput.receipt.pollSerial};
+  await retainHistoryEndpoint(beta,'on-time-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
+      provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:6});
+  const betaOnTimeChecksum=await retainChecksum(beta,'on-time-reference');
+  peerReport.pages.beta.on_time_cpu={endpoint:report.pages.beta.match_history.endpoints['on-time-cpu'],
+    checksum:betaOnTimeChecksum.retained};
+  const wrongPredictionChecksumDifference=checksumDifference(alphaPredChecksum,betaOnTimeChecksum);
+  peerReport.comparisons.wrong_prediction_checksum_bytes=wrongPredictionChecksumDifference;
+  peerReport.comparisons.wrong_prediction_scene_state={alpha:alphaPredChecksum.parsed.scene_state,
+    beta:betaOnTimeChecksum.parsed.scene_state,
+    different:alphaPredChecksum.parsed.scene_state!==betaOnTimeChecksum.parsed.scene_state};
+  assert.notEqual(alphaPredChecksum.parsed.scene_state,betaOnTimeChecksum.parsed.scene_state,
+    'Wrong prediction changed input bytes but not the native scene_state checksum');
+  await historyCommand(beta,'present',{phase:7,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
+  await historyCommand(beta,'idle',{phase:8,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0,gpuIdle:true});
+  await retainHistoryEndpoint(beta,'on-time-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:9});
+  peerReport.pages.beta.on_time_draw=report.pages.beta.match_history.endpoints['on-time-draw'];
+  const betaActualRemote=await peerOperation(alpha,'peerWaitRemote');
+  peerReport.pages.alpha.beta_actual_received=betaActualRemote;
+  const actualP2=Buffer.from(betaActualRemote.receipt.pad);
+  assert.deepEqual(actualP2,betaP2,'Alpha peer received a different actual beta native P2 poll');
+
+  await historyCommand(alpha,'restore',{phase:10,sourceFrame:0,restoreCount:1,forwardSteps:1,replaySteps:0,
+    pollSerial:alphaInput.receipt.pollSerial});
+  const alphaRestored=await retainHistoryEndpoint(alpha,'restored-pre',{view:CPU_ENDPOINT_VIEW.pre,
+    provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:11});
+  const restoredPreComparison=compareCpuReferenceParticleEndpoints(armed[0],alphaRestored);
+  peerReport.comparisons.alpha_armed_vs_restored_pre=restoredPreComparison;
+  assert(restoredPreComparison.equal,'Alpha complete Armed PRE differs from its complete Restored PRE');
+  await peerOperation(alpha,'remotePad',[...actualP2]);
+  const correctedStatus=await historyCommand(alpha,'correct',{phase:12,sourceFrame:1,
+    restoreCount:1,forwardSteps:1,replaySteps:1,pollSerial:alphaInput.receipt.pollSerial});
+  const alphaCorrectedInput=await retainHistoryInput(alpha,'corrected',{
+    remotePad:actualP2,forwardRemotePad:predP2,corrected:true,status:correctedStatus});
+  assert(alphaCorrectedInput.decoded.raw.equals(alphaInput.decoded.raw),
+    'Alpha corrected receipt changed the retained raw four-port PAD poll');
+  const authoritativePadComparison=byteDifference(alphaCorrectedInput.decoded.corrected,betaInput.decoded.forward);
+  peerReport.comparisons.authoritative_44_byte_pad=authoritativePadComparison;
+  assert(authoritativePadComparison.equal,
+    `Alpha corrected and beta on-time authoritative PAD differ at ${JSON.stringify(authoritativePadComparison.first_mismatch)}`);
+  await retainHistoryEndpoint(alpha,'corrected-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
+      provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:1,phase:13});
+  const alphaCorrectedChecksum=await retainChecksum(alpha,'corrected-cpu');
+  peerReport.pages.alpha.corrected_cpu={endpoint:report.pages.alpha.match_history.endpoints['corrected-cpu'],
+    checksum:alphaCorrectedChecksum.retained};
+  const correctedChecksumComparison=checksumDifference(alphaCorrectedChecksum,betaOnTimeChecksum);
+  peerReport.comparisons.corrected_vs_beta_on_time_native_checksum_64=correctedChecksumComparison;
+  assert(correctedChecksumComparison.equal,
+    `Alpha corrected native checksum differs from beta on-time in ${correctedChecksumComparison.first_mismatch_channel} at ${JSON.stringify(correctedChecksumComparison.first_mismatch)}`);
+  await historyCommand(alpha,'present',{phase:14,sourceFrame:1,restoreCount:1,forwardSteps:1,replaySteps:1});
+  await historyCommand(alpha,'idle',{phase:15,sourceFrame:1,restoreCount:1,forwardSteps:1,replaySteps:1,gpuIdle:true});
+  await retainHistoryEndpoint(alpha,'corrected-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:1,phase:16});
+  peerReport.pages.alpha.corrected_draw=report.pages.alpha.match_history.endpoints['corrected-draw'];
+  for(const item of [alpha,beta]){
+    const file=`${item.role}-final-match.png`;
+    const bytes=await item.page.screenshot({path:path.join(out,file),fullPage:false,timeout:4000});
+    peerReport.pages[item.role].final_screenshot={file,bytes:bytes.length,sha256:sha256(bytes)};
+  }
+  peerReport.endpoints_retained_per_page={alpha:Object.keys(report.pages.alpha.match_history.endpoints),
+    beta:Object.keys(report.pages.beta.match_history.endpoints),cross_peer_raw_endpoint_comparison:false};
+  await joinOwned('close-history',[historyCommand(alpha,'close',{phase:17,sourceFrame:1,
+    restoreCount:1,forwardSteps:1,replaySteps:1}),historyCommand(beta,'close',{phase:17,sourceFrame:1,
+    restoreCount:0,forwardSteps:1,replaySteps:0})]);
+  const retired=await joinOwned('retire-history',[historyCommand(alpha,'retire',{phase:18,sourceFrame:1,
+    restoreCount:1,forwardSteps:1,replaySteps:1}),historyCommand(beta,'retire',{phase:18,sourceFrame:1,
+    restoreCount:0,forwardSteps:1,replaySteps:0})]);
+  peerReport.final_history_retirement={alpha:retired[0],beta:retired[1]};
+  peerReport.checks.push('both actual browser-owned peers exchanged exactly one native-validated local sample',
+    'actual beta P2 differs from alpha held-prefix prediction and changes native scene_state checksum',
+    'alpha complete Armed PRE equals Restored PRE before retained-input correction',
+    'alpha corrected authoritative 44-byte PAD equals beta on-time PAD',
+    'all 64 alpha corrected native checksum bytes equal beta on-time checksum bytes',
+    'both pages retained local raw nine-domain/particle endpoints and completed source present/idle/DRAW/close/retire');
+  peerReport.local_endpoint_comparison_only=restoredPreComparison;
+  for(const item of [alpha,beta]){
+    assert.equal(item.pageErrors.length,0,`${item.role} browser errors: ${item.pageErrors[0]}`);
+    assert.equal(item.externalRequests.length,0,`${item.role} issued an external request`);
+  }
+  peerReport.status='peer-correction-complete';
+  report.result='PEER_CORRECTION_COMPLETE';
+  addCheck('one asymmetric wrong-prediction peer correction against beta on-time reference',{
+    alpha_local_polls:1,beta_local_polls:1,actual_remote_samples_each:1,
+    wrong_prediction_scene_state_changed:true,corrected_full_64_byte_checksum_equal:true,
+    corrected_authoritative_pad_44_bytes_equal:true,pre_restore_equal:true,
+    local_endpoint_sets:{alpha:Object.keys(report.pages.alpha.match_history.endpoints),
+      beta:Object.keys(report.pages.beta.match_history.endpoints)}});
+}
+async function historyCommandWithKey(item,key,name,expected){
+  const page=item.page;
+  let commandFailure=null,releaseFailure=null,pressed=false;
+  await page.locator('#canvas').focus();
+  assert.equal(await page.evaluate(()=>document.activeElement?.id),'canvas',`${item.role} canvas focus was not retained for actual ${key}`);
+  try{
+    pressed=true;await page.keyboard.down(key);
+    return await historyCommand(item,name,expected);
+  }catch(error){commandFailure=error;throw error;}
+  finally{
+    if(pressed)try{await page.keyboard.up(key);item.keyToRelease=null;}
+    catch(error){releaseFailure=error;item.keyToRelease=key;}
+    if(releaseFailure){
+      (report.pages[item.role].action_release_errors??=[]).push({key,error:String(releaseFailure?.message||releaseFailure)});
+      if(!commandFailure)throw releaseFailure;
+    }
+  }
+}
+
 try{
   const {chromium,browser:browserConfig,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
   const alpha=await startOwnedPage('alpha',chromium,browserConfig,browserPath,playwrightPath,item=>owned.push(item));
@@ -591,22 +1018,32 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  const staticReadRows=joined.map(({identity})=>({address:identity.address,size:identity.size,identity}));
-  const [alphaRows,betaRows]=await joinOwned('held-static-read',[
-    readHeldStaticRows(alpha,staticReadRows),readHeldStaticRows(beta,staticReadRows)]);
-  report.static_comparison=compareStaticRows(alphaRows,betaRows);
-  report.static_comparison.outcome=report.static_comparison.equal?'baseline-rows-equal':'baseline-differences-observed';
-  report.static_comparison.capture_called=false;report.static_comparison.begin_called=false;
-  addCheck('complete exact reviewed static row set copied while both source owners remain held',{
-    rows:wire.length,total_bytes:report.pages.alpha.static_rows.total_bytes,
-    equal:report.static_comparison.equal,rows_with_differences:report.static_comparison.rows_with_differences,
-    first_mismatch:report.static_comparison.first_mismatch});
-  report.result='BASELINE_DIAGNOSTIC_COMPLETE';
+  if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
+  else{
+    const staticReadRows=joined.map(({identity})=>({address:identity.address,size:identity.size,identity}));
+    const [alphaRows,betaRows]=await joinOwned('held-static-read',[
+      readHeldStaticRows(alpha,staticReadRows),readHeldStaticRows(beta,staticReadRows)]);
+    report.static_comparison=compareStaticRows(alphaRows,betaRows);
+    report.static_comparison.outcome=report.static_comparison.equal?'baseline-rows-equal':'baseline-differences-observed';
+    report.static_comparison.capture_called=false;report.static_comparison.begin_called=false;
+    addCheck('complete exact reviewed static row set copied while both source owners remain held',{
+      rows:wire.length,total_bytes:report.pages.alpha.static_rows.total_bytes,
+      equal:report.static_comparison.equal,rows_with_differences:report.static_comparison.rows_with_differences,
+      first_mismatch:report.static_comparison.first_mismatch});
+    report.result='BASELINE_DIAGNOSTIC_COMPLETE';
+  }
 }catch(error){
   resultError=error;report.result='FAIL';
   report.failure={name:error?.name||'Error',message:String(error?.message||error),stack:error?.stack||null};
 }
 finally{
+  await Promise.all(owned.filter(item=>item.peerInstalled).map(async item=>{
+    try{
+      const cleanup=report.pages[item.role].cleanup;
+      cleanup.peer=await peerOperation(item,'peerClose');
+      assert.equal(cleanup.peer.closed,true);
+    }catch(error){report.cleanup_failures.push(`${item.role} peer close: ${String(error)}`);}
+  }));
   for(const item of [...owned].reverse()){
     const pageReport=report.pages[item.role];
     if(item.page){
@@ -619,6 +1056,8 @@ finally{
         try{pageReport.failure_diagnostics=await item.driver?.diagnostics?.()??{unavailable:'browser driver unavailable'};}
         catch(error){pageReport.failure_diagnostics={unavailable:String(error?.message||error)};}
       }
+      if(item.keyToRelease)try{await item.page.keyboard.up(item.keyToRelease);}
+      catch(error){report.cleanup_failures.push(`${item.role} key release: ${String(error)}`);}
       await retainNativeLog(item,'before-cleanup');
       try{
         const actualOwner=await item.page.evaluate(()=>{
@@ -660,6 +1099,9 @@ finally{
     catch(error){pageReport.cleanup.browser=`browser-close-failed: ${String(error?.message||error)}`;
       report.cleanup_failures.push(`${item.role} browser process cleanup: ${String(error?.message||error)}`);}
   }
+  if(relayRuntime)try{
+    report.peer_correction.relay.cleanup=await relayRuntime.close(!resultError&&!report.cleanup_failures.length);
+  }catch(error){report.cleanup_failures.push(`Relay cleanup: ${String(error)}`);}
   const inventories=Object.entries(report.pages).flatMap(([role,pageReport])=>
     (pageReport.browser_process_info??[]).map(row=>({...row,owner_role:role})));
   report.browser_process_info=inventories;
