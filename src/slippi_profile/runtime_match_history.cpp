@@ -720,9 +720,17 @@ bool RuntimeMatchHistory::restore_pre() noexcept
        (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
        !gate(RuntimeMatchHistoryGatePoint::RestoreBefore,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Phase);
-    if(!checkpoint_->archive_history_endpoint(session_)||
-       checkpoint_->restore_history_pre(session_)!=GameplayCpuCommitResult::Ok)
-        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,"Native typed history restore refused");
+    if(!checkpoint_->archive_history_endpoint(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,
+                                  "Native typed history endpoint archive refused");
+    const auto restore_result=checkpoint_->restore_history_pre(session_);
+    if(restore_result!=GameplayCpuCommitResult::Ok){
+        char operation[96]{};
+        std::snprintf(operation,sizeof(operation),
+            "Native typed history restore refused result=%u",
+            static_cast<unsigned>(restore_result));
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,operation);
+    }
     audio_phase_=pre_audio_phase_;
     ++restore_count_;
     replay_target_end_=sealed_end_;replay_steps_=0;
