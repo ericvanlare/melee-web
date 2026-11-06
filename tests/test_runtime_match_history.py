@@ -65,6 +65,7 @@ struct MatchHistoryControl {
   MatchHistoryStatus status{};
   bool dispatching=false;
   bool episode_enabled=false;
+  bool arena_enabled=false;
   uint32_t requested_rebase_end=0;
   Capsule* capsule=nullptr;
   std::array<char,512> error{};
@@ -131,6 +132,17 @@ int main() {
     assert(match_history.status.complete_seq==2 && match_history.status.pending_command==0);
   }
   reset(37);
+  match_history.episode_enabled=true;
+  assert(melee_web_native_menu_match_history_request_rebase(77)==0);
+  assert(request_calls==0 && match_history.status.request_seq==0);
+  reset(37);
+  match_history.episode_enabled=true;
+  match_history.arena_enabled=true;
+  assert(melee_web_native_menu_match_history_request_rebase(77)==1);
+  assert(request_calls==1 && match_history.status.pending_command==11);
+  queued_callback(3.0,queued_data);
+  assert(dispatched_rebase_end==77 && match_history.status.last_completed_command==11);
+  reset(37);
   assert(melee_web_native_menu_match_history_request(11)==0);
   const std::string first_error=match_history.error.data();
   assert(match_history.status.first_failure==1 && first_error=="Confirmed rebase requires an explicit END frame");
@@ -168,6 +180,102 @@ int main() {
             output = result.stdout + result.stderr
             (self.work / f'{name}.log').write_text(output)
             self.assertEqual(result.returncode, 0, output)
+
+    def test_native_confirmed_rebase_keeps_legacy_one_tick_and_bounds_arena_episode(self):
+        source = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+        begin = source.index('bool RuntimeMatchHistory::can_rebase_confirmed(')
+        end = source.index('\nbool RuntimeMatchHistory::release_after_match_close(', begin)
+        method = source[begin:end]
+        fixture = r'''#include <array>
+#include <cassert>
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+constexpr unsigned PAD_MAX_CONTROLLERS=4;
+enum class RuntimeMatchHistoryPhase { Retired };
+enum class RuntimeMatchHistoryFailure { None, Other };
+struct Session { std::uint32_t frame{}; std::uint32_t source_frames() const { return frame; } };
+struct Reader { bool is_active{}; bool active() const { return is_active; } };
+struct Ticket { std::uint32_t ticket_id{}, source_frame{}, incarnation{}, local_port{}, remote_port{}; std::uint64_t poll_serial{}; };
+struct Row { std::uint32_t ticket_id{}, source_frame{}, incarnation{}, local_port{}, remote_port{}, state{}; std::uint64_t poll_serial{}; };
+struct NativeHistoryFixture {
+  Session session_{}; Reader reader_{}; std::unique_ptr<int> checkpoint_;
+  RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::Retired;
+  RuntimeMatchHistoryFailure failure_=RuntimeMatchHistoryFailure::None;
+  std::uint32_t sealed_end_{},pre_frame_{},forward_steps_{},ticket_count_{},incarnation_{},restore_count_{};
+  std::uint32_t last_ticket_id_{},local_port_{},remote_port_{};
+  std::uint64_t poll_serial_{}; bool episode_mode_{},arena_mode_{},current_ticket_pending_{},latest_ticket_valid_{};
+  Ticket latest_ticket_{}; std::array<Row,7> episode_rows_{}; bool owner_live=true;
+  bool live_owner(std::uint32_t frame) const { return owner_live&&session_.source_frames()==frame; }
+  bool can_rebase_confirmed(std::uint32_t end_frame) const noexcept;
+};
+'''
+        method = method.replace('RuntimeMatchHistory::can_rebase_confirmed',
+                                'NativeHistoryFixture::can_rebase_confirmed')
+        fixture += method + r'''
+int main() {
+  NativeHistoryFixture legacy{};
+  legacy.pre_frame_=20; legacy.sealed_end_=21; legacy.session_.frame=21; legacy.forward_steps_=1;
+  assert(legacy.can_rebase_confirmed(21));
+  legacy.forward_steps_=2; assert(!legacy.can_rebase_confirmed(21));
+  legacy.forward_steps_=1; legacy.arena_mode_=true; assert(!legacy.can_rebase_confirmed(21));
+
+  NativeHistoryFixture arena{};
+  arena.episode_mode_=arena.arena_mode_=true; arena.pre_frame_=100; arena.sealed_end_=104;
+  arena.session_.frame=104; arena.forward_steps_=arena.ticket_count_=4;
+  arena.incarnation_=3; arena.restore_count_=2; arena.local_port_=0; arena.remote_port_=1;
+  arena.last_ticket_id_=24; arena.poll_serial_=904; arena.latest_ticket_valid_=true;
+  arena.latest_ticket_={24,103,1,0,1,904};
+  for(std::uint32_t i=0;i<4;++i)
+    arena.episode_rows_[i]={21+i,100+i,1+i%3,0,1,(i==2?2u:1u),901+i};
+  assert(arena.can_rebase_confirmed(104));
+  arena.reader_.is_active=true; assert(!arena.can_rebase_confirmed(104));
+  arena.reader_.is_active=false; arena.checkpoint_=std::make_unique<int>(1);
+  assert(!arena.can_rebase_confirmed(104)); arena.checkpoint_.reset();
+  arena.failure_=RuntimeMatchHistoryFailure::Other; assert(!arena.can_rebase_confirmed(104));
+  arena.failure_=RuntimeMatchHistoryFailure::None;
+  assert(!arena.can_rebase_confirmed(103));
+  arena.restore_count_=3; assert(!arena.can_rebase_confirmed(104));
+  arena.restore_count_=2; arena.current_ticket_pending_=true; assert(!arena.can_rebase_confirmed(104));
+  arena.current_ticket_pending_=false; arena.owner_live=false; assert(!arena.can_rebase_confirmed(104));
+  arena.owner_live=true; arena.episode_rows_[2].source_frame=103; assert(!arena.can_rebase_confirmed(104));
+  arena.episode_rows_[2].source_frame=102; arena.ticket_count_=8; assert(!arena.can_rebase_confirmed(104));
+  arena.ticket_count_=4; arena.incarnation_=4; assert(!arena.can_rebase_confirmed(104));
+  arena.incarnation_=3; arena.arena_mode_=false; assert(!arena.can_rebase_confirmed(104));
+
+  for(const std::uint32_t span : {1u,7u}) {
+    NativeHistoryFixture bounded{};
+    bounded.episode_mode_=bounded.arena_mode_=true; bounded.pre_frame_=200;
+    bounded.sealed_end_=bounded.session_.frame=200+span;
+    bounded.forward_steps_=bounded.ticket_count_=span; bounded.incarnation_=1;
+    bounded.local_port_=0; bounded.remote_port_=1;
+    for(std::uint32_t i=0;i<span;++i)
+      bounded.episode_rows_[i]={40+i,200+i,1,0,1,1,1000+i};
+    const auto& last=bounded.episode_rows_[span-1];
+    bounded.last_ticket_id_=last.ticket_id; bounded.poll_serial_=last.poll_serial;
+    bounded.latest_ticket_valid_=true;
+    bounded.latest_ticket_={last.ticket_id,last.source_frame,last.incarnation,
+                            last.local_port,last.remote_port,last.poll_serial};
+    assert(bounded.can_rebase_confirmed(200+span));
+  }
+}
+'''
+        source = self.work / 'native-rebase-guard.cpp'
+        binary = self.work / 'native-rebase-guard'
+        source.write_text(fixture)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        result = subprocess.run([compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                                 str(source), '-o', str(binary)], cwd=ROOT,
+                                capture_output=True, text=True, timeout=30)
+        output = result.stdout + result.stderr
+        (self.work / 'native-rebase-guard-compile.log').write_text(output)
+        self.assertEqual(result.returncode, 0, output)
+        result = subprocess.run([str(binary)], cwd=ROOT, capture_output=True,
+                                text=True, timeout=30)
+        output = result.stdout + result.stderr
+        (self.work / 'native-rebase-guard.log').write_text(output)
+        self.assertEqual(result.returncode, 0, output)
 
     def test_extracted_native_start_with_controlled_owners(self):
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()

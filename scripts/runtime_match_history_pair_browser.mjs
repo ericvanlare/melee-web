@@ -38,7 +38,9 @@ values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
 assert(['held-statics','peer-correction','four-tick-correction'].includes(values.phase),
   'Unsupported bounded runtime history phase');
-if(values.phase!=='peer-correction')assert.equal(values.windows,'1','--windows applies only to peer-correction');
+const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
+if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
+  assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
 if(values['arena-history'])assert.equal(values.phase,'four-tick-correction','--arena-history requires four-tick-correction');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
@@ -161,13 +163,16 @@ for(const binding of diagnosticBindings){
 }
 
 const report={schema:values.phase==='four-tick-correction'?
-    (values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
+    (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
+      values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
   scope:values.phase==='four-tick-correction'?
-    'four actual source ticks in one fixed-PRE capsule, two typed corrections, and continuation before a newer remote PAD is confirmed; batch functional evidence with presentation only at sealed ENDs':values.phase==='held-statics'?
+    (twoArenaEpisodes?
+      'eight actual source ticks across two arena capsules, four typed corrections, and one confirmed same-match rebase; one socket/timeline per peer; batch functional evidence with presentation only at sealed ENDs':
+      'four actual source ticks in one fixed-PRE capsule, two typed corrections, and continuation before a newer remote PAD is confirmed; batch functional evidence with presentation only at sealed ENDs'):values.phase==='held-statics'?
     'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim':
     (values.windows==='2'?
       'two independently owned headless browser pages; one continuous browser-owned page peer pair and live native match; two adjacent actual one-input windows joined by checked same-match rebase at exact retired END; each window has beta on-time actual P2 and alpha typed restore/replay/correction; strict full Armed vs Restored PRE and all-64-byte CPU checksum agreement within each window; exact selected owner/statics/audio/frame continuity across rebase; no full cross-view END/PRE endpoint equality claim':
@@ -652,7 +657,7 @@ async function historyCommand(item,name,expected){
     }catch(journalError){entry.controller_journal_error=String(journalError);}
   }
 }
-async function historyRebase(item,confirmedEnd,{before,after}){
+async function historyRebase(item,confirmedEnd,{before,after,arenaEpisode=false}){
   const journal=report.pages[item.role].match_history.commands;
   const prefix=before?.window?`${before.window}:`:'';
   const entry={name:'rebase',confirmed_end:confirmedEnd,
@@ -660,7 +665,7 @@ async function historyRebase(item,confirmedEnd,{before,after}){
     before:await recordHistoryStatus(item,`${prefix}before:rebase`,before)};
   journal.push(entry);
   try{
-    const result=await peerOperation(item,'rebase',confirmedEnd);
+    const result=await peerOperation(item,arenaEpisode?'episodeRebase':'rebase',confirmedEnd);
     assert(result&&typeof result.identity==='string'&&result.status,
       `${item.role} confirmed rebase omitted its fresh status/identity`);
     entry.identity=result.identity;
@@ -813,6 +818,43 @@ async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialR
       new URL('/__melee_diag__/',baseUrl)).href,
     role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad});
 }
+function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus){
+  const oldOwner=ownerFields(oldEnd),newOwner=ownerFields(capture);
+  assert.deepEqual(oldOwner,newOwner,`${item.role} owner fields changed from retired END to fresh Capture PRE`);
+  assert.equal(oldOwner.SourceFrame,String(preFrame),`${item.role} retired END source frame differs`);
+  assert.equal(newOwner.SourceFrame,String(preFrame),`${item.role} fresh Capture PRE source frame differs`);
+  const oldStatics=oldEnd.domains.find(domain=>domain.name==='Statics');
+  const newStatics=capture.domains.find(domain=>domain.name==='Statics');
+  assert(oldStatics?.records.length>1&&newStatics?.records.length>1,
+    `${item.role} END or PRE has no reviewed Statics rows`);
+  for(const [index,row] of oldStatics.records.entries()){
+    const next=newStatics.records[index];
+    assert(next&&row.kind===next.kind&&row.kindName===next.kindName&&row.index===next.index&&row.bytesBase64===next.bytesBase64&&
+      row.metadataBytes===next.metadataBytes&&row.borrowedBytes===next.borrowedBytes&&row.count===next.count&&
+      JSON.stringify(row.fieldNames)===JSON.stringify(next.fieldNames)&&JSON.stringify(row.fields)===JSON.stringify(next.fields),
+      `${item.role} exact END-to-Capture PRE Statics record ${index} differs`);
+  }
+  assert.equal(oldStatics.records.length,newStatics.records.length);
+  const retiredToken=effectToken(oldEnd);
+  assert(BigInt(retiredToken)>0n,`${item.role} retired DRAW_END effect token must be nonzero`);
+  const oldActions=actionEventReceipt(oldEnd),newActions=actionEventReceipt(capture);
+  assert.equal(newActions.event_count,'0',`${item.role} fresh Capture PRE ActionEvent count must be zero`);
+  assert.equal(newActions.rows.length,0,`${item.role} fresh Capture PRE retained ActionEvent rows`);
+  const receipt={
+    retired_draw_end_owner_fields:oldOwner,capture_pre_owner_fields:newOwner,
+    retired_draw_end_action_events:{event_count:oldActions.event_count,row_count:oldActions.rows.length,
+      rows_sha256:sha256(Buffer.from(JSON.stringify(oldActions.rows)))},
+    capture_pre_action_events:{event_count:newActions.event_count,row_count:newActions.rows.length},
+    effect_tokens:{retired_draw_end:retiredToken,capture_pre:effectToken(capture)},
+    exact_statics_records_equal:oldStatics.records.length,
+    capture_status:captureStatus,
+  };
+  assert.equal(receipt.capture_status.metadata.preAudioPhase,
+    retiredStatus.metadata.currentAudioPhase,
+    `${item.role} fresh Capture PRE audio phase differs from retired END`);
+  return receipt;
+}
+
 async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionSource,priorPollSerials,
   previousDrawEndpoints,windowReport,previousRetirement}){
   const windowNumber=index+1,window=`window-${windowNumber}`;
@@ -851,42 +893,10 @@ async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionS
   }
 
   if(previousRetirement){
-    for(const [i,item] of [alpha,beta].entries()){
-      const oldEnd=previousDrawEndpoints[i],capture=captured[i];
-      const oldOwner=ownerFields(oldEnd),newOwner=ownerFields(capture);
-      assert.deepEqual(oldOwner,newOwner,`${item.role} owner fields changed from retired END to fresh Capture PRE`);
-      assert.equal(oldOwner.SourceFrame,String(preFrame),`${item.role} retired END source frame differs`);
-      assert.equal(newOwner.SourceFrame,String(preFrame),`${item.role} fresh Capture PRE source frame differs`);
-      const oldStatics=oldEnd.domains.find(domain=>domain.name==='Statics');
-      const newStatics=capture.domains.find(domain=>domain.name==='Statics');
-      assert(oldStatics?.records.length>1&&newStatics?.records.length>1,
-        `${item.role} END or PRE has no reviewed Statics rows`);
-      for(const [index,row] of oldStatics.records.entries()){
-        const next=newStatics.records[index];
-        assert(next&&row.kind===next.kind&&row.kindName===next.kindName&&row.index===next.index&&row.bytesBase64===next.bytesBase64&&
-          row.metadataBytes===next.metadataBytes&&row.borrowedBytes===next.borrowedBytes&&row.count===next.count&&
-          JSON.stringify(row.fieldNames)===JSON.stringify(next.fieldNames)&&JSON.stringify(row.fields)===JSON.stringify(next.fields),
-          `${item.role} exact END-to-Capture PRE Statics record ${index} differs`);
-      }
-      assert.equal(oldStatics.records.length,newStatics.records.length);
-      const retiredToken=effectToken(oldEnd);
-      assert(BigInt(retiredToken)>0n,`${item.role} retired DRAW_END effect token must be nonzero`);
-      const oldActions=actionEventReceipt(oldEnd),newActions=actionEventReceipt(capture);
-      assert.equal(newActions.event_count,'0',`${item.role} fresh Capture PRE ActionEvent count must be zero`);
-      assert.equal(newActions.rows.length,0,`${item.role} fresh Capture PRE retained ActionEvent rows`);
-      windowReport.pages[item.role].end_to_capture_receipts={
-        retired_draw_end_owner_fields:oldOwner,capture_pre_owner_fields:newOwner,
-        retired_draw_end_action_events:{event_count:oldActions.event_count,row_count:oldActions.rows.length,
-          rows_sha256:sha256(Buffer.from(JSON.stringify(oldActions.rows)))},
-        capture_pre_action_events:{event_count:newActions.event_count,row_count:newActions.rows.length},
-        effect_tokens:{retired_draw_end:retiredToken,capture_pre:effectToken(capture)},
-        exact_statics_records_equal:oldStatics.records.length,
-        capture_status:report.pages[item.role].match_history.statuses.at(-1).value,
-      };
-      assert.equal(windowReport.pages[item.role].end_to_capture_receipts.capture_status.metadata.preAudioPhase,
-        previousRetirement[item.role].metadata.currentAudioPhase,
-        `${item.role} fresh Capture PRE audio phase differs from retired END`);
-    }
+    for(const [i,item] of [alpha,beta].entries())
+      windowReport.pages[item.role].end_to_capture_receipts=compareEndToCapture(item,
+        previousDrawEndpoints[i],captured[i],preFrame,
+        report.pages[item.role].match_history.statuses.at(-1).value,previousRetirement[item.role]);
   }
 
   const beginStatuses=await joinOwned(`${window}-begin-history`,[
@@ -1080,10 +1090,12 @@ async function runFourTickEpisode(alpha,beta){
   const items=[alpha,beta];
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
-  const proof=report.peer_correction={claim:'four actual source ticks, two corrections and forward continuation while a newer input is unconfirmed',
+  const proof=report.peer_correction={claim:twoArenaEpisodes?
+      'two adjacent four-tick arena episodes with four actual corrections in one match and peer pair':
+      'four actual source ticks, two corrections and forward continuation while a newer input is unconfirmed',
     checksum_exchange:'none; exact finite native CPU_END checksum bytes are compared locally',
     pages:{alpha:{port:0},beta:{port:1}},events:[],segments:{},comparisons:{},checks:[]};
-  await startCorrectionPeers(alpha,beta,proof,4,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+  await startCorrectionPeers(alpha,beta,proof,twoArenaEpisodes?8:4,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
   const pollSerials={alpha:prefix.alpha.pollSerial,beta:prefix.beta.pollSerial};
   const tickets={alpha:[],beta:[]};
   const selected={alpha:[],beta:[]};
@@ -1094,19 +1106,75 @@ async function runFourTickEpisode(alpha,beta){
     try{return event.result=await peerOperation(item,operation,value);}
     catch(error){event.error=String(error);throw error;}
   };
-  const opts=(phase,sourceFrame,counters={})=>({window:'episode',phase,sourceFrame,...counters});
+  await joinOwned('episode-enable',items.map(item=>log(item,values['arena-history']?'arenaEnable':'episodeEnable')));
+  const episodes=twoArenaEpisodes?2:1;
+  if(twoArenaEpisodes)proof.windows=[];
+  let previous=null;
+  for(let index=0;index<episodes;index++){
+    const preFrame=index*4;
+    const windowProof=twoArenaEpisodes?
+      {source_pre_frame:preFrame,source_end_frame:preFrame+4,segments:{},comparisons:{}}:proof;
+    if(twoArenaEpisodes)proof.windows.push(windowProof);
+    if(previous){
+      const rebased=await joinOwned('arena-confirmed-rebase',items.map(item=>
+        historyRebase(item,preFrame,{arenaEpisode:true,
+          before:{window:'episode',phase:18,preFrame:preFrame-4,sourceFrame:preFrame,
+            restoreCount:item===alpha?2:0,forwardSteps:4,replaySteps:item===alpha?4:0,gpuIdle:true},
+          after:{window:'episode-2',phase:0,preFrame,sourceFrame:preFrame,
+            restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true,pollSerial:'0'}})));
+      for(const [index,item] of items.entries()){
+        const fresh=rebased[index],retired=previous.retired[item.role];
+        const prior=stableIdentity(report.pages[item.role].route.takeover.identity);
+        const identity=stableIdentity(fresh.identity);
+        assert.equal(identity.source_frame,preFrame);
+        assert.match(identity.current_rng,/^[0-9a-f]{8}$/);
+        assert.deepEqual(identity.owner,prior.owner);
+        assert.equal(fresh.status.requestSequence,retired.requestSequence+1);
+        assert.equal(fresh.status.metadata.preAudioPhase,retired.metadata.currentAudioPhase);
+        assert.equal(fresh.status.metadata.currentAudioPhase,retired.metadata.currentAudioPhase);
+        assert.deepEqual([fresh.timeline.confirmed_through,fresh.timeline.simulated_through,
+          fresh.timeline.dirty_from,fresh.timeline.plan_outstanding],[preFrame-1,preFrame-1,null,false]);
+        assert.deepEqual(item.websockets,[proof.pages[item.role].websocket]);
+      }
+      assert.equal(rebased[0].identity,rebased[1].identity,'Confirmed peers differ in live rebase identity');
+      proof.rebase_boundary={confirmed_end:preFrame,retired:previous.retired,alpha:rebased[0],beta:rebased[1]};
+    }
+    previous=await runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous,
+      pollSerials,tickets,selected,selectedEndpoints,log});
+  }
+  proof.final_history_retirement=previous.retired;
+  proof.status=twoArenaEpisodes?'two-arena-episodes-complete':'four-tick-episode-complete';
+  report.result=twoArenaEpisodes?'TWO_ARENA_EPISODES_COMPLETE':'FOUR_TICK_EPISODE_COMPLETE';
+  addCheck(twoArenaEpisodes?'two fixed PRE capsules, four actual corrections, one confirmed same-match rebase':
+    'one fixed PRE, two actual corrections, and source advancement before full confirmation');
+}
+
+async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous,
+  pollSerials,tickets,selected,selectedEndpoints,log}){
+  const items=[alpha,beta];
+  const episode=preFrame===0?'episode':'episode-2';
+  const artifact=name=>preFrame===0?name:`window-2-${name}`;
+  const opts=(phase,sourceFrame,counters={})=>({window:episode,phase,sourceFrame,preFrame,...counters});
   const endpoint=(item,label,view,provenance,sourceFrame,phase)=>
-    retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,phase});
-  const pre=(item,label,phase)=>endpoint(item,label,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,0,phase);
+    retainHistoryEndpoint(item,artifact(label),{view,provenance,sourceFrame,phase,preFrame});
+  const pre=(item,label,phase)=>endpoint(item,label,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,preFrame,phase);
   const command=(item,name,phase,frame,counters)=>historyCommand(item,name,opts(phase,frame,counters));
 
-  await joinOwned('episode-enable',items.map(item=>log(item,values['arena-history']?'arenaEnable':'episodeEnable')));
-  await joinOwned('episode-capture',items.map(item=>command(item,'capture',1,0)));
+  await joinOwned(`${episode}-capture`,items.map(item=>command(item,'capture',1,preFrame)));
   const captured=await joinOwned('episode-capture-pre',items.map(item=>pre(item,'episode-capture-pre',2)));
   for(const e of captured)assert.equal(effectToken(e),'0');
-  await joinOwned('episode-begin',items.map(item=>command(item,'beginEpisode',3,0)));
+  if(previous){
+    windowProof.end_to_capture=Object.fromEntries(items.map((item,index)=>[item.role,
+      compareEndToCapture(item,previous.drawEndpoints[index],captured[index],preFrame,
+        report.pages[item.role].match_history.statuses.at(-1).value,previous.retired[item.role])]));
+  }
+  await joinOwned(`${episode}-begin`,items.map(item=>command(item,'beginEpisode',3,preFrame)));
   const armed=await joinOwned('episode-armed-pre',items.map(item=>pre(item,'episode-armed-pre',4)));
-  for(const e of armed)assert(BigInt(effectToken(e))>0n);
+  for(const [index,e] of armed.entries()){
+    assert(BigInt(effectToken(e))>0n);
+    if(previous)assert(BigInt(effectToken(e))>BigInt(effectToken(previous.drawEndpoints[index])),
+      'Fresh arena episode must arm a new effect token');
+  }
 
   const poll=async(item,tick,key,expectedPad)=>{
     const page=item.page;
@@ -1117,11 +1185,13 @@ async function runFourTickEpisode(alpha,beta){
       item.keyToRelease=key;
       await page.keyboard.down(key);
       const {ticket,status}=await log(item,'episodePoll',{tick});
-      requireHistoryStatus(status,`${item.role} poll ${tick}`,opts(tick===0?4:21,tick,{gpuIdle:true}));
+      requireHistoryStatus(status,`${item.role} poll ${tick}`,opts(tick===preFrame?4:21,tick,{gpuIdle:true}));
       assert.equal(ticket.ticketId,status.completeSequence);
       assert.equal(ticket.raw.length,44);
       assert.deepEqual(Buffer.from(ticket.raw).subarray(ticket.localPort*11,(ticket.localPort+1)*11),expectedPad);
       assert(BigInt(ticket.pollSerial)>BigInt(pollSerials[item.role]),`${item.role} actual poll serial did not advance`);
+      const priorTicket=tickets[item.role][tick-1];
+      if(priorTicket)assert(ticket.ticketId>priorTicket.ticketId,'Native poll request sequence must advance');
       pollSerials[item.role]=ticket.pollSerial;
       tickets[item.role][tick]=ticket;
     }catch(cause){error=cause;throw cause;}
@@ -1144,7 +1214,7 @@ async function runFourTickEpisode(alpha,beta){
   const forward=async(item,tick,actual)=>{
     const ticket=tickets[item.role][tick];
     const result=await log(item,'episodeForward',{tick,ticketId:ticket.ticketId,actual});
-    requireHistoryStatus(result.status,`${item.role} forward ${tick}`,opts(21,tick+1,{forwardSteps:tick+1,gpuIdle:true}));
+    requireHistoryStatus(result.status,`${item.role} forward ${tick}`,opts(21,tick+1,{forwardSteps:tick-preFrame+1,gpuIdle:true}));
     assert.equal(result.row.pollSerial,ticket.pollSerial);
     assert.equal(result.row.ticketId,ticket.ticketId);
     assert.deepEqual(result.row.raw,ticket.raw);
@@ -1154,27 +1224,28 @@ async function runFourTickEpisode(alpha,beta){
   };
   const boundary=async(item,label,frame,corrected)=>{
     const prov=corrected?CPU_ENDPOINT_PROVENANCE.corrected:CPU_ENDPOINT_PROVENANCE.reference;
-    if(!corrected)await command(item,'seal',5,frame,{forwardSteps:frame});
+    if(!corrected)await command(item,'seal',5,frame,{forwardSteps:frame-preFrame});
     await endpoint(item,`${label}-cpu`,CPU_ENDPOINT_VIEW.cpuEnd,prov,frame,corrected?13:6);
-    const checksum=await retainChecksum(item,`${label}-cpu`,{tick:frame-1,sourceFrame:frame});
+    const checksum=await retainChecksum(item,artifact(`${label}-cpu`),{tick:frame-1,sourceFrame:frame});
     await command(item,'present',corrected?14:7,frame);
     await command(item,'idle',corrected?15:8,frame,{gpuIdle:true});
     selectedEndpoints[item.role]=await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,prov,frame,corrected?16:9);
     return checksum;
   };
   const correct=async(frame,dirty,speculative,restoreCount)=>{
-    await command(alpha,'restore',10,0,{restoreCount,forwardSteps:frame,replaySteps:0});
+    await command(alpha,'restore',10,preFrame,{restoreCount,forwardSteps:frame-preFrame,replaySteps:0});
     const restored=await pre(alpha,`episode-restored-${frame}`,11);
     const strict=values['arena-history']?
       compareCpuArenaRestoredPre(armed[0],restored,selectedEndpoints.alpha):
       compareCpuReferenceParticleEndpoints(armed[0],restored);
-    proof.comparisons[`restored_pre_${frame}`]=strict;
+    windowProof.comparisons[`restored_pre_${frame}`]=strict;
     assert(strict.equal);
     const result=await log(alpha,'episodeReplay',{dirty,through:frame-1,speculative});
     requireHistoryStatus(result.status,`corrected END ${frame}`,
-      opts(12,frame,{restoreCount,forwardSteps:frame,replaySteps:frame,gpuIdle:true}));
-    assert.equal(result.rows.length,frame);
-    for(const [tick,receipt] of result.rows.entries()){
+      opts(12,frame,{restoreCount,forwardSteps:frame-preFrame,replaySteps:frame-preFrame,gpuIdle:true}));
+    assert.equal(result.rows.length,frame-preFrame);
+    for(const [ordinal,receipt] of result.rows.entries()){
+      const tick=preFrame+ordinal;
       assert.equal(receipt.row.ticketId,tickets.alpha[tick].ticketId);
       assert.equal(receipt.row.pollSerial,tickets.alpha[tick].pollSerial);
       assert.deepEqual(receipt.row.raw,tickets.alpha[tick].raw);
@@ -1192,66 +1263,66 @@ async function runFourTickEpisode(alpha,beta){
   };
   const continueAt=async(item,end)=>{
     await command(item,'close',17,end);
-    const continued=await command(item,'continue',21,end,{forwardSteps:end,gpuIdle:true});
+    const continued=await command(item,'continue',21,end,{forwardSteps:end-preFrame,gpuIdle:true});
     assert.equal(continued.metadata.incarnation,2);
     assert.equal(continued.metadata.sealedEnd,0);
     return continued;
   };
 
-  // Both peers' real tick-0 contributions are admitted before source execution.
-  await poll(alpha,0,'KeyD',P1_RIGHT);await publish(alpha,0);
-  await poll(beta,0,'ArrowRight',P2_RIGHT);await publish(beta,0);
-  await admit(alpha,0);await admit(beta,0);
-  await forward(alpha,0,true);await forward(beta,0,true);
-  for(const tick of [1,2]){
+  // Admit both peers' first actual contribution before this capsule advances.
+  await poll(alpha,preFrame,'KeyD',P1_RIGHT);await publish(alpha,preFrame);
+  await poll(beta,preFrame,'ArrowRight',P2_RIGHT);await publish(beta,preFrame);
+  await admit(alpha,preFrame);await admit(beta,preFrame);
+  await forward(alpha,preFrame,true);await forward(beta,preFrame,true);
+  for(const tick of [preFrame+1,preFrame+2]){
     await poll(alpha,tick,'KeyD',P1_RIGHT);await publish(alpha,tick);
     await forward(alpha,tick,false);
   }
-  const predicted3=await boundary(alpha,'episode-end3-predicted',3,false);
-  await admit(beta,1);await poll(beta,1,'ArrowLeft',P2_LEFT);await publish(beta,1);
-  await forward(beta,1,true);
-  const firstLate=await admit(alpha,1);
-  assert.equal(firstLate.timeline.dirty_from,1);
-  assert.equal(firstLate.timeline.remote_contiguous_through,1);
-  const firstCorrected=await correct(3,1,1,1);
-  assert.equal(firstCorrected.confirmed_through,1);
-  assert.equal(firstCorrected.simulated_through,2);
-  const corrected3=await boundary(alpha,'episode-end3-corrected',3,true);
-  proof.comparisons.end3={predicted_scene_state:predicted3.parsed.scene_state,
-    corrected_scene_state:corrected3.parsed.scene_state,confirmed_pad_prefix:comparePads([0,1]),
-    still_unconfirmed:[2]};
+  const predicted3=await boundary(alpha,'episode-end3-predicted',preFrame+3,false);
+  await admit(beta,preFrame+1);await poll(beta,preFrame+1,'ArrowLeft',P2_LEFT);await publish(beta,preFrame+1);
+  await forward(beta,preFrame+1,true);
+  const firstLate=await admit(alpha,preFrame+1);
+  assert.equal(firstLate.timeline.dirty_from,preFrame+1);
+  assert.equal(firstLate.timeline.remote_contiguous_through,preFrame+1);
+  const firstCorrected=await correct(preFrame+3,preFrame+1,1,1);
+  assert.equal(firstCorrected.confirmed_through,preFrame+1);
+  assert.equal(firstCorrected.simulated_through,preFrame+2);
+  const corrected3=await boundary(alpha,'episode-end3-corrected',preFrame+3,true);
+  windowProof.comparisons.end3={predicted_scene_state:predicted3.parsed.scene_state,
+    corrected_scene_state:corrected3.parsed.scene_state,confirmed_pad_prefix:comparePads([preFrame,preFrame+1]),
+    still_unconfirmed:[preFrame+2]};
   assert.notEqual(predicted3.parsed.scene_state,corrected3.parsed.scene_state,
     'First late input must change native scene state while tick 2 remains speculative');
 
-  proof.segments.alpha_continuation=await continueAt(alpha,3);
-  await poll(alpha,3,'KeyD',P1_RIGHT);await publish(alpha,3);
-  const advanced=await forward(alpha,3,false);
-  assert.equal(advanced.timeline.remote_contiguous_through,1);
-  assert.equal(advanced.timeline.confirmed_through,1);
-  assert.equal(advanced.timeline.simulated_through,3);
-  proof.segments.forward_before_remote2={native_frame:advanced.status.metadata.currentFrame,timeline:advanced.timeline};
-  const predicted4=await boundary(alpha,'episode-end4-predicted',4,false);
+  windowProof.segments.alpha_continuation=await continueAt(alpha,preFrame+3);
+  await poll(alpha,preFrame+3,'KeyD',P1_RIGHT);await publish(alpha,preFrame+3);
+  const advanced=await forward(alpha,preFrame+3,false);
+  assert.equal(advanced.timeline.remote_contiguous_through,preFrame+1);
+  assert.equal(advanced.timeline.confirmed_through,preFrame+1);
+  assert.equal(advanced.timeline.simulated_through,preFrame+3);
+  windowProof.segments.forward_before_remote2={native_frame:advanced.status.metadata.currentFrame,timeline:advanced.timeline};
+  const predicted4=await boundary(alpha,'episode-end4-predicted',preFrame+4,false);
 
-  // Beta runs its reference on time at every source step. Its real tick 2
-  // and tick 3 samples are first published after alpha reaches source frame 4.
-  await admit(beta,2);await poll(beta,2,'ArrowRight',P2_RIGHT);await publish(beta,2);
-  await forward(beta,2,true);
-  await boundary(beta,'episode-end3-reference',3,false);
-  proof.segments.beta_continuation=await continueAt(beta,3);
-  await admit(beta,3);await poll(beta,3,'ArrowRight',P2_RIGHT);await publish(beta,3);
-  await forward(beta,3,true);
-  const reference4=await boundary(beta,'episode-end4-reference',4,false);
-  await admit(alpha,2);
-  const finalLate=await admit(alpha,3);
-  assert.equal(finalLate.timeline.dirty_from,2);
-  assert.equal(finalLate.timeline.remote_contiguous_through,3);
-  const finalCorrected=await correct(4,2,0,2);
-  assert.equal(finalCorrected.confirmed_through,3);
-  const corrected4=await boundary(alpha,'episode-end4-corrected',4,true);
+  // Beta runs on time. Its last two actual samples are first published after
+  // alpha reaches the fourth source frame of this capsule.
+  await admit(beta,preFrame+2);await poll(beta,preFrame+2,'ArrowRight',P2_RIGHT);await publish(beta,preFrame+2);
+  await forward(beta,preFrame+2,true);
+  await boundary(beta,'episode-end3-reference',preFrame+3,false);
+  windowProof.segments.beta_continuation=await continueAt(beta,preFrame+3);
+  await admit(beta,preFrame+3);await poll(beta,preFrame+3,'ArrowRight',P2_RIGHT);await publish(beta,preFrame+3);
+  await forward(beta,preFrame+3,true);
+  const reference4=await boundary(beta,'episode-end4-reference',preFrame+4,false);
+  await admit(alpha,preFrame+2);
+  const finalLate=await admit(alpha,preFrame+3);
+  assert.equal(finalLate.timeline.dirty_from,preFrame+2);
+  assert.equal(finalLate.timeline.remote_contiguous_through,preFrame+3);
+  const finalCorrected=await correct(preFrame+4,preFrame+2,0,2);
+  assert.equal(finalCorrected.confirmed_through,preFrame+3);
+  const corrected4=await boundary(alpha,'episode-end4-corrected',preFrame+4,true);
   const checksum=checksumDifference(corrected4,reference4);
-  proof.comparisons.end4={prediction:checksumDifference(predicted4,reference4),corrected:checksum,
+  windowProof.comparisons.end4={prediction:checksumDifference(predicted4,reference4),corrected:checksum,
     predicted_scene_state:predicted4.parsed.scene_state,on_time_scene_state:reference4.parsed.scene_state,
-    pad:comparePads([0,1,2,3])};
+    pad:comparePads([preFrame,preFrame+1,preFrame+2,preFrame+3])};
   assert.notEqual(predicted4.parsed.scene_state,reference4.parsed.scene_state,
     'Second late input must change the native scene-state checksum');
   assert(checksum.equal,`Corrected END4 differs from the on-time peer in ${checksum.first_mismatch_channel}`);
@@ -1259,20 +1330,19 @@ async function runFourTickEpisode(alpha,beta){
   for(const item of items){
     const timeline=await log(item,'episodeTimeline');
     assert.deepEqual([timeline.confirmed_through,timeline.simulated_through,timeline.dirty_from,
-      timeline.plan_outstanding],[3,3,null,false]);
+      timeline.plan_outstanding],[preFrame+3,preFrame+3,null,false]);
   }
-  await joinOwned('episode-close',items.map(item=>command(item,'close',17,4)));
-  const retired=await joinOwned('episode-retire',items.map(item=>command(item,'retire',18,4,
+  await joinOwned('episode-close',items.map(item=>command(item,'close',17,preFrame+4)));
+  const retired=await joinOwned('episode-retire',items.map(item=>command(item,'retire',18,preFrame+4,
     {forwardSteps:4,restoreCount:item===alpha?2:0,replaySteps:item===alpha?4:0,gpuIdle:true})));
-  proof.final_history_retirement={alpha:retired[0],beta:retired[1]};
+  windowProof.final_history_retirement={alpha:retired[0],beta:retired[1]};
   for(const item of items){
     assert.deepEqual(item.websockets,[proof.pages[item.role].websocket]);
     assert.deepEqual(item.pageErrors,[]);
     assert.deepEqual(item.externalRequests,[]);
   }
-  proof.status='four-tick-episode-complete';
-  report.result='FOUR_TICK_EPISODE_COMPLETE';
-  addCheck('one fixed PRE, two actual corrections, and source advancement before full confirmation');
+  return {drawEndpoints:[selectedEndpoints.alpha,selectedEndpoints.beta],
+    retired:windowProof.final_history_retirement};
 }
 
 async function runPeerCorrection(alpha,beta){

@@ -690,3 +690,40 @@ test('alternate renderer work retains its receipt on the original idle and clean
   assert.deepEqual(f.calls,[]);
   assert.equal(owner.journal()[1].rendererPreparation.latest.command,10);
 });
+
+test('arena controller rebases a four-tick retired END and keeps episode mode for the next capture',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  const identity=source_frame=>JSON.stringify({...host,source_frame,
+    current_rng:source_frame?'01234567':'fedcba98',selection:{stage:2}});
+  const publish=frame=>{
+    f.module.HEAPU8.set(new TextEncoder().encode(identity(frame)+'\0'),2048);
+    return 2048;
+  };
+  f.module[prefix+'identity_json']=()=>publish(0);
+  f.module[prefix+'rebase_identity_json']=()=>publish(4);
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  f.module[prefix+'request_rebase']=end=>{
+    assert.equal(end,4);
+    f.put(32,end);f.put(56,0);f.put(64,end);f.put(68,end);f.put(72,0);
+    f.put(76,0);f.put(80,0);f.put(84,0);f.put(88,0);f.put(92,0);
+    f.view.setBigUint64(352,0n,true);
+    f.put(104,40);f.put(112,0);
+    return f.module[prefix+'request'](11);
+  };
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);
+  owner.enableArenaHistory();
+  await owner.command('capture');
+  f.put(56,18);f.put(68,4);f.put(72,4);f.put(76,3);f.put(80,2);
+  f.put(88,4);f.put(92,4);f.put(108,40);f.put(112,1);
+  f.view.setBigUint64(352,465n,true);
+  const fresh=await owner.command('rebase',4);
+  assert.equal(fresh.identity,identity(4));
+  assert.deepEqual([fresh.status.expectedFrame,fresh.status.metadata.currentFrame,
+    fresh.status.completeSequence,fresh.status.metadata.pollSerial],[4,4,2,'0']);
+  assert.equal((await owner.command('capture')).completeSequence,3);
+  await assert.rejects(owner.command('forward'),/Legacy one-window/);
+  assert.deepEqual(f.calls,[1,11,1]);
+});

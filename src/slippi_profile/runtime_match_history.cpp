@@ -110,6 +110,7 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
     result->sealed_end_=0;
     result->segment_start_frame_=owners.frame;
     result->episode_mode_=episode_mode;
+    result->arena_mode_=arena_mode;
     result->checkpoint_=GameplayCpuCheckpoint::capture_history(
         session,std::move(statics),diagnostic,
         arena_mode?CpuHistoryStorage::OwnedArena:CpuHistoryStorage::StablePayload);
@@ -714,9 +715,46 @@ bool RuntimeMatchHistory::retire_confirmed() noexcept
 
 bool RuntimeMatchHistory::can_rebase_confirmed(std::uint32_t end_frame) const noexcept
 {
-    return !episode_mode_&&phase_==RuntimeMatchHistoryPhase::Retired&&!checkpoint_&&!reader_.active()&&
-        failure_==RuntimeMatchHistoryFailure::None&&forward_steps_==1&&
-        end_frame==sealed_end_&&live_owner(end_frame);
+    if(phase_!=RuntimeMatchHistoryPhase::Retired||checkpoint_||reader_.active()||
+       failure_!=RuntimeMatchHistoryFailure::None||end_frame!=sealed_end_||
+       session_.source_frames()!=end_frame||!live_owner(end_frame))
+        return false;
+
+    /* Preserve the historical single-tick route verbatim. Only explicitly
+     * arena-backed episodes get the wider confirmed END admission below. */
+    if(!episode_mode_)
+        return !arena_mode_&&forward_steps_==1;
+
+    if(!arena_mode_||current_ticket_pending_||end_frame<=pre_frame_)
+        return false;
+    const auto span=end_frame-pre_frame_;
+    if(span>episode_rows_.size()||
+       forward_steps_!=span||ticket_count_!=span||ticket_count_>episode_rows_.size()||
+       incarnation_==0||incarnation_>3u||restore_count_>2u||
+       !latest_ticket_valid_||!last_ticket_id_||!poll_serial_||
+       latest_ticket_.ticket_id!=last_ticket_id_||latest_ticket_.poll_serial!=poll_serial_||
+       latest_ticket_.source_frame!=end_frame-1u)
+        return false;
+
+    for(std::uint32_t index=0;index<ticket_count_;++index){
+        const auto& row=episode_rows_[index];
+        if((row.state!=1u&&row.state!=2u)||row.source_frame!=pre_frame_+index||
+           !row.ticket_id||!row.poll_serial||row.incarnation==0||row.incarnation>incarnation_||
+           row.local_port>=PAD_MAX_CONTROLLERS||row.remote_port>=PAD_MAX_CONTROLLERS||
+           row.local_port==row.remote_port||row.local_port!=local_port_||row.remote_port!=remote_port_||
+           (index&&(row.ticket_id<=episode_rows_[index-1u].ticket_id||
+                    row.poll_serial<=episode_rows_[index-1u].poll_serial)))
+            return false;
+    }
+    const auto& last=episode_rows_[ticket_count_-1u];
+    if(latest_ticket_.ticket_id!=last.ticket_id||
+       latest_ticket_.source_frame!=last.source_frame||
+       latest_ticket_.incarnation!=last.incarnation||
+       latest_ticket_.local_port!=last.local_port||
+       latest_ticket_.remote_port!=last.remote_port||
+       latest_ticket_.poll_serial!=last.poll_serial)
+        return false;
+    return true;
 }
 
 bool RuntimeMatchHistory::release_after_match_close() noexcept

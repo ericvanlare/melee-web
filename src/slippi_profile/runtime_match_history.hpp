@@ -251,7 +251,7 @@ private:
     std::uint64_t poll_serial_{};
     mutable bool endpoint_read_failure_{};
     bool has_input_{},source_step_possible_{};
-    bool episode_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
+    bool episode_mode_{},arena_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
     std::uint32_t segment_start_frame_{},replay_target_end_{},ticket_count_{},last_ticket_id_{};
     RuntimeMatchHistoryPollTicket latest_ticket_{};
     std::array<RuntimeMatchHistoryInputReceipt,7> episode_rows_{};

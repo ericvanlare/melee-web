@@ -817,7 +817,7 @@ std::unique_ptr<melee_web::GameplayCpuStatics> history_configure_statics(MatchHi
 bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  using Gate=melee_web::RuntimeMatchHistoryGatePoint;
  using Result=melee_web::RuntimeMatchHistoryGateResult;
- if(c.episode_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
+ if(c.episode_enabled!=c.arena_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
     c.capsule->pre_frame()!=c.status.expected_frame||
     end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||!c.capsule->can_rebase_confirmed(end)||
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
@@ -832,7 +832,8 @@ bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
   return history_refuse("Confirmed rebase lost the retired match END");
 
- // The host must copy the retired window's receipts before requesting rebase.
+ // The host must copy the retired window's receipts before requesting rebase;
+ // this native gate proves closed+retired ownership, not remote confirmation.
  // This transition never calls source tick, PAD poll, present, or audio.
  c.capsule.reset();
  c.statics=std::move(next_statics);
@@ -945,11 +946,12 @@ EM_BOOL history_dispatch(double,void*) {
 int history_request(unsigned command,uint32_t end_frame,bool explicit_episode_payload=false) {
  auto& c=match_history;
  const bool episode_command=command>=12&&command<=18;
- const bool legacy_execution=command==2||command==3||command==7||command==11;
+ const bool legacy_execution=command==2||command==3||command==7;
+ const bool unsupported_rebase=command==11&&c.episode_enabled!=c.arena_enabled;
  const bool frame_payload_command=command==13||command==15;
  if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
     (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>18||
-    (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||
+    (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||unsupported_rebase||
     (frame_payload_command!=explicit_episode_payload)||
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  c.requested_rebase_end=end_frame;

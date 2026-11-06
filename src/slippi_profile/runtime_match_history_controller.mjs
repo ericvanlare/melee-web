@@ -637,7 +637,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const command=MATCH_HISTORY_COMMAND[name];if(!command)throw Error('Unknown runtime history command');
       const framePayload=name==='forwardTicket'||name==='replayTicket';
       const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay','continue','beginEpisode']);
-      const legacyExecution=name==='begin'||name==='forward'||name==='correct'||name==='rebase';
+      const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
       let confirmedEnd,ticketId,planBytes;
       if(name==='rebase')confirmedEnd=argument;
       if(name==='rebase')u32(confirmedEnd,'Confirmed END frame');
@@ -683,10 +683,12 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         const next=before.requestSequence+1;
         if(name==='rebase'){
           const h=before.metadata;
+          const span=confirmedEnd-h.preFrame;
+          const supportedSpan=arenaMode?span>=1&&span<=7&&confirmedEnd<=UINT32_MAX-7:span===1;
           if(!captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
             before.completeSequence!==before.requestSequence||h.phase!==18||
-            h.preFrame!==before.expectedFrame||confirmedEnd!==h.preFrame+1||
-            confirmedEnd!==h.currentFrame||confirmedEnd!==h.sealedEnd||h.forwardSteps!==1)
+            h.preFrame!==before.expectedFrame||!supportedSpan||
+            confirmedEnd!==h.currentFrame||confirmedEnd!==h.sealedEnd||h.forwardSteps!==span)
             throw Error('Confirmed rebase requires the actual retired END');
           if(typeof module[PREFIX+'request_rebase']!=='function'||
             typeof module[PREFIX+'rebase_identity_json']!=='function')
