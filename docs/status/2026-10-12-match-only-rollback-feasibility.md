@@ -1983,11 +1983,39 @@ and the separate default-off control. The full local regression then passed on
 historical TObj compiler graph in its clean unit shard; the CI-only repair configures
 that graph with an explicitly empty source-only asset directory. The unchanged
 TObj component and all 15 focused CI controls pass; assertions, test ownership and
-deadlines are unchanged. Integration and exact-head checks are tracked by
-[PR #363](https://github.com/ericvanlare/melee-web/pull/363) and
-[#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
-boundary is confirmed retirement and rebase into adjacent correction windows in
-the same live match.
+deadlines are unchanged. [PR #363](https://github.com/ericvanlare/melee-web/pull/363)
+merged as `f817f857` after all 15 checks on `331e3f64` completed with 13 successes
+and two expected skips. The merged and reviewed trees match.
+
+The next milestone, [#364](https://github.com/ericvanlare/melee-web/issues/364),
+now passes two adjacent actual corrections in the same ordinary-runtime match
+and browser-owned relay sockets. Native and harness producer `21e508a0` uses
+confirmed retirement and an exact END-to-fresh-PRE rebase. P1 uses a new actual
+KeyD poll in each window; P2 uses ArrowLeft then ArrowRight. The second prediction
+holds the first actual received P2 sample. Both predictions change the native
+scene-state checksum; both corrected authoritative 44-byte PAD records and all
+64 checksum bytes match the on-time peer. Independent replay confirms strict
+local Armed/Restored PRE equality across all nine domains and 12 particle
+relations in each window.
+
+Rebase preserves the live Owner tuple and all 3,797 reviewed static rows per
+page between selected DRAW_END frame 1 and fresh Capture PRE frame 1. Effect
+and action authority lifetimes are checked separately, without asserting whole
+cross-view endpoint equality. Each page preserves its own audio phase; the pages
+still differ in phase, so cross-peer PCM is unmeasured. Native commands and actual
+input poll serials increase; sockets and match owners stay live throughout.
+Both native owners close successfully and all 23 owned browser/relay/server/capture
+processes are absent. The first host source draft's phase, scope, test-merge and
+continuity defects were repaired before capture and remain retained. The actual
+native translation units, affected private Release build and focused controls pass.
+
+These are two individually confirmed one-tick corrections. Multi-tick speculative
+continuation, sustained/full-match rollback, public enablement, complete profile
+behavior and acceptance remain open. The next experiment keeps one original PRE
+for four ticks, corrects a late input, and advances again while a newer input is
+still unconfirmed. The existing structured receipt's `continuation_364` owns the
+source, raw result, catalog, review and cleanup identities. Full regression and
+exact-head CI remain pending the complete #364 milestone.
 
 ## Stage decision dependencies, issue #333
 

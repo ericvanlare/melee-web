@@ -12387,7 +12387,119 @@
               },
               "scope": "Configure-only canonical v7 source graph before its owning unit shard, using an explicitly empty assets directory; no asset-bearing build, inventory/test assertion removal or deadline increase. Fifteen focused CI controls and unchanged actual TObj component pass."
             },
-            "integration": "PR #363; complete all exact-head checks before merge."
+            "integration": {
+              "pr": 363,
+              "reviewed_head": "331e3f644e11c161970bb9306124455279342b01",
+              "merged_commit": "f817f85719ea9f2e57e5e6e258247a94575d27f3",
+              "tree": "725052a5fb73f697e1f17e2c1a20f10fe194f286",
+              "exact_head_ci_run": 42171447529,
+              "checks": {
+                "success": 13,
+                "expected_skip": 2
+              },
+              "receipt": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-integration-preflight-v1/merge-receipt.json",
+                "sha256": "038d8030b799d35ddacc585375bbce65652dfc1c0ad0507c44aab5af9aa0d750"
+              },
+              "ci": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-integration-preflight-v1/exact-head-ci.json",
+                "sha256": "22e7b70044c558572efc0a6bf757d5a8519b2f99c0d1a6535dd36146defd5798"
+              }
+            }
+          },
+          "continuation_364": {
+            "issue": 364,
+            "state": "TWO_ADJACENT_CORRECTIONS_PASS; MULTI_TICK_SPECULATIVE_CONTINUATION_PENDING",
+            "native_and_harness_producer": "21e508a0ae1d7e7bca9ff374047d141450124753",
+            "native_candidate": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-rebase-candidate-v3/freeze.json",
+              "sha256": "e524573a335a044885feb28b84b08d85d69214338e94daac6d2fac5b1fe6b44a"
+            },
+            "native_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-rebase-candidate-v3/root-source-review.json",
+              "sha256": "91fe0573603a15de496ba6cf833cdcc362478458562ab4f51b18da6ed1cbe702"
+            },
+            "actual_tu_syntax": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-rebase-v3-native-syntax-v1/result.json",
+              "sha256": "2fe0e0910474799bb611b1cefb5edb2cbbbd4485cdb3ae1d2cfd28968475f2ea"
+            },
+            "host_candidate": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-two-window-candidate-v2/freeze.json",
+              "sha256": "af962d401ff1e908e8c78d4971c6d5d8900c56072f1e69cc2dfb5da52ec0bd87"
+            },
+            "host_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-two-window-candidate-v2/root-review.json",
+              "sha256": "6894b0153317adf06f5621f5213a2f94d586789ff17fc3c22746ea3cb6fb20cf"
+            },
+            "focused_integration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-window-integrated-focused-v1.json",
+              "sha256": "3b04fc10ea4bb247834b77de881f5e7f5c3e306b8cee1349d54da294cda31374"
+            },
+            "private_release": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-window-build-v1/result.json",
+              "sha256": "68f2e52c4052e3572a9409ea2afc2901f1f2a009e1ca543c12186ce92be88354"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-window-producer-v1/archive.json",
+              "sha256": "9e7ae9e66f646190cf0de18207c6f33c2e2486db9c2bfb4ca055dd894e2fd242"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-window-catalog-v1/final-linked-configuration-v1.json",
+              "sha256": "4f46dfb04e87b4b80dfd46f2a69d29d58f49c7d23f67b8833983c3563d116227"
+            },
+            "linked_wire": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-window-catalog-v1/validated-wire.json",
+              "sha256": "b0e14055034e8a67cc3128d131db4a16306dec7377d89c730b2d25311e924b46"
+            },
+            "capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-window-root-review-v1.json",
+              "sha256": "a2add517d1f0fd6f6908372f936541984bf4b5a5ccc342c825bf32c3544f56ed"
+            },
+            "browser_report": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-window-v1/browser/result.json",
+              "sha256": "1594ff996392e8dbdb621c453f7883c8b1fb3a69bdbb0a6a9f154bd9d4be79b3"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-window-v1/result-summary.json",
+              "sha256": "44027a10104009d044cb31e041f68058a67b30e7930521d53da6066e0fbaa62f"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-window-v1/owner.json",
+              "sha256": "1b0c255f6e56705f85948f3c4d510e3a6df12dd8b67e768ac72877cab3dcb79d"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-window-v1/independent-result-review.json",
+              "sha256": "c22fbd68dc405b8d10b87690b5a2d9cfd132c7725b9d6659c0050ca7104445be"
+            },
+            "observed": {
+              "windows": 2,
+              "source_frames": [
+                0,
+                1,
+                2
+              ],
+              "wrong_prediction_scene_state_changed_each": true,
+              "strict_armed_restored_pre_each": "All9 domains and12 particle relations equal with unchanged comparator",
+              "corrected_peer_comparison_each": "All44 authoritative PAD bytes and64 native gameplay checksum bytes equal on-time peer",
+              "rebase": "Exact same live native owner and3797 static rows per page from selected DRAW_END1 to fresh PRE1; token lifetimes checked separately, no full cross-view endpoint equality claim",
+              "input": "P1 actual KeyD each window; P2 actual ArrowLeft thenArrowRight. Second prediction holds received first P2. Actual poll and native command sequences increase; replay never repolls.",
+              "audio": "Local phase preserved across rebase (alpha40,beta20); no cross-peer PCM claim",
+              "native_cleanup": "Both ownerState2,cleanup command10; original page sockets closed/drained",
+              "owned_processes_absent": 23
+            },
+            "retained_source_review_failures": {
+              "host_v1": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-two-window-candidate-v1/freeze.json",
+                "sha256": "4b4cd32af727ebb8a4aa2e290e142b0cb8fec6d7d39dc212774baa9188984974"
+              },
+              "test_merge_repair": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-two-window-tests-v2/freeze.json",
+                "sha256": "c8534ef16a1d9bf555307ee58b67ccbeb9b9cb5124d67659b01e3342b3072161"
+              },
+              "scope": "External source draft had wrong pre/post phase checks, PRE/current conflation, unbound report, test overwrite and incomplete continuity/default receipts. Fixed before any capture; raw draft retained."
+            },
+            "next": "Four-tick fixed-PRE episode with once-polled input tickets and forward continuation after correction while a later input remains unconfirmed; reuse existing history adapter and MatchInputTimeline.",
+            "scope": "Two individually confirmed one-tick local functional windows. No sustained speculative window, full match, public enablement, Internet/physical-input/performance acceptance or complete profile claim. Full regression and exact-head CI for #364 remain pending its complete milestone."
           }
         }
       }
