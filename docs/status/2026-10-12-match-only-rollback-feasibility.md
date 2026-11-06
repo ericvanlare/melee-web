@@ -2082,6 +2082,25 @@ Focused controls and the affected private Release build pass; full milestone
 integration remains pending. The structured receipt's `continuous_366` owns exact
 source, capture, review and cleanup identities; no successful recapture is planned.
 
+Producer `5c28d840` then passes the changed presentation hypothesis: every
+forward tick draws through the original callback, while corrective ticks remain
+no-draw until the corrected present frame. Native callback receipts record
+alpha's 12 presentations and beta's eight, with exact request/submission identities
+and contiguous serials across rebase. Intermediate source frames use command 19
+and the same strict completion gate; segment ends retain CPU_END → present →
+DRAW_END. All four strict typed PRE comparisons, eight authoritative PAD rows,
+and both confirmed 64-byte checksums pass independent replay. Native cleanup
+passes and all 19 owned browser processes are absent. Ten observed renderer
+preparations perform no cache flush. The exact source draw schedule and retained
+fixture failures are in `continuous_366.per_forward_present_v1`.
+
+This establishes serialized presentation semantics. The diagnostic still spends
+separate native animation callbacks on poll, step and presentation. Actual cadence
+is unmeasured. Fully confirmed rebase also does not solve persistent remote-input
+lag: advancing the confirmed anchor while preserving a speculative suffix remains
+a separate native lifecycle requirement. No deadline, history cap or comparison
+has been weakened to claim continuous play.
+
 ## Stage decision dependencies, issue #333
 
 The next incomplete profile revision, `slippi-render-dependencies-v3`, adds two

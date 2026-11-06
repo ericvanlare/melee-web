@@ -13015,7 +13015,90 @@
               "renderer_cache_flushes": 0
             },
             "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
-            "next": "Present each forward source frame through existing native scheduling boundary; retain no-draw correction and exact comparisons. Measure actual cadence before performance claims."
+            "next": "Remove extra native percommandrAF using explicit async-aware inline dispatcher under same owner; parity then measured existing60Hzclock. Sustainedlag separately needs confirmedprefix anchor transfer without drawing oldframe or repolling.",
+            "per_forward_present_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-root-source-review-v1.json",
+                "sha256": "67c561cde1e1151ecc2ceca6089de32780f8888a0523ac4efe16d09f8373ef31"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-integrated-focused-v1.json",
+                "sha256": "4d28e2e490fdc9d795841fb94a76947cc551e76298e761fe5fa7496f2596aea7"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-build-v1/result.json",
+                "sha256": "5cf3ba05bbf7c934cbafe1b3cf8d16be49b6660db7e68c19fa830305fd1f8a9d"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-producer-v1/archive.json",
+                "sha256": "41da3fbcfe00b65735264d7a1952490c030013f386cf614c86a1771a3afde35d"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "35783da88b45e1a77e228d08d94d22df80960d39dea81b1dcc446d85b3adf54a"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-root-review-v1.json",
+                "sha256": "e85417803407c6711cfec86b2ddef6b58e170001af443ebb63942e373ba71836"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/result-summary.json",
+                "sha256": "15dec613f6eff980103c76763746037a68967ec05d0fc678167d93acf7721d9b"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/browser/result.json",
+                "sha256": "a6a4bfa7d5f55b316ac99248f83af5050921341964e3503f7c8eef518eb082c3"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/owner.json",
+                "sha256": "2e161e987d07fc5bf35e8aa2c02f5c3117cd6468100fb3b5b3424e3fc4e366e3"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/independent-result-review.json",
+                "sha256": "36e3de22ec5d247e70d9a5154c643a401d1a50f1e70ec15409773744834f6e9f"
+              },
+              "actual_source_presentations": {
+                "alpha": [
+                  1,
+                  2,
+                  3,
+                  3,
+                  4,
+                  4,
+                  5,
+                  6,
+                  7,
+                  7,
+                  8,
+                  8
+                ],
+                "beta": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8
+                ]
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "one_confirmed_rebase_preserves_owner_statics_audio": true,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 19,
+                "renderer_preparation_observations": 10,
+                "renderer_cache_flushes": 0
+              },
+              "scope": "One original source draw per forward tick plus corrected final-frame presentations; replay ticks remain no-draw. Serialized functional evidence only, no paced/continuous/fullmatch or Internet acceptance. Two native testfixture failures retained; actualfocused6 controls and privateRelease pass."
+            }
           }
         }
       }
