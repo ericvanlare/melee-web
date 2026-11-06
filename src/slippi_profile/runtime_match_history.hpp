@@ -21,6 +21,7 @@ namespace melee_web {
 enum class RuntimeMatchHistoryCommand : std::uint32_t {
     Capture=1, Begin=2, Forward=3, Present=4, AdmitIdle=5, Restore=6,
     Correct=7, CloseEndpoint=8, Retire=9, Cleanup=10, RebaseConfirmed=11,
+    RecordingPresent=19,
 };
 
 enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
@@ -58,7 +59,7 @@ enum class RuntimeMatchHistoryPhase : std::uint32_t {
     Restored=11, CorrectedSealed=12, CorrectedCpuCopied=13,
     CorrectedDrawPending=14, CorrectedDrawIdle=15, CorrectedComplete=16,
     Closed=17, Retired=18, Failed=19, MatchClosed=20,
-    EpisodeRecording=21,
+    EpisodeRecording=21, EpisodePresentPending=22,
 };
 
 enum class RuntimeMatchHistoryFailure : std::uint32_t {
@@ -163,7 +164,9 @@ public:
      * inside Aurora begin/end. Completion is admitted separately only after
      * the host's actual GPU/Asyncify fence boundary has become idle. */
     bool submit_present() noexcept;
+    bool submit_recording_present() noexcept;
     bool admit_present_completion() noexcept;
+    std::uint32_t recording_present_count() const noexcept { return recording_present_count_; }
 
     /* Copy the entire strict 9-domain endpoint and particle sidecar batch
      * through these accessors, then call end_endpoint_batch(). That method
@@ -247,11 +250,13 @@ private:
     std::uint32_t pre_frame_{},sealed_end_{},incarnation_{},restore_count_{};
     std::uint32_t endpoint_mask_{};
     std::uint32_t forward_steps_{},replay_steps_{};
+    std::uint32_t last_present_source_frame_{},recording_present_count_{};
     std::uint32_t local_port_{},remote_port_{};
     std::uint64_t poll_serial_{};
     mutable bool endpoint_read_failure_{};
     bool has_input_{},source_step_possible_{};
     bool episode_mode_{},arena_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
+    bool last_present_source_frame_valid_{};
     std::uint32_t segment_start_frame_{},replay_target_end_{},ticket_count_{},last_ticket_id_{};
     RuntimeMatchHistoryPollTicket latest_ticket_{};
     std::array<RuntimeMatchHistoryInputReceipt,7> episode_rows_{};

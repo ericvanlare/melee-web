@@ -277,6 +277,107 @@ int main() {
         (self.work / 'native-rebase-guard.log').write_text(output)
         self.assertEqual(result.returncode, 0, output)
 
+    def test_native_recording_present_uses_actual_callback_once_per_source_frame(self):
+        source_text = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+        begin = source_text.index('bool RuntimeMatchHistory::submit_present() noexcept')
+        end = source_text.index('\nbool RuntimeMatchHistory::endpoint_role_allowed(', begin)
+        methods = source_text[begin:end]
+        methods = methods.replace('RuntimeMatchHistory::', 'NativeHistoryFixture::')
+        fixture = r'''#include <array>
+#include <cassert>
+#include <cstdint>
+#include <memory>
+enum class RuntimeMatchHistoryPhase { PredictedCpuCopied, PredictedDrawPending,
+  PredictedDrawIdle, CorrectedCpuCopied, CorrectedDrawPending, CorrectedDrawIdle,
+  EpisodeRecording, EpisodePresentPending };
+enum class RuntimeMatchHistoryFailure { None, Boundary, Phase, Present };
+enum class RuntimeMatchHistoryGatePoint { PresentSubmit, PresentComplete };
+enum class RuntimeMatchHistoryPresentResult { Submitted, Refused };
+struct Session { std::uint32_t frame{}; std::uint32_t source_frames() const { return frame; } };
+struct Ticket { std::uint32_t ticket_id{}, source_frame{}, incarnation{}; std::uint64_t poll_serial{}; };
+struct Row { std::uint32_t ticket_id{}, source_frame{}, incarnation{}, state{}; std::uint64_t poll_serial{}; };
+using Present = RuntimeMatchHistoryPresentResult (*)(Session&,std::uint32_t,void*) noexcept;
+unsigned presents=0, gates=0;
+RuntimeMatchHistoryPresentResult present(Session& session,std::uint32_t expected,void*) noexcept {
+  ++presents; return session.source_frames()==expected ? RuntimeMatchHistoryPresentResult::Submitted
+                                                        : RuntimeMatchHistoryPresentResult::Refused;
+}
+struct NativeHistoryFixture {
+  Session session_{}; std::unique_ptr<int> checkpoint_;
+  RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
+  RuntimeMatchHistoryFailure failure_=RuntimeMatchHistoryFailure::None;
+  Present present_=&present; void* callback_context_{};
+  std::uint32_t sealed_end_{},pre_frame_{},forward_steps_{},ticket_count_{},incarnation_{};
+  std::uint32_t recording_present_count_{},last_present_source_frame_{},last_ticket_id_{};
+  std::uint64_t poll_serial_{};
+  bool episode_mode_=true,arena_mode_=true,current_ticket_pending_{},latest_ticket_valid_=true;
+  bool last_present_source_frame_valid_{};
+  Ticket latest_ticket_{}; std::array<Row,7> episode_rows_{};
+  bool live_owner(std::uint32_t frame) const { return session_.source_frames()==frame; }
+  bool gate(RuntimeMatchHistoryGatePoint,std::uint32_t frame) { ++gates; return live_owner(frame); }
+  bool fail(RuntimeMatchHistoryFailure failure,const char* = nullptr) { failure_=failure; return false; }
+  bool submit_present() noexcept;
+  bool submit_recording_present() noexcept;
+  bool admit_present_completion() noexcept;
+};
+'''
+        fixture += methods + r'''
+static NativeHistoryFixture episode_fixture() {
+  NativeHistoryFixture h{};
+  h.session_.frame=101; h.pre_frame_=100; h.forward_steps_=h.ticket_count_=1;
+  h.incarnation_=1; h.last_ticket_id_=77; h.poll_serial_=9001;
+  h.latest_ticket_={77,100,1,9001}; h.episode_rows_[0]={77,100,1,1,9001};
+  h.checkpoint_=std::make_unique<int>(1);
+  return h;
+}
+int main() {
+  presents=gates=0;
+  auto recording=episode_fixture();
+  assert(recording.submit_recording_present());
+  assert(presents==1 && recording.recording_present_count_==1);
+  assert(recording.phase_==RuntimeMatchHistoryPhase::EpisodePresentPending);
+  assert(recording.last_present_source_frame_valid_&&recording.last_present_source_frame_==101);
+  assert(recording.admit_present_completion());
+  assert(recording.phase_==RuntimeMatchHistoryPhase::EpisodeRecording && presents==1);
+  assert(!recording.submit_recording_present());
+  assert(recording.failure_==RuntimeMatchHistoryFailure::Phase && presents==1);
+
+  presents=gates=0;
+  auto sealed=episode_fixture();
+  sealed.phase_=RuntimeMatchHistoryPhase::PredictedCpuCopied;
+  sealed.sealed_end_=101;
+  assert(sealed.submit_present());
+  assert(presents==1 && sealed.last_present_source_frame_valid_&&sealed.last_present_source_frame_==101);
+  /* A sealed endpoint draw followed by continuation cannot draw that frame again. */
+  sealed.failure_=RuntimeMatchHistoryFailure::None;
+  sealed.phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
+  assert(!sealed.submit_recording_present());
+  assert(sealed.failure_==RuntimeMatchHistoryFailure::Phase && presents==1);
+
+  presents=0;
+  auto wrong_mode=episode_fixture();
+  wrong_mode.arena_mode_=false;
+  assert(!wrong_mode.submit_recording_present() && presents==0);
+  auto wrong_row=episode_fixture();
+  wrong_row.episode_rows_[0].state=2;
+  assert(!wrong_row.submit_recording_present() && presents==0);
+}
+'''
+        source = self.work / 'native-recording-present.cpp'
+        binary = self.work / 'native-recording-present'
+        source.write_text(fixture)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [
+            ('compile', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                         str(source), '-o', str(binary)]),
+            ('recording-present-control', [str(binary)]),
+        ]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
     def test_extracted_native_start_with_controlled_owners(self):
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
         history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()

@@ -727,3 +727,55 @@ test('arena controller rebases a four-tick retired END and keeps episode mode fo
   await assert.rejects(owner.command('forward'),/Legacy one-window/);
   assert.deepEqual(f.calls,[1,11,1]);
 });
+
+test('recording present and idle preserve the actual forward source boundary',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  await assert.rejects(owner.command('recordingPresent'),/explicit arena history/);
+  owner.enableArenaHistory();
+  await owner.command('capture');
+  f.put(56,21);f.put(68,1);f.put(76,1);f.put(88,1);f.put(108,20);f.put(112,1);
+  f.view.setBigUint64(352,9007199254740993n,true);
+  const request=f.module[prefix+'request'];
+  f.module[prefix+'request']=command=>{
+    const result=request(command);
+    queueMicrotask(()=>{
+      if(command===19){f.put(56,22);f.put(116,1);}
+      if(command===5)f.put(56,21);
+    });
+    return result;
+  };
+  const submitted=await owner.command('recordingPresent');
+  assert.equal(submitted.metadata.phase,22);
+  const receipt={schema:1,command:19,requestSequence:submitted.completeSequence,
+    sourceFrameBefore:1,sourceFrameAfter:1,priorSubmission:'9007199254741001',
+    submission:'9007199254741002',presentationSerial:'1'};
+  const publish=value=>f.module.HEAPU8.set(new TextEncoder().encode(JSON.stringify(value)+'\0'),2048);
+  f.module[prefix+'presentation_json']=()=>2048;
+  publish(receipt);
+  const copied=owner.presentation();
+  assert.deepEqual(copied,receipt);
+  publish({...receipt,sourceFrameAfter:2});
+  assert.throws(()=>owner.presentation(),/differs from completed native draw/);
+  assert.deepEqual(copied,receipt);
+  publish({...receipt,submission:receipt.priorSubmission});
+  assert.throws(()=>owner.presentation(),/submission did not advance/);
+  publish({...receipt,presentationSerial:'18446744073709551616'});
+  assert.throws(()=>owner.presentation(),/outside uint64 bounds/);
+  f.put(116,0);
+  const idle=await owner.command('idle');
+  assert.equal(idle.metadata.phase,21);
+  assert.equal(idle.metadata.currentFrame,1);
+  assert.equal(idle.metadata.pollSerial,'9007199254740993');
+  assert.throws(()=>owner.presentation(),/completed draw before idle/);
+  for(const phase of [7,14]){
+    f.put(56,phase);f.put(20,4);
+    const sealed={...receipt,command:4,requestSequence:idle.completeSequence};
+    publish(sealed);
+    assert.deepEqual(owner.presentation(),sealed);
+  }
+  assert.deepEqual(f.calls,[1,19,5]);
+});

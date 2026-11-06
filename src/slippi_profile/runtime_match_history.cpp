@@ -540,7 +540,37 @@ bool RuntimeMatchHistory::submit_present() noexcept
        RuntimeMatchHistoryPresentResult::Submitted||
        !live_owner(expected))
         return fail(RuntimeMatchHistoryFailure::Present);
+    last_present_source_frame_=expected;
+    last_present_source_frame_valid_=true;
     phase_=pending;
+    return true;
+}
+
+bool RuntimeMatchHistory::submit_recording_present() noexcept
+{
+    const auto current=session_.source_frames();
+    if(!episode_mode_||!arena_mode_||phase_!=RuntimeMatchHistoryPhase::EpisodeRecording||
+       !checkpoint_||current_ticket_pending_||!ticket_count_||ticket_count_!=forward_steps_||
+       ticket_count_>episode_rows_.size()||current<=pre_frame_||
+       current-pre_frame_!=forward_steps_||!live_owner(current)||
+       (last_present_source_frame_valid_&&last_present_source_frame_==current)||
+       recording_present_count_==UINT32_MAX||!gate(RuntimeMatchHistoryGatePoint::PresentSubmit,current))
+        return fail(RuntimeMatchHistoryFailure::Phase,"Recording present requires one unpresented committed arena forward");
+
+    const auto& latest=episode_rows_[ticket_count_-1u];
+    if(latest.state!=1u||latest.source_frame+1u!=current||
+       latest.ticket_id!=last_ticket_id_||latest.poll_serial!=poll_serial_||
+       latest.incarnation!=incarnation_||!latest_ticket_valid_||
+       latest_ticket_.ticket_id!=latest.ticket_id||latest_ticket_.source_frame!=latest.source_frame)
+        return fail(RuntimeMatchHistoryFailure::Present,"Recording present does not bind the latest forward ticket");
+
+    if(!present_||present_(session_,current,callback_context_)!=
+       RuntimeMatchHistoryPresentResult::Submitted||!live_owner(current))
+        return fail(RuntimeMatchHistoryFailure::Present,"Recording source present refused");
+    last_present_source_frame_=current;
+    last_present_source_frame_valid_=true;
+    ++recording_present_count_;
+    phase_=RuntimeMatchHistoryPhase::EpisodePresentPending;
     return true;
 }
 
@@ -552,6 +582,8 @@ bool RuntimeMatchHistory::admit_present_completion() noexcept
         expected=sealed_end_;idle=RuntimeMatchHistoryPhase::PredictedDrawIdle;
     }else if(phase_==RuntimeMatchHistoryPhase::CorrectedDrawPending){
         expected=sealed_end_;idle=RuntimeMatchHistoryPhase::CorrectedDrawIdle;
+    }else if(phase_==RuntimeMatchHistoryPhase::EpisodePresentPending&&last_present_source_frame_valid_){
+        expected=last_present_source_frame_;idle=RuntimeMatchHistoryPhase::EpisodeRecording;
     }else return fail(RuntimeMatchHistoryFailure::Phase);
     if(!live_owner(expected)||
        !gate(RuntimeMatchHistoryGatePoint::PresentComplete,expected))

@@ -32,7 +32,7 @@ const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
 const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
-  'arena-history':{type:'boolean',default:false}},strict:true});
+  'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false}},strict:true});
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
@@ -42,6 +42,9 @@ const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-hist
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
 if(values['arena-history'])assert.equal(values.phase,'four-tick-correction','--arena-history requires four-tick-correction');
+const presentForward=values['present-forward'];
+if(presentForward)assert(values['arena-history']&&values.phase==='four-tick-correction',
+  '--present-forward requires four-tick-correction with --arena-history');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
@@ -170,7 +173,9 @@ const report={schema:values.phase==='four-tick-correction'?
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
   scope:values.phase==='four-tick-correction'?
-    (twoArenaEpisodes?
+    (presentForward?
+      'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
+      twoArenaEpisodes?
       'eight actual source ticks across two arena capsules, four typed corrections, and one confirmed same-match rebase; one socket/timeline per peer; batch functional evidence with presentation only at sealed ENDs':
       'four actual source ticks in one fixed-PRE capsule, two typed corrections, and continuation before a newer remote PAD is confirmed; batch functional evidence with presentation only at sealed ENDs'):values.phase==='held-statics'?
     'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim':
@@ -185,6 +190,7 @@ const report={schema:values.phase==='four-tick-correction'?
     map_path:mapPath,map_sha256:mapSha256,wire_rows:wire.length,
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
   arena_history_mode:values['arena-history'],
+  ...(presentForward?{forward_presentation_scope:'one actual source draw per forward tick; corrected presentations occur only at sealed ENDs; no cadence claim'}:{}),
   arena_comparator:{path:'src/slippi_profile/tests/cpu_arena_endpoint.mjs',
     sha256:await hashFile(path.join(ROOT,'src/slippi_profile/tests/cpu_arena_endpoint.mjs'))},
   diagnostic_module_bindings:diagnosticBindings,
@@ -1110,6 +1116,7 @@ async function runFourTickEpisode(alpha,beta){
   const episodes=twoArenaEpisodes?2:1;
   if(twoArenaEpisodes)proof.windows=[];
   let previous=null;
+  const lastPresentations={alpha:null,beta:null};
   for(let index=0;index<episodes;index++){
     const preFrame=index*4;
     const windowProof=twoArenaEpisodes?
@@ -1140,7 +1147,7 @@ async function runFourTickEpisode(alpha,beta){
       proof.rebase_boundary={confirmed_end:preFrame,retired:previous.retired,alpha:rebased[0],beta:rebased[1]};
     }
     previous=await runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous,
-      pollSerials,tickets,selected,selectedEndpoints,log});
+      pollSerials,tickets,selected,selectedEndpoints,lastPresentations,log});
   }
   proof.final_history_retirement=previous.retired;
   proof.status=twoArenaEpisodes?'two-arena-episodes-complete':'four-tick-episode-complete';
@@ -1150,7 +1157,7 @@ async function runFourTickEpisode(alpha,beta){
 }
 
 async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous,
-  pollSerials,tickets,selected,selectedEndpoints,log}){
+  pollSerials,tickets,selected,selectedEndpoints,lastPresentations,log}){
   const items=[alpha,beta];
   const episode=preFrame===0?'episode':'episode-2';
   const artifact=name=>preFrame===0?name:`window-2-${name}`;
@@ -1159,6 +1166,28 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     retainHistoryEndpoint(item,artifact(label),{view,provenance,sourceFrame,phase,preFrame});
   const pre=(item,label,phase)=>endpoint(item,label,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,preFrame,phase);
   const command=(item,name,phase,frame,counters)=>historyCommand(item,name,opts(phase,frame,counters));
+  if(presentForward)windowProof.presentations={alpha:[],beta:[]};
+  const observePresentation=async(item,label,submitted)=>{
+    const row={label,submitted};
+    windowProof.presentations[item.role].push(row);
+    row.receipt=await item.page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.presentation());
+    assert.equal(row.receipt.requestSequence,submitted.completeSequence);
+    assert.equal(row.receipt.command,submitted.lastCompletedCommand);
+    assert.equal(row.receipt.sourceFrameAfter,submitted.metadata.currentFrame);
+    const serial=BigInt(row.receipt.presentationSerial);
+    const previous=lastPresentations[item.role];
+    assert.equal(serial,BigInt(previous?.presentationSerial??'0')+1n,
+      `${item.role} source presentation serial skipped or repeated`);
+    if(previous)assert(BigInt(row.receipt.priorSubmission)>=BigInt(previous.submission),
+      `${item.role} prior renderer submission regressed`);
+    lastPresentations[item.role]=row.receipt;
+    return row;
+  };
+  const bindPresentationIdle=(row,idle)=>{
+    row.idle=idle;
+    assert.equal(idle.completeSequence,row.receipt.requestSequence+1);
+    assert.equal(idle.metadata.currentFrame,row.receipt.sourceFrameAfter);
+  };
 
   await joinOwned(`${episode}-capture`,items.map(item=>command(item,'capture',1,preFrame)));
   const captured=await joinOwned('episode-capture-pre',items.map(item=>pre(item,'episode-capture-pre',2)));
@@ -1220,6 +1249,12 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     assert.deepEqual(result.row.raw,ticket.raw);
     assert.equal(result.timeline.simulated_through,tick);
     selected[item.role][tick]=result.row.selected;
+    if(presentForward&&tick-preFrame<2){
+      const counters={forwardSteps:tick-preFrame+1,pollSerial:ticket.pollSerial};
+      const submitted=await command(item,'recordingPresent',22,tick+1,counters);
+      const row=await observePresentation(item,'forward',submitted);
+      bindPresentationIdle(row,await command(item,'idle',21,tick+1,{...counters,gpuIdle:true}));
+    }
     return result;
   };
   const boundary=async(item,label,frame,corrected)=>{
@@ -1227,8 +1262,10 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     if(!corrected)await command(item,'seal',5,frame,{forwardSteps:frame-preFrame});
     await endpoint(item,`${label}-cpu`,CPU_ENDPOINT_VIEW.cpuEnd,prov,frame,corrected?13:6);
     const checksum=await retainChecksum(item,artifact(`${label}-cpu`),{tick:frame-1,sourceFrame:frame});
-    await command(item,'present',corrected?14:7,frame);
-    await command(item,'idle',corrected?15:8,frame,{gpuIdle:true});
+    const submitted=await command(item,'present',corrected?14:7,frame);
+    const row=presentForward?await observePresentation(item,corrected?'corrected':'forward',submitted):null;
+    const idle=await command(item,'idle',corrected?15:8,frame,{gpuIdle:true});
+    if(row)bindPresentationIdle(row,idle);
     selectedEndpoints[item.role]=await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,prov,frame,corrected?16:9);
     return checksum;
   };
@@ -1331,6 +1368,14 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     const timeline=await log(item,'episodeTimeline');
     assert.deepEqual([timeline.confirmed_through,timeline.simulated_through,timeline.dirty_from,
       timeline.plan_outstanding],[preFrame+3,preFrame+3,null,false]);
+  }
+  if(presentForward){
+    const first=[['forward',19,preFrame+1],['forward',19,preFrame+2],['forward',4,preFrame+3]];
+    const last=['forward',4,preFrame+4];
+    const schedule=role=>windowProof.presentations[role].map(({label,receipt})=>
+      [label,receipt.command,receipt.sourceFrameAfter]);
+    assert.deepEqual(schedule('alpha'),[...first,['corrected',4,preFrame+3],last,['corrected',4,preFrame+4]]);
+    assert.deepEqual(schedule('beta'),[...first,last]);
   }
   await joinOwned('episode-close',items.map(item=>command(item,'close',17,preFrame+4)));
   const retired=await joinOwned('episode-retire',items.map(item=>command(item,'retire',18,preFrame+4,

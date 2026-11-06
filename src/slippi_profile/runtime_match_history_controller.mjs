@@ -6,7 +6,7 @@ import {collectCpuEndpointInPage} from './tests/cpu_endpoint.mjs';
 export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,present:4,
   idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10,rebase:11,
   pollTicket:12,forwardTicket:13,seal:14,replayTicket:15,finishReplay:16,
-  continue:17,beginEpisode:18});
+  continue:17,beginEpisode:18,recordingPresent:19});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11,FRAME_BYTES=44,TICKET_BYTES=88,INPUT_ROW_BYTES=176;
 const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
@@ -129,15 +129,15 @@ export function validateRuntimeMatchStartPrefix(rawJSON,{publication,liveIdentit
   return parsed;
 }
 
-export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false}={}){
+export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false,arenaMode=false}={}){
   if(!(bytes instanceof Uint8Array)||bytes.length!==STATUS_BYTES)throw Error('Runtime history status extent');
   const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const result=fields(data,statusNames),metadata=fields(data,metadataNames,48);
   metadata.pollSerial=data.getBigUint64(96,true).toString();
   metadata.preAudioPhase=data.getUint32(104,true);metadata.currentAudioPhase=data.getUint32(108,true);
   Object.assign(result,{metadata,...fields(data,['inputReady','gpuPending','endpointActive','rendererErrors'],112)});
-  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=episodeMode?21:20,
-    commandLimit=episodeMode?18:11;
+  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?22:episodeMode?21:20,
+    commandLimit=arenaMode?19:episodeMode?18:11;
   if(result.schema!==1||result.bytes!==STATUS_BYTES||result.reserved!==0||result.ownerState>2||
     result.pendingCommand>commandLimit||result.lastCompletedCommand>commandLimit||result.completeSequence>result.requestSequence||
     result.inputReady>1||result.gpuPending>1||result.endpointActive>1||
@@ -237,7 +237,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(!start||!Number.isSafeInteger(size)||size<=0||start+size>heap.length)throw Error('Native history borrowed extent');
     return heap.slice(start,start+size);
   };
-  const status=()=>decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode});
+  const status=()=>decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode,arenaMode});
   const errorText=()=>module.UTF8ToString(module[PREFIX+'error']());
   const latch=error=>{failed??=error;return error;};
   const check=(snapshot,allowFailure=false)=>{
@@ -627,6 +627,35 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         return bytes;
       }catch(error){throw latch(error);}
     },
+    presentation(){
+      active();
+      const getter=module[PREFIX+'presentation_json'];
+      if(typeof getter!=='function')throw Error('Private runtime history presentation export is unavailable');
+      const before=check(status()),command=before.lastCompletedCommand;
+      const phase=before.metadata.phase;
+      if(!arenaMode||before.ownerState!==1||before.pendingCommand||before.endpointActive||
+        !before.completeSequence||before.completeSequence!==before.requestSequence||
+        !(command===4&&(phase===7||phase===14)||command===19&&phase===22))
+        throw Error('Runtime history presentation requires a completed draw before idle');
+      const pointer=getter();
+      if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>UINT32_MAX||!(pointer>>>0))
+        throw Error('Native runtime history presentation receipt is unavailable');
+      const receipt=JSON.parse(module.UTF8ToString(pointer>>>0));
+      const fields=['schema','command','requestSequence','sourceFrameBefore','sourceFrameAfter',
+        'priorSubmission','submission','presentationSerial'];
+      if(!hasExactKeys(receipt,fields)||receipt.schema!==1||receipt.command!==command||
+        receipt.requestSequence!==before.completeSequence||
+        receipt.sourceFrameBefore!==before.metadata.currentFrame||receipt.sourceFrameAfter!==receipt.sourceFrameBefore)
+        throw Error('Runtime history presentation receipt differs from completed native draw');
+      const prior=canonicalU64(receipt.priorSubmission,'presentation prior submission');
+      const submission=canonicalU64(receipt.submission,'presentation submission',{positive:true});
+      canonicalU64(receipt.presentationSerial,'presentation serial',{positive:true});
+      if(submission<=prior)throw Error('Runtime history presentation submission did not advance');
+      const after=check(status());
+      if(after.gpuPending>before.gpuPending||!sameJsonValue({...after,gpuPending:before.gpuPending},before))
+        throw Error('Runtime history presentation changed its native owner status');
+      return receipt;
+    },
     forwardTicket(ticketId,plan){
       return this.command('forwardTicket',{ticketId,plan});
     },
@@ -636,7 +665,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     async command(name,argument){
       const command=MATCH_HISTORY_COMMAND[name];if(!command)throw Error('Unknown runtime history command');
       const framePayload=name==='forwardTicket'||name==='replayTicket';
-      const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay','continue','beginEpisode']);
+      const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay','continue','beginEpisode','recordingPresent']);
       const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
       let confirmedEnd,ticketId,planBytes;
       if(name==='rebase')confirmedEnd=argument;
@@ -650,6 +679,8 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           throw Error('Episode ticket command requires a nonzero ticket ID and exact 44-byte plan');
         planBytes=argument.plan.slice();
       }else if(argument!==undefined)throw Error('Only confirmed rebase and episode ticket commands take arguments');
+      if(name==='recordingPresent'&&!arenaMode)
+        throw Error('Recording presentation requires explicit arena history mode');
       if(episodeCommands.has(name)&&!episodeMode)
         throw Error('Episode commands require explicit pre-capture episode mode');
       if(episodeMode&&legacyExecution)
@@ -680,6 +711,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         }:null;
         const before=await wait(value=>value.pendingCommand===0&&
           (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail);
+        const recordingIdle=name==='idle'&&before.metadata.phase===22;
+        if(name==='recordingPresent'&&(!captured||before.metadata.phase!==21||
+            before.metadata.currentFrame<=before.metadata.preFrame||before.gpuPending||before.endpointActive))
+          throw Error('Recording presentation requires a completed forward boundary');
         const next=before.requestSequence+1;
         if(name==='rebase'){
           const h=before.metadata;
@@ -706,7 +741,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,deadline,name,allowFailure);
         if(after.requestSequence!==next||after.lastCompletedCommand!==command)
           throw Error('Native command completion sequence mismatch');
-        if(episodeCommands.has(name)){
+        if(recordingIdle||name==='recordingPresent'){
+          const {phase:priorPhase,...prior}=before.metadata;
+          const {phase:nextPhase,...now}=after.metadata;
+          if(priorPhase!==(recordingIdle?22:21)||nextPhase!==(recordingIdle?21:22)||
+             !sameJsonValue(prior,now)||before.expectedFrame!==after.expectedFrame||
+             before.localPort!==after.localPort||before.remotePort!==after.remotePort||
+             after.ownerState!==1||after.endpointActive||(recordingIdle&&after.gpuPending))
+            throw Error('Recording presentation changed its forward source owner');
+        }
+        if(episodeCommands.has(name)&&name!=='recordingPresent'){
           const prior=before.metadata,now=after.metadata;
           let valid=false;
           switch(name){
