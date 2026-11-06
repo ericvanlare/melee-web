@@ -347,9 +347,12 @@ bool history_start_complete_initial_transfers(const GameplayMatchSession& sessio
  const bool stream_pending=melee_web_audio_stream_source_loading();
  if(!bank_pending&&!stream_pending&&DVDGetDriveStatus()==DVD_STATE_END)return true;
  auto* audio=session.audio();
- if(!audio||!melee_web_audio_bank_transport_active()||
-    (stream_pending&&!melee_web_audio_stream_owned(audio)))
+ if(!audio)
   return history_refuse("Agreed initial audio transfer lost its exact audio owner");
+ if(bank_pending&&!melee_web_audio_bank_transport_active())
+  return history_refuse("Agreed initial SSM transfer has no active bank transport");
+ if(stream_pending&&!melee_web_audio_stream_owned(audio))
+  return history_refuse("Agreed initial HPS transfer lost its exact stream owner");
  if(bank_pending)melee_web_audio_bank_transport_pump();
  if(melee_web_audio_stream_owned(audio)){
   char error[256]{};

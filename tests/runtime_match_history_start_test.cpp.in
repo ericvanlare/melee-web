@@ -22,7 +22,7 @@ unsigned default_pad_constructors=0;
 struct MeleeWebAudio {};
 MeleeWebAudio fixture_audio;
 bool source_files_idle=true,source_memory_healthy=true,bank_pending=false,stream_pending=false;
-bool stream_owned=true,stream_pump_ok=true,stream_completes=true;
+bool bank_active=false,stream_owned=true,stream_pump_ok=true,stream_completes=true;
 std::string transfer_order;
 struct GameplayMatchSession {
  MeleeWebMenuMatchSelection selection;
@@ -74,10 +74,10 @@ bool melee_web_cpu_interval_active(){return false;}
 bool melee_web_source_file_drive_busy(){return !source_files_idle;}
 bool melee_web_source_memory_healthy(){return source_memory_healthy;}
 bool melee_web_audio_bank_transport_busy(){return bank_pending;}
-bool melee_web_audio_bank_transport_active(){return true;}
+bool melee_web_audio_bank_transport_active(){return bank_active;}
 bool melee_web_audio_stream_source_loading(){return stream_pending;}
 bool melee_web_audio_stream_owned(MeleeWebAudio* audio){return stream_owned&&audio==&fixture_audio;}
-void melee_web_audio_bank_transport_pump(){transfer_order+='B';bank_pending=false;}
+void melee_web_audio_bank_transport_pump(){assert(bank_active);transfer_order+='B';bank_pending=false;}
 bool melee_web_audio_stream_pump_for(MeleeWebAudio* audio,char* error,size_t bytes){
  assert(melee_web_audio_stream_owned(audio));
  transfer_order+='H';
@@ -164,7 +164,7 @@ void reset(){
  renderer_services=0;submitted={};stats={};
  cache_status=AURORA_PIPELINE_CACHE_READY;cache_flushes=0;cache_flush_ok=true;
  source_files_idle=true;source_memory_healthy=true;bank_pending=false;stream_pending=false;
- stream_owned=true;stream_pump_ok=true;stream_completes=true;transfer_order.clear();
+ bank_active=false;stream_owned=true;stream_pump_ok=true;stream_completes=true;transfer_order.clear();
 }
 void offer(){
  assert(melee_web_native_menu_match_history_start_enable());
@@ -222,11 +222,15 @@ int main(){
   construct(deferred);
   unsigned draws=0;
   cache_status=AURORA_PIPELINE_CACHE_PENDING;
-  bank_pending=true;stream_pending=true;
+  // Both constructors share resident banks. Also exercise the pending SSM
+  // variant once to verify it keeps the existing bank-before-stream ordering.
+  bank_active=bank_pending=!deferred;
+  stream_pending=true;
+  const char* expected_transfers=deferred?"H":"BH";
   history_start_publish_initial_source([&]{
    ++draws;
    assert(cache_flushes==1&&cache_status==AURORA_PIPELINE_CACHE_READY);
-   assert(transfer_order=="BH"&&!bank_pending&&!stream_pending);
+   assert(transfer_order==expected_transfers&&!bank_pending&&!stream_pending);
    cache_status=AURORA_PIPELINE_CACHE_PENDING;
    assert(!preparation.busy()&&!running&&first_use_draw_pending);
    stats.lastBeginFrameId=stats.lastEndFrameId=1;
@@ -241,7 +245,7 @@ int main(){
   submitted.pendingStagingBuffers=0;
   assert(history_start_ordinary_callback_impl());
   assert(draws==1&&!first_use_draw_pending&&!running&&cache_flushes==2);
-  assert(transfer_order=="BH");
+  assert(transfer_order==expected_transfers);
   const auto* receipt=static_cast<const MatchHistoryPublication*>(melee_web_native_menu_match_history_start_publication_data());
   assert(receipt&&receipt->source_frame==0&&receipt->source_draws==1&&receipt->source_submission==1);
   assert(melee_web_native_menu_match_history_start_publication_bytes()==48);
@@ -306,25 +310,27 @@ int main(){
  // Initial transfers cannot dispatch through an unknown owner, touch an
  // unrelated file request, or draw after failure or incomplete HPS work.
  const char* transfer_errors[]{
-  "Agreed initial audio transfer lost its exact audio owner",
+  "Agreed initial HPS transfer lost its exact stream owner",
   "Agreed initial audio transfer requires quiescent match source files",
   "fixture HPS transfer failed",
   "fixture HPS still loading",
+  "Agreed initial SSM transfer has no active bank transport",
  };
- for(unsigned index=0;index<4;++index){
+ for(unsigned index=0;index<5;++index){
   construct(false);
   stream_pending=true;
   stream_owned=index!=0;
   source_files_idle=index!=1;
   stream_pump_ok=index!=2;
   stream_completes=false;
+  bank_pending=index==4;
   try {
    history_start_publish_initial_source([]{assert(false);return true;});
    assert(false);
   }catch(const std::runtime_error& error){
    assert(std::string(error.what())==transfer_errors[index]);
   }
-  assert(transfer_order==(index<2?"":"H"));
+  assert(transfer_order==(index==2||index==3?"H":""));
   assert(cache_flushes==0&&first_use_draw_pending);
  }
 
