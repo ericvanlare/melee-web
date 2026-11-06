@@ -1840,25 +1840,52 @@ nested Git patch-isolation defect and strict unused-parameter warnings. The
 repair preserves every existing assertion; all six failed controls pass. The
 first focused launcher missed the repository import path, and that failed
 invocation is retained separately from the corrected two-control pass. The
-browser producer stays `fc26c423`; integration source `a0fec4bd` changes fixtures
-and explicit unused-parameter casts. Its rebuilt Wasm differs (including the
-SDL revision string); it is not represented as the captured binary.
-Final-present raw lanes are independently replayable; the saved command68 GPU
-return object is null, so its original online validation cannot be replayed
-from that field. The full regression passes 3,082 tests with 238 skips, and
-both Release builds pass at `a0fec4bd`. Initial publication CI exhausted the
-existing 15-minute unit-0 budget while assertions were passing. A reviewed
-three-shard rebalance preserves the full test inventory, compiler settings and
-deadline; its focused controls pass. New-head CI and merge remain pending in
-`retained_history_integration_v1`.
+browser producer remains `fc26c423`; integration source `a0fec4bd` changes fixtures
+and explicit unused-parameter casts. Its rebuilt Wasm differs and is not
+represented as the captured binary. Final-present raw lanes are independently
+replayable; the saved command68 GPU return object is null, so its original
+online validation cannot be replayed from that field. The full regression
+passes 3,082 tests with 238 skips, and both Release builds pass at `a0fec4bd`.
+
+PR #361 merged as fb2b22043ba0362508df63fac9a1568ce3519a9a from exact reviewed
+head f654b6cd7016a353d536732da11587faf9ded3a5. The reviewed and merged trees
+are both 38f581f5748bb09c5b2c4bed77a6fbecf34c8b46; all 15 exact-head CI checks
+completed with 13 successes and two expected skips (run 41112558293). The
+premerge and merge receipts are pinned in `retained_history_integration_v1`.
+The earlier page-peer collision audit records an overwritten receipt with SHA-256
+c49eb124eb82e3436819a704ec246c5ce757b4c9675fb53b090f546bbe642702. No
+byte-identical recovery was found, so its prior bytes were not reconstructed.
 
 This remains a four-tick component with Node-held local Worker sockets and
-authored PAD input. The next step is the ordinary runtime's existing match
-session, browser-local input and relay owner; the private diagnostic target does
-not link the ordinary input API. Sustained rolling history, correction across
-refill, combat/KO breadth, combined frame budget, full-match play and public
-profile admission remain open.
+authored PAD input. Sustained rolling history, correction across refill,
+combat/KO breadth, combined frame budget, full-match play and public profile
+admission remain open.
 
+### Ordinary-runtime agreed match start, issue #362
+
+A private ordinary-runtime keyboard route now reaches original CSS and SSS,
+passes the native source-offer, negotiated-seed agreement and exact commit, and
+constructs the selected original match at source frame zero. V5 is retained as
+a harness readiness defect: source CSS readiness was 74, but the harness
+required exactly 1. Read-only review repaired the comparison to nonzero while
+retaining the raw value. V6 passed CSS/SSS, agreement/commit and frame-zero
+construction, then refused the initial source publication before a draw.
+V7 narrows the first refusal to the renderer quiescence descriptor schema or
+extent; no takeover, terminal capture, rollback command or match tick ran.
+V7 also records successful native close/cache flush and owner cleanup, with
+browser and server process cleanup verified. A source review attributes the
+descriptor refusal to pending pipeline-cache writes during the ordinary source
+hold. The private stopped-boundary flush repair passes focused controls and
+a Release build. V8 (`ac080bbe`) reaches an earlier strict source boundary:
+the original HPS stream is still loading, so initial publication refuses before
+the new flush runs. Native close/cache drain and owned-process cleanup pass.
+The next change services the existing bounded constructor audio transport;
+source and renderer quiescence guards remain unchanged. The earlier Release diagnostic
+build of native source 0f72ae25 completed in 38.64 seconds; its exact outputs
+are archived under runtime-agreed-start-producer-v1. V7 uses the later native
+and harness source checkpoint 08cffe8b. Exact producers and retained outcomes
+are pinned in `runtime_match_start_v1`. This is startup component evidence only,
+not takeover or rollback acceptance.
 
 ## Stage decision dependencies, issue #333
 

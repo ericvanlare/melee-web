@@ -11514,7 +11514,7 @@
           "next": "Ordinary-runtime private rollback integration using its existing match session and browser-local input/relay owner; first close the linked API and owner adapter gap. Sustained confirmed-anchor advancement, correction across refill, combat/KO breadth, full-match play and complete-profile admission remain open."
         },
         "retained_history_integration_v1": {
-          "status": "LOCAL_VALIDATION_PASS_PUBLICATION_PENDING",
+          "status": "MERGED_EXACT_HEAD_CI",
           "validation_source": "a0fec4bd2adb9c7d10b3a13b8ddd572f676833f5",
           "regression": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v2/result.json",
@@ -11548,7 +11548,7 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/focused-profile-result.json",
             "sha256": "c551ee9be81bc5d735248d2cc8314c84142849a7b1878d4eec77be5111176af6"
           },
-          "publication_head_ci": "Initial92d8044 run41107947034 unit-0 cancelled at existing15-minute cap; no assertion failure before cancellation. Current head pending after reviewed three-shard rebalance.",
+          "publication_head_ci": "Exact-head CI completed; premerge and merged receipts are pinned below.",
           "failed_full_regression": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v1/result.json",
             "sha256": "12fd24eb2c3f11a2e9f50f06d7851da61467797f176a92f08c8b0aa22532aa39"
@@ -11574,6 +11574,184 @@
               "sha256": "b4330086cd5bcd9f45554e5f9bf462c046f7e5bc10a99e14ce1ad22114ee3361"
             },
             "scope": "Same full test inventory, existing15-minute deadline and compiler-job settings; three slow complete modules gain their own unit shard."
+          },
+          "merge": {
+            "pull_request": 361,
+            "reviewed_head": "f654b6cd7016a353d536732da11587faf9ded3a5",
+            "merge_commit": "fb2b22043ba0362508df63fac9a1568ce3519a9a",
+            "reviewed_tree": "38f581f5748bb09c5b2c4bed77a6fbecf34c8b46",
+            "merged_tree": "38f581f5748bb09c5b2c4bed77a6fbecf34c8b46",
+            "trees_equal": true,
+            "premerge_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/premerge-f654.json",
+              "sha256": "f6e145cd32930cb3df2e152dc4fe3275759075f7448807c8369de203de3fa9c1"
+            },
+            "merged_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/merged-f654.json",
+              "sha256": "ae0ba1e77066b542fb7d2026ce487d93d7859b311ad8f16b7d7ae5c93b5f36bc"
+            }
+          }
+        },
+        "retained_page_peer_collision": {
+          "audit": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-history-page-peer-v1/collision-audit.json",
+            "sha256": "78bb160f5d1595b3188397bfc0b755c612efaf11a4942fbd3ee79c46d4f08025"
+          },
+          "overwritten_receipt_sha256": "c49eb124eb82e3436819a704ec246c5ce757b4c9675fb53b090f546bbe642702",
+          "recovery": "No byte-identical copy found; the exact prior receipt bytes cannot be restored and no reconstruction was attempted."
+        },
+        "runtime_match_start_v1": {
+          "issue": 362,
+          "status": "FRAME_ZERO_CONSTRUCTED_SOURCE_AUDIO_LOADING_NO_TAKEOVER",
+          "scope": "Private ordinary-runtime CSS/SSS keyboard startup, source-owned offer and negotiated-seed agreement/commit, source match construction at frame zero, and held-publication admission. No takeover, capture or rollback command.",
+          "native_release_build": {
+            "source_head": "0f72ae25e73e21c875b89ff5167f205a0f23b3ec",
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-build-v1/result.json",
+              "sha256": "84987b38278bf64ec5fe13cacb78ee3d7e80a1103df306a072c5efe69d570f59"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/archive.json",
+              "sha256": "329e1b52891eb8800074efa43ce6f051d71c3725518d87f25e0cfb6dfbc637cd"
+            },
+            "artifacts": {
+              "source_state": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser_match_history.source-state.json",
+                "sha256": "9d65534a12f51bdf89450c1bbc6bfe657f428e8f28c461d545cf50cf5c2b308b"
+              },
+              "map": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser_match_history.map",
+                "sha256": "7e4042e0dece9ae5e9b0713ffdab8d099852e09f14bd495ce1fac7e4f0fc9472"
+              },
+              "wasm": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.wasm",
+                "sha256": "d0101cb822cd903695c63d043d5f2d0a7844669b8e7b709b5564baabd8efeffd"
+              },
+              "javascript": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.js",
+                "sha256": "13c0a26d397900728f438db3686b89bd6a2dca8a5302fb6108b41883738af776"
+              },
+              "data": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.data",
+                "sha256": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              }
+            }
+          },
+          "native_source_controls": {
+            "focused_checkpoint": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/checkpoint.json",
+              "sha256": "754f6268a5d1bce8c91478b640027c1dd2e7e2a4b0e07d1760a2e5eb66e0988f"
+            },
+            "private_translation_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/private-tu.log",
+              "sha256": "ebb4e38073d5e6901ff226e14a8cdcbd34c81f19d475e7618f237fd763d58983"
+            },
+            "default_off_translation_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/default-off-tu.log",
+              "sha256": "23ba51c18cdccd6bedeacf0f34b2b7c6cf2d7829a7e6f50908d7dc877d440ad0"
+            },
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-native-agreed-start-root-review-v1.json",
+              "sha256": "8c9bf6cb31ed12c89abdce544508138f40df227ce62edd1c1c8844c94eecede8"
+            },
+            "control_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/root-review.json",
+              "sha256": "a0ae1f9feeb425f852ee2f4ae2835760a35c9f6c498c8c4d42640fc25609ba5c"
+            }
+          },
+          "host_adapter_controls": {
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-start-host-v1/receipt.json",
+              "sha256": "d72b59bf64ab17dde7272d3132745694bcf78d40067fc9d408f2f706829e5ba8"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-start-host-review-v1.json",
+              "sha256": "cd1704fa71dc0e361b3fb0569bdb36de37ac8437603ee50a938d09eba72a4596"
+            }
+          },
+          "harness_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-harness-review-v1.json",
+            "sha256": "bfe1dc78152bfe9b2f594d96741a45b949c7e8a3751b0f4f004862087f73b37a"
+          },
+          "css_readiness_defect": {
+            "status": "V5 harness comparison repaired to preserve source's nonzero readiness predicate",
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/browser/result.json",
+              "sha256": "752fc1266697c722838c15a5e89c7f839e383a80066016f0bc577d05f30e4b18"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/first-failure-summary.json",
+              "sha256": "5d297424d6301ee5e5f3553882bbd72737faced9c708cf0caad44f1fd28c1c24"
+            },
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/css-ready-source-review.json",
+              "sha256": "2fc6bf62d500cc143c6e8cd33faedc250c75f5c8d10bbdddd9945552cfbe5701"
+            }
+          },
+          "v6_initial_publication_failure": {
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/browser/result.json",
+              "sha256": "f99f03bb0d309f9283c45f33a06de19e2e87451bb6c10037efb264577e07c1b3"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/first-failure-summary.json",
+              "sha256": "d8de66c270ff310779244b0aca0d3dd9f451ab7d8fe1de072fb0307a1b152118"
+            },
+            "native_close_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/browser/native-log-after-cleanup.txt",
+              "sha256": "da8410c39ce62138374b49ce838c23b75b0861d442ffed3ee64ff0e3ff200805"
+            }
+          },
+          "v7_current_attempt": {
+            "native_and_harness_head": "08cffe8b77688c27463a8fdb459035f1ed7e60fb",
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser/result.json",
+              "sha256": "bc1ca768f5bb128e4c92cb5f8d128fce14d8f9caba27fbdce5e55f4546679978"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/first-failure-summary.json",
+              "sha256": "c108937fb2902f92c6be16fa0ef4a7678951f3b6491020f20c6ff18797dbfb01"
+            },
+            "native_close_and_cache_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser/native-log-after-cleanup.txt",
+              "sha256": "89f4e1598b0c400c1ac907fdd3b16c0e6217f2f9ad3f253ddef0418941137db4"
+            },
+            "owner_cleanup": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/owner.json",
+              "sha256": "31610fb70a707e08690a1e0782828fe72dc2fb6d84e81660d5193509849c4556"
+            },
+            "process_inventory": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser-processes.jsonl",
+              "sha256": "749f71cab15dbd8fd93ef187c1fec61935aba039757c75d82a5ce1ee82f039c6"
+            },
+            "current_observation": "V7 reaches original CSS/SSS and source-bound frame-zero construction. The initial publication fails on renderer quiescence descriptor schema/extent. Native close/cache flush and browser/server owner cleanup pass; no takeover or rollback command runs."
+          },
+          "followup": "Current source review attributes the descriptor refusal to pending pipeline-cache writes while the ordinary source hold defers flush. Sol is implementing bounded private stopped-boundary use of the existing flush without relaxing guards. Update this boundary after the next result.",
+          "latest_attempt": {
+            "attempt": "v8",
+            "producer": "ac080bbeacec6746890875197a0c7aef3a43223a",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v8/first-failure-summary.json",
+              "sha256": "3be8a6738e1de6b4037dbb8b9e3609373b541852b42449d8ef23d7e4578269d7"
+            },
+            "browser": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v8/browser/result.json",
+              "sha256": "9171a4c529f7c557475cf09f558003aba71e45d999db63d7207bfbbc1354218e"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-build-v3/result.json",
+              "sha256": "67b2e7c9bff1633735f4723cecdc3d4ad6de63c0df7a5c46b3dcc09e63b38560"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v3/archive.json",
+              "sha256": "64b871c3a3a15a94fc1cfac1765e168046822cac6d89e8160e1981d80c165ea2"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v6/root-review.json",
+              "sha256": "35781413fa2aed44794fc27b6757b75f34c6df630afe438563d375a77b681fef"
+            },
+            "observed": "Source HPS startup loading refuses initial publication before cache flush is exercised. Native close/cache drain and all recorded owned process cleanup pass.",
+            "next": "Service the existing bounded constructor SSM/HPS resident transport before initial publication; full source, renderer and ownership checks remain required."
           }
         }
       }
