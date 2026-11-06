@@ -20,6 +20,22 @@ static void tick(uint64_t token,const void* context,uint64_t world,
     }
 }
 
+static uint64_t replay_from(uint64_t world,const void* context,
+                            uint64_t owner_epoch,uint32_t pre_frame,
+                            uint32_t old_end)
+{
+    uint64_t token=melee_web_cpu_interval_begin();assert(token);
+    assert(melee_web_cpu_interval_motor_history_capture_begin(token,world,
+        context,owner_epoch,pre_frame));
+    assert(melee_web_cpu_interval_motor_history_begin_incarnation(token,1,pre_frame));
+    for(uint32_t frame=pre_frame;frame<old_end;++frame)
+        tick(token,context,world,owner_epoch,frame,frame%3u);
+    assert(melee_web_cpu_interval_motor_history_seal(token,1,old_end));
+    assert(melee_web_cpu_interval_motor_history_restore_admit(token,1,old_end));
+    melee_web_cpu_interval_motor_history_restore_commit(token,1,old_end);
+    return token;
+}
+
 int main(void)
 {
     const uint64_t world=0x1234,owner_epoch=0x5678;
@@ -125,6 +141,92 @@ int main(void)
         &context,owner_epoch,300));
     assert(melee_web_cpu_interval_motor_history_begin_incarnation(token,1,300));
     assert(!melee_web_cpu_interval_motor_history_begin_incarnation(token,1,300));
+    assert(melee_web_cpu_interval_end(token));
+
+    /* A replay may retire at an exact CPU prefix inside its immutable old END.
+     * The baseline tape remains untouched, while selected and retirement data
+     * identify only the actual replayed prefix. */
+    token=replay_from(world,&context,owner_epoch,400,404);
+    tick(token,&context,world,owner_epoch,400,2);
+    tick(token,&context,world,owner_epoch,401,1);
+    assert(melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,402));
+    const MeleeWebCpuMotorEvidence* prefix=
+        melee_web_cpu_interval_motor_history_evidence_for(token,world,&context,
+            owner_epoch,400,1,402);
+    assert(prefix&&prefix->baseline.frames_seen==4&&
+           prefix->baseline.event_count==4&&
+           prefix->selected.frames_seen==2&&prefix->selected.span==2&&
+           prefix->selected.event_count==2&&prefix->selected.events[0].command==2&&
+           prefix->selected.events[1].source_frame==401);
+    assert(!melee_web_cpu_interval_motor_history_restore_admit(token,1,402));
+    assert(melee_web_cpu_interval_motor_history_retire_admit(token,1,402));
+    melee_web_cpu_interval_motor_history_retire_commit(token,1,402);
+    assert(melee_web_cpu_interval_end(token));
+    const MeleeWebCpuMotorCommitReceipt* prefix_receipt=
+        melee_web_cpu_interval_motor_commit_receipt();
+    assert(prefix_receipt&&prefix_receipt->span==2&&
+           prefix_receipt->event_count==2&&
+           prefix_receipt->selected_lane==MELEE_WEB_CPU_MOTOR_LANE_CORRECTED);
+
+    token=replay_from(world,&context,owner_epoch,480,484);
+    tick(token,&context,world,owner_epoch,480,2);
+    tick(token,&context,world,owner_epoch,481,0);
+    assert(melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,482));
+    assert(!melee_web_cpu_interval_motor_history_begin_incarnation(token,2,482));
+    assert(melee_web_cpu_interval_end(token));
+
+    /* Exact identity and open-frame checks reject wrong tokens/incarnations,
+     * owner drift and incomplete or non-prefix endpoints. */
+    token=replay_from(world,&context,owner_epoch,500,504);
+    tick(token,&context,world,owner_epoch,500,1);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token+1,1,501));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,510,514);
+    tick(token,&context,world,owner_epoch,510,1);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,2,511));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,520,524);
+    tick(token,&context,world,owner_epoch,520,1);
+    MeleeWebCpuMotorEvidence* drift=(MeleeWebCpuMotorEvidence*)
+        melee_web_cpu_interval_motor_evidence();
+    assert(drift);drift->selected.world_lo^=1u;
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,521));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,530,534);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,530));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,540,544);
+    for(uint32_t frame=540;frame<544;++frame)
+        tick(token,&context,world,owner_epoch,frame,frame%3u);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,544));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,550,554);
+    tick(token,&context,world,owner_epoch,550,1);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,555));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,555,559);
+    tick(token,&context,world,owner_epoch,555,2);
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,557));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,560,564);
+    assert(melee_web_cpu_interval_motor_frame_begin(token,&context,world,
+        owner_epoch,560));
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,561));
+    assert(melee_web_cpu_interval_end(token));
+
+    token=replay_from(world,&context,owner_epoch,570,574);
+    tick(token,&context,world,owner_epoch,570,1);
+    tick(token,&context,world,owner_epoch,571,0);
+    assert(melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,572));
+    assert(!melee_web_cpu_interval_motor_history_replay_finish(token,1,574));
+    assert(!melee_web_cpu_interval_motor_history_finish_confirmed_prefix(token,1,572));
     assert(melee_web_cpu_interval_end(token));
     puts("Actual CPU motor retained-history journal passed two same-PRE restores, bounded continuation, stale-ticket refusal and legacy-safe control");
 }

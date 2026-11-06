@@ -68,6 +68,12 @@ public:
     bool close_history_endpoint(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&) noexcept;
     bool finish_history_replay(const GameplayMatchSession&) noexcept;
+    /* Finalize only the actual authoritative prefix C inside the restored
+     * interval. The caller proves remote confirmation; this owner proves the
+     * source frame and typed leaves. The result is CPU-only and retirement-only,
+     * never a drawn endpoint or another continuation of the old capsule. */
+    bool finish_history_confirmed_prefix(const GameplayMatchSession&,
+                                         std::uint32_t confirmed_end) noexcept;
     bool retire_history_confirmed(const GameplayMatchSession&) noexcept;
     GameplayActionStoreHistory* history_actions() const noexcept {
         return history_actions_.get();
@@ -102,7 +108,8 @@ private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
                        HistoryReady, HistoryRecording, HistorySealed,
                        HistoryCorrecting, HistoryCorrectedSealed,
-                       Finished, Failed, ConfirmedDetached, Retired };
+                       Finished, Failed, ConfirmedDetached, Retired,
+                       HistoryConfirmedPrefixSealed };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop)
         :span_(span),reusable_loop_(reusable_loop){}

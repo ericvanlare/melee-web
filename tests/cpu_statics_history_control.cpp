@@ -102,5 +102,54 @@ int main()
     assert(legacy->commit_prevalidated());
     assert(!legacy->prepare_commit()&&!legacy->commit_prevalidated());
     assert(values[0]==10&&values[2]==30);
+
+    /* Prefix sealing binds a live Restored incarnation/count and captures the
+     * actual rows at C while retaining the old restored END as its upper bound. */
+    values={10,20,30};
+    auto prefix=owner();
+    assert(prefix->begin_history(200));
+    assert(prefix->history_begin_incarnation(1,200));
+    values[0]=11;values[2]=31;
+    assert(prefix->history_seal_endpoint(1,204));
+    assert(prefix->history_close_endpoint(1,204));
+    assert(prefix->history_prepare_commit(1,204));
+    assert(prefix->history_admit_commit(1,204));
+    prefix->history_commit_prevalidated();
+    assert(values[0]==10&&values[1]==20&&values[2]==30);
+    values[0]=12;values[2]=32;
+    assert(!prefix->history_seal_confirmed_prefix(1,2,202));
+    assert(!prefix->history_seal_confirmed_prefix(2,1,202));
+    assert(!prefix->history_seal_confirmed_prefix(1,1,200));
+    assert(!prefix->history_seal_confirmed_prefix(1,1,204));
+    assert(!prefix->history_seal_confirmed_prefix(1,1,205));
+    values[1]=21;
+    assert(!prefix->history_seal_confirmed_prefix(1,1,202));
+    values[1]=20;
+    assert(prefix->history_seal_confirmed_prefix(1,1,202));
+    auto prefix_header=prefix->history_endpoint_header();
+    assert(prefix_header.status==CpuStaticEndpointStatus::Ok&&
+           prefix_header.phase==CpuStaticEndpointPhase::ConfirmedPrefix&&
+           prefix_header.row_count==3);
+    assert(prefix->history_endpoint_row(0).status==CpuStaticEndpointStatus::Ok);
+    assert(prefix->history_endpoint_row(3).status==CpuStaticEndpointStatus::InvalidIndex);
+    values[2]=33;
+    assert(!prefix->history_close_endpoint(1,202)); /* Live row drift. */
+    values[2]=32;
+    values[2]=32;
+    assert(!prefix->history_retire_admit(1,202));
+    assert(prefix->history_close_endpoint(1,202));
+    assert(!prefix->history_close_endpoint(1,202));
+    assert(!prefix->history_seal_confirmed_prefix(1,1,202)); /* Duplicate. */
+    assert(!prefix->history_seal_endpoint(1,204)); /* Same-END path is closed. */
+    assert(!prefix->history_begin_incarnation(2,202));
+    assert(!prefix->history_restored_pre_admit(1,1,200));
+    assert(!prefix->history_prepare_commit(1,202));
+    assert(!prefix->history_admit_commit(1,202));
+    assert(prefix->history_retire_admit(1,202));
+    prefix->history_retire_confirmed();
+    assert(!prefix->history_begin_incarnation(2,202));
+    assert(!prefix->history_restored_pre_admit(1,1,200));
+    assert(!prefix->history_retire_admit(1,202));
+
     puts("Actual CPU statics retained-PRE history permits two bounded restores, refuses stale tickets before writes, and preserves legacy single-use mode");
 }

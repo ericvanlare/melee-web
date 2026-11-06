@@ -153,10 +153,15 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
             checkpoint.phase_==Phase::HistorySealed;
         const bool corrected_end=!pre&&provenance_==Provenance::Corrected&&
             checkpoint.phase_==Phase::HistoryCorrectedSealed;
+        // A confirmed prefix was re-simulated without source draw. It exposes
+        // only its actual CPU endpoint; DrawEnd is never admitted for it.
+        const bool confirmed_prefix=view_==View::CpuEnd&&
+            provenance_==Provenance::Corrected&&
+            checkpoint.phase_==Phase::HistoryConfirmedPrefixSealed;
         if(!checkpoint.history_mode_||
            (pre&&provenance_!=Provenance::SharedPre)||
            (!pre&&provenance_==Provenance::SharedPre)||
-           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end))
+           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end||confirmed_prefix))
             return collect_refusal("history-phase");
         if(!checkpoint.same_owner(*session_)||
            !session_->diagnostic_source_files_quiescent()||

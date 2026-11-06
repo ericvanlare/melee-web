@@ -62,10 +62,13 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
       throw Error('Native episode receipt differs from the retained ticket and timeline frame');
   };
   let episodeBusy = false, episodeFailure = null, arenaEnabled = false, lastPollSerial = 0n;
+  let pendingPrefix = null;
   const episode = async (operation, value) => {
     if (!timeline || episodeBusy) throw Error('Episode timeline owner unavailable');
     episodeBusy = true;
     try {
+      if (pendingPrefix && !['episodePrefixRebase', 'episodePrefixAdopt', 'episodeTimeline'].includes(operation))
+        throw Error('Confirmed-prefix handoff owns the pending replay plan');
       switch (operation) {
         case 'episodeEnable': return owner.enableEpisode();
         case 'inlineEnable': return owner.enableInlineDispatch();
@@ -161,6 +164,85 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             throw Error('Episode replay finish did not reach its old END');
           return {status, rows, plan, timeline: timeline.commitReplay(plan)};
         }
+        case 'episodePrefixBegin': {
+          const pre = preFrame(), state = timeline.status();
+          const c = value.confirmedEnd, frontier = value.through+1;
+          if (!arenaEnabled || !rebaseScope || !Number.isInteger(c) || c <= pre || c >= frontier ||
+              state.remote_contiguous_through !== c-1 || state.simulated_through !== frontier-1 ||
+              state.dirty_from !== value.dirty || value.dirty >= c || value.dirty < pre ||
+              owner.status().metadata.phase !== 11)
+            throw Error('Confirmed-prefix replay requires actual authority through C and restored old PRE');
+          const plan = timeline.planReplay();
+          if (plan.kind !== 'replay' || plan.from !== value.dirty || plan.through !== value.through ||
+              plan.speculative_ticks !== frontier-c || plan.speculative_ticks !== value.speculative)
+            throw Error('Confirmed-prefix replay differs from the pending dirty suffix');
+          const originals = Array.from({length: ordinalAt(frontier-1, pre)+1},
+            (_, ordinal) => owner.receipt(ordinal));
+          pendingPrefix = {pre, c, frontier, plan, originals, rows: []};
+          for (let tick=pre; tick<c; ++tick) {
+            const original = originals[tick-pre];
+            const planned = tick < plan.from ? null : plan.frames[tick-plan.from];
+            if (original.sourceFrame !== tick || original.ordinal !== tick-pre || original.state < 1 ||
+                (tick >= plan.from && !planned) ||
+                (planned && (planned.tick !== tick || planned.remote_source !== 'actual' || planned.speculative)))
+              throw Error('Confirmed prefix lost its authoritative frame or retained original input');
+            const frame = planned ? Uint8Array.from(planned.frame) : original.selected;
+            const status = await owner.replayTicket(original.ticketId, frame);
+            const applied = owner.receipt(tick-pre);
+            requireApplied(original, applied, frame, 2);
+            if (!same(applied.forward, original.forward) || status.metadata.currentFrame !== tick+1)
+              throw Error('Confirmed-prefix execution changed original input or missed its source frame');
+            pendingPrefix.rows.push({status, row: publicRow(applied), unchangedPrefix: planned === null});
+          }
+          const status = await owner.command('finishPrefix', c);
+          const handoff = owner.prefixHandoff();
+          if (handoff.oldPreFrame !== pre || handoff.confirmedFrame !== c ||
+              handoff.selectedEndFrame !== frontier || handoff.suffixCount !== frontier-c ||
+              handoff.suffixCursor !== 0 || status.metadata.currentFrame !== c)
+            throw Error('Native prefix handoff differs from actual replay interval');
+          return {status, rows: pendingPrefix.rows, handoff, plan, timeline: timeline.status()};
+        }
+        case 'episodePrefixRebase': {
+          if (!pendingPrefix || value !== pendingPrefix.c || owner.status().metadata.phase !== 26 ||
+              !timeline.status().plan_outstanding)
+            throw Error('Confirmed-prefix rebase requires its retired old owner and pending replay plan');
+          const result = await owner.command('rebaseConfirmedPrefix', value);
+          return {...result, handoff: owner.prefixHandoff(), timeline: timeline.status()};
+        }
+        case 'episodePrefixAdopt': {
+          if (!pendingPrefix || preFrame() !== pendingPrefix.c ||
+              owner.status().metadata.currentFrame !== pendingPrefix.c ||
+              owner.status().metadata.phase !== 4 || !timeline.status().plan_outstanding)
+            throw Error('Confirmed-prefix adoption requires the exact newly armed PRE');
+          const {pre, c, frontier, plan, originals} = pendingPrefix;
+          const rows = [];
+          for (let tick=c; tick<frontier; ++tick) {
+            const original = originals[tick-pre], origin = owner.prefixOrigin(tick-c);
+            if (origin.ticketId !== original.ticketId || origin.pollSerial !== original.pollSerial ||
+                origin.sourceFrame !== tick || origin.incarnation !== original.incarnation ||
+                origin.localPort !== original.localPort || origin.remotePort !== original.remotePort ||
+                origin.state !== original.state || !same(origin.raw, original.raw) ||
+                !same(origin.forward, original.forward) || !same(origin.selected, original.selected))
+              throw Error('Native handoff origin differs from the original suffix poll receipt');
+            const adopted = await owner.command('adoptNextPrefixTicket');
+            const ticket = owner.adoptedTicket(origin);
+            const planned = plan.frames[tick-plan.from];
+            if (planned?.tick !== tick) throw Error('Retained suffix lost its pending replay frame');
+            const frame = Uint8Array.from(planned.frame);
+            const status = await owner.forwardTicket(ticket.ticketId, frame);
+            const applied = owner.receipt(tick-c);
+            requireApplied(ticket, applied, frame, 1);
+            if (!same(applied.forward, frame) || status.metadata.currentFrame !== tick+1)
+              throw Error('Retained suffix failed exact source execution');
+            rows.push({adopted, status, origin: publicRow(origin), row: publicRow(applied)});
+          }
+          const handoff = owner.prefixHandoff();
+          if (handoff.suffixCursor !== handoff.suffixCount || owner.status().metadata.currentFrame !== frontier)
+            throw Error('Confirmed-prefix suffix did not return to its original frontier');
+          const status = owner.status(), committed = timeline.commitReplay(plan);
+          pendingPrefix = null;
+          return {status, rows, handoff, timeline: committed};
+        }
         case 'episodeTimeline': return timeline.status();
         default: throw Error(`Unknown episode operation ${operation}`);
       }
@@ -185,6 +267,9 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
       if (operation.startsWith('episode') || operation === 'arenaEnable' || operation === 'inlineEnable')
         return episode(operation, value);
       if (episodeBusy) throw Error('Episode command owns the page');
+      if (pendingPrefix && operation === 'command' &&
+          !['capture', 'beginEpisode', 'closePrefix', 'retirePrefix', 'cleanup'].includes(value))
+        throw Error('Confirmed-prefix handoff forbids presenting or changing its pending replay');
       switch (operation) {
         case 'peerStart': {
           await peer.start();

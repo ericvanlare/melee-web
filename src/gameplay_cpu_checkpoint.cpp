@@ -389,7 +389,8 @@ const char* GameplayCpuCheckpoint::history_arena_failure(
 bool GameplayCpuCheckpoint::history_endpoint_admit(
     const GameplayMatchSession& session,MeleeWebSourcePayloadEndpointHeader* arena_payload) const noexcept {
     const bool selected=phase_==Phase::HistorySealed||
-                        phase_==Phase::HistoryCorrectedSealed;
+                        phase_==Phase::HistoryCorrectedSealed||
+                        phase_==Phase::HistoryConfirmedPrefixSealed;
     return history_mode_&&selected&&same_owner(session)&&
         session.source_frames()==history_end_frame_&&
         history_end_frame_>owner_.frame&&
@@ -495,6 +496,39 @@ bool GameplayCpuCheckpoint::finish_history_replay(
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;
     phase_=Phase::HistoryCorrectedSealed;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::finish_history_confirmed_prefix(
+    const GameplayMatchSession& session,std::uint32_t confirmed_end) noexcept {
+    /* A separate terminal path preserves the old same-END replay contract.
+     * No source draw occurs here and no renderer endpoint is fabricated. */
+    if(!history_mode_||!commit_.arena||phase_!=Phase::HistoryCorrecting||
+       !same_owner(session)||session.source_frames()!=confirmed_end||
+       confirmed_end<=owner_.frame||confirmed_end>=history_restore_end_||
+       history_restore_end_!=history_end_frame_||
+       history_restore_end_-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       !session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_cpu_interval_admit(commit_.effect_token)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
+       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
+       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
+       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
+       !history_payload_admit()||!history_actions_||history_actions_->active_failure()!=0||
+       !melee_web_cpu_interval_motor_history_finish_confirmed_prefix(
+            commit_.effect_token,history_incarnation_,confirmed_end)||
+       !history_actions_->seal_corrected_incarnation(history_incarnation_)||
+       !statics_->history_seal_confirmed_prefix(
+            history_incarnation_,history_restore_count_,confirmed_end)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_end_frame_=confirmed_end;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryConfirmedPrefixSealed;
     return true;
 }
 

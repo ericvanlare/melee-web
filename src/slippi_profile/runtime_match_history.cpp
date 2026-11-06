@@ -214,11 +214,15 @@ bool RuntimeMatchHistory::can_admit_poll_ticket(
     const auto current=session_.source_frames();
     const bool phase_ok=phase_==RuntimeMatchHistoryPhase::Armed||
         phase_==RuntimeMatchHistoryPhase::EpisodeRecording;
+    const bool prefix_suffix_complete=!prefix_handoff_imported_||
+        (prefix_handoff_&&prefix_handoff_->active_&&
+         prefix_handoff_->suffix_cursor_==prefix_handoff_->suffix_count_&&
+         current>=prefix_handoff_->selected_end_frame_);
     return episode_mode_&&phase_ok&&checkpoint_&&ticket_id&&ticket_id>last_ticket_id_&&
         local_port<PAD_MAX_CONTROLLERS&&remote_port<PAD_MAX_CONTROLLERS&&
         local_port!=remote_port&&current>=pre_frame_&&
         current-pre_frame_==ticket_count_&&ticket_count_<episode_rows_.size()&&
-        !current_ticket_pending_&&live_owner(current)&&
+        !current_ticket_pending_&&prefix_suffix_complete&&live_owner(current)&&
         (!ticket_count_||(episode_rows_[0].local_port==local_port&&
           episode_rows_[0].remote_port==remote_port));
 }
@@ -238,6 +242,7 @@ bool RuntimeMatchHistory::admit_poll_ticket(
     row.ticket_id=ticket_id;row.source_frame=current;row.incarnation=incarnation_;
     row.local_port=local_port;row.remote_port=remote_port;row.poll_serial=poll_serial;
     encode_pad_frame(raw,row.raw_pad);
+    episode_origin_rows_[ticket_count_]=row;
     latest_ticket_={};
     latest_ticket_.ticket_id=ticket_id;latest_ticket_.source_frame=current;
     latest_ticket_.incarnation=incarnation_;latest_ticket_.local_port=local_port;
@@ -262,6 +267,11 @@ bool RuntimeMatchHistory::forward_ticket(
        forward_steps_>=7u||!live_owner(current)||
        !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current))
         return fail(RuntimeMatchHistoryFailure::Input,"Episode forward ticket is stale or out of order");
+    if(prefix_adoption_pending_&&
+       (!prefix_handoff_imported_||!prefix_handoff_||!prefix_handoff_->active_||
+        prefix_handoff_->suffix_cursor_!=prefix_adopted_cursor_||
+        current!=prefix_handoff_->confirmed_frame_+prefix_adopted_cursor_))
+        return fail(RuntimeMatchHistoryFailure::Input,"Adopted prefix ticket handoff changed before forward");
     if(!checkpoint_->interval_boundary(session_))
         return checkpoint_failure(RuntimeMatchHistoryFailure::Owner,"Episode forward interval admission refused");
 
@@ -293,6 +303,8 @@ bool RuntimeMatchHistory::forward_ticket(
     std::memcpy(retained_forward_.data(),applied.data(),sizeof(applied));
     std::memcpy(row.forward_pad.data(),planned_frame,44);
     row.selected_pad=row.forward_pad;row.state=1;
+    if(!prefix_adoption_pending_)
+        episode_origin_rows_[ordinal]=row;
     local_port_=row.local_port;remote_port_=row.remote_port;has_input_=true;
     current_ticket_pending_=false;
     try{
@@ -307,6 +319,11 @@ bool RuntimeMatchHistory::forward_ticket(
     if(actual_frame!=current+1u||actual_frame-pre_frame_>7u||!live_owner(actual_frame)||
        !gate(RuntimeMatchHistoryGatePoint::ForwardAfter,actual_frame))
         return fail(RuntimeMatchHistoryFailure::SourceTick,"Episode forward source frame boundary refused");
+    if(prefix_adoption_pending_){
+        ++prefix_handoff_->suffix_cursor_;
+        prefix_suffix_cursor_=prefix_handoff_->suffix_cursor_;
+        prefix_adoption_pending_=false;
+    }
     phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
     return true;
 }
@@ -393,6 +410,238 @@ bool RuntimeMatchHistory::finish_replay() noexcept
     sealed_end_=replay_target_end_;endpoint_mask_=0;
     phase_=RuntimeMatchHistoryPhase::CorrectedSealed;
     return true;
+}
+
+bool RuntimeMatchHistory::finish_confirmed_prefix(std::uint32_t confirmed_end) noexcept
+{
+    const auto actual=session_.source_frames();
+    if(!episode_mode_||!arena_mode_||phase_!=RuntimeMatchHistoryPhase::Restored||!checkpoint_||
+       current_ticket_pending_||prefix_adoption_pending_||confirmed_end<=pre_frame_||
+       confirmed_end>=replay_target_end_||replay_target_end_!=sealed_end_||
+       replay_target_end_<=pre_frame_||replay_target_end_-pre_frame_>episode_rows_.size()||
+       forward_steps_!=replay_target_end_-pre_frame_||ticket_count_!=forward_steps_||
+       replay_steps_!=confirmed_end-pre_frame_||actual!=confirmed_end||
+       !live_owner(confirmed_end)||!gate(RuntimeMatchHistoryGatePoint::CorrectAfter,confirmed_end))
+        return fail(RuntimeMatchHistoryFailure::Correction,
+                    "Confirmed-prefix finish requires the actual strictly interior replay CPU frame");
+    for(std::uint32_t index=0;index<ticket_count_;++index){
+        const auto& row=episode_rows_[index];
+        if((row.state!=1u&&row.state!=2u)||row.source_frame!=pre_frame_+index||
+           !row.ticket_id||!row.poll_serial||row.incarnation==0||row.incarnation>incarnation_||
+           row.local_port!=local_port_||row.remote_port!=remote_port_)
+            return fail(RuntimeMatchHistoryFailure::Input,
+                        "Confirmed-prefix input receipt interval is incomplete");
+    }
+    if(!checkpoint_->finish_history_confirmed_prefix(session_,confirmed_end))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Correction,
+                                  "Native confirmed-prefix leaf admission refused");
+    prefix_selected_end_=replay_target_end_;
+    sealed_end_=confirmed_end;
+    endpoint_mask_=0;
+    phase_=RuntimeMatchHistoryPhase::PrefixSealed;
+    return true;
+}
+
+bool RuntimeMatchHistory::capture_confirmed_prefix_handoff(
+    std::uint32_t finish_request_sequence,
+    RuntimeMatchHistoryPrefixHandoff& handoff) const noexcept
+{
+    if(!episode_mode_||!arena_mode_||phase_!=RuntimeMatchHistoryPhase::PrefixSealed||
+       !checkpoint_||!finish_request_sequence||!prefix_selected_end_||
+       sealed_end_<=pre_frame_||sealed_end_>=prefix_selected_end_||
+       prefix_selected_end_-pre_frame_!=ticket_count_||
+       ticket_count_>episode_rows_.size()||!live_owner(sealed_end_))
+        return false;
+    if(handoff.active_&&handoff.suffix_cursor_!=handoff.suffix_count_)
+        return false;
+    const std::uint32_t first=sealed_end_-pre_frame_;
+    const std::uint32_t suffix_count=prefix_selected_end_-sealed_end_;
+    if(!suffix_count||first+suffix_count!=ticket_count_||suffix_count>handoff.suffix_.size())
+        return false;
+    RuntimeMatchHistoryPrefixHandoff value;
+    value.active_=true;
+    value.owners_=owners_;
+    value.old_pre_frame_=pre_frame_;
+    value.confirmed_frame_=sealed_end_;
+    value.selected_end_frame_=prefix_selected_end_;
+    value.old_incarnation_=incarnation_;
+    value.finish_request_sequence_=finish_request_sequence;
+    value.local_port_=local_port_;
+    value.remote_port_=remote_port_;
+    value.suffix_count_=suffix_count;
+    for(std::uint32_t index=0;index<suffix_count;++index){
+        const auto& live_row=episode_rows_[first+index];
+        const auto& row=episode_origin_rows_[first+index];
+        if((live_row.state!=1u&&live_row.state!=2u)||
+           (row.state!=1u&&row.state!=2u)||row.schema!=1||row.bytes!=sizeof(row)||
+           live_row.source_frame!=sealed_end_+index||row.source_frame!=live_row.source_frame||
+           row.ticket_id!=live_row.ticket_id||row.poll_serial!=live_row.poll_serial||
+           row.incarnation==0||row.incarnation>3u||row.local_port!=local_port_||
+           row.remote_port!=remote_port_||row.raw_pad!=live_row.raw_pad||
+           live_row.local_port!=local_port_||live_row.remote_port!=remote_port_||
+           live_row.incarnation==0||live_row.incarnation>incarnation_||
+           (index&&(row.ticket_id<=value.suffix_[index-1u].ticket_id||
+                    row.poll_serial<=value.suffix_[index-1u].poll_serial)))
+            return false;
+        value.suffix_[index]=row;
+    }
+    handoff.clear();
+    handoff.active_=value.active_;
+    handoff.owners_=value.owners_;
+    handoff.old_pre_frame_=value.old_pre_frame_;
+    handoff.confirmed_frame_=value.confirmed_frame_;
+    handoff.selected_end_frame_=value.selected_end_frame_;
+    handoff.old_incarnation_=value.old_incarnation_;
+    handoff.finish_request_sequence_=value.finish_request_sequence_;
+    handoff.local_port_=value.local_port_;
+    handoff.remote_port_=value.remote_port_;
+    handoff.suffix_count_=value.suffix_count_;
+    handoff.suffix_=value.suffix_;
+    return true;
+}
+
+bool RuntimeMatchHistory::close_confirmed_prefix() noexcept
+{
+    if(phase_!=RuntimeMatchHistoryPhase::PrefixCpuCopied||!checkpoint_||
+       !(endpoint_mask_&PrefixCpu)||reader_.active()||!live_owner(sealed_end_)||
+       !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_)||
+       !checkpoint_->close_history_endpoint(session_))
+        return fail(RuntimeMatchHistoryFailure::Close,"Confirmed-prefix CPU endpoint close refused");
+    phase_=RuntimeMatchHistoryPhase::PrefixClosed;
+    return true;
+}
+
+bool RuntimeMatchHistory::retire_confirmed_prefix() noexcept
+{
+    if(phase_!=RuntimeMatchHistoryPhase::PrefixClosed||!checkpoint_||
+       !live_owner(sealed_end_)||!gate(RuntimeMatchHistoryGatePoint::Retire,sealed_end_)||
+       !checkpoint_->retire_history_confirmed(session_))
+        return fail(RuntimeMatchHistoryFailure::Retire,"Confirmed-prefix retirement refused");
+    reader_=GameplayCpuEndpointReader{};
+    checkpoint_.reset();
+    source_step_possible_=false;
+    phase_=RuntimeMatchHistoryPhase::PrefixRetired;
+    return true;
+}
+
+bool RuntimeMatchHistory::can_rebase_confirmed_prefix(
+    std::uint32_t confirmed_end,RuntimeMatchHistoryPrefixHandoff& handoff,
+    std::uint32_t rebase_request_sequence) const noexcept
+{
+    if(phase_!=RuntimeMatchHistoryPhase::PrefixRetired||checkpoint_||reader_.active()||
+       failure_!=RuntimeMatchHistoryFailure::None||confirmed_end!=sealed_end_||
+       confirmed_end<=pre_frame_||confirmed_end>=prefix_selected_end_||
+       session_.source_frames()!=confirmed_end||!live_owner(confirmed_end)||
+       !handoff.active_||handoff.old_pre_frame_!=pre_frame_||
+       handoff.confirmed_frame_!=confirmed_end||
+       handoff.selected_end_frame_!=prefix_selected_end_||
+       handoff.old_incarnation_!=incarnation_||handoff.finish_request_sequence_==0||
+       handoff.suffix_count_!=prefix_selected_end_-confirmed_end||
+       handoff.suffix_cursor_!=0||!rebase_request_sequence||
+       rebase_request_sequence<=handoff.finish_request_sequence_||
+       !same_owner_tuple(owners_,handoff.owners_))
+        return false;
+    handoff.rebase_request_sequence_=rebase_request_sequence;
+    return true;
+}
+
+bool RuntimeMatchHistory::begin_episode(RuntimeMatchHistoryPrefixHandoff& handoff) noexcept
+{
+    if(!episode_mode_||!arena_mode_||phase_!=RuntimeMatchHistoryPhase::CapturedPreCopied||
+       !checkpoint_||!handoff.active_||handoff.rebase_request_sequence_==0||
+       handoff.confirmed_frame_!=pre_frame_||handoff.suffix_cursor_!=0||
+       handoff.suffix_count_!=handoff.selected_end_frame_-handoff.confirmed_frame_||
+       handoff.suffix_count_==0||handoff.suffix_count_>prefix_suffix_rows_.size()||
+       !same_owner_tuple(owners_,handoff.owners_)||!live_owner(pre_frame_))
+        return fail(RuntimeMatchHistoryFailure::Phase,
+                    "Fresh PRE does not match the retained confirmed-prefix handoff");
+    if(!begin_episode())return false;
+    prefix_handoff_=&handoff;
+    prefix_handoff_imported_=true;
+    prefix_suffix_cursor_=handoff.suffix_cursor_;
+    prefix_selected_end_=handoff.selected_end_frame_;
+    local_port_=handoff.local_port_;
+    remote_port_=handoff.remote_port_;
+    prefix_suffix_rows_=handoff.suffix_;
+    return true;
+}
+
+bool RuntimeMatchHistory::adopt_next_prefix_ticket() noexcept
+{
+    const auto current=session_.source_frames();
+    const bool phase_ok=phase_==RuntimeMatchHistoryPhase::Armed||
+        phase_==RuntimeMatchHistoryPhase::EpisodeRecording;
+    if(!episode_mode_||!arena_mode_||!prefix_handoff_imported_||!prefix_handoff_||
+       !prefix_handoff_->active_||!checkpoint_||!phase_ok||current_ticket_pending_||
+       prefix_adoption_pending_||prefix_suffix_cursor_!=prefix_handoff_->suffix_cursor_||
+       prefix_suffix_cursor_>=prefix_handoff_->suffix_count_||
+       current!=prefix_handoff_->confirmed_frame_+prefix_suffix_cursor_||
+       current<pre_frame_||current-pre_frame_!=ticket_count_||
+       ticket_count_>=episode_rows_.size()||!live_owner(current)||
+       !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current)||
+       !checkpoint_->interval_boundary(session_))
+        return fail(RuntimeMatchHistoryFailure::Input,
+                    "Native retained prefix ticket adoption refused before source work");
+    const auto& original=prefix_suffix_rows_[prefix_suffix_cursor_];
+    if(original.schema!=1||original.bytes!=sizeof(original)||
+       (original.state!=1u&&original.state!=2u)||
+       original.source_frame!=current||!original.ticket_id||!original.poll_serial||
+       original.incarnation==0||original.incarnation>3u||
+       original.local_port!=prefix_handoff_->local_port_||
+       original.remote_port!=prefix_handoff_->remote_port_||
+       original.local_port>=PAD_MAX_CONTROLLERS||original.remote_port>=PAD_MAX_CONTROLLERS||
+       original.local_port==original.remote_port||
+       (prefix_suffix_cursor_&&
+        (original.ticket_id<=prefix_suffix_rows_[prefix_suffix_cursor_-1u].ticket_id||
+         original.poll_serial<=prefix_suffix_rows_[prefix_suffix_cursor_-1u].poll_serial))||
+       original.ticket_id<=last_ticket_id_||original.poll_serial<=poll_serial_)
+        return fail(RuntimeMatchHistoryFailure::Input,
+                    "Stored prefix ticket identity or monotonicity refused");
+    std::array<PADStatus,PAD_MAX_CONTROLLERS> decoded{};
+    for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port)
+        if(!melee_web_net_decode_pad(original.raw_pad.data()+port*MELEE_WEB_NET_PAD_BYTES,
+              MELEE_WEB_NET_PAD_BYTES,&decoded[port]))
+            return fail(RuntimeMatchHistoryFailure::Input,
+                        "Stored prefix ticket raw PAD refused");
+    episode_origin_rows_[ticket_count_]=original;
+    auto& row=episode_rows_[ticket_count_];
+    row=original;
+    row.incarnation=incarnation_;
+    row.state=0;
+    row.forward_pad={};
+    row.selected_pad={};
+    row.reserved=0;
+    latest_ticket_={};
+    latest_ticket_.ticket_id=original.ticket_id;
+    latest_ticket_.source_frame=original.source_frame;
+    latest_ticket_.incarnation=incarnation_;
+    latest_ticket_.local_port=original.local_port;
+    latest_ticket_.remote_port=original.remote_port;
+    latest_ticket_.poll_serial=original.poll_serial;
+    latest_ticket_.raw_pad=original.raw_pad;
+    ++ticket_count_;
+    last_ticket_id_=original.ticket_id;
+    poll_serial_=original.poll_serial;
+    local_port_=original.local_port;
+    remote_port_=original.remote_port;
+    latest_ticket_valid_=true;
+    current_ticket_pending_=true;
+    prefix_adopted_cursor_=prefix_suffix_cursor_;
+    prefix_adoption_pending_=true;
+    return true;
+}
+
+std::uint32_t RuntimeMatchHistory::prefix_suffix_cursor() const noexcept
+{
+    return prefix_handoff_imported_&&prefix_handoff_?prefix_handoff_->suffix_cursor_:0;
+}
+
+std::uint32_t RuntimeMatchHistory::prefix_suffix_remaining() const noexcept
+{
+    if(!prefix_handoff_imported_||!prefix_handoff_||
+       prefix_handoff_->suffix_cursor_>=prefix_handoff_->suffix_count_)
+        return 0;
+    return prefix_handoff_->suffix_count_-prefix_handoff_->suffix_cursor_;
 }
 
 bool RuntimeMatchHistory::begin_continuation() noexcept
@@ -616,6 +865,10 @@ bool RuntimeMatchHistory::endpoint_role_allowed(
        phase_==RuntimeMatchHistoryPhase::CorrectedSealed){
         role=EndpointRole::CorrectedCpu;return true;
     }
+    if(view==View::CpuEnd&&provenance==Provenance::Corrected&&
+       phase_==RuntimeMatchHistoryPhase::PrefixSealed){
+        role=EndpointRole::PrefixCpu;return true;
+    }
     if(view==View::DrawEnd&&provenance==Provenance::Corrected&&
        phase_==RuntimeMatchHistoryPhase::CorrectedDrawIdle){
         role=EndpointRole::CorrectedDraw;return true;
@@ -711,6 +964,8 @@ bool RuntimeMatchHistory::end_endpoint_batch() noexcept
         endpoint_mask_|=CorrectedCpu;phase_=RuntimeMatchHistoryPhase::CorrectedCpuCopied;break;
     case EndpointRole::CorrectedDraw:
         endpoint_mask_|=CorrectedDraw;phase_=RuntimeMatchHistoryPhase::CorrectedComplete;break;
+    case EndpointRole::PrefixCpu:
+        endpoint_mask_|=PrefixCpu;phase_=RuntimeMatchHistoryPhase::PrefixCpuCopied;break;
     case EndpointRole::None:return fail(RuntimeMatchHistoryFailure::Endpoint);
     }
     return true;

@@ -13,6 +13,7 @@ static struct {
  uint32_t span,first_frame,active_lane,open_frame,frame_channels;
  unsigned capture_enabled,restore_used,frame_open,retired;
  unsigned history_mode,history_restore_count,history_sealed,history_replay_active;
+ unsigned history_confirmed_prefix_finished;
  uint64_t history_incarnation;
  uint32_t history_end_frame,history_replay_end;
 } motor;
@@ -231,7 +232,8 @@ int melee_web_cpu_interval_motor_history_begin_incarnation(uint64_t token,
 {
  if(!motor.capture_enabled||!motor.history_mode||!incarnation||incarnation>3u||
     !melee_web_cpu_interval_admit(token)||token!=motor.token||motor.frame_open||
-    motor.history_replay_active||motor.history_restore_count>2u){
+    motor.history_replay_active||motor.history_confirmed_prefix_finished||
+    motor.history_restore_count>2u){
   if(motor.capture_enabled&&motor.history_mode)motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_LANE);
   return 0;
  }
@@ -302,7 +304,8 @@ int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,
 {
  if(!motor.capture_enabled||!motor.history_mode||!incarnation||
     incarnation!=motor.history_incarnation||motor.history_restore_count>=2u||
-    !motor.history_sealed||motor.history_replay_active||motor.frame_open||
+    motor.history_confirmed_prefix_finished||!motor.history_sealed||
+    motor.history_replay_active||motor.frame_open||
     motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_NONE||
     actual_end!=motor.history_end_frame||actual_end<=motor.first_frame||
     actual_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
@@ -338,7 +341,8 @@ int melee_web_cpu_interval_motor_history_replay_finish(uint64_t token,
 {
  MeleeWebCpuMotorSequence* selected=&motor.evidence.selected;
  if(!motor.capture_enabled||!motor.history_mode||!incarnation||
-    incarnation!=motor.history_incarnation||!motor.history_replay_active||
+    incarnation!=motor.history_incarnation||motor.history_confirmed_prefix_finished||
+    !motor.history_replay_active||
     actual_end!=motor.history_replay_end||actual_end<=motor.first_frame||
     actual_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
     !melee_web_cpu_interval_admit(token)||token!=motor.token||motor.frame_open||
@@ -353,6 +357,39 @@ int melee_web_cpu_interval_motor_history_replay_finish(uint64_t token,
  motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;
  motor.history_replay_active=0;motor.history_end_frame=actual_end;
  motor.history_sealed=1;
+ return 1;
+}
+
+int melee_web_cpu_interval_motor_history_finish_confirmed_prefix(uint64_t token,
+ uint64_t incarnation,uint32_t confirmed_end)
+{
+ MeleeWebCpuMotorSequence* selected=&motor.evidence.selected;
+ if(!motor.capture_enabled||!motor.history_mode||!incarnation||
+    incarnation!=motor.history_incarnation||motor.history_confirmed_prefix_finished||
+    !motor.history_replay_active||!melee_web_cpu_interval_admit(token)||
+    token!=motor.token||motor.frame_open||
+    motor.history_restore_count<1u||motor.history_restore_count>2u||
+    motor.active_lane!=MELEE_WEB_CPU_MOTOR_LANE_CORRECTED||
+    !sequence_owner_matches(selected)||
+    selected->state!=MELEE_WEB_CPU_MOTOR_SEQUENCE_INCOMPLETE||
+    confirmed_end<=motor.first_frame||
+    confirmed_end>=motor.history_replay_end||
+    motor.history_replay_end!=motor.history_end_frame||
+    motor.history_replay_end<=motor.first_frame||
+    motor.history_replay_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    confirmed_end-motor.first_frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    selected->frames_seen!=confirmed_end-motor.first_frame){
+  motor_refuse(MELEE_WEB_CPU_MOTOR_FAILURE_INCOMPLETE);return 0;
+ }
+ /* Keep baseline bytes and history_replay_end as the proof of the old selected
+  * END. Only the actual selected CPU prefix becomes the retirement endpoint. */
+ selected->span=selected->frames_seen;
+ selected->state=MELEE_WEB_CPU_MOTOR_SEQUENCE_COMPLETE;
+ motor.active_lane=MELEE_WEB_CPU_MOTOR_LANE_NONE;
+ motor.history_replay_active=0;
+ motor.history_end_frame=confirmed_end;
+ motor.history_sealed=1;
+ motor.history_confirmed_prefix_finished=1;
  return 1;
 }
 

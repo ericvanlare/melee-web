@@ -37,17 +37,19 @@ const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix'].includes(values.phase),
   'Unsupported bounded runtime history phase');
+const confirmedPrefix=values.phase==='confirmed-prefix';
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert.equal(values.phase,'four-tick-correction','--arena-history requires four-tick-correction');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&values.phase==='four-tick-correction',
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
+if(confirmedPrefix)assert(inlineDispatch&&presentForward&&values['arena-history'],'Confirmed prefix requires arena, per-forward presentation and inline dispatch');
 const profileHistory=values['profile-history'];
 if(profileHistory)assert(inlineDispatch,'--profile-history requires --inline-dispatch');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
@@ -170,14 +172,14 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:values.phase==='four-tick-correction'?
+const report={schema:confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
     (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
       values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:values.phase==='four-tick-correction'?
+  scope:confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
     (presentForward?
       'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
       twoArenaEpisodes?
@@ -878,7 +880,8 @@ async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialR
       new URL('/__melee_diag__/',baseUrl)).href,
     role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad});
 }
-function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus){
+function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus,{endView='DRAW_END'}={}){
+  assert.equal(oldEnd.view,endView==='CPU_END'?CPU_ENDPOINT_VIEW.cpuEnd:CPU_ENDPOINT_VIEW.drawEnd);
   const oldOwner=ownerFields(oldEnd),newOwner=ownerFields(capture);
   assert.deepEqual(oldOwner,newOwner,`${item.role} owner fields changed from retired END to fresh Capture PRE`);
   assert.equal(oldOwner.SourceFrame,String(preFrame),`${item.role} retired END source frame differs`);
@@ -896,16 +899,16 @@ function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredS
   }
   assert.equal(oldStatics.records.length,newStatics.records.length);
   const retiredToken=effectToken(oldEnd);
-  assert(BigInt(retiredToken)>0n,`${item.role} retired DRAW_END effect token must be nonzero`);
+  assert(BigInt(retiredToken)>0n,`${item.role} retired ${endView} effect token must be nonzero`);
   const oldActions=actionEventReceipt(oldEnd),newActions=actionEventReceipt(capture);
   assert.equal(newActions.event_count,'0',`${item.role} fresh Capture PRE ActionEvent count must be zero`);
   assert.equal(newActions.rows.length,0,`${item.role} fresh Capture PRE retained ActionEvent rows`);
   const receipt={
-    retired_draw_end_owner_fields:oldOwner,capture_pre_owner_fields:newOwner,
-    retired_draw_end_action_events:{event_count:oldActions.event_count,row_count:oldActions.rows.length,
+    [endView==='CPU_END'?'retired_cpu_end_owner_fields':'retired_draw_end_owner_fields']:oldOwner,capture_pre_owner_fields:newOwner,
+    [endView==='CPU_END'?'retired_cpu_end_action_events':'retired_draw_end_action_events']:{event_count:oldActions.event_count,row_count:oldActions.rows.length,
       rows_sha256:sha256(Buffer.from(JSON.stringify(oldActions.rows)))},
     capture_pre_action_events:{event_count:newActions.event_count,row_count:newActions.rows.length},
-    effect_tokens:{retired_draw_end:retiredToken,capture_pre:effectToken(capture)},
+    effect_tokens:{[endView==='CPU_END'?'retired_cpu_end':'retired_draw_end']:retiredToken,capture_pre:effectToken(capture)},
     exact_statics_records_equal:oldStatics.records.length,
     capture_status:captureStatus,
   };
@@ -1445,6 +1448,226 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     retired:windowProof.final_history_retirement};
 }
 
+async function runConfirmedPrefixTransfer(alpha,beta){
+  const items=[alpha,beta],preFrame={alpha:0,beta:0},armed={},selectedEnd={};
+  const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
+    beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
+  const proof=report.peer_correction={claim:
+      'one actual confirmed-prefix anchor transfer while a suffix remains speculative, followed by correction against the new PRE',
+    checksum_exchange:'none; exact native CPU_END bytes compared locally',
+    pages:{alpha:{port:0},beta:{port:1}},events:[],comparisons:{},segments:{},
+    presentations:{alpha:[],beta:[]},checks:[]};
+  await startCorrectionPeers(alpha,beta,proof,8,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+  const tickets={alpha:[],beta:[]},selected={alpha:[],beta:[]};
+  const serials={alpha:prefix.alpha.pollSerial,beta:prefix.beta.pollSerial};
+  const log=async(item,operation,value=null)=>{
+    const event={role:item.role,operation,value};proof.events.push(event);
+    try{return event.result=await peerOperation(item,operation,value);}
+    catch(error){event.error=String(error);throw error;}
+  };
+  const expected=(item,phase,frame,counters={})=>({window:'confirmed-prefix',preFrame:preFrame[item.role],
+    phase,sourceFrame:frame,...counters});
+  const command=(item,name,phase,frame,counters)=>historyCommand(item,name,expected(item,phase,frame,counters));
+  const endpoint=(item,label,view,provenance,frame,phase)=>retainHistoryEndpoint(item,label,
+    {view,provenance,sourceFrame:frame,phase,preFrame:preFrame[item.role]});
+  const observe=async(item,label,submitted,idlePhase)=>{
+    const receipt=await item.page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.presentation());
+    const rows=proof.presentations[item.role],previous=rows.at(-1)?.receipt;
+    assert.equal(receipt.requestSequence,submitted.completeSequence);
+    assert.equal(receipt.command,submitted.lastCompletedCommand);
+    assert.equal(receipt.sourceFrameAfter,submitted.metadata.currentFrame);
+    assert.equal(BigInt(receipt.presentationSerial),BigInt(previous?.presentationSerial??'0')+1n);
+    if(previous)assert(BigInt(receipt.priorSubmission)>=BigInt(previous.submission));
+    const row={label,submitted,receipt};rows.push(row);
+    row.idle=await command(item,'idle',idlePhase,receipt.sourceFrameAfter,{gpuIdle:true});
+    assert.equal(row.idle.completeSequence,receipt.requestSequence+1);
+  };
+  const presentRecording=async(item,frame,label='forward')=>{
+    const status=await command(item,'recordingPresent',22,frame);
+    await observe(item,label,status,21);
+  };
+  const capture=async(item,label,oldEnd=null,retired=null,cpuOnly=false)=>{
+    const frame=preFrame[item.role];
+    await command(item,'capture',1,frame);
+    const captured=await endpoint(item,`${label}-capture`,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,frame,2);
+    assert.equal(effectToken(captured),'0');
+    if(oldEnd){
+      const current=report.pages[item.role].match_history.statuses.at(-1).value;
+      proof.segments[`${item.role}-${label}-end-to-capture`]=compareEndToCapture(item,oldEnd,captured,frame,current,retired,
+        {endView:cpuOnly?'CPU_END':'DRAW_END'});
+    }
+    await command(item,'beginEpisode',3,frame);
+    armed[item.role]=await endpoint(item,`${label}-armed`,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,frame,4);
+    assert(BigInt(effectToken(armed[item.role]))>0n);
+    if(oldEnd)assert(BigInt(effectToken(armed[item.role]))>BigInt(effectToken(oldEnd)));
+  };
+  const boundary=async(item,label,frame,corrected=false)=>{
+    const provenance=corrected?CPU_ENDPOINT_PROVENANCE.corrected:CPU_ENDPOINT_PROVENANCE.reference;
+    if(!corrected)await command(item,'seal',5,frame,{forwardSteps:frame-preFrame[item.role]});
+    await endpoint(item,`${label}-cpu`,CPU_ENDPOINT_VIEW.cpuEnd,provenance,frame,corrected?13:6);
+    const checksum=await retainChecksum(item,`${label}-cpu`,{tick:frame-1,sourceFrame:frame});
+    await observe(item,corrected?'corrected':'forward',await command(item,'present',corrected?14:7,frame),corrected?15:8);
+    selectedEnd[item.role]=await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,provenance,frame,corrected?16:9);
+    return checksum;
+  };
+  const closeContinue=async(item,frame,incarnation)=>{
+    await command(item,'close',17,frame);
+    const next=await command(item,'continue',21,frame,{forwardSteps:frame-preFrame[item.role],gpuIdle:true});
+    assert.equal(next.metadata.incarnation,incarnation);
+    return next;
+  };
+  const poll=async(item,tick,key,pad)=>{
+    await item.page.locator('#canvas').focus();
+    assert.equal(await item.page.evaluate(()=>document.activeElement?.id),'canvas');
+    let failure=null;
+    try{
+      item.keyToRelease=key;await item.page.keyboard.down(key);
+      const {ticket,status}=await log(item,'episodePoll',{tick});
+      requireHistoryStatus(status,`${item.role} prefix poll ${tick}`,
+        expected(item,tick===preFrame[item.role]?4:21,tick,{gpuIdle:true}));
+      assert.equal(ticket.ticketId,status.completeSequence);
+      assert.equal(ticket.raw.length,44);
+      assert.deepEqual(Buffer.from(ticket.raw).subarray(ticket.localPort*11,(ticket.localPort+1)*11),pad);
+      assert(BigInt(ticket.pollSerial)>BigInt(serials[item.role]));
+      if(tick>0)assert(ticket.ticketId>tickets[item.role][tick-1].ticketId);
+      assert.equal(tickets[item.role][tick],undefined,'Each actual tick may be polled only once');
+      serials[item.role]=ticket.pollSerial;tickets[item.role][tick]=ticket;
+    }catch(error){failure=error;throw error;}
+    finally{
+      try{await item.page.keyboard.up(key);item.keyToRelease=null;}
+      catch(error){(report.pages[item.role].action_release_errors??=[]).push({key,error:String(error)});if(!failure)throw error;}
+    }
+    const ticket=tickets[item.role][tick];
+    const published=await log(item,'episodePublish',{tick,ticketId:ticket.ticketId});
+    assert.equal(published.protocol_input_tick,tick);
+    assert.equal(published.poll_serial,ticket.pollSerial);
+    assert.deepEqual(published.pad,ticket.raw.slice(ticket.localPort*11,(ticket.localPort+1)*11));
+  };
+  const forward=async(item,tick,actual)=>{
+    const ticket=tickets[item.role][tick];
+    const result=await log(item,'episodeForward',{tick,ticketId:ticket.ticketId,actual});
+    requireHistoryStatus(result.status,`${item.role} prefix forward ${tick}`,
+      expected(item,21,tick+1,{forwardSteps:tick+1-preFrame[item.role],gpuIdle:true}));
+    assert.equal(result.row.pollSerial,ticket.pollSerial);assert.equal(result.row.ticketId,ticket.ticketId);
+    assert.deepEqual(result.row.raw,ticket.raw);assert.equal(result.timeline.simulated_through,tick);
+    selected[item.role][tick]=result.row.selected;
+  };
+  const tick=async(t,alphaActual,{draw=true,betaLeft=t%2===1}={})=>{
+    await poll(alpha,t,'KeyD',P1_RIGHT);
+    await poll(beta,t,betaLeft?'ArrowLeft':'ArrowRight',betaLeft?P2_LEFT:P2_RIGHT);
+    await log(beta,'episodeAdmit',{tick:t});
+    if(alphaActual)await log(alpha,'episodeAdmit',{tick:t});
+    await forward(alpha,t,alphaActual);await forward(beta,t,true);
+    if(draw)await joinOwned(`prefix-present-${t}`,items.map(item=>presentRecording(item,t+1)));
+  };
+  const restore=async(item,label,frontier,restoreCount)=>{
+    const pre=preFrame[item.role];
+    await command(item,'restore',10,pre,{restoreCount,forwardSteps:frontier-pre,replaySteps:0});
+    const restored=await endpoint(item,`${label}-restored`,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,pre,11);
+    const comparison=compareCpuArenaRestoredPre(armed[item.role],restored,selectedEnd[item.role]);
+    proof.comparisons[`${label}-restored-pre`]=comparison;assert(comparison.equal);
+  };
+  const acceptRows=rows=>{
+    for(const receipt of rows){
+      const row=receipt.row,original=tickets.alpha[row.sourceFrame];
+      assert.equal(row.ticketId,original.ticketId);assert.equal(row.pollSerial,original.pollSerial);
+      assert.deepEqual(row.raw,original.raw);selected.alpha[row.sourceFrame]=row.selected;
+    }
+  };
+  await joinOwned('prefix-enable',items.map(item=>log(item,'arenaEnable')));
+  await joinOwned('prefix-inline-enable',items.map(item=>log(item,'inlineEnable')));
+  await joinOwned('prefix-initial-capture',items.map(item=>capture(item,'prefix0')));
+  await tick(0,true);
+  await tick(1,false,{draw:false});
+  await presentRecording(alpha,2);
+  const reference2=await boundary(beta,'reference2',2);
+  await command(beta,'close',17,2);
+  const betaRetired=await command(beta,'retire',18,2,{gpuIdle:true});
+  const betaOldEnd=selectedEnd.beta;
+  const betaRebase=await historyRebase(beta,2,{arenaEpisode:true,before:expected(beta,18,2),
+    after:{window:'confirmed-prefix',preFrame:2,phase:0,sourceFrame:2,forwardSteps:0,replaySteps:0,restoreCount:0,gpuIdle:true}});
+  preFrame.beta=2;proof.segments.beta_rebase=betaRebase;
+  await capture(beta,'prefix2',betaOldEnd,betaRetired);
+  await tick(2,false);
+  await tick(3,false,{draw:false});
+  const predicted4=await boundary(alpha,'predicted4',4);
+  const reference4=await boundary(beta,'reference4',4);
+  proof.comparisons.predicted4=checksumDifference(predicted4,reference4);
+  assert.notEqual(predicted4.parsed.scene_state,reference4.parsed.scene_state);
+  await closeContinue(beta,4,2);
+
+  const late=await log(alpha,'episodeAdmit',{tick:1});
+  assert.equal(late.timeline.remote_contiguous_through,1);assert.equal(late.timeline.dirty_from,1);
+  await restore(alpha,'old-pre0',4,1);
+  const prefixRun=await log(alpha,'episodePrefixBegin',{confirmedEnd:2,dirty:1,through:3,speculative:2});
+  requireHistoryStatus(prefixRun.status,'alpha prefix CPU seal',expected(alpha,23,2,
+    {forwardSteps:4,replaySteps:2,restoreCount:1,gpuIdle:true}));
+  acceptRows(prefixRun.rows);
+  const prefixEnd=await endpoint(alpha,'confirmed-prefix2-cpu',CPU_ENDPOINT_VIEW.cpuEnd,CPU_ENDPOINT_PROVENANCE.corrected,2,24);
+  const prefixChecksum=await retainChecksum(alpha,'confirmed-prefix2-cpu',{tick:1,sourceFrame:2});
+  proof.comparisons.prefix2=checksumDifference(prefixChecksum,reference2);
+  assert(proof.comparisons.prefix2.equal,'Actual CPU-only confirmed prefix differs from on-time peer');
+  await command(alpha,'closePrefix',25,2);
+  const prefixRetired=await command(alpha,'retirePrefix',26,2,{gpuIdle:true});
+  const rebased=await log(alpha,'episodePrefixRebase',2);
+  requireHistoryStatus(rebased.status,'alpha fresh prefix owner',{preFrame:2,phase:0,sourceFrame:2,
+    forwardSteps:0,replaySteps:0,restoreCount:0,gpuIdle:true});
+  assert.equal(rebased.status.requestSequence,prefixRetired.requestSequence+1);
+  assert.deepEqual(stableIdentity(rebased.identity).owner,stableIdentity(report.pages.alpha.route.takeover.identity).owner);
+  assert.equal(rebased.status.metadata.preAudioPhase,prefixRetired.metadata.currentAudioPhase);
+  assert.equal(rebased.status.metadata.currentAudioPhase,prefixRetired.metadata.currentAudioPhase);
+  assert(rebased.timeline.plan_outstanding);
+  proof.segments.prefix_handoff={prefixRun,retired:prefixRetired,rebased};
+  preFrame.alpha=2;
+  await capture(alpha,'prefix2',prefixEnd,prefixRetired,true);
+  const adopted=await log(alpha,'episodePrefixAdopt');
+  requireHistoryStatus(adopted.status,'alpha adopted suffix',expected(alpha,21,4,
+    {forwardSteps:2,replaySteps:0,restoreCount:0,gpuIdle:true}));
+  assert.equal(adopted.rows.length,2);acceptRows(adopted.rows);
+  assert.deepEqual([adopted.timeline.confirmed_through,adopted.timeline.simulated_through,
+    adopted.timeline.dirty_from,adopted.timeline.plan_outstanding],[1,3,null,false]);
+  proof.segments.prefix_adoption=adopted;
+  await presentRecording(alpha,4,'rebuilt-frontier');
+
+  await tick(4,false,{draw:false});
+  const predicted5=await boundary(alpha,'predicted5',5);
+  const reference5=await boundary(beta,'reference5',5);
+  await closeContinue(beta,5,3);
+  for(const t of [2,3,4])await log(alpha,'episodeAdmit',{tick:t});
+  await restore(alpha,'fresh-pre2',5,1);
+  const corrected=await log(alpha,'episodeReplay',{dirty:2,through:4,speculative:0});
+  requireHistoryStatus(corrected.status,'alpha correction from fresh PRE',expected(alpha,12,5,
+    {forwardSteps:3,replaySteps:3,restoreCount:1,gpuIdle:true}));
+  acceptRows(corrected.rows);
+  const corrected5=await boundary(alpha,'corrected5',5,true);
+  proof.comparisons.end5={predicted:checksumDifference(predicted5,reference5),corrected:checksumDifference(corrected5,reference5)};
+  assert.notEqual(predicted5.parsed.scene_state,reference5.parsed.scene_state);
+  assert(proof.comparisons.end5.corrected.equal);
+  await closeContinue(alpha,5,2);
+  await tick(5,true);await tick(6,true);await tick(7,true,{draw:false});
+  const finalAlpha=await boundary(alpha,'final8',8),finalBeta=await boundary(beta,'final8',8);
+  proof.comparisons.end8=checksumDifference(finalAlpha,finalBeta);assert(proof.comparisons.end8.equal);
+  proof.comparisons.authoritative_pad=Array.from({length:8},(_,tick)=>({tick,
+    ...byteDifference(Buffer.from(selected.alpha[tick]),Buffer.from(selected.beta[tick]))}));
+  assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
+  for(const item of items){
+    const timeline=await log(item,'episodeTimeline');
+    assert.deepEqual([timeline.confirmed_through,timeline.simulated_through,timeline.dirty_from,timeline.plan_outstanding],[7,7,null,false]);
+    assert.equal(tickets[item.role].length,8);
+    assert.equal(proof.events.filter(event=>event.role===item.role&&event.operation==='episodePoll').length,8);
+    assert.equal(new Set(tickets[item.role].map(ticket=>ticket.pollSerial)).size,8);
+    assert.deepEqual(item.websockets,[proof.pages[item.role].websocket]);
+    assert.deepEqual(item.pageErrors,[]);assert.deepEqual(item.externalRequests,[]);
+    await command(item,'close',17,8);
+    const retired=await command(item,'retire',18,8,{forwardSteps:6,gpuIdle:true});
+    (proof.final_history_retirement??={})[item.role]=retired;
+  }
+  assert.deepEqual(proof.presentations.alpha.map(row=>row.receipt.sourceFrameAfter),[1,2,3,4,4,5,5,6,7,8]);
+  assert.deepEqual(proof.presentations.beta.map(row=>row.receipt.sourceFrameAfter),[1,2,3,4,5,6,7,8]);
+  proof.status='confirmed-prefix-transfer-complete';report.result='CONFIRMED_PREFIX_TRANSFER_COMPLETE';
+  addCheck('actual CPU-only prefix retirement, native suffix-ticket handoff and later correction from new PRE');
+}
+
 async function runPeerCorrection(alpha,beta){
   const alphaHeld=report.pages.alpha.route.agreed_start.held;
   const betaHeld=report.pages.beta.route.agreed_start.held;
@@ -1694,7 +1917,8 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
+  if(confirmedPrefix)await runConfirmedPrefixTransfer(alpha,beta);
+  else if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
   else if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
   else{
     const staticReadRows=joined.map(({identity})=>({address:identity.address,size:identity.size,identity}));
