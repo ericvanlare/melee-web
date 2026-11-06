@@ -13240,6 +13240,80 @@
               "interpretation": "The four quadratic shadow paths account for most exclusive samples in all three command profiles. Inclusive sample counts overlap. Profile elapsed includes CDP overhead and sample counts are not exact durations.",
               "next_change": "Use fresh per-admission sorted validation with preallocated typed-owner scratch for both range and cell checks; reuse those same checked orders for endpoint row-to-cell and SDK exact-host joins. Leave ordinary and legacy paths unchanged. Retain arena byte copies/comparisons and all owner checks.",
               "scope": "Same eight-tick functional witness with first-alpha capture/seal/restore CDP attribution only. Sampling overhead and browser scheduling prevent treating these profiles as frame-budget measurements. No paced, persistent-lag, whole-match or Internet rollback result."
+            },
+            "indexed_shadow_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_producer": "6b666f4134a229eda4871be5241adc9326069144",
+              "harness_producer": "6b666f4134a229eda4871be5241adc9326069144",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-root-source-review-v1.json",
+                "sha256": "83658e1c12faa16af29a4c84a972af688308afcd11057ca6b19333410172656a"
+              },
+              "independent_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-source-memory-index-candidate-v1/independent-review.json",
+                "sha256": "d2fe336847dab5ed34160ed16c5d39acf99f08d5da3dfe9f9ff3c879d6172bae"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-focused-v2/result.json",
+                "sha256": "d755344f7b0c3683c36b83f81e6144f564902cb8f3504eaa654b22a835c28ef5"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-build-v1/result.json",
+                "sha256": "5481bf63acdcbeb4f765f15281b9746006a606ea2d4232e0b7c6c3f0e6edb4d7"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-producer-v1/archive.json",
+                "sha256": "bb5684a51d83384247e3d3fffe2674466900eed40784c92f94215dfe88dd61ee"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "bce74e211d9bd7d5c6c78f580008021fc5c051878b9eeb05be3dc27233367354"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-root-review-v1.json",
+                "sha256": "e15e9091d473460c843f3fd90cbe058af9be04e997f9d0ea3c0e285fc8f76bff"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/result-summary.json",
+                "sha256": "06e7a8d5db25686177c5b1f8c65db028b7141ea9d575ae6338d5feb28f9fab1d"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/browser/result.json",
+                "sha256": "c96170426baee2b0a47f2704bb4b43d703f9ec691cc3f9efa673f10e2ca18ec0"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/owner.json",
+                "sha256": "80e5e33f45323bed43da9e314fc2bd9a5484593d2130026aa9e135bcc4d2ba36"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/independent-result-review.json",
+                "sha256": "14d382dfe8dde18be00f211649514ed3f2ceaed7a34a24232a83def8f9097db6"
+              },
+              "command_cost_comparison": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/command-cost-comparison.json",
+                "sha256": "771d28b8962d09e1debf09f2bc93eb20cd0fd7b70b49545f2066efd2197f4d73"
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "source_presents": {
+                  "alpha": 12,
+                  "beta": 8
+                },
+                "rebase_static_rows_each": 3798,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 18,
+                "renderer_preparation_observations": 16,
+                "actual_conditional_flushes": 2
+              },
+              "scope": "Identical local serialized inline witness after fresh preallocated indexed validation. Independent raw comparator and every timing sample replayed. One before/after command-wall sample set; no sustained or combined correction frame budget, continuous/full-match or Internet acceptance. All original ownership and raw comparison guards remain.",
+              "retained_runner_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-focused-v1/preflight-refusal.json",
+                "sha256": "4f6b81d1fbc0fcc29405a398cb94bd59fcb5f3b1bc1a0aff381913fd33e27be9"
+              }
             }
           }
         }

@@ -2128,11 +2128,25 @@ these are attribution counts, not exact native durations. The raw profiles,
 producer identities and independent review are pinned in
 `continuous_366.history_cpu_attribution_v1`.
 
-The next experiment replaces repeated scans with freshly rebuilt sorted indexes
-owned by the typed arena history, retaining overlap, generation, lease and owner
-checks. The same unprofiled eight-tick witness will check semantics and command
-cost before a longer paced run. Continuous advancement under persistent remote
-input lag remains separate; no frame-budget success is inferred.
+The indexed repair now passes at native/harness producer `6b666f41`. It uses
+freshly rebuilt, preallocated sorted indexes for typed arena admission and exact
+host lookup; original allocation/cell order, arithmetic, owner/lease checks,
+saved-index corruption refusal and the legacy APIs remain unchanged. Six focused
+controls and the private Release build pass. Independent replay of the identical
+unprofiled eight-tick witness confirms all four PRE restores, authoritative PAD,
+full checksums, 12/8 source presentations and confirmed rebase, now with 3,798
+static rows per page. Native cleanup passes and all 18 owned browser PIDs are
+absent. The structured receipt pins every producer and retained runner failure
+under `continuous_366.indexed_shadow_v1`.
+
+Alpha's observed command medians fall from 54.97 to 15.51 ms for capture,
+19.43 to 0.58 ms for seal, and 59.35 to 11.16 ms for restore. The two new captures
+are 25.32 ms initially and 5.70 ms at the confirmed rebase; the four restores
+range from 9.83 to 14.41 ms. These are serialized wall durations from one
+before/after witness, not sustained cadence or a combined correction budget.
+The next native boundary is an explicit CPU-only confirmed-prefix transfer that
+retains the already-polled speculative suffix. Its source candidates are not
+runtime evidence. Continuous/paced and full-match rollback remain incomplete.
 
 ## Stage decision dependencies, issue #333
 
