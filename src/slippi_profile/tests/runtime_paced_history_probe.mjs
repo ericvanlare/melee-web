@@ -1,13 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Bounded page-owned cadence probe. Native code owns source ticks, clock,
 // snapshots, renderer submission and idle. No CDP operation drives this loop.
-export function installRuntimePacedHistoryProbe({role}={}){
+import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
+
+export function installRuntimePacedHistoryProbe({role,
+  inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS}={}){
   const owner=globalThis.__meleeRuntimeMatchHistory;
   const peer=globalThis.__meleeRuntimePeerHistoryProbe;
-  if(!owner||!peer||!['alpha','beta'].includes(role)||globalThis.__meleeRuntimePacedHistory)
-    throw Error('Paced probe requires the existing exclusive runtime and peer owners');
-  const report={scope:'eight actual source inputs; native admission and measured headless cadence',
-    role,result:'pending',events:[],presentations:[],admissions:[],polls:[],
+  if(!owner||!peer||!['alpha','beta'].includes(role)||globalThis.__meleeRuntimePacedHistory||
+      ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS].includes(inputTicks))
+    throw Error('Paced probe requires the existing exclusive owners and an explicit supported finite horizon');
+  const targetFrame=inputTicks;
+  const paced120=inputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
+  const report={scope:paced120?'120 actual source inputs; functional pacing clock trace with native-sized rollback windows':
+      'eight actual source inputs; native admission and measured headless cadence',
+    input_ticks:inputTicks,role,result:'pending',events:[],presentations:[],admissions:[],polls:[],
     authoritativeInputs:[],corrections:[],rebases:[],callbacks:[],failure:null};
   let prepared=false,started=false,remoteNext=0;
   const selected=new Map();
@@ -49,7 +57,10 @@ export function installRuntimePacedHistoryProbe({role}={}){
     await capture();
   };
   const admitAvailable=async()=>{
-    while(remoteNext<8){
+    while(remoteNext<targetFrame){
+      const active=await timeline();
+      const nextLocal=active.simulated_through+1;
+      if(remoteNext-nextLocal>=active.max_lookahead_ticks)break;
       const receipt=await call('peerRemoteSnapshot',{tick:remoteNext});
       if(!receipt)break;
       await call('episodeAdmit',{tick:remoteNext});remoteNext++;
@@ -84,7 +95,7 @@ export function installRuntimePacedHistoryProbe({role}={}){
       await present(false,'corrected-frontier');admit(3,3);
       report.corrections.push({kind:'fully-confirmed-correction',pre,frontier,confirmed,
         dirty:snapshot.dirty_from,checksum,replay});
-      if(frontier!==8)await closeRebase(frontier);
+      if(frontier!==targetFrame)await closeRebase(frontier);
     }
   };
   const api=Object.freeze({
@@ -114,7 +125,8 @@ export function installRuntimePacedHistoryProbe({role}={}){
           await admitAvailable();
           let inputs=await timeline(),current=state().metadata;
           const frame=current.currentFrame,confirmed=inputs.remote_contiguous_through+1;
-          if(frame===8&&confirmed===8&&inputs.dirty_from===null){
+          if(frame===targetFrame&&confirmed===targetFrame&&inputs.dirty_from===null){
+            report.finalTimeline=inputs;
             // The final endpoint is explicitly post-draw, not CPU-before-draw.
             if(current.phase!==16)await sealPresented();
             report.finalChecksum={view:current.phase===16?'corrected-draw-end':'presented-frontier',
@@ -123,10 +135,10 @@ export function installRuntimePacedHistoryProbe({role}={}){
             report.clockFinishedAt=performance.now();
             await command('close');await command('retire');
             report.finalOwner=state();
-            report.authoritativeInputs=Array.from({length:8},(_,tick)=>({tick,bytes:selected.get(tick)}));
+            report.authoritativeInputs=Array.from({length:targetFrame},(_,tick)=>({tick,bytes:selected.get(tick)}));
             if(report.authoritativeInputs.some(row=>!row.bytes||row.bytes.length!==44))
               throw Error('Paced terminal lost an authoritative input row');
-            report.result='PACED_EIGHT_INPUTS_COMPLETE';break;
+            report.result=paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
           if(inputs.dirty_from!==null||
               (frame-current.preFrame===7&&confirmed>current.preFrame)){
@@ -135,12 +147,12 @@ export function installRuntimePacedHistoryProbe({role}={}){
             await reconcile(inputs);
             const remaining=owner.pacingSample(0);
             callback.lastWorkAt=performance.now();
-            continueCallback=(remaining.pendingSteps>0||frame===8)&&callback.grants<8;
+            continueCallback=(remaining.pendingSteps>0||frame===targetFrame)&&callback.grants<8;
             continue;
           }
           // Remote samples ahead of local execution are retained by the existing
           // transport/timeline; only actual simulated inputs can become anchors.
-          if(frame===8||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
+          if(frame===targetFrame||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
             report.events.push({operation:'network-wait',frame,confirmed});continue;
           }
           if(callback.grants===8)continue;
@@ -157,7 +169,7 @@ export function installRuntimePacedHistoryProbe({role}={}){
           retainRows([forwarded]);await present(true);
           const remaining=owner.pacingSample(0);
           callback.lastWorkAt=performance.now();
-          continueCallback=(remaining.pendingSteps>0||frame+1===8)&&callback.grants<8;
+          continueCallback=(remaining.pendingSteps>0||frame+1===targetFrame)&&callback.grants<8;
         }
       }catch(error){
         report.result='FAIL';report.failure={message:String(error?.message??error),

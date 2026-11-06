@@ -1087,6 +1087,9 @@ void source_memory_history_controls()
     check(melee_web_source_memory_fighter_release(a + 256), "history release PRE lease");
     check(melee_web_source_memory_history_commit(missing.prepared) ==
           MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, "history catches lease release without fence bump");
+    char refusal[320]{};
+    melee_web_source_memory_history_describe_pre_change(captured.pre, refusal, sizeof(refusal));
+    check(std::strncmp(refusal, "lease[", 6) == 0, "history diagnostic identifies the first lease");
     melee_web_source_memory_history_prepared_destroy(missing.prepared);
     check(melee_web_source_memory_free(3, a) && melee_web_source_memory_alloc(3, a, sizeof(a)),
           "history PRE same-host replacement");
@@ -1094,6 +1097,9 @@ void source_memory_history_controls()
           "current endpoint read does not require PRE survival");
     check(melee_web_source_memory_history_prepare(captured.pre).status ==
           MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, "history refuses missing PRE identity");
+    melee_web_source_memory_history_describe_pre_change(captured.pre, refusal, sizeof(refusal));
+    check(std::strncmp(refusal, "alloc[0] missing-generation pre=", 32) == 0 &&
+          std::strstr(refusal, " live="), "history diagnostic identifies replaced PRE allocation");
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     armed = melee_web_class_piece_arm();
     check(armed.ready, "legacy observer still arms after history");

@@ -56,9 +56,10 @@ class GameplayHeapTests(OwnedWorkspaceTests):
     def run_history(self, case, marker):
         generated = ROOT / "build/gameplay-source-slippi-profile/src"
         tracking = (generated / "sysdolphin/baselib/jobj.h").is_file()
-        if case == "joint" and not tracking:
+        if (case == "joint" or case.startswith("coupled-")) and not tracking:
             self.skipTest("Private profile generated source headers unavailable")
-        output = self.directory / "heap-history.js"
+        diagnostic = case.startswith("coupled-")
+        output = self.directory / ("heap-history-diagnostic.js" if diagnostic else "heap-history.js")
         if not output.is_file():
             options = ["-fexceptions", "-sDISABLE_EXCEPTION_CATCHING=0"]
             if tracking:
@@ -66,6 +67,8 @@ class GameplayHeapTests(OwnedWorkspaceTests):
                 # the immutable PRE and prepared restore each retain a copy.
                 options += ["-sINITIAL_MEMORY=33554432",
                             "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-I", str(generated)]
+                if diagnostic:
+                    options.append("-DMELEE_WEB_MATCH_HISTORY_DIAGNOSTIC=1")
             self.compile_trace(output, ROOT / "tests/gameplay_heap_history_trace.cpp",
                                options=options)
         result = subprocess.run([str(self.node), str(output), case], env=self.env,
@@ -80,6 +83,17 @@ class GameplayHeapTests(OwnedWorkspaceTests):
 
     def test_original_sdk_and_active_shadow_restore_together(self):
         self.run_history("joint", "Actual SDK and active shadow paired restore: passed two cycles")
+
+    def test_original_sdk_and_shadow_coupled_class_piece_restore(self):
+        cases = (
+            ("coupled-positive", "Actual SDK and shadow coupled class-piece restore: passed"),
+            ("coupled-fence", "Coupled negative control coupled-fence: passed"),
+            ("coupled-reuse", "Coupled negative control coupled-reuse: passed"),
+            ("coupled-stale-owner", "Coupled negative control coupled-stale-owner: passed"),
+        )
+        for case, marker in cases:
+            with self.subTest(case=case):
+                self.run_history(case, marker)
 
     def run_case(self, case):
         result = subprocess.run([str(self.node), str(self.output), case], env=self.env,

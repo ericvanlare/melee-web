@@ -11,6 +11,7 @@ import {
   RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
@@ -656,6 +657,60 @@ test('eight actual contributions keep one peer transport across the episode boun
   }finally{
     await Promise.allSettled([alpha.close(),beta.close()]);
   }
+});
+
+test('finite 120-input peer session preserves its protocol pre-roll and refuses tick 120',async()=>{
+  assert.equal(RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,120);
+  const bus=createEndpointBus();
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:119}),/supports one, two, four, eight, or 120/);
+  const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
+  const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
+  try{
+    const [startedAlpha,startedBeta]=await Promise.all([alpha.start(),beta.start()]);
+    for(const started of [startedAlpha,startedBeta]){
+      assert.equal(started.input_ticks_protocol_only,120);
+      assert.equal(started.source_ticks_protocol_only,122);
+      assert.equal(started.scope,'melee-web-runtime-paced-120-inputs-history-peer-v1');
+    }
+    assert.equal(startedAlpha.agreement_hash,startedBeta.agreement_hash);
+    for(let tick=0;tick<120;++tick){
+      const alphaPad=validPad(10+tick),betaPad=validPad(30+tick);
+      await Promise.all([
+        alpha.publishLocal({port:0,tick,pollSerial:String(400+tick),pad:alphaPad}),
+        beta.publishLocal({port:1,tick,pollSerial:String(900+tick),pad:betaPad}),
+      ]);
+      const [alphaRemote,betaRemote]=await Promise.all([
+        alpha.waitForRemoteSample({tick}),beta.waitForRemoteSample({tick}),
+      ]);
+      assert.deepEqual(alphaRemote.pad,[...betaPad]);
+      assert.deepEqual(betaRemote.pad,[...alphaPad]);
+    }
+    await Promise.all([bus.flush('alpha'),bus.flush('beta')]);
+    for(const peer of [alpha,beta]){
+      const snapshot=peer.snapshot();
+      assert.equal(snapshot.input_ticks_protocol_only,120);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row=>row.protocol_input_tick),
+        [null,null,...Array.from({length:120},(_,tick)=>tick)]);
+    }
+    await assert.rejects(alpha.publishLocal({port:0,tick:120,pollSerial:'520',pad:validPad(90)}),
+      /contiguous index order/);
+  }finally{
+    await Promise.allSettled([alpha.close(),beta.close()]);
+  }
+});
+
+test('four-input page timeline retains its legacy four-tick lookahead',async t=>{
+  t.after(()=>{
+    delete globalThis.__meleeRuntimePeerHistoryProbe;
+    delete globalThis.__meleeRuntimeMatchHistory;
+  });
+  globalThis.__meleeRuntimeMatchHistory={validatePad:()=>true};
+  installRuntimePeerHistoryProbe({role:'alpha',relayUrl:'ws://127.0.0.1:8787',
+    roomId:'a'.repeat(24),sourceIdentityJson:identityText(0),loadedIdentity,inputTicks:4,
+    initialRemotePad:[...Buffer.from(lockstepConstants.neutralPad,'hex')]});
+  const timeline=await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline');
+  assert.equal(timeline.max_history_ticks,8);
+  assert.equal(timeline.max_lookahead_ticks,4);
 });
 
 test('arena bridge refuses rebase outside the fully confirmed page timeline',async t=>{

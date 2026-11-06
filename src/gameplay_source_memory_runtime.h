@@ -90,6 +90,8 @@ void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snap
  * Commit is one-shot and retains displaced storage until prepared_destroy. */
 typedef struct MeleeWebSourceMemoryHistory MeleeWebSourceMemoryHistory;
 typedef struct MeleeWebSourceMemoryHistoryPrepared MeleeWebSourceMemoryHistoryPrepared;
+typedef struct MeleeWebGameplayHeapHistorySnapshot MeleeWebGameplayHeapHistorySnapshot;
+typedef struct MeleeWebGameplayHeapHistoryPrepared MeleeWebGameplayHeapHistoryPrepared;
 typedef enum MeleeWebSourceMemoryHistoryStatus {
     MELEE_WEB_SOURCE_MEMORY_HISTORY_OK = 0,
     MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT,
@@ -125,12 +127,29 @@ typedef struct MeleeWebSourceMemoryHistoryObservation {
 } MeleeWebSourceMemoryHistoryObservation;
 
 MeleeWebSourceMemoryHistoryCaptureResult melee_web_source_memory_history_capture(void);
+/* Bind an arena-backed checkpoint PRE once, after the owner has joined its
+ * SDK allocation chain to this shadow and both captured images still equal
+ * current. The SDK snapshot is borrowed for this PRE's lifetime. */
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_bind_arena_pre(
+    MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistorySnapshot* arena_pre);
 /* Validate the selected live owner and its current shape without preparing
  * a restore. This does not establish PRE survival or authority to commit. */
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_current_admit(
     const MeleeWebSourceMemoryHistory* pre);
+/* Failure-only observation for a PRE_CHANGED result. It does not admit or
+ * mutate any owner. Call synchronously before other source activity. */
+void melee_web_source_memory_history_describe_pre_change(
+    const MeleeWebSourceMemoryHistory* pre, char* out, size_t out_bytes);
 MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare(
     const MeleeWebSourceMemoryHistory* pre);
+/* Private arena-coupled path. `arena_plan` must be a prepared plan for the
+ * exact immutable snapshot bound to `pre`; it outlives this shadow plan. Only
+ * this path may restore changed class-piece sidecar cells. */
+MeleeWebSourceMemoryHistoryPrepareResult
+melee_web_source_memory_history_prepare_arena_coupled(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistoryPrepared* arena_plan);
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(
     const MeleeWebSourceMemoryHistoryPrepared* prepared);
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_commit(

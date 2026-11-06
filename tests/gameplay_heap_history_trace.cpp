@@ -185,12 +185,200 @@ static void paired_restore()
     std::free(arena);
     std::puts("Actual SDK and active shadow paired restore: passed two cycles");
 }
+
+static void paired_coupled_piece_restore(const char* mode)
+{
+    constexpr uint64_t world=29;
+    auto* arena=static_cast<unsigned char*>(std::malloc(kArenaBytes));
+    check(arena!=nullptr,"allocate coupled arena");
+    std::memset(arena,0xA7,kArenaBytes);
+    void* start=melee_web_gameplay_heap_initialize(arena,kArenaBytes,error,sizeof(error));
+    check(start!=nullptr,"initialize coupled SDK arena");
+    const auto heap=OSCreateHeap(start,arena+kArenaBytes);
+    check(heap==0&&OSCheckHeap(heap)>0,"create coupled SDK heap");
+    OSSetCurrentHeap(heap);
+    check(melee_web_source_memory_begin(world,heap),"begin coupled shadow owner");
+    melee_web_class_piece_cold(nullptr,0);
+    auto* anchor=static_cast<unsigned char*>(OSAllocFromHeap(heap,kAnchorBytes));
+    check(anchor!=nullptr,"coupled outer allocation");
+    fill(anchor,kAnchorBytes,0x32);
+    melee_web_class_piece_alloc(anchor,24,32);
+    melee_web_class_piece_origin(anchor,24,MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST);
+
+    const auto sdk=melee_web_gameplay_heap_history_capture();
+    const auto shadow=melee_web_source_memory_history_capture();
+    const auto payload=melee_web_source_memory_payload_snapshot_capture();
+    check(sdk.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&sdk.snapshot&&
+          shadow.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&shadow.pre&&payload.snapshot,
+          "capture coupled SDK, shadow and payload PRE");
+    MeleeWebSourcePayloadEndpointHeader header{};
+    check(melee_web_source_memory_history_current_endpoint_header(
+              shadow.pre,payload.snapshot,&header)==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&
+          header.status==MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&header.row_count==1,
+          "validate current SDK/shadow row join at PRE");
+    auto* captured_anchor=anchor;
+    struct PairRows { const MeleeWebSourceMemoryHistory* pre; const MeleeWebSourcePayloadEndpointHeader* header; };
+    PairRows pair_rows{shadow.pre,&header};
+    const auto visit=[](void* context,uint64_t,const void* host,uint32_t capacity)->int {
+        const auto& view=*static_cast<const PairRows*>(context);
+        MeleeWebSourceMemoryAllocation row{};
+        return melee_web_source_memory_history_current_allocation_read(
+            view.pre,view.header,host,&row)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&row.live&&
+            row.source_heap_handle==view.header->source_heap_handle&&
+            row.world_generation==view.header->world_generation&&row.allocation_generation&&
+            row.requested_bytes&&row.requested_bytes<=capacity;
+    };
+    uint64_t row_count=0;
+    check(melee_web_gameplay_heap_history_visit_allocations(
+              sdk.snapshot,visit,&pair_rows,&row_count)==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+          row_count==header.row_count,"join exact SDK chain to live shadow rows");
+    check(melee_web_source_memory_history_bind_arena_pre(shadow.pre,sdk.snapshot)==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,"bind exact equal SDK/shadow PREs");
+    const std::vector<unsigned char> pre_bytes(arena,arena+kArenaBytes);
+    const auto pre_observation=melee_web_source_memory_history_observe(shadow.pre);
+    check(pre_observation.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&pre_observation.exact_pre,
+          "coupled PRE source shadow equality");
+
+    const auto retire_piece=[&](unsigned char seed) {
+        melee_web_class_piece_free(anchor,24);
+        fill(anchor,32,static_cast<unsigned char>(seed));
+        melee_web_class_piece_alloc(anchor,24,32);
+        melee_web_class_piece_origin(anchor,24,MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST);
+    };
+    retire_piece(0x91);
+    const std::vector<unsigned char> selected_bytes(arena,arena+kArenaBytes);
+    const auto selected_observation=melee_web_source_memory_history_observe(shadow.pre);
+    check(selected_observation.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&
+          !selected_observation.exact_pre,"selected branch differs from PRE piece sidecar");
+
+    if(std::strcmp(mode,"coupled-positive")==0){
+        const auto unpaired=melee_web_source_memory_history_prepare(shadow.pre);
+        check(unpaired.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED&&
+              !unpaired.prepared,"legacy unpaired shadow-only restore refuses piece death");
+        same_bytes(arena,selected_bytes.data(),kArenaBytes,"legacy refusal writes no arena bytes");
+
+        const auto other_sdk=melee_web_gameplay_heap_history_capture();
+        check(other_sdk.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&other_sdk.snapshot,
+              "capture different physical PRE identity");
+        const auto other_plan=melee_web_gameplay_heap_history_prepare(other_sdk.snapshot);
+        check(other_plan.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&other_plan.prepared,
+              "prepare different physical PRE identity");
+        const auto wrong=melee_web_source_memory_history_prepare_arena_coupled(
+            shadow.pre,other_plan.prepared);
+        check(wrong.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE&&!wrong.prepared,
+              "coupled API rejects a plan from another immutable SDK snapshot");
+        same_bytes(arena,selected_bytes.data(),kArenaBytes,"wrong-plan refusal writes no arena bytes");
+        melee_web_gameplay_heap_history_prepared_destroy(other_plan.prepared);
+        melee_web_gameplay_heap_history_snapshot_destroy(other_sdk.snapshot);
+
+        const auto physical=melee_web_gameplay_heap_history_prepare(sdk.snapshot);
+        const auto mirror=melee_web_source_memory_history_prepare_arena_coupled(
+            shadow.pre,physical.prepared);
+        check(physical.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&physical.prepared&&
+              mirror.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&mirror.prepared,
+              "prepare exact coupled SDK and shadow leaves");
+        const auto sdk_admit=melee_web_gameplay_heap_history_admit(physical.prepared);
+        const auto shadow_admit=melee_web_source_memory_history_admit(mirror.prepared);
+        check(sdk_admit==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+              shadow_admit==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
+              "admit physical fence before coupled shadow sidecar");
+        const auto early_shadow_commit=melee_web_source_memory_history_commit_prevalidated(mirror.prepared);
+        check(early_shadow_commit==MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE,
+              "coupled shadow commit refuses before its physical arena commit");
+        same_bytes(arena,selected_bytes.data(),kArenaBytes,
+              "pre-physical shadow commit refusal writes zero arena bytes");
+        const auto early_shadow_observation=melee_web_source_memory_history_observe(shadow.pre);
+        check(early_shadow_observation.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&
+              !early_shadow_observation.exact_pre&&
+              early_shadow_observation.current_piece_revision==selected_observation.current_piece_revision,
+              "pre-physical shadow commit refusal writes zero piece sidecar");
+        const auto sdk_readmit=melee_web_gameplay_heap_history_admit(physical.prepared);
+        const auto shadow_readmit=melee_web_source_memory_history_admit(mirror.prepared);
+        check(sdk_readmit==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+              shadow_readmit==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
+              "both coupled leaves re-admit after ordered-commit refusal");
+        melee_web_gameplay_heap_history_commit_prevalidated(physical.prepared);
+        const auto restored=melee_web_source_memory_history_commit_prevalidated(mirror.prepared);
+        const auto sdk_observation=melee_web_gameplay_heap_history_observe(sdk.snapshot);
+        const auto shadow_observation=melee_web_source_memory_history_observe(shadow.pre);
+        check(restored==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&sdk_observation.exact_equal&&
+              sdk_observation.compared_bytes==kArenaBytes&&shadow_observation.exact_pre&&
+              shadow_observation.current_piece_revision==selected_observation.current_piece_revision+1&&
+              shadow_observation.current_piece_watermark==selected_observation.current_piece_watermark&&
+              shadow_observation.current_piece_watermark>pre_observation.current_piece_watermark,
+              "coupled commit restores exact arena and PRE piece cell without rewinding high-water");
+        same_bytes(arena,pre_bytes.data(),kArenaBytes,"coupled arena equals exact PRE bytes");
+        std::puts("Actual SDK and shadow coupled class-piece restore: passed");
+        melee_web_source_memory_history_prepared_destroy(mirror.prepared);
+        melee_web_gameplay_heap_history_prepared_destroy(physical.prepared);
+    } else {
+        const auto physical=melee_web_gameplay_heap_history_prepare(sdk.snapshot);
+        const auto mirror=melee_web_source_memory_history_prepare_arena_coupled(
+            shadow.pre,physical.prepared);
+        check(physical.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&physical.prepared&&
+              mirror.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_OK&&mirror.prepared,
+              "prepare coupled negative-control leaves");
+        if(std::strcmp(mode,"coupled-fence")==0){
+            anchor[0]^=0x55;
+            const std::vector<unsigned char> fenced(arena,arena+kArenaBytes);
+            const auto sdk_admit=melee_web_gameplay_heap_history_admit(physical.prepared);
+            const auto shadow_admit=melee_web_source_memory_history_admit(mirror.prepared);
+            check(sdk_admit==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_LIVE_STATE&&
+                  shadow_admit==MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE,
+                  "SDK byte-fence refusal blocks coupled shadow admit");
+            same_bytes(arena,fenced.data(),kArenaBytes,"fence refusal performs zero writes");
+        } else if(std::strcmp(mode,"coupled-reuse")==0){
+            melee_web_class_piece_free(anchor,24);
+            melee_web_class_piece_alloc(anchor,24,32);
+            melee_web_class_piece_origin(anchor,24,MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST);
+            const std::vector<unsigned char> fenced(arena,arena+kArenaBytes);
+            const auto sdk_admit=melee_web_gameplay_heap_history_admit(physical.prepared);
+            const auto shadow_admit=melee_web_source_memory_history_admit(mirror.prepared);
+            check(sdk_admit==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+                  shadow_admit==MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE,
+                  "post-prepare piece reuse invalidates the paired high-water fence");
+            same_bytes(arena,fenced.data(),kArenaBytes,"piece-reuse refusal performs zero writes");
+        } else if(std::strcmp(mode,"coupled-stale-owner")==0){
+            check(melee_web_source_memory_end(world),"retire coupled source owner before admit");
+            const std::vector<unsigned char> fenced(arena,arena+kArenaBytes);
+            const auto sdk_admit=melee_web_gameplay_heap_history_admit(physical.prepared);
+            const auto shadow_admit=melee_web_source_memory_history_admit(mirror.prepared);
+            check(sdk_admit==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+                  shadow_admit==MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER,
+                  "source owner retirement blocks coupled admit");
+            same_bytes(arena,fenced.data(),kArenaBytes,"stale-owner refusal performs zero writes");
+        } else {
+            fail("unknown coupled control mode");
+        }
+        std::printf("Coupled negative control %s: passed\n",mode);
+        melee_web_source_memory_history_prepared_destroy(mirror.prepared);
+        melee_web_gameplay_heap_history_prepared_destroy(physical.prepared);
+    }
+
+    if(std::strcmp(mode,"coupled-stale-owner")!=0){
+        melee_web_class_piece_free(anchor,24);
+        check(melee_web_source_memory_end(world),"retire coupled source owner");
+    }
+    OSFreeToHeap(heap,captured_anchor);
+    melee_web_source_memory_history_destroy(shadow.pre);
+    melee_web_gameplay_heap_history_snapshot_destroy(sdk.snapshot);
+    melee_web_source_memory_payload_snapshot_destroy(payload.snapshot);
+    OSSetCurrentHeap(-1);
+    OSDestroyHeap(heap);
+    check(melee_web_gameplay_heap_release(arena,error,sizeof(error)),"release coupled SDK arena");
+    std::free(arena);
+}
+
 #endif
 
 int main(int argc,char** argv)
 {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if(argc==2&&std::strcmp(argv[1],"joint")==0){paired_restore();return 0;}
+    if(argc==2&&std::strcmp(argv[1],"coupled-positive")==0){paired_coupled_piece_restore(argv[1]);return 0;}
+    if(argc==2&&std::strcmp(argv[1],"coupled-fence")==0){paired_coupled_piece_restore(argv[1]);return 0;}
+    if(argc==2&&std::strcmp(argv[1],"coupled-reuse")==0){paired_coupled_piece_restore(argv[1]);return 0;}
+    if(argc==2&&std::strcmp(argv[1],"coupled-stale-owner")==0){paired_coupled_piece_restore(argv[1]);return 0;}
 #else
     (void)argc;(void)argv;
 #endif

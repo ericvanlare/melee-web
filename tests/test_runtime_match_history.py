@@ -625,6 +625,7 @@ int main() {
 
         fixture = r'''#include <array>
 #include <cassert>
+#include <cstdio>
 #include <cstdint>
 #include <memory>
 enum class RuntimeMatchHistoryPhase { Captured, CapturedPreCopied, ArmedPrePending, Armed,
@@ -649,7 +650,7 @@ struct MockCheckpoint {
   bool seal_history_incarnation(Session& s,const char**) { ++seal_calls; seal_frame=s.frame; return seal_ok; }
   bool close_history_endpoint(Session&) { ++close_calls; return close_ok; }
   bool archive_history_endpoint(Session&) { ++archive_calls; return archive_ok; }
-  GameplayCpuCommitResult restore_history_pre(Session& s) {
+  GameplayCpuCommitResult restore_history_pre(Session& s,char*,std::size_t) {
     ++restore_calls; if(!restore_ok)return GameplayCpuCommitResult::Refused;
     s.frame=restore_frame; return GameplayCpuCommitResult::Ok;
   }

@@ -13,6 +13,8 @@ import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseNetChecksum} from './net_lockstep_core.mjs';
+import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS}
+  from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions,loadBrowserTools} from './browser_tools.mjs';
@@ -22,6 +24,8 @@ import {compareCpuReferenceParticleEndpoints,CPU_ENDPOINT_PROVENANCE,CPU_ENDPOIN
   decodeCpuParticleEndpointResult} from '../src/slippi_profile/tests/cpu_endpoint.mjs';
 import {decodeCpuArenaEndpointResult,compareCpuArenaRestoredPre}
   from '../src/slippi_profile/tests/cpu_arena_endpoint.mjs';
+import {incidentRecordingUrl,readIncidentRecorderReadiness,requireIncidentRecorderReadiness,
+  summarizeRuntimeIncidents} from './a3_runtime_incidents.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
@@ -32,22 +36,26 @@ const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
 const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
+  'runtime-incidents':{type:'boolean',default:false},
   'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false},
   'inline-dispatch':{type:'boolean',default:false},'profile-history':{type:'boolean',default:false}},strict:true});
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 const repeatPrefix=values.phase==='repeated-confirmed-prefix';
-const paced=values.phase==='paced-eight-inputs';
+const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs';
+const pacedInputTicks=values.phase==='paced-120-inputs'?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
+  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
+const paced120=values.phase==='paced-120-inputs';
 const confirmedPrefix=values.phase==='confirmed-prefix'||repeatPrefix;
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),'--arena-history requires an arena episode');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
@@ -55,7 +63,10 @@ if(confirmedPrefix||paced)assert(inlineDispatch&&presentForward&&values['arena-h
 const profileHistory=values['profile-history'];
 if(profileHistory)assert(inlineDispatch,'--profile-history requires --inline-dispatch');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
-const baseUrl=new URL(values.url);
+const runtimeIncidentRecording=values['runtime-incidents'];
+if(runtimeIncidentRecording)assert(values.phase!=='held-statics',
+  '--runtime-incidents requires a combat or network history phase');
+const baseUrl=runtimeIncidentRecording?incidentRecordingUrl(values.url):new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
 assert(['127.0.0.1','localhost','[::1]'].includes(baseUrl.hostname),'The runtime server must be local');
 if(values.phase!=='held-statics')
@@ -181,14 +192,14 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:paced?'melee-web-runtime-paced-eight-inputs-v1':repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
+const report={schema:paced?(paced120?'melee-web-runtime-paced-120-inputs-v1':'melee-web-runtime-paced-eight-inputs-v1'):repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
     (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
       values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
+  scope:paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
     (presentForward?
       'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
       twoArenaEpisodes?
@@ -211,6 +222,10 @@ const report={schema:paced?'melee-web-runtime-paced-eight-inputs-v1':repeatPrefi
     scope:'first alpha capture, seal, and restore historyCommand bridge calls only',
     interpretation:'CPU attribution only; not a benchmark',profiles:[]}}:{}),
   ...(presentForward?{forward_presentation_scope:'one actual source draw per forward tick; corrected presentations occur only at sealed ENDs; no cadence claim'}:{}),
+  runtime_incident_recording:runtimeIncidentRecording?{requested:true,url:baseUrl.href,profiles:{},
+    export_status:'pending',
+    policy:'Optional best-effort use of the existing bounded runtime recorder. A missing current/persisted export is not H1 coverage; native pacing receipts remain separate and are never converted into runtime incidents.'}:
+    {requested:false,reason:'Pass --runtime-incidents to opt in for a combat or network history phase.'},
   arena_comparator:{path:'src/slippi_profile/tests/cpu_arena_endpoint.mjs',
     sha256:await hashFile(path.join(ROOT,'src/slippi_profile/tests/cpu_arena_endpoint.mjs'))},
   diagnostic_module_bindings:diagnosticBindings,
@@ -221,6 +236,26 @@ const report={schema:paced?'melee-web-runtime-paced-eight-inputs-v1':repeatPrefi
     beta:{route:{},disc:{},checks:[],cleanup:{native_owner:'not_started',browser:'not_started'}}},
   startup_comparison:null,static_comparison:null,checks:[],failure:null,
   cleanup_failures:[],finished_at:null};
+// Four optional page observations at most (readiness/export on each page).
+// This short cap never replaces the enclosing capture owner's deadline.
+const INCIDENT_OBSERVATION_MS=250;
+async function readOptionalIncident(evidence,step,read){
+  let timer;
+  try{
+    return await Promise.race([
+      Promise.resolve().then(read),
+      new Promise((_,reject)=>{
+        timer=setTimeout(()=>reject(Error(`Optional recorder ${step} timed out`)),INCIDENT_OBSERVATION_MS);
+      }),
+    ]);
+  }catch(error){
+    noteMissingIncident(evidence,step,error);
+    return null;
+  }finally{clearTimeout(timer);}
+}
+function noteMissingIncident(evidence,step,error){
+  (evidence.missing_evidence??=[]).push({step,message:String(error?.message??error)});
+}
 const addCheck=(name,details=null)=>report.checks.push({name,details});
 const owned=[];let resultError=null,relayRuntime=null;
 // All launched operations must settle before cleanup can inspect their owners.
@@ -353,6 +388,16 @@ async function startOwnedPage(role,chromium,browserConfig,browserPath,playwright
     item.driver=createBrowserDriver(item.page,{surface:'development',timeoutMs:90000});
     const response=await item.page.goto(baseUrl.href,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200);
     await item.driver.waitForImport();
+    if(runtimeIncidentRecording){
+      const evidence=report.runtime_incident_recording.profiles[role]={readiness:null};
+      const readiness=await readOptionalIncident(evidence,'readiness',()=>
+        readIncidentRecorderReadiness(item.page));
+      if(readiness){
+        evidence.readiness=readiness;
+        try{requireIncidentRecorderReadiness(readiness);}
+        catch(error){noteMissingIncident(evidence,'readiness',error);}
+      }
+    }
     await item.page.waitForFunction(()=>globalThis.Module&&
       typeof Module._melee_web_native_menu_match_history_take_over==='function'&&
       typeof Module._melee_web_native_menu_match_observe==='function',null,{timeout:90000});
@@ -1457,24 +1502,25 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     retired:windowProof.final_history_retirement};
 }
 
-async function runPacedEightInputs(alpha,beta){
-  const items=[alpha,beta];
+async function runPacedInputs(alpha,beta,inputTicks){
+  const items=[alpha,beta],targetFrame=inputTicks,paced120=inputTicks===120;
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
   assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
     'Both scripted first local inputs must differ from the actual held-prefix prediction');
-  const proof=report.peer_correction={claim:'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
-    scope:'native typed admission; no full raw endpoint publication during paced work',
+  const proof=report.peer_correction={claim:paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
+      'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
+    scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
     checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[]};
-  await startCorrectionPeers(alpha,beta,proof,8,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
-    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role})=>{
+    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks})=>{
       const {installRuntimePacedHistoryProbe}=await import(moduleUrl);
-      installRuntimePacedHistoryProbe({role});
+      installRuntimePacedHistoryProbe({role,inputTicks});
       return globalThis.__meleeRuntimePacedHistory.prepare();
-    },{moduleUrl,role:item.role});
+    },{moduleUrl,role:item.role,inputTicks});
   }));
   for(const item of items){
     await item.page.locator('#canvas').focus();
@@ -1485,7 +1531,7 @@ async function runPacedEightInputs(alpha,beta){
   let operationFailure=null;
   const releaseErrors=[];
   try{
-    await joinOwned('paced-eight-inputs',items.map(async item=>{
+    await joinOwned(paced120?'paced-120-inputs':'paced-eight-inputs',items.map(async item=>{
       proof.pages[item.role].paced=await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run());
     }));
   }catch(error){operationFailure=error;
@@ -1500,23 +1546,35 @@ async function runPacedEightInputs(alpha,beta){
   const [a,b]=items.map(item=>proof.pages[item.role].paced);
   for(const item of items){
     const run=proof.pages[item.role].paced;
-    assert.equal(run.result,'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
-    assert.equal(run.polls.length,8);
-    assert.deepEqual(run.polls.map(row=>row.sourceFrame),[0,1,2,3,4,5,6,7]);
-    assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,8);
+    assert.equal(run.result,paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
+    assert.equal(run.input_ticks,targetFrame);
+    assert.equal(run.polls.length,targetFrame);
+    assert.deepEqual(run.polls.map(row=>row.sourceFrame),Array.from({length:targetFrame},(_,tick)=>tick));
+    assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,targetFrame);
     for(const row of run.polls){
       assert.deepEqual(Buffer.from(row.raw).subarray(row.localPort*11,(row.localPort+1)*11),
         item.role==='alpha'?P1_RIGHT:P2_LEFT);
     }
     assert(run.clock.length>8&&run.clock.every(row=>!row.stalled));
-    assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),8);
+    assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),targetFrame);
     assert(run.callbacks.length>0&&run.callbacks.every(row=>row.grants<=8&&row.reconciliations<=1));
-    assert.equal(run.callbacks.reduce((sum,row)=>sum+row.grants,0),8);
-    assert.equal(run.finalOwner.metadata.currentFrame,8);
+    assert(run.corrections.every(row=>row.frontier-row.pre<=7),
+      'Paced correction crossed the existing seven-source-tick native window');
+    assert.equal(run.callbacks.reduce((sum,row)=>sum+row.grants,0),targetFrame);
+    assert.equal(run.finalOwner.metadata.currentFrame,targetFrame);
+    assert.equal(run.finalTimeline.simulated_through,targetFrame-1);
+    assert.equal(run.finalTimeline.remote_contiguous_through,targetFrame-1);
+    assert.equal(run.finalTimeline.confirmed_through,targetFrame-1);
+    assert.equal(run.finalTimeline.dirty_from,null);
+    assert.equal(run.finalTimeline.max_prediction_ticks,7);
+    assert.equal(run.finalTimeline.max_history_ticks,8);
+    assert.equal(run.finalTimeline.max_lookahead_ticks,8);
     assert.equal(run.finalOwner.metadata.phase,18);
     assert.equal(run.admissions.every(row=>row.scope==='native-typed-admission-only'&&row.rawRowsPublished===false),true);
-    assert.equal(run.presentations.filter(row=>row.kind==='forward').length,8);
-    assert.equal(run.presentations.length,8+run.corrections.length);
+    assert.equal(run.authoritativeInputs.length,targetFrame);
+    assert(run.authoritativeInputs.every(row=>row.bytes.length===44));
+    assert.equal(run.presentations.filter(row=>row.kind==='forward').length,targetFrame);
+    assert.equal(run.presentations.length,targetFrame+run.corrections.length);
     assert(run.presentations.every((row,index)=>index===0||
       row.receipt.sourceFrameAfter>=run.presentations[index-1].receipt.sourceFrameAfter));
     assert.equal(item.pageErrors.length,0);
@@ -1524,13 +1582,14 @@ async function runPacedEightInputs(alpha,beta){
   assert.equal(releaseErrors.length,0,`Owned keyboard release failed: ${JSON.stringify(releaseErrors)}`);
   assert(a.corrections.some(row=>row.dirty!==null)||b.corrections.some(row=>row.dirty!==null),
     'Paced run must actually correct a wrong prediction');
-  proof.comparisons.end8=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
+  proof.comparisons[`end${targetFrame}`]=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
   assert.equal(a.finalChecksum.bytes.length,64);assert.equal(b.finalChecksum.bytes.length,64);
-  assert(proof.comparisons.end8.equal,'Paced confirmed post-draw checksums differ');
+  assert(proof.comparisons[`end${targetFrame}`].equal,'Paced confirmed post-draw checksums differ');
   proof.comparisons.authoritative_pad=a.authoritativeInputs.map((row,index)=>({tick:row.tick,
     ...byteDifference(Buffer.from(row.bytes),Buffer.from(b.authoritativeInputs[index].bytes))}));
   assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
-  proof.status='paced-eight-inputs-complete';report.result='PACED_EIGHT_INPUTS_COMPLETE';
+  proof.status=paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
+  report.result=paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
 }
 
 async function runConfirmedPrefixTransfer(alpha,beta){
@@ -2067,7 +2126,7 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  if(paced)await runPacedEightInputs(alpha,beta);
+  if(paced)await runPacedInputs(alpha,beta,pacedInputTicks);
   else if(confirmedPrefix)await runConfirmedPrefixTransfer(alpha,beta);
   else if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
   else if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
@@ -2089,6 +2148,7 @@ try{
   report.failure={name:error?.name||'Error',message:String(error?.message||error),stack:error?.stack||null};
 }
 finally{
+  const incidentExports=new Map();
   await Promise.all(owned.filter(item=>item.peerInstalled).map(async item=>{
     try{
       const cleanup=report.pages[item.role].cleanup;
@@ -2138,6 +2198,22 @@ finally{
         report.cleanup_failures.push(`${item.role} native/source cleanup: ${String(error?.message||error)}`);
       }
       await retainNativeLog(item,'after-cleanup');
+      if(runtimeIncidentRecording){
+        const evidence=report.runtime_incident_recording.profiles[item.role]??={readiness:null};
+        if(pageReport.cleanup.native_owner?.startsWith('failed:')){
+          noteMissingIncident(evidence,'export','Native cleanup did not complete; recorder export was skipped.');
+        }else{
+          // This existing JS exporter persists recorder data only. No native
+          // timing read or source action can run after a timed-out observation.
+          const exported=await readOptionalIncident(evidence,'export',async()=>{
+            const value=await item.page.evaluate(async()=>
+              await window.meleeNetRuntimeDiagnosticExport?.()??null);
+            if(!value)throw Error('Existing runtime diagnostic export returned no session');
+            return value;
+          });
+          if(exported)incidentExports.set(item.role,exported);
+        }
+      }
       if(inlineDispatch&&item.takenOver){
         try{
           pageReport.controller_journal=await item.page.evaluate(()=>
@@ -2177,6 +2253,56 @@ finally{
     report.cleanup_failures.push('The two owned headless Chrome browser processes were not independently attributed');
   if(report.cleanup_failures.length&&report.result!=='FAIL'){
     report.result='FAIL';report.failure={name:'CleanupError',message:report.cleanup_failures[0],stack:null};
+  }
+  if(runtimeIncidentRecording){
+    const recorder=report.runtime_incident_recording;
+    for(const role of ['alpha','beta']){
+      const evidence=recorder.profiles[role]??={readiness:null};
+      const paced=report.peer_correction?.pages?.[role]?.paced;
+      const clockPath=`peer_correction.pages.${role}.paced.clock`;
+      try{
+        if(Array.isArray(paced?.clock)){
+          const bytes=Buffer.from(JSON.stringify(paced.clock),'utf8');
+          evidence.native_clock_receipt={retained_in_report:true,source_path:clockPath,
+            sample_count:paced.clock.length,bytes:bytes.length,sha256:sha256(bytes),
+            encoding:'UTF-8 compact JSON.stringify of the report array, without trailing newline',
+            native_failure:paced.failure??null,scope:'Native pacing journal, separate from runtime incidents.'};
+        }else{
+          evidence.native_clock_receipt={retained_in_report:false};
+          noteMissingIncident(evidence,'native-clock','No native pacing journal was retained.');
+        }
+      }catch(error){noteMissingIncident(evidence,'native-clock',error);}
+      evidence.export_status='missing';
+      const exported=incidentExports.get(role);
+      if(exported){
+        try{
+          const summary=summarizeRuntimeIncidents(exported,null);
+          const raw=Buffer.from(JSON.stringify(exported,null,2)+'\n','utf8');
+          const file=`${role}-rawruntime-incidents.json`;
+          await fs.writeFile(path.join(out,file),raw,{flag:'wx',signal:AbortSignal.timeout(INCIDENT_OBSERVATION_MS)});
+          evidence.artifact={name:file,bytes:raw.length,sha256:sha256(raw),
+            scope:'Existing recorder current-session and persisted records export.'};
+          evidence.summary=summary;
+          evidence.export_status='retained';
+          if(summary.missing_timing_staging_count>0)
+            noteMissingIncident(evidence,'staging','Retained H1 timing incident has no staging observation.');
+        }catch(error){noteMissingIncident(evidence,'retention',error);}
+      }else if(!evidence.missing_evidence?.some(row=>row.step==='export')){
+        noteMissingIncident(evidence,'export','No owned page export was available.');
+      }
+      const observed=evidence.summary?.h1_timing_pause_observed===true;
+      if(observed)recorder.h1_timing_pause_observed=true;
+      evidence.h1_projection={status:observed?'observed':'missing',
+        source:'Existing runtime recorder export only.',
+        h1_timing_pause_observed:evidence.summary?.h1_timing_pause_observed??null,
+        missing_h1_projection:!observed,
+        timing_incident_count:evidence.summary?.timing_incident_count??null,
+        native_clock_receipt_path:evidence.native_clock_receipt?.retained_in_report?clockPath:null,
+        native_clock_failure_projected_as_incident:false,
+        missing_reason:observed?null:'No actual timing incident was retained from the existing recorder.'};
+    }
+    recorder.export_status=Object.values(recorder.profiles).every(profile=>profile.export_status==='retained')?
+      'retained':'missing';
   }
   report.finished_at=new Date().toISOString();
   report.failure_cause=resultError?String(resultError.message||resultError):null;

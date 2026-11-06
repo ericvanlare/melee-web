@@ -3,8 +3,9 @@
 // owns the existing WebSocket peer; all native source work stays with the
 // existing runtime-history controller.
 import {createRuntimeMatchHistoryPeer, RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
-import {MatchInputTimeline} from '../../../scripts/net_rollback_input_timeline.mjs';
+  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
+import {MatchInputTimeline, ROLLBACK_MAX_PREDICTION_TICKS}
+  from '../../../scripts/net_rollback_input_timeline.mjs';
 
 function encode(bytes) {
   let binary = '';
@@ -33,11 +34,16 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   // bounded peer receipts, and only this serialized owner admits them to the
   // timeline between operations.
   const localPort = role === 'alpha' ? 0 : 1;
-  const rebaseScope = inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
-  const timeline = (rebaseScope || inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS)
+  const arenaHistoryScope = inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ||
+    inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
+  const timelineLookaheadTicks = inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
+    ? RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
+    : RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
+  const timeline = (arenaHistoryScope || inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS)
     ? new MatchInputTimeline({localPort, remotePort: 1-localPort,
       initialRemotePad: bytes(initialRemotePad, 'Held-prefix prediction'),
-      maxHistoryTicks: 8, maxLookaheadTicks: inputTicks})
+      maxHistoryTicks: ROLLBACK_MAX_PREDICTION_TICKS+1,
+      maxLookaheadTicks: timelineLookaheadTicks})
     : null;
   const preFrame = () => {
     const status = owner.status();
@@ -85,7 +91,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         }
         case 'episodeRebase': {
           const status = timeline.status();
-          if (!rebaseScope || !arenaEnabled || !Number.isInteger(value) || value <= preFrame() ||
+          if (!arenaHistoryScope || !arenaEnabled || !Number.isInteger(value) || value <= preFrame() ||
               status.confirmed_through !== value-1 || status.simulated_through !== value-1 ||
               status.dirty_from !== null || status.plan_outstanding || status.terminal || status.disposed)
             throw Error('Arena episode rebase requires the fully confirmed selected END');
@@ -176,7 +182,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         case 'episodePrefixBegin': {
           const pre = preFrame(), state = timeline.status();
           const c = value.confirmedEnd, frontier = value.through+1;
-          if (!arenaEnabled || !rebaseScope || !Number.isInteger(c) || c <= pre || c >= frontier ||
+          if (!arenaEnabled || !arenaHistoryScope || !Number.isInteger(c) || c <= pre || c >= frontier ||
               state.remote_contiguous_through !== c-1 || state.simulated_through !== frontier-1 ||
               state.dirty_from !== value.dirty ||
               (value.dirty !== null && (value.dirty >= c || value.dirty < pre)) ||

@@ -13,9 +13,12 @@ export const RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS = 1;
 export const RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS = 2;
 export const RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS = 4;
 export const RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS = 8;
+export const RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS = 120;
 const REBASE_SCOPE = 'melee-web-runtime-two-episode-arena-history-peer-v1';
+const PACED_SCOPE = 'melee-web-runtime-paced-120-inputs-history-peer-v1';
 const SUPPORTED_INPUT_TICKS = [1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS];
+  RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS];
 const EPISODE_SCOPE = 'melee-web-runtime-four-tick-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS = 5000;
 const PAD_BYTES = 11;
@@ -142,11 +145,12 @@ function validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame)
 export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
   loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS} = {}) {
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, or eight indexed input samples');
+    'Runtime history peer supports one, two, four, eight, or 120 indexed input samples');
   validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame);
   return Object.freeze({
     protocol: 'melee-web-local-lockstep-a2-v1',
-    scope: inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ? REBASE_SCOPE :
+    scope: inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ? PACED_SCOPE :
+      inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ? REBASE_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS ? EPISODE_SCOPE :
       (inputTicks === 1 ? RUNTIME_MATCH_HISTORY_PEER_SCOPE : RUNTIME_MATCH_HISTORY_TWO_WINDOW_PEER_SCOPE),
     source_ticks: inputTicks + 2,
@@ -200,7 +204,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     'Runtime history peer requires the existing room relay endpoint factory');
 
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, or eight indexed input samples');
+    'Runtime history peer supports one, two, four, eight, or 120 indexed input samples');
   const sourceTicks = inputTicks + 2;
   const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame, inputTicks});
   const localPort = role === 'alpha' ? 0 : 1;

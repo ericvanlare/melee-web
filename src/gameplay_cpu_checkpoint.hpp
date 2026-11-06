@@ -4,6 +4,7 @@
 #include "gameplay_cpu_interval.h"
 #include "gameplay_match_session.hpp"
 #include <array>
+#include <cstddef>
 #include <memory>
 #include <vector>
 namespace melee_web {
@@ -66,7 +67,8 @@ public:
     /* Close ActionStore only after the endpoint is selected (corrected, or
      * an uncorrected final endpoint) and its complete receipt was copied. */
     bool close_history_endpoint(const GameplayMatchSession&) noexcept;
-    GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&) noexcept;
+    GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&,
+        char* refusal=nullptr, std::size_t refusal_bytes=0) noexcept;
     bool finish_history_replay(const GameplayMatchSession&) noexcept;
     /* Finalize only the actual authoritative prefix C inside the restored
      * interval. The caller proves remote confirmation; this owner proves the

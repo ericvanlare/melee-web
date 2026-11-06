@@ -297,7 +297,7 @@ private:
     RuntimeMatchHistoryAudioStep audio_step_{};
     unsigned& audio_phase_;
     unsigned pre_audio_phase_{};
-    std::array<char,256> error_{};
+    std::array<char,512> error_{};
     void* callback_context_{};
     std::unique_ptr<GameplayCpuCheckpoint> checkpoint_;
     GameplayCpuEndpointReader reader_{};

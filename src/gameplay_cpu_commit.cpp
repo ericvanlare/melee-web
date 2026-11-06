@@ -1,5 +1,6 @@
 #include "gameplay_cpu_commit.hpp"
 #include "gameplay_cpu_interval.h"
+#include <cstdio>
 #include <memory>
 namespace melee_web {
 GameplayCpuCommitResult gameplay_cpu_commit(const GameplayCpuCommitOwners& o) noexcept {
@@ -98,8 +99,24 @@ bool gameplay_cpu_history_audio_disjoint(const GameplayCpuCommitOwners& o) noexc
 #endif
 
 GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
-    const GameplayCpuCommitOwners& o) noexcept {
+    const GameplayCpuCommitOwners& o, char* refusal, std::size_t refusal_bytes) noexcept {
     using R=GameplayCpuCommitResult;
+    const auto payload_refusal=[&](const char* leaf, unsigned status,
+                                   const MeleeWebSourceMemoryHistory* changed=nullptr){
+        if(refusal&&refusal_bytes){
+            const auto used=std::snprintf(refusal,refusal_bytes,"leaf=%s status=%u",leaf,status);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+            if(changed&&used>=0&&static_cast<std::size_t>(used)+1<refusal_bytes){
+                refusal[used]=' ';
+                melee_web_source_memory_history_describe_pre_change(
+                    changed,refusal+used+1,refusal_bytes-static_cast<std::size_t>(used)-1);
+            }
+#else
+            (void)used;(void)changed;
+#endif
+        }
+        return R::Payload;
+    };
     if (!o.action_history || !o.audio || !o.audio_snapshot || !o.flow || !o.flow_snapshot ||
         !o.bootstrap || !o.context || !o.context_snapshot || !o.payload || !o.statics ||
         !o.effect_token || !o.history_incarnation || !o.history_end_frame ||
@@ -116,10 +133,14 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
     if(o.arena){
         const auto physical=melee_web_gameplay_heap_history_prepare(o.arena);
         arena.reset(physical.prepared);
-        if(physical.status!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||!arena)return R::Payload;
-        const auto mirror=melee_web_source_memory_history_prepare(o.shadow);
+        if(physical.status!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||!arena)
+            return payload_refusal("sdk-prepare",physical.status);
+        const auto mirror=melee_web_source_memory_history_prepare_arena_coupled(
+            o.shadow,arena.get());
         shadow.reset(mirror.prepared);
-        if(mirror.status!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK||!shadow)return R::Payload;
+        if(mirror.status!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK||!shadow)
+            return payload_refusal("shadow-prepare",mirror.status,
+                mirror.status==MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED?o.shadow:nullptr);
     }
 
 #else
@@ -148,13 +169,20 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
     if (!melee_web_match_context_snapshot_admit(o.context,o.context_snapshot,nullptr,0)) return R::Context;
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     if(arena){
-        if(melee_web_gameplay_heap_history_admit(arena.get())!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||
-           melee_web_source_memory_history_admit(shadow.get())!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
-            return R::Payload;
+        const auto physical=melee_web_gameplay_heap_history_admit(arena.get());
+        if(physical!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+            return payload_refusal("sdk-admit",physical);
+        const auto mirror=melee_web_source_memory_history_admit(shadow.get());
+        if(mirror!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+            return payload_refusal("shadow-admit",mirror,
+                mirror==MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED?o.shadow:nullptr);
     }else
 #endif
-    if(melee_web_source_memory_payload_snapshot_admit(o.payload)!=
-             MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) return R::Payload;
+    {
+        const auto payload=melee_web_source_memory_payload_snapshot_admit(o.payload);
+        if(payload!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+            return payload_refusal("payload-admit",payload);
+    }
     if (!o.statics->history_admit_commit(o.history_incarnation,o.history_end_frame))
         return R::Statics;
 

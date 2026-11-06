@@ -151,6 +151,12 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
             if(const char* error=c->history_arena_failure()){
                 refused(stage,0,error);return {};
             }
+            const auto bound=melee_web_source_memory_history_bind_arena_pre(
+                c->commit_.shadow,c->commit_.arena);
+            if(bound!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK){
+                refused(stage,static_cast<std::uint32_t>(bound),
+                        "Owned SDK arena shadow PRE binding refused");return {};
+            }
             if(!gameplay_cpu_history_audio_disjoint(c->commit_)){
                 refused(CpuComparisonDomain::Audio,0,"Audio-owned ranges overlap SDK arena or are unavailable");return {};
             }
@@ -442,7 +448,7 @@ bool GameplayCpuCheckpoint::close_history_endpoint(
 }
 
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
-    const GameplayMatchSession& session) noexcept {
+    const GameplayMatchSession& session,char* refusal,std::size_t refusal_bytes) noexcept {
     if(!history_mode_||phase_!=Phase::HistorySealed||!history_endpoint_archived_||
        history_endpoint_closed_||
        !same_owner(session)||session.source_frames()!=history_end_frame_||
@@ -453,7 +459,7 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
     commit_.action_history=history_actions_.get();
     commit_.history_incarnation=history_incarnation_;
     commit_.history_end_frame=history_end_frame_;
-    const auto result=gameplay_cpu_commit_history_pre(commit_);
+    const auto result=gameplay_cpu_commit_history_pre(commit_,refusal,refusal_bytes);
     if(result!=GameplayCpuCommitResult::Ok){phase_=Phase::Failed;disarm();return result;}
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(!slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){

@@ -175,7 +175,7 @@ bool RuntimeMatchHistory::fail(RuntimeMatchHistoryFailure failure,const char* me
 bool RuntimeMatchHistory::checkpoint_failure(RuntimeMatchHistoryFailure failure,const char* operation) noexcept
 {
     const auto proof=checkpoint_?checkpoint_->comparison():CpuComparison{};
-    char message[200]{};
+    char message[512]{};
     std::snprintf(message,sizeof(message),"%s: domain=%u status=%u row=%u detail=%u",
         operation,proof.domain,proof.status,proof.row,proof.detail);
     return fail(failure,message);
@@ -720,9 +720,18 @@ bool RuntimeMatchHistory::restore_pre() noexcept
        (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
        !gate(RuntimeMatchHistoryGatePoint::RestoreBefore,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Phase);
-    if(!checkpoint_->archive_history_endpoint(session_)||
-       checkpoint_->restore_history_pre(session_)!=GameplayCpuCommitResult::Ok)
-        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,"Native typed history restore refused");
+    if(!checkpoint_->archive_history_endpoint(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,
+                                  "Native typed history endpoint archive refused");
+    char refusal[320]{};
+    const auto restore_result=checkpoint_->restore_history_pre(session_,refusal,sizeof(refusal));
+    if(restore_result!=GameplayCpuCommitResult::Ok){
+        char operation[384]{};
+        std::snprintf(operation,sizeof(operation),
+            "Native typed history restore refused result=%u%s%s",
+            static_cast<unsigned>(restore_result),refusal[0]?" ":"",refusal);
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,operation);
+    }
     audio_phase_=pre_audio_phase_;
     ++restore_count_;
     replay_target_end_=sealed_end_;replay_steps_=0;
