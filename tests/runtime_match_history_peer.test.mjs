@@ -12,6 +12,9 @@ import {
   RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
@@ -165,11 +168,11 @@ function createEndpointBus() {
 
 function makePeer(bus, role, {sourceFrame = 120, sourceJson = identityText(sourceFrame),
   identity = loadedIdentity, validateNativePad = () => true, inputTicks = 1, timeoutMs = 1000,
-  sampleTimeoutMs = timeoutMs,deferredLocalTick = null} = {}) {
+  sampleTimeoutMs = timeoutMs,deferredLocalTick = null,deferredLocalTicks = null} = {}) {
   return createRuntimeMatchHistoryPeer({
     role, relayUrl: 'ws://local.test/room', roomId: 'R'.repeat(24), timeoutMs, sampleTimeoutMs,
     sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks,
-    validateNativePad,deferredLocalTick,createEndpoint: bus.createEndpoint,
+    validateNativePad,deferredLocalTick,deferredLocalTicks,createEndpoint: bus.createEndpoint,
   });
 }
 
@@ -700,7 +703,7 @@ test('eight actual contributions keep one peer transport across the episode boun
 test('finite 120-input peer session preserves its protocol pre-roll and refuses tick 120',async()=>{
   assert.equal(RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,120);
   const bus=createEndpointBus();
-  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:119}),/supports one, two, four, eight, or 120/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:119}),/supports one, two, four, eight, 120, or 600/);
   const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
   const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
   try{
@@ -731,6 +734,68 @@ test('finite 120-input peer session preserves its protocol pre-roll and refuses 
         [null,null,...Array.from({length:120},(_,tick)=>tick)]);
     }
     await assert.rejects(alpha.publishLocal({port:0,tick:120,pollSerial:'520',pad:validPad(90)}),
+      /contiguous index order/);
+  }finally{
+    await Promise.allSettled([alpha.close(),beta.close()]);
+  }
+});
+
+test('finite 600-input peer session releases only the fixed deferred source polls once',async()=>{
+  assert.equal(RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,600);
+  assert.deepEqual(RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,[26,226,426]);
+  const bus=createEndpointBus();
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:600,
+    deferredLocalTicks:[26,226,426,526]}),/fixed ticks 26, 226, and 426/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:120,
+    deferredLocalTicks:[26,226,426]}),/fixed ticks 26, 226, and 426/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:600,deferredLocalTick:26,
+    deferredLocalTicks:[26,226,426]}),/cannot mix single and multiple/);
+  const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS});
+  const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+    deferredLocalTicks:[...RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS]});
+  try{
+    const [startedAlpha,startedBeta]=await Promise.all([alpha.start(),beta.start()]);
+    for(const started of [startedAlpha,startedBeta]){
+      assert.equal(started.input_ticks_protocol_only,600);
+      assert.equal(started.source_ticks_protocol_only,602);
+      assert.equal(started.scope,RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE);
+    }
+    assert.equal(startedAlpha.agreement_hash,startedBeta.agreement_hash);
+    for(let tick=0;tick<600;++tick){
+      const alphaPad=validPad(10+tick),betaPad=validPad(30+tick);
+      await alpha.publishLocal({port:0,tick,pollSerial:String(400+tick),pad:alphaPad});
+      const deferred=RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS.includes(tick);
+      await beta.publishLocal({port:1,tick,pollSerial:String(900+tick),pad:betaPad,
+        deferSend:deferred});
+      if(deferred){
+        assert.equal(alpha.remoteSnapshot(tick),null,
+          `Beta deferred tick ${tick} escaped before release`);
+        const released=await beta.releaseDeferredLocal(tick);
+        assert.deepEqual(released.pad,[...betaPad]);
+        assert.equal(released.protocol_input_tick,tick);
+        assert.equal(released.poll_serial,String(900+tick));
+        assert.equal(released.local_port,1);
+        await assert.rejects(beta.releaseDeferredLocal(tick),
+          /requires its retained original publication/);
+      }
+      const [alphaRemote,betaRemote]=await Promise.all([
+        alpha.waitForRemoteSample({tick}),beta.waitForRemoteSample({tick}),
+      ]);
+      assert.deepEqual(alphaRemote.pad,[...betaPad]);
+      assert.deepEqual(betaRemote.pad,[...alphaPad]);
+      assert.equal(alphaRemote.protocol_input_tick,tick);
+      assert.equal(betaRemote.protocol_input_tick,tick);
+    }
+    await Promise.all([bus.flush('alpha'),bus.flush('beta')]);
+    for(const peer of [alpha,beta]){
+      const snapshot=peer.snapshot();
+      assert.equal(snapshot.input_ticks_protocol_only,600);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row=>row.protocol_input_tick),
+        [null,null,...Array.from({length:600},(_,tick)=>tick)]);
+    }
+    await assert.rejects(alpha.publishLocal({port:0,tick:600,pollSerial:'1000',pad:validPad(90)}),
+      /contiguous index order/);
+    await assert.rejects(beta.publishLocal({port:1,tick:600,pollSerial:'1500',pad:validPad(91)}),
       /contiguous index order/);
   }finally{
     await Promise.allSettled([alpha.close(),beta.close()]);

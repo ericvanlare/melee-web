@@ -14,11 +14,15 @@ export const RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS = 2;
 export const RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS = 4;
 export const RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS = 8;
 export const RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS = 120;
+export const RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS = 600;
+export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS = Object.freeze([26, 226, 426]);
 const REBASE_SCOPE = 'melee-web-runtime-two-episode-arena-history-peer-v1';
 const PACED_SCOPE = 'melee-web-runtime-paced-120-inputs-history-peer-v1';
+export const RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE =
+  'melee-web-runtime-paced-600-respawn-history-peer-v1';
 const SUPPORTED_INPUT_TICKS = [1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS];
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS];
 const EPISODE_SCOPE = 'melee-web-runtime-four-tick-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS = 5000;
 const PAD_BYTES = 11;
@@ -145,11 +149,12 @@ function validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame)
 export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
   loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS} = {}) {
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, eight, or 120 indexed input samples');
+    'Runtime history peer supports one, two, four, eight, 120, or 600 indexed input samples');
   validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame);
   return Object.freeze({
     protocol: 'melee-web-local-lockstep-a2-v1',
-    scope: inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ? PACED_SCOPE :
+    scope: inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE :
+      inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ? PACED_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ? REBASE_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS ? EPISODE_SCOPE :
       (inputTicks === 1 ? RUNTIME_MATCH_HISTORY_PEER_SCOPE : RUNTIME_MATCH_HISTORY_TWO_WINDOW_PEER_SCOPE),
@@ -190,6 +195,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   sampleTimeoutMs = timeoutMs, sourceIdentityJson, loadedIdentity, sourceFrame,
   inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
   deferredLocalTick = null,
+  deferredLocalTicks: deferredLocalTicksOption = null,
   validateNativePad, createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   timeoutMs = timeoutValue(timeoutMs, 'Runtime history peer timeout');
   sampleTimeoutMs = timeoutValue(sampleTimeoutMs, 'Runtime history remote sample timeout');
@@ -205,10 +211,23 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     'Runtime history peer requires the existing room relay endpoint factory');
 
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, eight, or 120 indexed input samples');
-  requireCondition(deferredLocalTick === null || (Number.isSafeInteger(deferredLocalTick) &&
-    deferredLocalTick >= 0 && deferredLocalTick < inputTicks),
-  'Runtime history peer deferred publication requires one explicit in-range local tick');
+    'Runtime history peer supports one, two, four, eight, 120, or 600 indexed input samples');
+  requireCondition(deferredLocalTicksOption === null || deferredLocalTick === null,
+    'Runtime history peer cannot mix single and multiple deferred tick options');
+  let configuredDeferredTicks;
+  if (deferredLocalTicksOption !== null) {
+    requireCondition(inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS &&
+      Array.isArray(deferredLocalTicksOption) &&
+      deferredLocalTicksOption.length === RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS.length &&
+      deferredLocalTicksOption.every((tick, index) => tick === RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS[index]),
+    'Runtime history peer 600-input deferral requires the fixed ticks 26, 226, and 426');
+    configuredDeferredTicks = new Set(deferredLocalTicksOption);
+  } else if (deferredLocalTick !== null) {
+    requireCondition(Number.isSafeInteger(deferredLocalTick) && deferredLocalTick >= 0 &&
+      deferredLocalTick < inputTicks,
+    'Runtime history peer deferred publication requires one explicit in-range local tick');
+    configuredDeferredTicks = new Set([deferredLocalTick]);
+  } else configuredDeferredTicks = new Set();
   const sourceTicks = inputTicks + 2;
   const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame, inputTicks});
   const localPort = role === 'alpha' ? 0 : 1;
@@ -382,7 +401,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     throwIfFailed();
     requireCondition(typeof deferSend === 'boolean',
       'Runtime history local PAD deferSend must be an explicit boolean');
-    requireCondition(deferSend === (deferredLocalTick === tick),
+    requireCondition(deferSend === configuredDeferredTicks.has(tick),
       'Runtime history local PAD deferSend differs from its explicitly configured tick');
     requireCondition(!closed && peer?.ready,
       'Runtime history local PAD requires a ready, open peer');
@@ -430,7 +449,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     requireCondition(!closed && peer?.ready,
       'Runtime history deferred local PAD requires a ready, open peer');
     tick = inputTick(tick);
-    requireCondition(tick === deferredLocalTick,
+    requireCondition(configuredDeferredTicks.has(tick),
       'Runtime history deferred local PAD release differs from its explicitly configured tick');
     const receipt = localReceipts.get(tick), pad = localPads.get(tick);
     requireCondition(deferredLocalTicks.has(tick) && !deferredLocalReleasePending.has(tick) && receipt && pad,

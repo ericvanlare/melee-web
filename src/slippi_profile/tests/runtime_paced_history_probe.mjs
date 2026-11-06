@@ -2,7 +2,8 @@
 // Bounded page-owned cadence probe. Native code owns source ticks, clock,
 // snapshots, renderer submission and idle. No CDP operation drives this loop.
 import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS} from '../runtime_match_history_peer.mjs';
 
 function pauseGate(label){
   let resolveReady,resolveResume,entered=false,resumed=false;
@@ -27,23 +28,40 @@ export function installRuntimePacedHistoryProbe({role,
   const owner=globalThis.__meleeRuntimeMatchHistory;
   const peer=globalThis.__meleeRuntimePeerHistoryProbe;
   if(!owner||!peer||!['alpha','beta'].includes(role)||globalThis.__meleeRuntimePacedHistory||
-      ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS].includes(inputTicks) ||
+      ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS].includes(inputTicks) ||
       typeof lateClassPiece!=='boolean' || (lateClassPiece&&inputTicks!==RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS))
     throw Error('Paced probe requires the existing exclusive owners and an explicit supported finite horizon');
   const targetFrame=inputTicks;
   const paced120=inputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
-  const lateScenario=lateClassPiece?{target_source_tick:26,anchor:null,keyboard_change:null,held_packet:null,
-    release_gate:null,alpha_frontier:null,network_release:null}:null;
-  const report={scope:lateClassPiece?'120 actual source inputs with one deferred actual peer packet at source tick 26; existing clock and rollback bounds':
+  const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
+  const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:lateClassPiece?[26]:[];
+  const lateEvents=new Map(lateTicks.map(tick=>[tick,{
+    scenario:{target_source_tick:tick,anchor:null,keyboard_change:null,held_packet:null,
+      release_gate:null,alpha_frontier:null,network_release:null},
+    key:pauseGate('late-key-change'),packet:pauseGate('late-packet-release'),
+    frontier:pauseGate('late-alpha-frontier'),
+  }]));
+  const walkStart=pauseGate('respawn-walk-start'),walkStop=pauseGate('respawn-walk-stop');
+  const report={scope:respawn?'600 actual source inputs, three deferred actual peer packets and one stock respawn':
+      lateClassPiece?'120 actual source inputs with one deferred actual peer packet at source tick 26; existing clock and rollback bounds':
       paced120?'120 actual source inputs; functional pacing clock trace with native-sized rollback windows':
       'eight actual source inputs; native admission and measured headless cadence',
     input_ticks:inputTicks,role,result:'pending',events:[],presentations:[],admissions:[],polls:[],
     authoritativeInputs:[],corrections:[],rebases:[],callbacks:[],failure:null,
-    ...(lateScenario?{late_class_piece:lateScenario}:{})};
-  const lateKeyGate=pauseGate('late-key-change'),latePacketGate=pauseGate('late-packet-release'),
-    lateFrontierGate=pauseGate('late-alpha-frontier');
+    ...(lateClassPiece?{late_class_piece:lateEvents.get(26).scenario}:{}),
+    ...(respawn?{late_corrections:[...lateEvents.values()].map(event=>event.scenario),stock_samples:[]}:{}),
+  };
   let lateAborted=false;
-  const requireLateScenario=()=>{if(!lateClassPiece)throw Error('Late class-piece controls are unavailable in this paced phase');};
+  const pauseScenario=async(gate,value,label)=>{
+    if(lateAborted)throw Error(`${label} was aborted before entering its gate`);
+    await gate.pause(value);
+    if(lateAborted)throw Error(`${label} was aborted before leaving its gate`);
+  };
+  const lateEvent=(tick=26)=>{
+    const event=lateEvents.get(tick);
+    if(!event)throw Error('No configured late input at the requested source tick');
+    return event;
+  };
   let prepared=false,started=false,remoteNext=0;
   const selected=new Map();
   const state=()=>owner.status();
@@ -61,6 +79,35 @@ export function installRuntimePacedHistoryProbe({role,
   const retainRows=rows=>{
     for(const item of rows){const row=item.row??item;selected.set(row.sourceFrame,[...row.selected]);}
   };
+  const observeStock=({metadata,pendingCommand,gpuPending,endpointActive,firstFailure,rendererErrors,ownerState})=>{
+    const module=globalThis.Module;
+    if(ownerState!==1||pendingCommand||gpuPending||endpointActive||firstFailure||rendererErrors||
+        (module?.Asyncify&&module.Asyncify.state!==0))
+      throw Error('Sparse stock observation requires quiescent history ownership');
+    // The awaited native idle command proves Asyncify even when its JS object is private.
+    const pointer=module._melee_web_native_menu_match_observe();
+    if(!pointer)throw Error('Sparse native match observation is unavailable');
+    const match=JSON.parse(module.UTF8ToString(pointer));
+    const authoredPlayer=(player,index)=>{
+      const {fighter,motion,groundAir,source_slot:slot}=player;
+      const live=fighter===0&&Number.isInteger(motion)&&motion>=0&&[0,1].includes(groundAir);
+      const absent=index===0&&fighter===-1&&motion===-1&&groundAir===-1;
+      return player.human===true&&player.source_character===8&&player.source_player_index===index&&
+        player.source_port===index&&Number.isInteger(slot)&&slot>=0&&
+        (slot===0?index:slot-1)===index&&slot===match.rules.player_source_slots?.[index]&&
+        (live||absent);
+    };
+    if(match.frame!==metadata.currentFrame||!match.ready||match.paused||match.ending||match.complete||
+        match.outcome!==0||match.rules?.stage!==32||match.players?.length!==2||
+        match.rules.match_kind!==1||match.rules.is_stock!==1||match.rules.is_vs!==1||
+        match.rules.is_teams!==0||!match.players.every(authoredPlayer)||
+        ![3,4].includes(match.players[0].stocks)||match.players[1].stocks!==4)
+      throw Error(`Unexpected source stock observation: ${JSON.stringify(match)}`);
+    const sample={frame:match.frame,kind:'post-present-idle',incarnation:metadata.incarnation,
+      players:match.players.map(({stocks,fighter,motion,groundAir})=>({stocks,fighter,motion,groundAir}))};
+    report.stock_samples.push(sample);
+    return sample;
+  };
   const present=async(recording,kind='forward')=>{
     const status=await command(recording?'recordingPresent':'present');
     const receipt=owner.presentation();
@@ -70,6 +117,14 @@ export function installRuntimePacedHistoryProbe({role,
       throw Error('Paced presentation lost its native frame or serial');
     const row={kind,receipt};report.presentations.push(row);
     row.idle=await command('idle');
+    if(respawn&&row.idle.metadata.currentFrame>=28&&
+        (row.idle.metadata.currentFrame%4===0||kind!=='forward'||row.idle.metadata.currentFrame===targetFrame)){
+      const sample=observeStock(state());
+      if(role==='alpha'&&walkStart.resumed&&!walkStop.entered&&sample.players[0].stocks===3){
+        report.walk_stop_frame=sample.frame;
+        await pauseScenario(walkStop,sample,'Respawn walk-stop');
+      }
+    }
   };
   const capture=async()=>{
     await command('capture');admit(1,1);
@@ -91,8 +146,9 @@ export function installRuntimePacedHistoryProbe({role,
       const receipt=await call('peerRemoteSnapshot',{tick:remoteNext});
       if(!receipt)break;
       const admission=await call('episodeAdmit',{tick:remoteNext});
-      if(lateScenario&&role==='alpha'&&remoteNext===26)
-        lateScenario.remote_admission={tick:remoteNext,receipt:admission.receipt,
+      const event=lateEvents.get(remoteNext);
+      if(event&&role==='alpha')
+        event.scenario.remote_admission={tick:remoteNext,receipt:admission.receipt,
           timeline:admission.timeline};
       remoteNext++;
     }
@@ -102,8 +158,9 @@ export function installRuntimePacedHistoryProbe({role,
     const confirmed=Math.min(snapshot.remote_contiguous_through+1,frontier);
     if(confirmed<=pre||confirmed>frontier)throw Error('Paced correction lacks a newer confirmed anchor');
     await sealPresented();
+    const lateScenario=lateEvents.get(snapshot.dirty_from)?.scenario;
     const lateFrontier=lateScenario?.alpha_frontier;
-    if(role==='alpha'&&snapshot.dirty_from===26&&lateFrontier?.pre_frame===pre&&
+    if(role==='alpha'&&lateFrontier?.pre_frame===pre&&
         lateFrontier.frontier===frontier){
       const frontierStatus=state();
       if(frontierStatus.ownerState!==1||frontierStatus.pendingCommand||frontierStatus.gpuPending||
@@ -122,6 +179,8 @@ export function installRuntimePacedHistoryProbe({role,
     if(snapshot.dirty_from===null&&confirmed===frontier){
       await closeRebase(frontier);return;
     }
+    if(respawn&&snapshot.dirty_from!==null)
+      report.stock_samples=report.stock_samples.filter(sample=>sample.frame<=snapshot.dirty_from);
     const restoreEventIndex=report.events.length;
     const restoreStatus=await command('restore');admit(1,1);
     if(confirmed<frontier){
@@ -148,60 +207,75 @@ export function installRuntimePacedHistoryProbe({role,
         ...(lateScenario?{restore_event_index:restoreEventIndex,restore_status:restoreStatus}:{})});
       if(frontier!==targetFrame)await closeRebase(frontier);
     }
+    if(respawn&&role==='alpha'&&snapshot.dirty_from===lateTicks[0]&&!walkStart.entered){
+      if(pre!==21||frontier!==28)throw Error('Walk-off requires the first exact late correction');
+      report.walk_start_frame=frontier;
+      const baseline=report.stock_samples.at(-1);
+      if(baseline?.frame!==frontier||baseline.players[0].stocks!==4)
+        throw Error('Walk-off requires its actual corrected four-stock baseline');
+      await pauseScenario(walkStart,baseline,'Respawn walk-start');
+    }
   };
   const api=Object.freeze({
     snapshot:()=>structuredClone({...report,clock:owner.pacingJournal()}),
-    waitForLateKeyChange(){requireLateScenario();if(role!=='beta')throw Error('Only beta owns the late key-change gate');return lateKeyGate.wait();},
-    noteLateKeyChange({from,to}={}){
-      requireLateScenario();
-      if(role!=='beta'||!lateKeyGate.entered||lateKeyGate.resumed||lateScenario.keyboard_change||
-          from!=='ArrowLeft'||to!=='ArrowRight')
-        throw Error('Late key change must be one Playwright ArrowLeft-to-ArrowRight transition at source tick 26');
-      lateScenario.keyboard_change={source_tick:26,from,to,pre_frame:state().metadata.preFrame,
-        current_frame:state().metadata.currentFrame,driver:'Playwright page.keyboard'};
-      return structuredClone(lateScenario.keyboard_change);
+    lateSnapshot(tick){
+      return structuredClone({scenario:lateEvent(tick).scenario,
+        poll:report.polls.find(row=>row.sourceFrame===tick)});
     },
-    resumeLateKeyChange(){
-      requireLateScenario();
-      if(role!=='beta'||!lateScenario.keyboard_change)throw Error('Late native poll cannot resume before its recorded key change');
-      lateKeyGate.release();
+    waitForLateKeyChange(tick){if(role!=='beta')throw Error('Only beta owns the late key-change gate');return lateEvent(tick).key.wait();},
+    noteLateKeyChange({tick=26,from,to}={}){
+      const {key,scenario}=lateEvent(tick);
+      if(role!=='beta'||!key.entered||key.resumed||scenario.keyboard_change||
+          from!==(respawn?null:'ArrowLeft')||to!=='ArrowRight')
+        throw Error('Late key change must be the configured Playwright ArrowRight transition');
+      const {preFrame,currentFrame}=state().metadata;
+      if(currentFrame!==tick)throw Error('Late key change lost its source frame');
+      scenario.keyboard_change={source_tick:tick,from,to,pre_frame:preFrame,
+        current_frame:currentFrame,driver:'Playwright page.keyboard'};
+      return structuredClone(scenario.keyboard_change);
     },
-    waitForLatePacketGate(){requireLateScenario();if(role!=='beta')throw Error('Only beta owns the held-packet gate');return latePacketGate.wait();},
-    waitForLateFrontier(){requireLateScenario();if(role!=='alpha')throw Error('Only alpha owns the delayed-input frontier');return lateFrontierGate.wait();},
-    async releaseLatePacket(){
-      requireLateScenario();
-      if(role!=='beta'||!latePacketGate.entered||latePacketGate.resumed||lateScenario.network_release||
-          !lateScenario.held_packet)
+    resumeLateKeyChange(tick){
+      const {key,scenario}=lateEvent(tick);
+      if(role!=='beta'||!scenario.keyboard_change)throw Error('Late native poll cannot resume before its recorded key change');
+      key.release();
+    },
+    waitForLatePacketGate(tick){if(role!=='beta')throw Error('Only beta owns the held-packet gate');return lateEvent(tick).packet.wait();},
+    waitForLateFrontier(tick){if(role!=='alpha')throw Error('Only alpha owns the delayed-input frontier');return lateEvent(tick).frontier.wait();},
+    async releaseLatePacket(tick=26){
+      const {packet,scenario}=lateEvent(tick);
+      if(role!=='beta'||!packet.entered||packet.resumed||scenario.network_release||!scenario.held_packet)
         throw Error('Late packet release requires the exact held beta source poll at the release gate');
-      const released=await call('episodeReleaseLocal',{tick:26});
-      const receipt=released.receipt,held=lateScenario.held_packet;
-      if(receipt.protocol_input_tick!==26||receipt.poll_serial!==held.poll_serial||
+      const released=await call('episodeReleaseLocal',{tick});
+      const receipt=released.receipt,held=scenario.held_packet;
+      if(receipt.protocol_input_tick!==tick||receipt.poll_serial!==held.poll_serial||
           receipt.local_port!==held.local_port||
           JSON.stringify(receipt.pad)!==JSON.stringify(held.actual_local_pad))
         throw Error('Late packet release changed the retained source poll identity or bytes');
-      lateScenario.network_release={source_tick:26,poll_serial:receipt.poll_serial,
-        local_port:receipt.local_port,actual_local_pad:[...receipt.pad],
-        source_poll:released.source};
-      return structuredClone(lateScenario.network_release);
+      scenario.network_release={source_tick:tick,poll_serial:receipt.poll_serial,
+        local_port:receipt.local_port,actual_local_pad:[...receipt.pad],source_poll:released.source};
+      return structuredClone(scenario.network_release);
     },
-    resumeLatePacket(){
-      requireLateScenario();
-      if(role!=='beta'||!lateScenario.network_release)throw Error('Beta source loop cannot resume before the held packet was released');
-      latePacketGate.release();
+    resumeLatePacket(tick){
+      const {packet,scenario}=lateEvent(tick);
+      if(role!=='beta'||!scenario.network_release)throw Error('Beta source loop cannot resume before the held packet was released');
+      packet.release();
     },
     resumeLateFrontier(receipt){
-      requireLateScenario();
-      if(role!=='alpha'||!lateFrontierGate.entered||lateFrontierGate.resumed||
-          receipt?.accepted_by!=='lockstep-protocol'||receipt.sender_role!=='beta'||
-          receipt.remote_port!==1||receipt.protocol_input_tick!==26||
-          !Array.isArray(receipt.pad)||receipt.pad.length!==11)
+      const {frontier,scenario}=lateEvent(receipt?.protocol_input_tick);
+      if(role!=='alpha'||!frontier.entered||frontier.resumed||
+          receipt.accepted_by!=='lockstep-protocol'||receipt.sender_role!=='beta'||
+          receipt.remote_port!==1||!Array.isArray(receipt.pad)||receipt.pad.length!==11)
         throw Error('Alpha source loop requires the received actual beta packet before frontier release');
-      lateScenario.remote_receipt=structuredClone(receipt);
-      lateFrontierGate.release();
+      scenario.remote_receipt=structuredClone(receipt);
+      frontier.release();
     },
+    waitForWalkStart(){return walkStart.wait();},
+    resumeWalkStart(){walkStart.release();},
+    waitForWalkStop(){return walkStop.wait();},
+    resumeWalkStop(){walkStop.release();},
     abortLateScenario(){
-      requireLateScenario();lateAborted=true;
-      for(const gate of [lateKeyGate,latePacketGate,lateFrontierGate])
+      lateAborted=true;
+      for(const gate of [walkStart,walkStop,...[...lateEvents.values()].flatMap(event=>[event.key,event.packet,event.frontier])])
         if(gate.entered&&!gate.resumed)gate.release();
       return {aborted:true,role};
     },
@@ -231,11 +305,15 @@ export function installRuntimePacedHistoryProbe({role,
           await admitAvailable();
           let inputs=await timeline(),current=state().metadata;
           const frame=current.currentFrame,confirmed=inputs.remote_contiguous_through+1;
-          const lateAnchorFrame=21;
-          const needsLateAnchor=lateClassPiece&&!lateScenario.anchor;
+          const activeLate=[...lateEvents.values()].find(({scenario})=>frame<=scenario.target_source_tick+2||
+            !scenario.anchor);
+          const lateScenario=activeLate?.scenario;
+          const target=lateScenario?.target_source_tick;
+          const lateAnchorFrame=target-5;
+          const needsLateAnchor=lateScenario&&!lateScenario.anchor;
           const atLateAnchor=needsLateAnchor&&frame===lateAnchorFrame;
           if(needsLateAnchor&&frame>lateAnchorFrame)
-            throw Error('Late-piece run advanced past its required frame-21 native anchor');
+            throw Error('Late-piece run advanced past its required native anchor');
           if(atLateAnchor&&inputs.dirty_from===null){
             if(inputs.confirmed_through<lateAnchorFrame-1){
               report.events.push({operation:'late-anchor-network-wait',frame,confirmed});
@@ -246,39 +324,36 @@ export function installRuntimePacedHistoryProbe({role,
                 confirmed_through:inputs.confirmed_through,
                 evidence:'existing native PRE after confirmed rebase'};
           }
-          if(lateClassPiece&&role==='beta'&&frame===26&&!lateScenario.keyboard_change){
-            if(current.preFrame>26)throw Error('Late key-change target tick 26 is already before the active native PRE');
-            await lateKeyGate.pause({source_tick:frame,pre_frame:current.preFrame,
-              current_frame:current.currentFrame});
-            if(lateAborted)throw Error('Late key-change gate was aborted before its actual poll');
+          if(lateScenario&&role==='beta'&&frame===target&&!lateScenario.keyboard_change){
+            if(current.preFrame>target)throw Error('Late key-change target is already before the active native PRE');
+            await pauseScenario(activeLate.key,{source_tick:frame,pre_frame:current.preFrame,
+              current_frame:current.currentFrame},'Late key change');
           }
-          if(lateClassPiece&&role==='alpha'&&!lateScenario.alpha_frontier){
-            const frontier=Math.min(28,current.preFrame+7);
-            if(frame===frontier&&frame>26){
-              if(!(lateScenario.anchor?.pre_frame===21&&current.preFrame===21&&
-                  frame===28&&26<frame&&frame<=current.preFrame+7))
+          if(lateScenario&&role==='alpha'&&!lateScenario.alpha_frontier){
+            const frontier=Math.min(target+2,current.preFrame+7);
+            if(frame===frontier&&frame>target){
+              if(!(lateScenario.anchor?.pre_frame===lateAnchorFrame&&current.preFrame===lateAnchorFrame&&
+                  frame===target+2&&target<frame&&frame<=current.preFrame+7))
                 throw Error('Late alpha frontier is outside the current native PRE and seven-tick bound');
-              if(inputs.remote_contiguous_through<25){
+              if(inputs.remote_contiguous_through<target-1){
                 report.events.push({operation:'late-prefix-network-wait',frame,
                   remote_contiguous_through:inputs.remote_contiguous_through,dirty_from:inputs.dirty_from});
                 continue;
               }
-              if(inputs.remote_contiguous_through!==25||inputs.dirty_from!==null)
-                throw Error('Late alpha frontier observed an escaped tick 26 or an earlier dirty correction');
+              if(inputs.remote_contiguous_through!==target-1||inputs.dirty_from!==null)
+                throw Error('Late alpha frontier observed an escaped late tick or an earlier dirty correction');
               lateScenario.alpha_frontier={pre_frame:current.preFrame,frontier:frame,
                 remote_contiguous_through:inputs.remote_contiguous_through,dirty_from:inputs.dirty_from,
                 span:frame-current.preFrame};
-              await lateFrontierGate.pause(structuredClone(lateScenario.alpha_frontier));
-              if(lateAborted)throw Error('Late alpha frontier gate was aborted before packet admission');
+              await pauseScenario(activeLate.frontier,structuredClone(lateScenario.alpha_frontier),'Late alpha frontier');
               continue;
             }
           }
-          if(lateClassPiece&&role==='beta'&&frame===27&&lateScenario.held_packet&&
+          if(lateScenario&&role==='beta'&&frame===target+1&&lateScenario.held_packet&&
               !lateScenario.release_gate){
             lateScenario.release_gate={pre_frame:current.preFrame,frontier:frame,
               remote_contiguous_through:inputs.remote_contiguous_through};
-            await latePacketGate.pause(structuredClone(lateScenario.release_gate));
-            if(lateAborted)throw Error('Late beta packet gate was aborted before source tick 27');
+            await pauseScenario(activeLate.packet,structuredClone(lateScenario.release_gate),'Late beta packet');
           }
           if(frame===targetFrame&&confirmed===targetFrame&&inputs.dirty_from===null){
             report.finalTimeline=inputs;
@@ -293,33 +368,35 @@ export function installRuntimePacedHistoryProbe({role,
             report.authoritativeInputs=Array.from({length:targetFrame},(_,tick)=>({tick,bytes:selected.get(tick)}));
             if(report.authoritativeInputs.some(row=>!row.bytes||row.bytes.length!==44))
               throw Error('Paced terminal lost an authoritative input row');
-            if(lateClassPiece){
+            for(const [tick,{scenario:lateScenario,packet}] of lateEvents){
               if(role==='beta'&&(!lateScenario.keyboard_change||!lateScenario.held_packet||
-                  !lateScenario.network_release||!latePacketGate.resumed))
+                  !lateScenario.network_release||!packet.resumed))
                 throw Error('Late beta source poll, held packet, or exact packet release was not completed');
               if(role==='alpha'){
-                const correction=report.corrections.find(row=>row.dirty===26);
+                const correction=report.corrections.find(row=>row.dirty===tick);
                 if(!correction||!lateScenario.alpha_frontier||!lateScenario.remote_admission||
-                    !lateScenario.remote_receipt||correction.pre>26||correction.frontier<=26||
+                    !lateScenario.remote_receipt||correction.pre!==tick-5||correction.frontier!==tick+2||
                     correction.frontier>correction.pre+7||correction.frontier!==lateScenario.alpha_frontier.frontier||
                     correction.restore_status?.metadata?.preFrame!==correction.pre||
                     correction.restore_status?.metadata?.sealedEnd!==correction.frontier||
                     correction.restore_status?.metadata?.restoreCount<1)
-                  throw Error('Late tick 26 did not cross a bounded native restore lifecycle');
+                  throw Error('Late input did not cross a bounded native restore lifecycle');
                 const plan=correction.prefix?.plan??correction.replay?.plan;
-                const frame=plan?.frames?.find(row=>row.tick===26);
+                const frame=plan?.frames?.find(row=>row.tick===tick);
                 if(!frame||frame.remote_source!=='actual'||frame.speculative!==false)
-                  throw Error('Late tick 26 restore did not use its actual peer-confirmed PAD');
+                  throw Error('Late input restore did not use its actual peer-confirmed PAD');
                 lateScenario.correction={kind:correction.kind,pre:correction.pre,
                   frontier:correction.frontier,confirmed:correction.confirmed,dirty:correction.dirty,
                   restore_count:correction.restore_status.metadata.restoreCount,
                   corrected_tick:frame.tick,remote_source:frame.remote_source};
               }
             }
-            report.result=paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
+            if(respawn&&role==='alpha'&&(!walkStart.resumed||!walkStop.resumed))
+              throw Error('Respawn source run lost its owned walk-off gates');
+            report.result=respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
           const fullWindow=frame-current.preFrame===7;
-          const cleanRebase=lateClassPiece
+          const cleanRebase=lateEvents.size>0
             ? (fullWindow||atLateAnchor)&&confirmed>=frame&&current.preFrame<frame
             : fullWindow&&confirmed>current.preFrame;
           if(inputs.dirty_from!==null||cleanRebase){
@@ -342,15 +419,15 @@ export function installRuntimePacedHistoryProbe({role,
           if(clock.steps!==1||clock.currentFrame!==frame)throw Error('Paced grant differs from actual source frame');
           callback.grants++;
           const polled=await call('episodePoll',{tick:frame});report.polls.push(polled.ticket);
-          const deferLatePacket=lateClassPiece&&role==='beta'&&frame===26;
+          const deferLatePacket=role==='beta'&&lateEvents.has(frame);
           const publication=await call('episodePublish',{tick:frame,ticketId:polled.ticket.ticketId,
             ...(deferLatePacket?{deferSend:true}:{})});
           if(deferLatePacket){
-            if(publication?.deferred_send!==true||publication.receipt?.protocol_input_tick!==26||
+            if(publication?.deferred_send!==true||publication.receipt?.protocol_input_tick!==frame||
                 publication.receipt?.poll_serial!==polled.ticket.pollSerial)
-              throw Error('Late packet hold did not retain the exact source tick 26 native poll');
+              throw Error('Late packet hold did not retain the exact late native poll');
             const localPort=polled.ticket.localPort;
-            lateScenario.held_packet={source_tick:26,poll_serial:polled.ticket.pollSerial,
+            lateEvent(frame).scenario.held_packet={source_tick:frame,poll_serial:polled.ticket.pollSerial,
               local_port:localPort,actual_local_pad:polled.ticket.raw.slice(localPort*11,(localPort+1)*11),
               deferred_send:true};
           }
