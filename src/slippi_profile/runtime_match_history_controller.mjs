@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Private one-tick ordinary-runtime owner. Commands execute on the native
-// owner's rAF callback; this transport neither polls PAD nor performs source work.
+// Private ordinary-runtime owner. The transport admits native commands and
+// observes their completion without polling PAD or performing source work.
 import {collectCpuEndpointInPage} from './tests/cpu_endpoint.mjs';
 
 export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,present:4,
   idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10,rebase:11,
   pollTicket:12,forwardTicket:13,seal:14,replayTicket:15,finishReplay:16,
-  continue:17,beginEpisode:18});
+  continue:17,beginEpisode:18,recordingPresent:19,finishPrefix:20,
+  closePrefix:21,retirePrefix:22,rebaseConfirmedPrefix:23,
+  adoptNextPrefixTicket:24,sealPresentedFrontier:25});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11,FRAME_BYTES=44,TICKET_BYTES=88,INPUT_ROW_BYTES=176;
 const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
@@ -20,6 +22,15 @@ const START_PREFIX_FIELDS=['schema','input_provenance','source_ticks','source_dr
 const START_PREFIX_ROW_FIELDS=['poll_serial','tick_before','tick_after','source_frame_before',
   'source_frame_after','hud_ready_before','hud_ready_after','pad_hex','draw_submission'];
 const START_HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
+const PREFIX_HANDOFF_SCHEMA='melee-web-runtime-prefix-handoff-v1';
+const PREFIX_HANDOFF_FIELDS=['schema','oldPreFrame','confirmedFrame','selectedEndFrame',
+  'oldIncarnation','finishRequestSequence','rebaseRequestSequence','suffixCount','suffixCursor',
+  'localPort','remotePort','worldGeneration','contextEpoch','ownerStorage','ownerContext',
+  'ownerFlow','ownerAudio'];
+const PREFIX_HANDOFF_U32_FIELDS=['oldPreFrame','confirmedFrame','selectedEndFrame',
+  'oldIncarnation','finishRequestSequence','rebaseRequestSequence','suffixCount','suffixCursor',
+  'localPort','remotePort'];
+const PREFIX_OWNER_FIELDS=['ownerStorage','ownerContext','ownerFlow','ownerAudio'];
 const statusNames=['schema','bytes','ownerState','firstFailure','pendingCommand','lastCompletedCommand',
   'requestSequence','completeSequence','expectedFrame','localPort','remotePort','reserved'];
 const metadataNames=['schema','bytes','phase','firstFailure','preFrame','currentFrame','sealedEnd',
@@ -69,6 +80,8 @@ const sameJsonValue=(left,right)=>{
   return leftKeys.length===rightKeys.length&&leftKeys.every(key=>Object.hasOwn(right,key)&&
     sameJsonValue(left[key],right[key]));
 };
+const sameBytes=(left,right)=>left instanceof Uint8Array&&right instanceof Uint8Array&&
+  left.length===right.length&&left.every((value,index)=>value===right[index]);
 
 // This prefix binds literal ordinary local four-port PAD rows to source ticks;
 // poll serials here are not relay receipts, and PAD bytes do not prove actions.
@@ -129,15 +142,15 @@ export function validateRuntimeMatchStartPrefix(rawJSON,{publication,liveIdentit
   return parsed;
 }
 
-export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false}={}){
+export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false,arenaMode=false}={}){
   if(!(bytes instanceof Uint8Array)||bytes.length!==STATUS_BYTES)throw Error('Runtime history status extent');
   const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const result=fields(data,statusNames),metadata=fields(data,metadataNames,48);
   metadata.pollSerial=data.getBigUint64(96,true).toString();
   metadata.preAudioPhase=data.getUint32(104,true);metadata.currentAudioPhase=data.getUint32(108,true);
   Object.assign(result,{metadata,...fields(data,['inputReady','gpuPending','endpointActive','rendererErrors'],112)});
-  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=episodeMode?21:20,
-    commandLimit=episodeMode?18:11;
+  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?28:episodeMode?21:20,
+    commandLimit=arenaMode?25:episodeMode?18:11;
   if(result.schema!==1||result.bytes!==STATUS_BYTES||result.reserved!==0||result.ownerState>2||
     result.pendingCommand>commandLimit||result.lastCompletedCommand>commandLimit||result.completeSequence>result.requestSequence||
     result.inputReady>1||result.gpuPending>1||result.endpointActive>1||
@@ -145,6 +158,53 @@ export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false}={}){
     metadata.incarnation>(episodeMode?3:1)||metadata.forwardSteps>stepLimit||metadata.replaySteps>stepLimit||
     (!episodeMode&&metadata.phase===21))
     throw Error('Runtime history status schema or bounded-owner violation');
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryPacing(bytes){
+  if(!(bytes instanceof Uint8Array)||bytes.byteLength!==64)throw Error('Native pacing receipt extent');
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const result=fields(data,['schema','bytes','phase','currentFrame','steps','pendingSteps','stalled','stallReason']);
+  for(const [index,key] of ['elapsedMs','pendingTicks','triggeringValue','threshold'].entries())
+    result[key]=data.getFloat64(32+index*8,true);
+  if(result.schema!==1||result.bytes!==64||result.phase>28||result.steps>1||
+      result.pendingSteps>8||result.stalled>1||result.stallReason>3||
+      (result.stalled?(result.steps!==0||result.stallReason===0):result.stallReason!==0)||
+      !Number.isFinite(result.elapsedMs)||result.elapsedMs<0||
+      !Number.isFinite(result.pendingTicks)||result.pendingTicks<0||
+      (result.stallReason!==2&&!Number.isFinite(result.triggeringValue))||
+      !Number.isFinite(result.threshold))
+    throw Error('Native pacing receipt schema or clock invariant refused');
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryPrefixHandoff(rawJSON){
+  if(typeof rawJSON!=='string'||!rawJSON)throw Error('Runtime prefix handoff JSON is required');
+  let result;
+  try{result=JSON.parse(rawJSON);}catch{throw Error('Runtime prefix handoff JSON parse refused');}
+  if(!hasExactKeys(result,PREFIX_HANDOFF_FIELDS)||result.schema!==PREFIX_HANDOFF_SCHEMA)
+    throw Error('Runtime prefix handoff schema or exact field set violation');
+  for(const name of PREFIX_HANDOFF_U32_FIELDS)u32(result[name],`Prefix handoff ${name}`);
+  if(result.oldPreFrame>=result.confirmedFrame||result.confirmedFrame>=result.selectedEndFrame||
+    result.selectedEndFrame-result.oldPreFrame>7||
+    result.oldIncarnation<1||result.oldIncarnation>3||
+    !result.finishRequestSequence||
+    (result.rebaseRequestSequence!==0&&
+      result.rebaseRequestSequence<=result.finishRequestSequence)||
+    result.suffixCount!==result.selectedEndFrame-result.confirmedFrame||
+    !result.suffixCount||result.suffixCursor>result.suffixCount||
+    ![0,1].includes(result.localPort)||![0,1].includes(result.remotePort)||
+    result.localPort===result.remotePort)
+    throw Error('Runtime prefix handoff bounds or source interval violation');
+  try{
+    canonicalU64(result.worldGeneration,'handoff world generation',{positive:true});
+    canonicalU64(result.contextEpoch,'handoff context epoch',{positive:true});
+  }catch(error){throw Error(`Runtime prefix handoff ${error.message}`);}
+  for(const name of PREFIX_OWNER_FIELDS){
+    if(typeof result[name]!=='string'||!/^[0-9a-f]{16}$/.test(result[name])||
+      BigInt('0x'+result[name])===0n)
+      throw Error(`Runtime prefix handoff ${name} is not a nonzero fixed-width owner token`);
+  }
   return result;
 }
 
@@ -227,8 +287,11 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||module[PREFIX+'input_bytes']()!==INPUT_BYTES)
     throw Error('Private runtime history ABI differs from its controller');
   let busy=false,failed=null,terminal=false,captured=false,episodeMode=false,arenaMode=false;
+  let inlineMode=false,nativeCallPending=false;
   let identityText=null;
-  const journal=[];
+  let adoptedPrefixTicket=null,unclaimedPrefixTicket=false,confirmedPrefixActive=false;
+  const journal=[],pacingJournal=[];
+  let pacingStarted=false;
   const read=(pointer,size)=>{
     if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>0xffffffff)throw Error('Native history pointer');
     const start=pointer>>>0,heap=module.HEAPU8;
@@ -237,7 +300,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(!start||!Number.isSafeInteger(size)||size<=0||start+size>heap.length)throw Error('Native history borrowed extent');
     return heap.slice(start,start+size);
   };
-  const status=()=>decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode});
+  const status=()=>{
+    if(nativeCallPending)throw Error('Runtime history Asyncify call is in progress');
+    return decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode,arenaMode});
+  };
   const errorText=()=>module.UTF8ToString(module[PREFIX+'error']());
   const latch=error=>{failed??=error;return error;};
   const check=(snapshot,allowFailure=false)=>{
@@ -328,6 +394,79 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(episodeExport(name)(...args)!==1)
       throw latch(Error(`Native history episode ${name} refused: ${errorText()}`));
   };
+  const readPrefixHandoff=()=>{
+    if(!arenaMode)throw Error('Confirmed-prefix handoff requires explicit arena history mode');
+    const getter=module[PREFIX+'prefix_handoff_json'];
+    if(typeof getter!=='function')throw Error('Private confirmed-prefix handoff export is unavailable');
+    const before=check(status());
+    const pointer=getter();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native confirmed-prefix handoff is unavailable'));
+    // The returned native JSON is borrowed; copy it before asking for status.
+    const text=module.UTF8ToString(pointer>>>0);
+    let result;
+    try{result=decodeRuntimeMatchHistoryPrefixHandoff(text);}
+    catch(error){throw latch(error);}
+    const after=check(status());
+    if(!sameJsonValue(before,after))
+      throw latch(Error('Reading confirmed-prefix handoff changed native owner status'));
+    const h=before.metadata;
+    if(result.finishRequestSequence>before.requestSequence||
+      (result.rebaseRequestSequence!==0&&result.rebaseRequestSequence>before.requestSequence))
+      throw latch(Error('Confirmed-prefix handoff request sequence is ahead of its owner'));
+    if(result.rebaseRequestSequence===0){
+      if(![23,24,25,26].includes(h.phase)||h.preFrame!==result.oldPreFrame||
+        h.currentFrame!==result.confirmedFrame||h.incarnation!==result.oldIncarnation)
+        throw latch(Error('Confirmed-prefix handoff differs from its retired CPU prefix owner'));
+    }else if(before.expectedFrame!==result.confirmedFrame||
+      before.completeSequence<result.rebaseRequestSequence){
+      throw latch(Error('Confirmed-prefix handoff differs from its fresh PRE rebase owner'));
+    }
+    return result;
+  };
+  const readPrefixOrigin=ordinal=>{
+    u32(ordinal,'Confirmed-prefix suffix ordinal');
+    const handoff=readPrefixHandoff();
+    if(ordinal>=handoff.suffixCount)
+      throw Error('Confirmed-prefix origin row ordinal is outside the retained suffix');
+    const sizeExport=module[PREFIX+'prefix_origin_row_bytes'];
+    const dataExport=module[PREFIX+'prefix_origin_row_data'];
+    if(typeof sizeExport!=='function'||typeof dataExport!=='function')
+      throw Error('Private confirmed-prefix origin-row exports are unavailable');
+    const before=check(status());
+    if(sizeExport()!==INPUT_ROW_BYTES)
+      throw latch(Error('Native confirmed-prefix origin row ABI differs from the 176-byte receipt'));
+    const pointer=dataExport(ordinal);
+    if(!pointer)throw latch(Error(`Native confirmed-prefix origin row ${ordinal} is unavailable`));
+    const bytes=read(pointer,INPUT_ROW_BYTES);
+    let row;
+    try{row=decodeRuntimeMatchHistoryEpisodeInputRow(bytes);}
+    catch(error){throw latch(error);}
+    const after=check(status());
+    if(!sameJsonValue(before,after)||
+      (handoff.rebaseRequestSequence===0&&
+        (after.metadata.preFrame!==handoff.oldPreFrame||
+         after.metadata.incarnation!==handoff.oldIncarnation))||
+      (handoff.rebaseRequestSequence!==0&&after.expectedFrame!==handoff.confirmedFrame)||
+      row.sourceFrame!==handoff.confirmedFrame+ordinal||
+      row.localPort!==handoff.localPort||
+      row.remotePort!==handoff.remotePort||row.state===0)
+      throw latch(Error('Confirmed-prefix origin row differs from its immutable old suffix owner'));
+    row.ordinal=row.sourceFrame-handoff.oldPreFrame;
+    row.suffixOrdinal=ordinal;
+    return row;
+  };
+  const inlineCall=async(name,...args)=>{
+    nativeCallPending=true;
+    try{return await module.ccall(PREFIX.slice(1)+name,'number',args.map(()=>'number'),args,{async:true});}
+    finally{nativeCallPending=false;}
+  };
+  const requireInlineRequest=async(name,...args)=>{
+    if(typeof module[PREFIX+name]!=='function')
+      throw Error(`Private inline runtime history export ${name} is unavailable`);
+    if(await inlineCall(name,...args)!==1)
+      throw Error(`Native history ${name} refused: ${errorText()}`);
+  };
   let padArgument=0,padArgumentStart=0,frameArgument=0,frameArgumentStart=0,padArgumentReleased=false;
   const writePadArgument=bytes=>{
     if(!padArgument||padArgumentReleased)throw Error('Runtime history PAD argument storage is unavailable');
@@ -362,16 +501,20 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     heap.set(bytes,frameArgumentStart);
     return frameArgumentStart;
   };
-  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null)=>{
+  const deadlineError=(label,detail)=>
+    latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null,acceptLateCompletion=false)=>{
     for(;;){
       const snapshot=check(status(),allowFailure);
+      if(inlineMode&&!acceptLateCompletion&&performance.now()>=deadline)throw deadlineError(label,detail);
       if(predicate(snapshot))return snapshot;
       if(performance.now()>=deadline)
-        throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+        throw deadlineError(label,detail);
       if(onBlocked){
-        onBlocked(snapshot);
+        const blocked=onBlocked(snapshot);
+        if(inlineMode)await blocked;
         if(performance.now()>=deadline)
-          throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+          throw deadlineError(label,detail);
       }
       await new Promise(resolve=>setTimeout(resolve,5));
     }
@@ -387,6 +530,37 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     return Object.freeze({
     status,
     journal:()=>structuredClone(journal),
+    pacingJournal:()=>structuredClone(pacingJournal),
+    pacingStart(){
+      active();
+      if(pacingStarted||!arenaMode||!inlineMode||!captured)
+        throw Error('Pacing requires a once-only prepared inline arena owner');
+      const start=module[PREFIX+'pacing_start'];
+      if(typeof start!=='function'||start()!==1)
+        throw latch(Error(`Native pacing start refused: ${errorText()}`));
+      pacingStarted=true;
+    },
+    pacingSample(budget){
+      active();
+      if(!pacingStarted||![0,1].includes(budget))throw Error('Pacing requires a started owner and zero/one budget');
+      const sample=module[PREFIX+'pacing_sample'],size=module[PREFIX+'pacing_sample_bytes'];
+      if(typeof sample!=='function'||typeof size!=='function'||size()!==64)
+        throw latch(Error('Native pacing exports or receipt extent unavailable'));
+      const pointer=sample(budget);
+      if(!pointer)throw latch(Error(`Native pacing sample refused: ${errorText()}`));
+      // Preserve the clock's first failure before status() can turn it into a
+      // generic native owner error. The clock itself never auto-resumes.
+      const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
+      pacingJournal.push({budget,...receipt});
+      if(receipt.stalled){
+        const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
+        error.pacingSample=receipt;throw latch(error);
+      }
+      const after=check(status());
+      if(after.metadata.phase!==receipt.phase||after.metadata.currentFrame!==receipt.currentFrame)
+        throw latch(Error('Pacing sample changed its source owner'));
+      return receipt;
+    },
     takeOver({sourceFrame,localPort,remotePort}){
       active();u32(sourceFrame,'Source frame');
       if(![0,1].includes(localPort)||![0,1].includes(remotePort)||localPort===remotePort)
@@ -443,6 +617,27 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       allocateFrameArgument();
       requireEpisodeSuccess('arena_enable');
       episodeMode=true;arenaMode=true;
+      check(status());
+      return true;
+    },
+    prefixHandoff(){
+      active();
+      return readPrefixHandoff();
+    },
+    prefixOrigin(ordinal){
+      active();
+      return readPrefixOrigin(ordinal);
+    },
+    enableInlineDispatch(){
+      active();
+      if(!arenaMode||captured||inlineMode)
+        throw Error('Inline dispatch requires explicit arena history before PRE capture and can only be enabled once');
+      const snapshot=check(status());
+      if(snapshot.ownerState!==1||snapshot.pendingCommand||snapshot.requestSequence||snapshot.endpointActive)
+        throw Error('Inline dispatch requires a fresh terminal takeover owner');
+      if(typeof module.ccall!=='function')throw Error('Inline dispatch requires Asyncify ccall');
+      requireEpisodeSuccess('inline_dispatch_enable');
+      inlineMode=true;
       check(status());
       return true;
     },
@@ -532,6 +727,13 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       requireSuccess('remote_pad',pointer,PAD_BYTES);},
     ticket(){
       active();if(!episodeMode)throw Error('Episode poll tickets require explicit episode mode');
+      if(unclaimedPrefixTicket||adoptedPrefixTicket)
+        throw Error('Adopted suffix tickets require their paired adoptedTicket path and forward');
+      if(confirmedPrefixActive){
+        const handoff=readPrefixHandoff();
+        if(!handoff.rebaseRequestSequence||handoff.suffixCursor<handoff.suffixCount)
+          throw Error('Retained suffix tickets are read only through adoptedTicket');
+      }
       const before=check(status());
       if(before.pendingCommand||before.completeSequence!==before.requestSequence||
         before.lastCompletedCommand!==MATCH_HISTORY_COMMAND.pollTicket)
@@ -548,6 +750,50 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         ticket.remotePort!==before.remotePort||ticket.pollSerial!==before.metadata.pollSerial||
         !after.inputReady)
         throw latch(Error('Native episode ticket differs from its exact poll completion and live owner'));
+      return ticket;
+    },
+    adoptedTicket(originalRow){
+      active();
+      if(!arenaMode||!episodeMode)
+        throw Error('Adopted prefix tickets require explicit arena history mode');
+      const handoff=readPrefixHandoff(),before=check(status());
+      const cursor=handoff.suffixCursor;
+      if(!unclaimedPrefixTicket||!captured||!handoff.rebaseRequestSequence||cursor>=handoff.suffixCount||
+        before.ownerState!==1||before.expectedFrame!==handoff.confirmedFrame||
+        ![4,21].includes(before.metadata.phase)||
+        before.metadata.currentFrame!==handoff.confirmedFrame+cursor||
+        !before.metadata.incarnation||before.metadata.restoreCount!==0||
+        before.pendingCommand||before.completeSequence!==before.requestSequence||
+        before.lastCompletedCommand!==MATCH_HISTORY_COMMAND.adoptNextPrefixTicket||
+        before.inputReady!==1)
+        throw latch(Error('Adopted prefix ticket requires the exact completed native suffix handoff'));
+      const origin=readPrefixOrigin(cursor);
+      if(!originalRow||originalRow.suffixOrdinal!==cursor||
+        originalRow.ticketId!==origin.ticketId||originalRow.sourceFrame!==origin.sourceFrame||
+        originalRow.incarnation!==origin.incarnation||originalRow.pollSerial!==origin.pollSerial||
+        originalRow.localPort!==origin.localPort||originalRow.remotePort!==origin.remotePort||
+        !sameBytes(originalRow.rawBytes,origin.rawBytes))
+        throw latch(Error('Adopted prefix ticket was not paired with its exact immutable origin row'));
+      if(episodeExport('ticket_bytes')()!==TICKET_BYTES)
+        throw latch(Error('Native adopted ticket ABI differs from its 88-byte poll ticket'));
+      const pointer=episodeExport('ticket_data')();
+      if(!pointer)throw latch(Error('Native adopted prefix ticket is unavailable'));
+      const ticket=decodeRuntimeMatchHistoryPollTicket(read(pointer,TICKET_BYTES));
+      const after=check(status());
+      const afterHandoff=readPrefixHandoff();
+      if(!sameJsonValue(before,after)||afterHandoff.suffixCursor!==cursor||
+        !sameJsonValue({...handoff,suffixCursor:afterHandoff.suffixCursor},afterHandoff)||
+        ticket.ticketId!==origin.ticketId||ticket.sourceFrame!==origin.sourceFrame||
+        ticket.incarnation!==before.metadata.incarnation||
+        ticket.localPort!==handoff.localPort||ticket.remotePort!==handoff.remotePort||
+        ticket.pollSerial!==origin.pollSerial||after.metadata.pollSerial!==origin.pollSerial||
+        !sameBytes(ticket.raw,origin.raw))
+        throw latch(Error('Native adopted prefix ticket differs from its preserved original poll receipt'));
+      ticket.suffixOrdinal=cursor;
+      adoptedPrefixTicket={ticketId:ticket.ticketId,sourceFrame:ticket.sourceFrame,
+        incarnation:ticket.incarnation,localPort:ticket.localPort,remotePort:ticket.remotePort,
+        pollSerial:ticket.pollSerial,raw:ticket.raw.slice(),suffixOrdinal:cursor};
+      unclaimedPrefixTicket=false;
       return ticket;
     },
     receipt(ordinal){
@@ -589,33 +835,86 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(request?.arenaHistoryEndpoint)throw Error('Arena history was not enabled before capture');
       return collectCpuEndpointInPage(request,{runtime:'match-history',module});
     },
+    admitEndpoint({view,provenance}){
+      active();
+      if(!arenaMode||!inlineMode||!captured||![1,2,3].includes(view)||![1,2,3].includes(provenance))
+        throw Error('Native endpoint admission requires an inline arena owner and explicit view/provenance');
+      const before=check(status()),started=performance.now();
+      if(before.pendingCommand||before.endpointActive||before.gpuPending||
+          before.completeSequence!==before.requestSequence)
+        throw Error('Native endpoint admission requires an idle owner');
+      try{
+        if(module[PREFIX+'cpu_endpoint_begin'](view,provenance)!==0||
+            module[PREFIX+'cpu_endpoint_end']()!==0)
+          throw Error(`Native endpoint admission refused: ${errorText()}`);
+        const after=check(status());
+        if(after.requestSequence!==before.requestSequence||after.completeSequence!==before.completeSequence||
+            after.expectedFrame!==before.expectedFrame||after.metadata.currentFrame!==before.metadata.currentFrame||
+            after.localPort!==before.localPort||after.remotePort!==before.remotePort||
+            after.ownerState!==1||after.endpointActive||after.gpuPending)
+          throw Error('Native endpoint admission changed its source owner');
+        return {scope:'native-typed-admission-only',rawRowsPublished:false,view,provenance,
+          elapsedMs:performance.now()-started,before,after};
+      }catch(error){throw latch(error);}
+    },
     motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
     motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
     pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},
-    checksum(){
+    checksum({postDraw=false}={}){
       active();
+      if(typeof postDraw!=='boolean')throw Error('Checksum endpoint kind must be explicit');
       const data=module[PREFIX+'checksum_data'],extent=module[PREFIX+'checksum_bytes'];
       if(typeof data!=='function'||typeof extent!=='function')
         throw Error('Private runtime history checksum exports are unavailable');
       try{
         const before=check(status()),history=before.metadata;
-        const corrected=history.phase===13; // CorrectedCpuCopied
+        const corrected=history.phase===13||(postDraw&&arenaMode&&history.phase===16);
+        const confirmedPrefix=arenaMode&&history.phase===24; // PrefixCpuCopied
+        const presented=postDraw&&arenaMode&&
+          ((history.phase===28&&history.endpointMask===(1<<8))||
+           (history.phase===16&&(history.endpointMask&96)===96));
         const span=history.currentFrame-history.preFrame;
         const episodeStepsOkay=episodeMode&&span>0&&span<=7&&history.forwardSteps===span&&
           (corrected?history.replaySteps===span:history.replaySteps===0);
+        let prefixHandoff=null;
+        let prefixStepsOkay=false;
+        if(confirmedPrefix){
+          prefixHandoff=readPrefixHandoff();
+          prefixStepsOkay=prefixHandoff.rebaseRequestSequence===0&&
+            prefixHandoff.oldPreFrame===history.preFrame&&
+            prefixHandoff.confirmedFrame===history.currentFrame&&
+            prefixHandoff.selectedEndFrame>history.currentFrame&&
+            history.sealedEnd===history.currentFrame&&
+            history.forwardSteps===prefixHandoff.selectedEndFrame-prefixHandoff.oldPreFrame&&
+            history.replaySteps===prefixHandoff.confirmedFrame-prefixHandoff.oldPreFrame;
+          const rowOrdinal=prefixHandoff.confirmedFrame-prefixHandoff.oldPreFrame-1;
+          if(!prefixStepsOkay||rowOrdinal<0)
+            throw Error('Confirmed-prefix checksum lacks its exact CPU-only replay interval');
+          if(episodeExport('input_row_bytes')()!==INPUT_ROW_BYTES)
+            throw Error('Confirmed-prefix source-boundary row ABI differs from its 176-byte receipt');
+          const rowPointer=episodeExport('input_row_data')(rowOrdinal);
+          if(!rowPointer)throw Error('Confirmed-prefix C−1 source-boundary row is unavailable');
+          const sourceRow=decodeRuntimeMatchHistoryEpisodeInputRow(read(rowPointer,INPUT_ROW_BYTES));
+          if(sourceRow.sourceFrame!==prefixHandoff.confirmedFrame-1||sourceRow.state!==2||
+            sourceRow.incarnation>prefixHandoff.oldIncarnation||
+            sourceRow.localPort!==prefixHandoff.localPort||sourceRow.remotePort!==prefixHandoff.remotePort||
+            !sameJsonValue(check(status()),before))
+            throw Error('Confirmed-prefix checksum requires the exact old-incarnation selected C−1 input row');
+        }
         const legacyStepsOkay=!episodeMode&&span===1&&history.forwardSteps===1&&
           history.replaySteps===(corrected?1:0);
         if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
           before.inputReady!==1||before.completeSequence!==before.requestSequence||
-          (history.phase!==6&&!corrected)||history.preFrame!==before.expectedFrame||
+          (postDraw?!presented:(history.phase!==6&&!corrected&&!confirmedPrefix))||history.preFrame!==before.expectedFrame||
           history.preFrame===UINT32_MAX||history.currentFrame<=history.preFrame||
           history.currentFrame!==history.sealedEnd||history.pollSerial==='0'||
-          (!episodeStepsOkay&&!legacyStepsOkay))
-          throw Error('Runtime history checksum requires a copied, idle CPU endpoint');
+          (!episodeStepsOkay&&!prefixStepsOkay&&!legacyStepsOkay))
+          throw Error(postDraw?'Runtime history checksum requires an admitted idle presented frontier':
+            'Runtime history checksum requires a copied, idle CPU endpoint');
         const size=extent();
         if(size!==64)throw Error('Runtime history checksum ABI must be exactly 64 bytes');
         const pointer=data();
-        if(!pointer)throw Error('Native runtime history checksum refused its copied CPU endpoint');
+        if(!pointer)throw Error('Native runtime history checksum refused its admitted endpoint');
         const bytes=read(pointer,size); // Copy borrowed data before another native call.
         const record=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
         const expectedTick=episodeMode?history.currentFrame-1:history.preFrame;
@@ -627,6 +926,35 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         return bytes;
       }catch(error){throw latch(error);}
     },
+    presentation(){
+      active();
+      const getter=module[PREFIX+'presentation_json'];
+      if(typeof getter!=='function')throw Error('Private runtime history presentation export is unavailable');
+      const before=check(status()),command=before.lastCompletedCommand;
+      const phase=before.metadata.phase;
+      if(!arenaMode||before.ownerState!==1||before.pendingCommand||before.endpointActive||
+        !before.completeSequence||before.completeSequence!==before.requestSequence||
+        !(command===4&&(phase===7||phase===14)||command===19&&phase===22))
+        throw Error('Runtime history presentation requires a completed draw before idle');
+      const pointer=getter();
+      if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>UINT32_MAX||!(pointer>>>0))
+        throw Error('Native runtime history presentation receipt is unavailable');
+      const receipt=JSON.parse(module.UTF8ToString(pointer>>>0));
+      const fields=['schema','command','requestSequence','sourceFrameBefore','sourceFrameAfter',
+        'priorSubmission','submission','presentationSerial'];
+      if(!hasExactKeys(receipt,fields)||receipt.schema!==1||receipt.command!==command||
+        receipt.requestSequence!==before.completeSequence||
+        receipt.sourceFrameBefore!==before.metadata.currentFrame||receipt.sourceFrameAfter!==receipt.sourceFrameBefore)
+        throw Error('Runtime history presentation receipt differs from completed native draw');
+      const prior=canonicalU64(receipt.priorSubmission,'presentation prior submission');
+      const submission=canonicalU64(receipt.submission,'presentation submission',{positive:true});
+      canonicalU64(receipt.presentationSerial,'presentation serial',{positive:true});
+      if(submission<=prior)throw Error('Runtime history presentation submission did not advance');
+      const after=check(status());
+      if(after.gpuPending>before.gpuPending||!sameJsonValue({...after,gpuPending:before.gpuPending},before))
+        throw Error('Runtime history presentation changed its native owner status');
+      return receipt;
+    },
     forwardTicket(ticketId,plan){
       return this.command('forwardTicket',{ticketId,plan});
     },
@@ -636,11 +964,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     async command(name,argument){
       const command=MATCH_HISTORY_COMMAND[name];if(!command)throw Error('Unknown runtime history command');
       const framePayload=name==='forwardTicket'||name==='replayTicket';
-      const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay','continue','beginEpisode']);
-      const legacyExecution=name==='begin'||name==='forward'||name==='correct'||name==='rebase';
-      let confirmedEnd,ticketId,planBytes;
-      if(name==='rebase')confirmedEnd=argument;
-      if(name==='rebase')u32(confirmedEnd,'Confirmed END frame');
+      const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay',
+        'continue','beginEpisode','recordingPresent','finishPrefix','closePrefix','retirePrefix',
+        'rebaseConfirmedPrefix','adoptNextPrefixTicket','sealPresentedFrontier']);
+      const prefixCommands=new Set(['finishPrefix','closePrefix','retirePrefix',
+        'rebaseConfirmedPrefix','adoptNextPrefixTicket']);
+      const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
+      let confirmedEnd,ticketId,planBytes,transitionHandoff=null,prefixHandoffComplete=false;
+      if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')confirmedEnd=argument;
+      if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
+        u32(confirmedEnd,name==='finishPrefix'?'Confirmed prefix frame':'Confirmed END frame');
       else if(framePayload){
         if(!argument||typeof argument!=='object'||Array.isArray(argument)||
           Object.keys(argument).length!==2||!Object.hasOwn(argument,'ticketId')||!Object.hasOwn(argument,'plan'))
@@ -649,24 +982,37 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         if(!ticketId||!(argument.plan instanceof Uint8Array)||argument.plan.length!==FRAME_BYTES)
           throw Error('Episode ticket command requires a nonzero ticket ID and exact 44-byte plan');
         planBytes=argument.plan.slice();
-      }else if(argument!==undefined)throw Error('Only confirmed rebase and episode ticket commands take arguments');
+      }else if(argument!==undefined)
+        throw Error('Only confirmed frame and episode ticket commands take arguments');
+      if((name==='recordingPresent'||name==='sealPresentedFrontier')&&!arenaMode)
+        throw Error('Recording presentation requires explicit arena history mode');
+      if(prefixCommands.has(name)&&!arenaMode)
+        throw Error('Confirmed-prefix commands require explicit arena history mode');
       if(episodeCommands.has(name)&&!episodeMode)
         throw Error('Episode commands require explicit pre-capture episode mode');
       if(episodeMode&&legacyExecution)
         throw Error('Legacy one-window execution commands are disabled in episode mode');
+      if(unclaimedPrefixTicket&&name!=='cleanup')
+        throw Error('Adopted prefix ticket must be copied before another command');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');
+      if(name==='rebase'&&confirmedPrefixActive){
+        const handoff=readPrefixHandoff();
+        if(!handoff.rebaseRequestSequence||handoff.suffixCursor!==handoff.suffixCount||
+          adoptedPrefixTicket)
+          throw Error('Whole-END rebase requires the exhausted confirmed-prefix handoff');
+        prefixHandoffComplete=true;
+      }
       busy=true;const started=performance.now(),deadline=started+commandTimeoutMs;
       const entry={command,name,started,status:'pending'};journal.push(entry);
-      if(name==='rebase')entry.confirmedEnd=confirmedEnd;
+      if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
+        entry.confirmedEnd=confirmedEnd;
       try{
         const allowFailure=name==='cleanup';
         const waitForRenderer=name==='idle'||name==='cleanup';
         const prepare=waitForRenderer?module[PREFIX+'renderer_prepare_json']:null;
         const rendererDetail=()=>entry.rendererPreparation?
           ` (renderer preparation: ${JSON.stringify(entry.rendererPreparation)})`:'';
-        const onBlocked=typeof prepare==='function'?value=>{
-          if(value.pendingCommand||!value.gpuPending)return;
-          const pointer=prepare(command);
+        const retainPreparation=pointer=>{
           if(!pointer)return;
           const receipt=JSON.parse(module.UTF8ToString(pointer));
           if(receipt.schema!==1||receipt.command!==command||
@@ -677,34 +1023,162 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(receipt.action)entry.rendererPreparation.flush=receipt;
           if(receipt.action===2&&!allowFailure)
             throw Error(`Native history refused: ${errorText()}${rendererDetail()}`);
+        };
+        const onBlocked=typeof prepare==='function'?value=>{
+          if(value.pendingCommand||!value.gpuPending)return;
+          if(inlineMode)return inlineCall('renderer_prepare_json',command).then(retainPreparation);
+          retainPreparation(prepare(command));
         }:null;
         const before=await wait(value=>value.pendingCommand===0&&
           (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail);
+        const recordingIdle=name==='idle'&&before.metadata.phase===22;
+        if(name==='recordingPresent'&&(!captured||before.metadata.phase!==21||
+            before.metadata.currentFrame<=before.metadata.preFrame||before.gpuPending||before.endpointActive))
+          throw Error('Recording presentation requires a completed forward boundary');
+        if(name==='sealPresentedFrontier'&&(!captured||before.metadata.phase!==21||
+            before.lastCompletedCommand!==5||before.metadata.currentFrame<=before.metadata.preFrame||
+            before.gpuPending||before.endpointActive))
+          throw Error('Presented frontier seal requires the completed idle of its actual recording draw');
         const next=before.requestSequence+1;
+        const dispatchGeneric=async()=>{
+          if(inlineMode)await requireInlineRequest('request',command);
+          else requireSuccess('request',command);
+        };
         if(name==='rebase'){
           const h=before.metadata;
+          const span=confirmedEnd-h.preFrame;
+          const supportedSpan=arenaMode?span>=1&&span<=7&&confirmedEnd<=UINT32_MAX-7:span===1;
           if(!captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
             before.completeSequence!==before.requestSequence||h.phase!==18||
-            h.preFrame!==before.expectedFrame||confirmedEnd!==h.preFrame+1||
-            confirmedEnd!==h.currentFrame||confirmedEnd!==h.sealedEnd||h.forwardSteps!==1)
+            h.preFrame!==before.expectedFrame||!supportedSpan||
+            confirmedEnd!==h.currentFrame||confirmedEnd!==h.sealedEnd||h.forwardSteps!==span)
             throw Error('Confirmed rebase requires the actual retired END');
           if(typeof module[PREFIX+'request_rebase']!=='function'||
             typeof module[PREFIX+'rebase_identity_json']!=='function')
             throw Error('Private confirmed rebase exports are unavailable');
-          requireSuccess('request_rebase',confirmedEnd);
+          if(inlineMode)await requireInlineRequest('request_rebase',confirmedEnd);
+          else requireSuccess('request_rebase',confirmedEnd);
+        }else if(name==='finishPrefix'){
+          const h=before.metadata;
+          if(!captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
+            before.completeSequence!==before.requestSequence||h.phase!==11||
+            h.preFrame!==before.expectedFrame||confirmedEnd<=h.preFrame||
+            confirmedEnd>=h.sealedEnd||h.currentFrame!==confirmedEnd||
+            h.sealedEnd-h.preFrame>7||h.forwardSteps!==h.sealedEnd-h.preFrame||
+            h.replaySteps!==confirmedEnd-h.preFrame||!h.incarnation||h.restoreCount<1||h.restoreCount>2)
+            throw Error('Confirmed-prefix finish requires the actual completed CPU replay prefix inside its selected END');
+          const requestName='request_prefix_finish';
+          if(inlineMode)await requireInlineRequest(requestName,confirmedEnd);
+          else if(episodeExport(requestName)(confirmedEnd)!==1)
+            throw latch(Error(`Native history ${requestName} refused: ${errorText()}`));
+        }else if(name==='closePrefix'){
+          transitionHandoff=readPrefixHandoff();
+          const h=before.metadata;
+          if(!confirmedPrefixActive||transitionHandoff.rebaseRequestSequence||
+            before.ownerState!==1||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence||h.phase!==24||
+            h.preFrame!==transitionHandoff.oldPreFrame||
+            h.currentFrame!==transitionHandoff.confirmedFrame||
+            h.sealedEnd!==transitionHandoff.confirmedFrame||
+            h.incarnation!==transitionHandoff.oldIncarnation)
+            throw Error('Confirmed-prefix close requires the exact copied CPU prefix endpoint');
+          await dispatchGeneric();
+        }else if(name==='retirePrefix'){
+          transitionHandoff=readPrefixHandoff();
+          const h=before.metadata;
+          if(!confirmedPrefixActive||transitionHandoff.rebaseRequestSequence||
+            before.ownerState!==1||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence||h.phase!==25||
+            h.preFrame!==transitionHandoff.oldPreFrame||
+            h.currentFrame!==transitionHandoff.confirmedFrame||
+            h.sealedEnd!==transitionHandoff.confirmedFrame||
+            h.incarnation!==transitionHandoff.oldIncarnation)
+            throw Error('Confirmed-prefix retire requires the exact closed CPU prefix endpoint');
+          await dispatchGeneric();
+        }else if(name==='rebaseConfirmedPrefix'){
+          transitionHandoff=readPrefixHandoff();
+          const h=before.metadata;
+          if(!confirmedPrefixActive||transitionHandoff.rebaseRequestSequence||
+            !captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
+            before.completeSequence!==before.requestSequence||h.phase!==26||
+            h.preFrame!==transitionHandoff.oldPreFrame||
+            confirmedEnd!==transitionHandoff.confirmedFrame||
+            h.currentFrame!==confirmedEnd||h.sealedEnd!==confirmedEnd||
+            h.incarnation!==transitionHandoff.oldIncarnation)
+            throw Error('Confirmed-prefix rebase requires the exact retired CPU prefix endpoint');
+          const requestName='request_prefix_rebase';
+          if(inlineMode)await requireInlineRequest(requestName,confirmedEnd);
+          else if(episodeExport(requestName)(confirmedEnd)!==1)
+            throw latch(Error(`Native history ${requestName} refused: ${errorText()}`));
+        }else if(name==='adoptNextPrefixTicket'){
+          transitionHandoff=readPrefixHandoff();
+          const h=before.metadata;
+          if(!confirmedPrefixActive||!transitionHandoff.rebaseRequestSequence||
+            !captured||before.ownerState!==1||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence||
+            transitionHandoff.suffixCursor>=transitionHandoff.suffixCount||
+            ![4,21].includes(h.phase)||before.expectedFrame!==transitionHandoff.confirmedFrame||
+            h.currentFrame!==transitionHandoff.confirmedFrame+transitionHandoff.suffixCursor||
+            !h.incarnation||h.restoreCount!==0||adoptedPrefixTicket)
+            throw Error('Adopted prefix ticket requires the current fresh-PRE suffix cursor');
+          await dispatchGeneric();
+        }else if(name==='pollTicket'&&confirmedPrefixActive){
+          transitionHandoff=readPrefixHandoff();
+          if(!transitionHandoff.rebaseRequestSequence||
+            transitionHandoff.suffixCursor<transitionHandoff.suffixCount)
+            throw Error('Fresh PAD polling is disabled until every retained prefix suffix ticket is forwarded');
+          await dispatchGeneric();
         }else if(framePayload){
           const h=before.metadata;
-          if(!captured||!frameArgument||ticketId>before.requestSequence||
+          if(!captured||!frameArgument||
+            (!adoptedPrefixTicket&&ticketId>before.requestSequence)||
             (name==='forwardTicket'?![4,21].includes(h.phase):h.phase!==11))
             throw Error('Episode ticket command is outside its captured source phase');
+          if(confirmedPrefixActive&&name==='forwardTicket'){
+            transitionHandoff=readPrefixHandoff();
+            if(!transitionHandoff.rebaseRequestSequence)
+              throw Error('A retired confirmed-prefix owner cannot continue before fresh PRE rebase');
+            if(transitionHandoff.rebaseRequestSequence&&
+              transitionHandoff.suffixCursor<transitionHandoff.suffixCount){
+              if(!adoptedPrefixTicket||adoptedPrefixTicket.suffixOrdinal!==transitionHandoff.suffixCursor||
+                adoptedPrefixTicket.ticketId!==ticketId||
+                adoptedPrefixTicket.sourceFrame!==h.currentFrame||
+                adoptedPrefixTicket.incarnation!==h.incarnation)
+                throw Error('Forwarded prefix suffix requires its exact adopted native ticket');
+              for(const port of [adoptedPrefixTicket.localPort,2,3]){
+                const from=port*PAD_BYTES,to=from+PAD_BYTES;
+                if(!sameBytes(planBytes.subarray(from,to),adoptedPrefixTicket.raw.subarray(from,to)))
+                  throw Error('Adopted suffix forward changed local or unused original PAD bytes');
+              }
+            }
+          }else if(confirmedPrefixActive&&name==='replayTicket'){
+            transitionHandoff=readPrefixHandoff();
+            if(!transitionHandoff.rebaseRequestSequence||
+              transitionHandoff.suffixCursor<transitionHandoff.suffixCount)
+              throw Error('Retained post-prefix suffixes use adopted forward tickets, not replay tickets');
+          }
           const pointer=writeFrameArgument(planBytes);
-          requireEpisodeSuccess(name==='forwardTicket'?'request_episode_forward':'request_episode_replay',
-            ticketId,pointer,FRAME_BYTES);
-        }else requireSuccess('request',command);
-        const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,deadline,name,allowFailure);
+          const request=name==='forwardTicket'?'request_episode_forward':'request_episode_replay';
+          if(inlineMode)await requireInlineRequest(request,ticketId,pointer,FRAME_BYTES);
+          else requireEpisodeSuccess(request,ticketId,pointer,FRAME_BYTES);
+        }else if(inlineMode)await requireInlineRequest('request',command);
+        else requireSuccess('request',command);
+        // Completion and deadline checks occur only after native Asyncify
+        // settles. Cleanup may release an already retired owner even if late.
+        const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,
+          deadline,name,allowFailure,null,rendererDetail,allowFailure);
         if(after.requestSequence!==next||after.lastCompletedCommand!==command)
           throw Error('Native command completion sequence mismatch');
-        if(episodeCommands.has(name)){
+        if(recordingIdle||name==='recordingPresent'){
+          const {phase:priorPhase,...prior}=before.metadata;
+          const {phase:nextPhase,...now}=after.metadata;
+          if(priorPhase!==(recordingIdle?22:21)||nextPhase!==(recordingIdle?21:22)||
+             !sameJsonValue(prior,now)||before.expectedFrame!==after.expectedFrame||
+             before.localPort!==after.localPort||before.remotePort!==after.remotePort||
+             after.ownerState!==1||after.endpointActive||(recordingIdle&&after.gpuPending))
+            throw Error('Recording presentation changed its forward source owner');
+        }
+        if(episodeCommands.has(name)&&name!=='recordingPresent'){
           const prior=before.metadata,now=after.metadata;
           let valid=false;
           switch(name){
@@ -721,6 +1195,12 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           case 'seal':
             valid=now.phase===5&&now.currentFrame===prior.currentFrame&&
               now.sealedEnd===now.currentFrame&&now.forwardSteps>0;break;
+          case 'sealPresentedFrontier':
+            valid=now.phase===27&&now.currentFrame===prior.currentFrame&&
+              now.sealedEnd===now.currentFrame&&now.forwardSteps===prior.forwardSteps&&
+              now.incarnation===prior.incarnation&&now.restoreCount===prior.restoreCount&&
+              now.replaySteps===prior.replaySteps&&now.pollSerial===prior.pollSerial&&
+              now.currentAudioPhase===prior.currentAudioPhase&&!after.gpuPending;break;
           case 'replayTicket':
             valid=now.phase===11&&now.currentFrame===prior.currentFrame+1&&
               now.replaySteps===prior.replaySteps+1&&now.replaySteps<=7&&
@@ -732,13 +1212,70 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
             valid=now.phase===21&&now.incarnation===prior.incarnation+1&&
               now.currentFrame===prior.currentFrame&&now.sealedEnd===0&&now.replaySteps===0&&
               now.restoreCount===prior.restoreCount;break;
+          case 'finishPrefix':{
+            confirmedPrefixActive=true;
+            const handoff=readPrefixHandoff();
+            valid=now.phase===23&&now.currentFrame===confirmedEnd&&now.sealedEnd===confirmedEnd&&
+              now.preFrame===prior.preFrame&&now.incarnation===prior.incarnation&&
+              now.forwardSteps===prior.sealedEnd-prior.preFrame&&
+              now.replaySteps===confirmedEnd-prior.preFrame&&
+              handoff.oldPreFrame===prior.preFrame&&handoff.confirmedFrame===confirmedEnd&&
+              handoff.selectedEndFrame===prior.sealedEnd&&handoff.oldIncarnation===prior.incarnation&&
+              handoff.finishRequestSequence===after.completeSequence&&
+              handoff.rebaseRequestSequence===0&&handoff.suffixCursor===0;
+            break;
+          }
+          case 'closePrefix':{
+            const handoff=readPrefixHandoff();
+            valid=now.phase===25&&now.currentFrame===handoff.confirmedFrame&&
+              now.sealedEnd===handoff.confirmedFrame&&now.preFrame===handoff.oldPreFrame&&
+              now.incarnation===handoff.oldIncarnation&&
+              handoff.rebaseRequestSequence===0&&sameJsonValue(handoff,transitionHandoff);
+            break;
+          }
+          case 'retirePrefix':{
+            const handoff=readPrefixHandoff();
+            valid=now.phase===26&&now.currentFrame===handoff.confirmedFrame&&
+              now.sealedEnd===handoff.confirmedFrame&&now.preFrame===handoff.oldPreFrame&&
+              now.incarnation===handoff.oldIncarnation&&
+              handoff.rebaseRequestSequence===0&&sameJsonValue(handoff,transitionHandoff);
+            break;
+          }
+          case 'rebaseConfirmedPrefix':{
+            const handoff=readPrefixHandoff();
+            valid=now.phase===0&&now.preFrame===confirmedEnd&&now.currentFrame===confirmedEnd&&
+              now.sealedEnd===0&&now.incarnation===0&&now.restoreCount===0&&
+              now.endpointMask===0&&now.forwardSteps===0&&now.replaySteps===0&&
+              now.pollSerial==='0'&&after.expectedFrame===confirmedEnd&&
+              handoff.confirmedFrame===confirmedEnd&&
+              handoff.rebaseRequestSequence===after.completeSequence;
+            break;
+          }
+          case 'adoptNextPrefixTicket':{
+            const handoff=readPrefixHandoff();
+            valid=[4,21].includes(now.phase)&&now.currentFrame===prior.currentFrame&&
+              now.incarnation===prior.incarnation&&now.forwardSteps===prior.forwardSteps&&
+              now.replaySteps===prior.replaySteps&&after.inputReady===1&&now.pollSerial!=='0'&&
+              handoff.suffixCursor===transitionHandoff.suffixCursor;
+            if(valid)unclaimedPrefixTicket=true;
+            break;
+          }
           default:break;
           }
           if(!valid)throw Error(`Episode ${name} completion differs from its bounded native transition`);
         }
+        if(name==='forwardTicket'&&adoptedPrefixTicket){
+          const handoff=readPrefixHandoff();
+          const {suffixCursor:oldCursor,...oldOwner}=transitionHandoff;
+          const {suffixCursor:newCursor,...newOwner}=handoff;
+          if(newCursor!==oldCursor+1||!sameJsonValue(oldOwner,newOwner))
+            throw Error('Adopted prefix forward did not advance exactly one retained suffix cursor');
+          adoptedPrefixTicket=null;
+        }
         if(name==='cleanup'){
           if(after.ownerState!==2)throw Error('Native cleanup did not retire the owner');
           releasePadArgument();terminal=true;
+          if(inlineMode&&performance.now()>=deadline)throw deadlineError(name,rendererDetail);
         }
         if(name==='capture')captured=true;
         if(name==='rebase'){
@@ -763,9 +1300,45 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           identityText=identity;
           entry.identity=identity;
           captured=false;
+          if(prefixHandoffComplete){
+            const handoffExport=module[PREFIX+'prefix_handoff_json'];
+            const originSize=module[PREFIX+'prefix_origin_row_bytes'];
+            if(typeof handoffExport!=='function'||handoffExport()!==0||
+              typeof originSize!=='function'||originSize()!==0||!sameJsonValue(check(status()),after))
+              throw Error('Whole-END rebase did not clear its exhausted confirmed-prefix handoff');
+            confirmedPrefixActive=false;
+            adoptedPrefixTicket=null;
+            unclaimedPrefixTicket=false;
+          }
+        }
+        if(name==='rebaseConfirmedPrefix'){
+          const h=after.metadata;
+          if(after.ownerState!==1||after.localPort!==before.localPort||after.remotePort!==before.remotePort||
+            after.expectedFrame!==confirmedEnd||after.inputReady||after.gpuPending||after.endpointActive||
+            h.phase||h.preFrame!==confirmedEnd||h.currentFrame!==confirmedEnd||h.sealedEnd||
+            h.incarnation||h.endpointMask||h.forwardSteps||h.restoreCount||h.replaySteps||h.pollSerial!=='0'||
+            h.preAudioPhase!==before.metadata.currentAudioPhase||h.currentAudioPhase!==h.preAudioPhase)
+            throw Error('Confirmed-prefix rebase acknowledgment did not bind fresh PRE at actual C');
+          const pointer=module[PREFIX+'rebase_identity_json']();
+          if(!Number.isInteger(pointer)||pointer<=0||pointer>0xffffffff)
+            throw Error('Confirmed-prefix rebase has no fresh native identity');
+          const identity=module.UTF8ToString(pointer);
+          const prior=JSON.parse(identityText),fresh=JSON.parse(identity);
+          const {source_frame:priorFrame,current_rng:priorRng,...priorOwner}=prior;
+          const {source_frame:frame,current_rng:rng,...freshOwner}=fresh;
+          const handoff=readPrefixHandoff();
+          if(priorFrame!==before.expectedFrame||!/^[0-9a-f]{8}$/.test(priorRng)||
+            frame!==confirmedEnd||!/^[0-9a-f]{8}$/.test(rng)||!sameJsonValue(priorOwner,freshOwner)||
+            handoff.rebaseRequestSequence!==after.completeSequence||
+            !sameJsonValue(check(status()),after))
+            throw Error('Confirmed-prefix rebase changed its fresh identity, handoff, or owner status');
+          identityText=identity;
+          entry.identity=identity;
+          captured=false;
         }
         entry.status='complete';entry.after=after;entry.elapsedMs=performance.now()-started;
-        return name==='rebase'?{status:after,identity:entry.identity}:after;
+        return name==='rebase'||name==='rebaseConfirmedPrefix'?
+          {status:after,identity:entry.identity}:after;
       }catch(error){entry.status='failed';entry.error=String(error);entry.elapsedMs=performance.now()-started;throw latch(error);}
       finally{busy=false;}
     },

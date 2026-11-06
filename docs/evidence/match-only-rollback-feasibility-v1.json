@@ -12931,7 +12931,917 @@
                 "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-build-v4/result.json",
                 "sha256": "c866b336aeeaa76f4a1ac5149914e3a85be3b3ad4a6449f7c23156576f56e173"
               },
-              "scope": "All executable changes match7eda50d7; subsequent edits are existing receipt documentation only. Exact publication-head CI pending."
+              "scope": "Executable producer remains7eda50d7; publication head changes only receipt docs; exact-head CI and reviewed tree equality pass.",
+              "publication_head": "74e53237058eea96edbc1329821d1426a95a3a93",
+              "merged_commit": "e8a6a842a0411ca00460bc904c606997523cb38c",
+              "integration_receipt": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-continuation-integration-receipt-v1.json",
+                "sha256": "abca1ca22f7b06efed35d005920f01cfefae6060495f8647782003d1800a4d14"
+              },
+              "ci_run": 42190974199,
+              "checks": {
+                "success": 13,
+                "expected_skip": 2
+              },
+              "reviewed_merged_tree_equal": true
+            }
+          },
+          "continuous_366": {
+            "issue": 366,
+            "status": "TWO_ARENA_EPISODES_COMPLETE",
+            "native_and_harness_producer": "08960dc3067e07fd7947f381f943eacc5ff2c869",
+            "base": "e8a6a842a0411ca00460bc904c606997523cb38c",
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-rebase-root-source-review-v1.json",
+              "sha256": "edfb47bfcb4c659a470526d352bd0a684e56de491ae6599346692681cec44256"
+            },
+            "focused_integration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-rebase-integrated-focused-v1.json",
+              "sha256": "1cc66a63d3b7a1e24864b490baff038f545c07f927f17e56dc76c9cddc6298a1"
+            },
+            "private_release": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-build-v1/result.json",
+              "sha256": "a1433799fc49683cd017b7285142601964170ed7583eac0bab4ad904e51636b3"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-producer-v1/archive.json",
+              "sha256": "8e9927cb32c5de904a7e6fecc9b4c8bc13b4a9f30acca7c83b5f71869d010733"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-catalog-v1/final-linked-configuration-v1.json",
+              "sha256": "b73d95923b670812526233f87d3bb9cd7df8d1dee6354db62b4533d84a067df8"
+            },
+            "capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-root-review-v1.json",
+              "sha256": "b69dbfd705101ddccb796cf6e6d266e3549ad50d698af63318912f7ad3ffa81f"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/result-summary.json",
+              "sha256": "e62bbea96b1cca4ce89297b7c98cc8461b093d26ecddcc9a2d32b1bf230fa03c"
+            },
+            "browser_report": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/browser/result.json",
+              "sha256": "36ab1a97b8bf26d3e1b2b6193bc0edf2af78e26f488bc7174037f96a0592e49e"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/owner.json",
+              "sha256": "173bc4ba7003098a9d06808dbb74c8669fca4e0cb7311aa67cc2ffda46fefb10"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/independent-result-review.json",
+              "sha256": "41354f5f2300003743f2092c9335100e17823d4e35c9fd498bba8bd98f7ee30d"
+            },
+            "observed": {
+              "source_ticks": 8,
+              "corrections": 4,
+              "confirmed_rebases": 1,
+              "raw_domains_per_restore": 9,
+              "particle_relations_per_restore": 12,
+              "arena_bytes_per_restore": 33554432,
+              "same_match_and_connection": true,
+              "actual_polls_per_peer": 8,
+              "authoritative_pad_equal": {
+                "rows": 8,
+                "bytes_per_row": 44
+              },
+              "confirmed_checksum_equal": {
+                "endpoints": 2,
+                "bytes_each": 64
+              },
+              "static_rows_equal_across_rebase_per_page": 3797,
+              "native_cleanup": true,
+              "owned_browser_pids_absent": 20,
+              "renderer_preparation_observations": 7,
+              "renderer_cache_flushes": 0
+            },
+            "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
+            "next": "Complete exact-head publication checks, then reduce remaining actual arena-admission and GPU-completion-wait costs before a longer paced rollback run; preserve all guards and exact comparisons.",
+            "per_forward_present_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-root-source-review-v1.json",
+                "sha256": "67c561cde1e1151ecc2ceca6089de32780f8888a0523ac4efe16d09f8373ef31"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-integrated-focused-v1.json",
+                "sha256": "4d28e2e490fdc9d795841fb94a76947cc551e76298e761fe5fa7496f2596aea7"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-build-v1/result.json",
+                "sha256": "5cf3ba05bbf7c934cbafe1b3cf8d16be49b6660db7e68c19fa830305fd1f8a9d"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-producer-v1/archive.json",
+                "sha256": "41da3fbcfe00b65735264d7a1952490c030013f386cf614c86a1771a3afde35d"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-forward-present-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "35783da88b45e1a77e228d08d94d22df80960d39dea81b1dcc446d85b3adf54a"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-root-review-v1.json",
+                "sha256": "e85417803407c6711cfec86b2ddef6b58e170001af443ebb63942e373ba71836"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/result-summary.json",
+                "sha256": "15dec613f6eff980103c76763746037a68967ec05d0fc678167d93acf7721d9b"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/browser/result.json",
+                "sha256": "a6a4bfa7d5f55b316ac99248f83af5050921341964e3503f7c8eef518eb082c3"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/owner.json",
+                "sha256": "2e161e987d07fc5bf35e8aa2c02f5c3117cd6468100fb3b5b3424e3fc4e366e3"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-forward-present-v1/independent-result-review.json",
+                "sha256": "36e3de22ec5d247e70d9a5154c643a401d1a50f1e70ec15409773744834f6e9f"
+              },
+              "actual_source_presentations": {
+                "alpha": [
+                  1,
+                  2,
+                  3,
+                  3,
+                  4,
+                  4,
+                  5,
+                  6,
+                  7,
+                  7,
+                  8,
+                  8
+                ],
+                "beta": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6,
+                  7,
+                  8
+                ]
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "one_confirmed_rebase_preserves_owner_statics_audio": true,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 19,
+                "renderer_preparation_observations": 10,
+                "renderer_cache_flushes": 0
+              },
+              "scope": "One original source draw per forward tick plus corrected final-frame presentations; replay ticks remain no-draw. Serialized functional evidence only, no paced/continuous/fullmatch or Internet acceptance. Two native testfixture failures retained; actualfocused6 controls and privateRelease pass."
+            },
+            "inline_dispatch_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_producer": "dfc0acb27c046a1cdbf2aa0c4728e456369ab7d8",
+              "harness_producer": "c8b84e57b34ada9b35ea385f3baeda9e497c27f0",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-root-source-review-v1.json",
+                "sha256": "855a59d727113d40de7b4112c87cd52a2341587b3c0a449b0c14e7d620ac205d"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-integrated-focused-v1.json",
+                "sha256": "69c1973ef292811a1e2e2db7e8918bcc744f3f2c1e92f2d11b8fca5506cb1b08"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-build-v1/result.json",
+                "sha256": "66ebd8747ee66ec4e1171881b2f6fd5c31755463c0f1e26915bcb7a6f91d85d0"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-producer-v1/archive.json",
+                "sha256": "044419ed5b3e834b7ec5027fbce72eb8f0a4cf0fc636d6a83553a25a6f18973e"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "27dcf69704e0e52a16f21b69414ad02ded8e558c98566cae796895840ffa484b"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-root-review-v1.json",
+                "sha256": "d109b32db91f0ca732e594516a9921789d5bbe04514a14769a9bc69c12d9f70e"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/result-summary.json",
+                "sha256": "67571e8fa258089346ddb7a913314c532aef3636420df1260bfc4f640ee72de1"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/browser/result.json",
+                "sha256": "898b7afa6fed8765bbe1af93d5e20676955d9a59ea088f1f2cf1e8fe65b66ebc"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/owner.json",
+                "sha256": "4e1eb4c4376fe4840c5c408350e059e836a9ca4f092448e0e45969f1435e294b"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/independent-result-review.json",
+                "sha256": "ef3d797b840ed323a528d085d11a063ba909a47a1a0bb9f4588b46b9cdfeb82c"
+              },
+              "serialized_command_timings": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/command-timings.json",
+                "sha256": "97d67cd4094f0991f14f57815aa66f8c6e5a21f20a4a6d8e6726d0c2ffb0a12c"
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "source_presents": {
+                  "alpha": 12,
+                  "beta": 8
+                },
+                "inline_enable_once_each": true,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 19,
+                "renderer_preparation_observations": 16,
+                "actual_conditional_flushes": 2
+              },
+              "scope": "Same8tick functional semantics under explicit Asyncify-aware inline dispatch. Timings are serialized controller wall durations, not foreground/native-only or cadence acceptance. Actual conditional cache service now exercised twice; original v3 renderer timeout attribution remains unproven.",
+              "retained_failure": "Old queued rAF fixture lacked defaultfalse inline_dispatch control field; one-line repair independently reviewed, full7 focused methods pass."
+            },
+            "history_cpu_attribution_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE; all three owned CPU profiles saved without errors",
+              "native_producer": "dfc0acb27c046a1cdbf2aa0c4728e456369ab7d8",
+              "harness_producer": "c91bedc8b84f3d98da7e8ac321150d75ac02a66b",
+              "harness_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-history-cpu-profile-root-review-v1.json",
+                "sha256": "de99a2d2af024a078b9688cef3d42fb322aefefb813ad8fbae634c8b389a215d"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/result-summary.json",
+                "sha256": "f1a3df23566fef459c437675485ae60951675f2d1b54c06e4695d43196743573"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/result.json",
+                "sha256": "4fbd53561f14061d1ff969ea13db32714b991f7336cc0176b33cf11ed69dd3c7"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/owner.json",
+                "sha256": "94cd8e8de090d1934a96e177414e2df574604131fd779913bb7359e9bed8cdfc"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/independent-profile-review.json",
+                "sha256": "7da5454ce3eadcc4e4442c783a7be9dc2d76e4680bffc69c440c0860f5bb167c"
+              },
+              "profiles": {
+                "capture": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-capture.cpuprofile",
+                    "sha256": "b5e0dff48786c9f8d5719bbacdf9486e15402234003afbc1e918080c650f1980"
+                  },
+                  "samples": 518,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 143,
+                    "current_heap_state_valid": 74,
+                    "melee_web_source_memory_payload_current_endpoint_header": 159,
+                    "melee_web_source_memory_allocation_read": 18
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                },
+                "seal": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-seal.cpuprofile",
+                    "sha256": "f56780f24217589938649e505c5b5c0fbded105e3400ea83ba8b5cab9b7b97ca"
+                  },
+                  "samples": 133,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 39,
+                    "current_heap_state_valid": 29,
+                    "melee_web_source_memory_payload_current_endpoint_header": 35,
+                    "melee_web_source_memory_allocation_read": 16
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                },
+                "restore": {
+                  "artifact": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-history-profile-v1/browser/alpha-first-restore.cpuprofile",
+                    "sha256": "80217385629dba700e73535599ec275eb49b2cb47332d25a456747983e1b50e2"
+                  },
+                  "samples": 430,
+                  "target_exclusive_samples": {
+                    "validate_live_allocations": 124,
+                    "current_heap_state_valid": 80,
+                    "melee_web_source_memory_payload_current_endpoint_header": 72,
+                    "melee_web_source_memory_allocation_read": 34
+                  },
+                  "session_detached": true,
+                  "profiler_errors": []
+                }
+              },
+              "interpretation": "The four quadratic shadow paths account for most exclusive samples in all three command profiles. Inclusive sample counts overlap. Profile elapsed includes CDP overhead and sample counts are not exact durations.",
+              "next_change": "Use fresh per-admission sorted validation with preallocated typed-owner scratch for both range and cell checks; reuse those same checked orders for endpoint row-to-cell and SDK exact-host joins. Leave ordinary and legacy paths unchanged. Retain arena byte copies/comparisons and all owner checks.",
+              "scope": "Same eight-tick functional witness with first-alpha capture/seal/restore CDP attribution only. Sampling overhead and browser scheduling prevent treating these profiles as frame-budget measurements. No paced, persistent-lag, whole-match or Internet rollback result."
+            },
+            "indexed_shadow_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_producer": "6b666f4134a229eda4871be5241adc9326069144",
+              "harness_producer": "6b666f4134a229eda4871be5241adc9326069144",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-root-source-review-v1.json",
+                "sha256": "83658e1c12faa16af29a4c84a972af688308afcd11057ca6b19333410172656a"
+              },
+              "independent_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-source-memory-index-candidate-v1/independent-review.json",
+                "sha256": "d2fe336847dab5ed34160ed16c5d39acf99f08d5da3dfe9f9ff3c879d6172bae"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-focused-v2/result.json",
+                "sha256": "d755344f7b0c3683c36b83f81e6144f564902cb8f3504eaa654b22a835c28ef5"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-build-v1/result.json",
+                "sha256": "5481bf63acdcbeb4f765f15281b9746006a606ea2d4232e0b7c6c3f0e6edb4d7"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-producer-v1/archive.json",
+                "sha256": "bb5684a51d83384247e3d3fffe2674466900eed40784c92f94215dfe88dd61ee"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "bce74e211d9bd7d5c6c78f580008021fc5c051878b9eeb05be3dc27233367354"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-root-review-v1.json",
+                "sha256": "e15e9091d473460c843f3fd90cbe058af9be04e997f9d0ea3c0e285fc8f76bff"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/result-summary.json",
+                "sha256": "06e7a8d5db25686177c5b1f8c65db028b7141ea9d575ae6338d5feb28f9fab1d"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/browser/result.json",
+                "sha256": "c96170426baee2b0a47f2704bb4b43d703f9ec691cc3f9efa673f10e2ca18ec0"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/owner.json",
+                "sha256": "80e5e33f45323bed43da9e314fc2bd9a5484593d2130026aa9e135bcc4d2ba36"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/independent-result-review.json",
+                "sha256": "14d382dfe8dde18be00f211649514ed3f2ceaed7a34a24232a83def8f9097db6"
+              },
+              "command_cost_comparison": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-shadow-index-v1/command-cost-comparison.json",
+                "sha256": "771d28b8962d09e1debf09f2bc93eb20cd0fd7b70b49545f2066efd2197f4d73"
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "source_presents": {
+                  "alpha": 12,
+                  "beta": 8
+                },
+                "rebase_static_rows_each": 3798,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 18,
+                "renderer_preparation_observations": 16,
+                "actual_conditional_flushes": 2
+              },
+              "scope": "Identical local serialized inline witness after fresh preallocated indexed validation. Independent raw comparator and every timing sample replayed. One before/after command-wall sample set; no sustained or combined correction frame budget, continuous/full-match or Internet acceptance. All original ownership and raw comparison guards remain.",
+              "retained_runner_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-shadow-index-focused-v1/preflight-refusal.json",
+                "sha256": "4f6b81d1fbc0fcc29405a398cb94bd59fcb5f3b1bc1a0aff381913fd33e27be9"
+              }
+            },
+            "confirmed_prefix_v1": {
+              "status": "CONFIRMED_PREFIX_TRANSFER_COMPLETE",
+              "native_producer": "703a0e838953396b7a04c33649fccddfecd6e3df",
+              "harness_producer": "245bdf10d7850dc88c1ae70799ae53fc295292bd",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-controller-candidate-v1/independent-combined-source-review.json",
+                "sha256": "6b25a8bf36535ee49e2d55359d2ef7f22b2377921a7b93721b783c951fc432ab"
+              },
+              "leaf_gcp_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-gcp-candidate-v1/independent-review.json",
+                "sha256": "db8a983d793de83fed1c00d2a7c0022f5225ecd2a6783aca1ab5426ddfce633a"
+              },
+              "leaf_focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-leaves-v2-focused-result.json",
+                "sha256": "ebb138645c5b835ca6fdbef1bf3e69ba42cfce54a0a84be6cab0ea9eb8606687"
+              },
+              "integrated_host_focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-integrated-host-focused-v1.json",
+                "sha256": "648f37662ada17ee455d59865215470efd9108bdada1526ac8d02f5650eab372"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-build-v1/result.json",
+                "sha256": "33f514d983c4a396ecba9dc7a50525067cee88873e74736772a8d5b1faab6149"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-producer-v1/archive.json",
+                "sha256": "771408bc5efba645190d3942bec536c4441edfdcfc36000231a08d9b0e391530"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-prefix-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "50547dbc725d50794f907236d0d5d462eb682ed880e767fdf96c1b1022019bc6"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-root-review-v1.json",
+                "sha256": "b733598e000a8a65680f999c47302705b2409d82b853308dd032b21edbc163ec"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/result-summary.json",
+                "sha256": "50ad95402bd68b1d1d758df4176f4403f26283ea98eec28e991aa452577002b6"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/browser/result.json",
+                "sha256": "a16038e1715692c31fe703b648815aa86385fa1ca1237ac5a6fddc8cccb0b3b4"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/owner.json",
+                "sha256": "9a731603cfc69c7ddbc9b99cb118df8bcf8a422a23651167a34e11b67d8d7000"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-confirmed-prefix-v1/independent-result-review.json",
+                "sha256": "381f7dcd182c7fc572f4a6adb75b49c9c3d427aa7dcea0e380f92233520a608b"
+              },
+              "observed": {
+                "actual_source_inputs_per_peer": 8,
+                "confirmed_prefix": {
+                  "old_pre": 0,
+                  "selected_frontier": 4,
+                  "confirmed_cpu_end": 2,
+                  "suffix_source_ticks": [
+                    2,
+                    3
+                  ],
+                  "original_ticket_ids": [
+                    11,
+                    15
+                  ],
+                  "original_poll_serials": [
+                    "450",
+                    "451"
+                  ],
+                  "no_repoll_or_republication": true,
+                  "no_source_draw_at_old_C_during_transfer": true
+                },
+                "exact_restored_pres": [
+                  0,
+                  2
+                ],
+                "arena_bytes_per_restore": 33554432,
+                "raw_domains_per_restore": 9,
+                "particle_relations_per_restore": 12,
+                "checksum_source_frames": [
+                  2,
+                  5,
+                  8
+                ],
+                "checksum_bytes_each": 64,
+                "all_checksums_equal": true,
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "actual_source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    4,
+                    5,
+                    5,
+                    6,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8
+                  ]
+                },
+                "same_match_and_page_sockets": true,
+                "alpha_prefix_end_to_capture": {
+                  "cpu_only": true,
+                  "exact_static_records": 3798,
+                  "effect_tokens": [
+                    "1",
+                    "0",
+                    "2"
+                  ],
+                  "audio_phase": 40
+                },
+                "beta_whole_end_to_capture": {
+                  "exact_static_records": 3798,
+                  "audio_phase": 20
+                },
+                "owned_browser_pids_absent": 19,
+                "owned_native_worker_server_cleanup": true
+              },
+              "serialized_alpha_commands_ms": {
+                "fresh_capture": 5.07,
+                "restores": [
+                  15.78,
+                  9.77
+                ],
+                "finish_prefix": 0.815,
+                "rebase_prefix": 0.805,
+                "adopt_tickets": [
+                  0.205,
+                  0.05
+                ],
+                "scope": "Observed serialized command samples, not sustained cadence or combined frame budget."
+              },
+              "review_repairs": [
+                "Allow new polls after suffix completion beyond F, retain original adopted-row provenance, preserve legacy explicit-frame refusal and export the five private entry points.",
+                "Dispatch prefix close/retire/adopt/poll commands exactly once. Keep request IDs distinct from original ticket IDs.",
+                "Retain original frozen drafts and the earlier failed leaf controls; correct the new synchronous refusal assertion before executing it."
+              ],
+              "scope": [
+                "One local functional CPU-only prefix transfer and later correction from its new PRE.",
+                "No arbitrary object-lifetime, combat, repeated-transfer, paced-loop, full-match or public-relay rollback claim.",
+                "Full integration regression, ordinary Release and exact-head CI for milestone366 remain pending."
+              ]
+            },
+            "repeated_prefix_v1": {
+              "status": "REPEATED_CONFIRMED_PREFIX_COMPLETE",
+              "native_producer": "e8421d8adf87784be137ce0ff7256c3287936a11",
+              "harness_producer": "02483dffd2950812ce0a25cf9aaf8efcf9e4b9aa",
+              "observed": {
+                "actual_source_inputs_per_peer": 8,
+                "exact_restored_pres": [
+                  0,
+                  2,
+                  3
+                ],
+                "arena_bytes_per_restore": 33554432,
+                "raw_domains_per_restore": 9,
+                "particle_relations_per_restore": [
+                  12,
+                  11,
+                  8
+                ],
+                "confirmed_prefixes": [
+                  {
+                    "pre": 0,
+                    "frontier": 4,
+                    "confirmed_end": 2,
+                    "dirty_from": 1
+                  },
+                  {
+                    "pre": 2,
+                    "frontier": 5,
+                    "confirmed_end": 3,
+                    "dirty_from": null
+                  }
+                ],
+                "original_tick3_full176_bytes_reused_twice": true,
+                "original_tick3_ticket": 15,
+                "original_tick3_poll_serial": "452",
+                "current_capsule_tick3_forward_differs_from_origin": true,
+                "checksum_source_frames": [
+                  2,
+                  3,
+                  6,
+                  8
+                ],
+                "checksum_bytes_each": 64,
+                "all_checksums_equal": true,
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "actual_source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    4,
+                    5,
+                    5,
+                    6,
+                    6,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8
+                  ]
+                },
+                "final_whole_end_rebase": 8,
+                "same_match_and_page_sockets": true,
+                "owner_statics_audio_joins": 6,
+                "owned_browser_pids_absent": 18,
+                "owned_native_worker_server_cleanup": true
+              },
+              "scope": [
+                "Repeated local functional confirmed-prefix handoff, including clean predictions and an original receipt carried through two capsules.",
+                "Serialized eight-input witness; no paced, combat/KO, full-match, full-profile or public-relay rollback claim.",
+                "Full integration regression, ordinary Release and exact-head CI remain pending."
+              ],
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-probe-candidate-v1/independent-combined-source-review.json",
+                "sha256": "126c5c0b33ccf2b7f799d2c88f5e617c96db6707297922e89ba7e5f7dafa153f"
+              },
+              "native_rebase_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-whole-end-rebase-handoff-candidate-v1/independent-review.json",
+                "sha256": "54312343ef285dcda00accd3b70b3c24f523b59a58d31f3f9c954dc5f0753eb0"
+              },
+              "focused_controls": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-controls-v1.json",
+                "sha256": "1c9ee83d7bebc698b26665f76e63f983565b4ad9f145426860b488b2947ac099"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-build-v1/result.json",
+                "sha256": "e75a4d56f1491f80697abc524ef43cfc2053b4afd270bd78b0423917e53f78d8"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-producer-v1/archive.json",
+                "sha256": "b8b109b43218e5c218c0ace487ea0e1a2a93294d40c22ae0d5e3ef10899cb92c"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "48d19068eba60270ad44bbc8795a4d6a0c0104890d07b87d0075e29960777e3c"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-root-review-v1.json",
+                "sha256": "c2286acd82e092e61a88f41f5e5ae556e7b838f1cdd980074d9c5b92962bed4e"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/result-summary.json",
+                "sha256": "4ded5f6037106d8a3774986e1f49e8778493387fd077483fa2fcdc692e83dc72"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/browser/result.json",
+                "sha256": "4d4d24fdfa454bd55a01dfe2902a215084603ff2715d19ee49bc58cd8ae072bc"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/owner.json",
+                "sha256": "ae3196c2386720bde3640ae6c85f190e1afb4a6d7a77f069cb6feed09907857e"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/independent-result-review.json",
+                "sha256": "8487608d81eda395e712a1570e885ff75ba15a9592b1333ac09ef3f3af5414a0"
+              }
+            },
+            "paced_loop_v2": {
+              "status": "PACED_EIGHT_INPUTS_COMPLETE",
+              "native_and_harness_producer": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+              "observed": {
+                "pages": {
+                  "alpha": {
+                    "elapsed_ms": 230.8400001525879,
+                    "native_clock_elapsed_ms": 230.71000003814697,
+                    "terminal_native_pending_ticks": 5.842600002288818,
+                    "maximum_pending_ticks": 5.943500022888183,
+                    "callback_grants": [
+                      0,
+                      0,
+                      3,
+                      5
+                    ],
+                    "actual_polls": 8,
+                    "presentations": 9,
+                    "corrections": [
+                      [
+                        "confirmed-prefix",
+                        0,
+                        7,
+                        4,
+                        null
+                      ]
+                    ],
+                    "PRE_admissions_ms": [
+                      9.419999599456787,
+                      8.255000114440918,
+                      7.730000019073486,
+                      7.180000305175781,
+                      7.484999656677246
+                    ]
+                  },
+                  "beta": {
+                    "elapsed_ms": 273.914999961853,
+                    "native_clock_elapsed_ms": 273.7999997138977,
+                    "terminal_native_pending_ticks": 8.427999982833862,
+                    "maximum_pending_ticks": 8.427999982833862,
+                    "callback_grants": [
+                      0,
+                      0,
+                      1,
+                      7,
+                      0
+                    ],
+                    "actual_polls": 8,
+                    "presentations": 10,
+                    "corrections": [
+                      [
+                        "fully-confirmed-correction",
+                        0,
+                        1,
+                        1,
+                        0
+                      ],
+                      [
+                        "confirmed-prefix",
+                        1,
+                        8,
+                        7,
+                        null
+                      ]
+                    ],
+                    "PRE_admissions_ms": [
+                      10.144999980926514,
+                      8.130000114440918,
+                      7.184999942779541,
+                      7.425000190734863,
+                      6.974999904632568,
+                      7.695000171661377,
+                      7.255000114440918,
+                      7.569999694824219
+                    ]
+                  }
+                },
+                "postdraw_checksum_bytes": 64,
+                "all_postdraw_checksums_equal": true,
+                "checksum_exchange": "none; compared locally after capture",
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    8
+                  ]
+                },
+                "cleanup": {
+                  "owned_pids_absent": 18,
+                  "relay_disposed": true,
+                  "capture_and_server_groups_absent": true
+                },
+                "clock": "existing 60Hz FixedTickClock with unchanged debt guard; no reset or auto-Resume",
+                "callback_bound": "eight individually granted forwards and at most one reconciliation",
+                "history_bounds": "unchanged seven rows, three incarnations, two restores"
+              },
+              "scope": [
+                "Native typed admission without raw endpoint publication. Eight inputs and actual catch-up bursts; terminal debt remains and run durations exceed nominal 133.33ms. No steady 60Hz, broader rollback coverage or full-match claim.",
+                "No combat/KO, full-match, complete-profile, public-relay rollback or human/two-machine acceptance claim.",
+                "Local full regression and ordinary/private Release builds pass. Publication-head CI and merge outcome are tracked on issue #366; no broader acceptance follows."
+              ],
+              "focused_controls": {
+                "tests": 13,
+                "passed": true,
+                "elapsed_s": 11.928,
+                "actual_wasm_sdk_equality_and_first_mismatch_controls": true
+              },
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-combined-candidate-v1/independent-source-review.json",
+                "sha256": "ace695b3ea0fd5024a5dbea477d74b2437975db0e1eaf8c32e2f34f2bfb7c6e8"
+              },
+              "root_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-root-source-review-v2.json",
+                "sha256": "83aaa5c5332dba5533472a1bd710579ae2f7badcd8a3a6a966cfa42a8f4ff8eb"
+              },
+              "fast_compare_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-sdk-arena-observe-fast-equal-candidate-v1/independent-review.json",
+                "sha256": "a7578ee9cd757da284cbdf87477be7bbf133bcef8f8b3618568924eeae14297d"
+              },
+              "catchup_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-catchup-candidate-v1/independent-source-review.json",
+                "sha256": "8dc6a4f357056e2f62e527a2d0f4e9e6c46385fdc001d6926293132be8cc8210"
+              },
+              "focused_controls_log": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-fast-compare-controls-v1.log",
+                "sha256": "e8f2b91d53e42645e85d5e20b7688017725d59ad1becc4891a4346ac7f5b4fbc"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-build-v2/result.json",
+                "sha256": "7cf06bbaa1807824244d803b4a3304f153b409c466394c4eaea0b22117ba5f7a"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-producer-v2/archive.json",
+                "sha256": "2c1c04ea37d7551ad1457544910465bf0f4d95b7ce79f04a349106a36ef257f8"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-catalog-v2/final-linked-configuration-v1.json",
+                "sha256": "ccc886e6726237c8c60f249c32c0596b366f27e6829c13f0abbd2cf570d6d400"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-root-review-v2.json",
+                "sha256": "6806dd12d713e8b747bbdff65d31a1484d19c7609ffb8800bf2f4def2cecc674"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/result-summary.json",
+                "sha256": "2122e2d0b054acc30d9e53b085bf49a2de0a25b6962e7257ddfc2dc607e2e496"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/browser/result.json",
+                "sha256": "b2333dd0ba4e54a6d43bd03ad0fc742ce7288953ee04a0fda4e8a0f5dec1663c"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/owner.json",
+                "sha256": "86504e31dcfad2dd54c4fa938666fe54a56273c5850aef5c9128cef856850d1d"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/independent-result-review.json",
+                "sha256": "b8fe327117bc64b435e9a442105cbf01a1959d4cffaba79a8b437d43a42d882a"
+              },
+              "integration_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-source-review-v1.json",
+                "sha256": "6e46f37610a9a4113c927e99a35d14032652e4a3b4baa6e7ff7d54db8a718547"
+              },
+              "retained_first_failure": {
+                "native_and_harness_producer": "7b6b26cf3429a7e0a6edf57716f6736fe5a997d5",
+                "result": "Existing clock-debt guard stopped both peers after real correction work.",
+                "repair": "Exact whole-arena memcmp equality fast path before unchanged first-mismatch walker; bounded catch-up grants; clean anchor refresh at existing seven-row capacity.",
+                "summary": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/result-summary.json",
+                  "sha256": "25295e4932ea54059d80faa86c56c15c436f74fe277ecc92e3232416376bf4c7"
+                },
+                "browser_report": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/browser/result.json",
+                  "sha256": "d45d924f589c94aaa53489643aa8edf2cac96ac25011fa11dbafb0fc3a6d2940"
+                },
+                "owner": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/owner.json",
+                  "sha256": "d7273ebfdd8517dc81b068162594fa6b77569a84d6f087d95d6af5d250af408d"
+                },
+                "independent_analysis": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/independent-failure-analysis.json",
+                  "sha256": "71fe3b1e4c4258abd995d681220a6b20244c738749339ea781d99e36963cf7fa"
+                },
+                "producer_archive": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-producer-v1/archive.json",
+                  "sha256": "e3ca9767d64fdb78bcd559bd3b070d27231131539c0a7387ec866e3b4c44488a"
+                },
+                "linked_configuration": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-catalog-v1/final-linked-configuration-v1.json",
+                  "sha256": "36f14db3fc78f527faa831401c6e283dfb7b10ae574d5341df7294094ec9c74d"
+                }
+              },
+              "retained_fixture_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-integrated-controls-v1.log",
+                "sha256": "d0a4d82e4a375aba47ca69c1479f6b54abf3a264a311a4a421573e07e07412e6"
+              },
+              "integration_validation": {
+                "source": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+                "full_regression": {
+                  "tests": 3108,
+                  "skips": 242,
+                  "elapsed_s": 747.129,
+                  "result": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-validation-v1/full-regression-result.json",
+                    "sha256": "3f744392829b6276136e2be8beaa050239814e7da0efdcdc590a056896edafc4"
+                  }
+                },
+                "ordinary_release": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-validation-v1/ordinary-release-result.json",
+                  "sha256": "51cd15b9ed67d30d0143436f15b53bbee93ccadb729f63363b79301cddce88a6"
+                },
+                "private_release_source": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+                "source_review": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-source-review-v1.json",
+                  "sha256": "6e46f37610a9a4113c927e99a35d14032652e4a3b4baa6e7ff7d54db8a718547"
+                },
+                "pre_validation_docs_review": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-docs-review-v1.json",
+                  "sha256": "59e6282b50392fb178926b394b224cf536beb25f3514d0cef588345c0d290c1c"
+                }
+              }
             }
           }
         }

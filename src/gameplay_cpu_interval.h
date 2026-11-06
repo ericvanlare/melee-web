@@ -109,6 +109,10 @@ void melee_web_cpu_interval_motor_history_restore_commit(uint64_t token,
     uint64_t incarnation,uint32_t actual_end);
 int melee_web_cpu_interval_motor_history_replay_finish(uint64_t token,
     uint64_t incarnation,uint32_t actual_end);
+/* Retirement-only close for a proved replay prefix strictly before the
+ * selected endpoint. It preserves the baseline and old replay bound. */
+int melee_web_cpu_interval_motor_history_finish_confirmed_prefix(uint64_t token,
+    uint64_t incarnation,uint32_t confirmed_end);
 int melee_web_cpu_interval_motor_history_retire_admit(uint64_t token,
     uint64_t incarnation,uint32_t actual_end);
 void melee_web_cpu_interval_motor_history_retire_commit(uint64_t token,
@@ -150,6 +154,7 @@ static inline int melee_web_cpu_interval_motor_history_seal(uint64_t t,uint64_t 
 static inline int melee_web_cpu_interval_motor_history_restore_admit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
 static inline void melee_web_cpu_interval_motor_history_restore_commit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;}
 static inline int melee_web_cpu_interval_motor_history_replay_finish(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
+static inline int melee_web_cpu_interval_motor_history_finish_confirmed_prefix(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
 static inline int melee_web_cpu_interval_motor_history_retire_admit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;return 0;}
 static inline void melee_web_cpu_interval_motor_history_retire_commit(uint64_t t,uint64_t i,uint32_t f){(void)t;(void)i;(void)f;}
 static inline const MeleeWebCpuMotorEvidence* melee_web_cpu_interval_motor_history_evidence_for(uint64_t t,uint64_t w,const void* c,uint64_t e,uint32_t f,uint64_t i,uint32_t end){(void)t;(void)w;(void)c;(void)e;(void)f;(void)i;(void)end;return (const MeleeWebCpuMotorEvidence*)0;}

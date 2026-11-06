@@ -153,10 +153,15 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
             checkpoint.phase_==Phase::HistorySealed;
         const bool corrected_end=!pre&&provenance_==Provenance::Corrected&&
             checkpoint.phase_==Phase::HistoryCorrectedSealed;
+        // A confirmed prefix was re-simulated without source draw. It exposes
+        // only its actual CPU endpoint; DrawEnd is never admitted for it.
+        const bool confirmed_prefix=view_==View::CpuEnd&&
+            provenance_==Provenance::Corrected&&
+            checkpoint.phase_==Phase::HistoryConfirmedPrefixSealed;
         if(!checkpoint.history_mode_||
            (pre&&provenance_!=Provenance::SharedPre)||
            (!pre&&provenance_==Provenance::SharedPre)||
-           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end))
+           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end||confirmed_prefix))
             return collect_refusal("history-phase");
         if(!checkpoint.same_owner(*session_)||
            !session_->diagnostic_source_files_quiescent()||
@@ -182,7 +187,7 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
                     pre_frame):false);
             if(!statics_admitted)return collect_refusal("history-static-pre");
         }
-        if(!pre&&!checkpoint.history_endpoint_admit(*session_))
+        if(!pre&&!checkpoint.history_endpoint_admit(*session_,&out.payload))
             return collect_refusal("history-end-admit");
         out.history_phase=static_cast<std::uint32_t>(checkpoint.phase_);
         out.history_incarnation=checkpoint.history_incarnation_;
@@ -238,7 +243,7 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     if(checkpoint.commit_.arena){
-        if(!history_mode_||(pre&&!checkpoint.history_payload_admit()))
+        if(!history_mode_||(pre&&!checkpoint.history_payload_admit(&out.payload)))
             return collect_refusal("arena-history-owner");
         const auto sdk=melee_web_gameplay_heap_history_observe(checkpoint.commit_.arena);
         const auto shadow=melee_web_source_memory_history_observe(checkpoint.commit_.shadow);
@@ -268,9 +273,9 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 
 #endif
 
-    out.payload=pre&&!out.arena.schema?
-        melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
-        melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
+    if(!out.arena.schema)
+        out.payload=pre?melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
+            melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
     if(out.payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||out.payload.schema!=1||
        out.payload.row_count>UINT32_MAX||out.payload.free_cell_count>UINT32_MAX||
        out.payload.allocated_cell_count>UINT32_MAX)

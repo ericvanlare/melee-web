@@ -241,10 +241,38 @@ bool GameplayCpuStatics::history_seal_endpoint(std::uint64_t incarnation,
     return true;
 }
 
+bool GameplayCpuStatics::history_seal_confirmed_prefix(
+    std::uint64_t incarnation,std::uint32_t restore_count,
+    std::uint32_t confirmed_end) noexcept
+{
+    if(!incarnation||incarnation!=history_incarnation_||
+       history_phase_!=HistoryPhase::Restored||
+       history_restore_incarnation_!=incarnation||
+       !restore_count||restore_count>2u||restore_count!=history_restore_count_||
+       history_restore_end_!=history_end_frame_||
+       history_restore_end_<=history_pre_frame_||
+       history_restore_end_-history_pre_frame_>7u||
+       confirmed_end<=history_pre_frame_||confirmed_end>=history_end_frame_||
+       confirmed_end-history_pre_frame_>7u||!layout_valid()||!invariants_match())
+        return false;
+    std::size_t offset=0;
+    for(const auto& row:rows_){
+        std::memcpy(after_.data()+offset,
+                    reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes);
+        offset+=row.bytes;
+    }
+    history_end_frame_=confirmed_end;
+    history_confirmed_prefix_restore_count_=restore_count;
+    history_endpoint_closed_=false;
+    history_phase_=HistoryPhase::ConfirmedPrefix;
+    return true;
+}
+
 CpuStaticEndpointHeader GameplayCpuStatics::history_endpoint_header() const noexcept
 {
     CpuStaticEndpointHeader result{};
-    if(history_phase_!=HistoryPhase::EndpointSealed){
+    if(history_phase_!=HistoryPhase::EndpointSealed&&
+       history_phase_!=HistoryPhase::ConfirmedPrefix){
         result.status=CpuStaticEndpointStatus::WrongPhase;
         return result;
     }
@@ -259,7 +287,8 @@ CpuStaticEndpointHeader GameplayCpuStatics::history_endpoint_header() const noex
     result.status=CpuStaticEndpointStatus::Ok;
     result.schema=1;
     result.bytes=static_cast<std::uint32_t>(sizeof(result));
-    result.phase=CpuStaticEndpointPhase::Sealed;
+    result.phase=history_phase_==HistoryPhase::ConfirmedPrefix?
+        CpuStaticEndpointPhase::ConfirmedPrefix:CpuStaticEndpointPhase::Sealed;
     result.table_identity=table_identity_;
     result.row_count=static_cast<std::uint64_t>(rows_.size());
     return result;
@@ -268,7 +297,8 @@ CpuStaticEndpointHeader GameplayCpuStatics::history_endpoint_header() const noex
 CpuStaticEndpointRow GameplayCpuStatics::history_endpoint_row(std::uint64_t index) const noexcept
 {
     CpuStaticEndpointRow result{};
-    if(history_phase_!=HistoryPhase::EndpointSealed){
+    if(history_phase_!=HistoryPhase::EndpointSealed&&
+       history_phase_!=HistoryPhase::ConfirmedPrefix){
         result.status=CpuStaticEndpointStatus::WrongPhase;
         return result;
     }
@@ -291,7 +321,8 @@ CpuStaticEndpointRow GameplayCpuStatics::history_endpoint_row(std::uint64_t inde
 bool GameplayCpuStatics::history_close_endpoint(std::uint64_t incarnation,
                                                  std::uint32_t actual_end) noexcept
 {
-    if(history_phase_!=HistoryPhase::EndpointSealed||history_endpoint_closed_||
+    if((history_phase_!=HistoryPhase::EndpointSealed&&
+        history_phase_!=HistoryPhase::ConfirmedPrefix)||history_endpoint_closed_||
        incarnation!=history_incarnation_||actual_end!=history_end_frame_||
        !layout_valid()||!invariants_match())return false;
     std::size_t offset=0;
@@ -358,11 +389,19 @@ void GameplayCpuStatics::history_commit_prevalidated() noexcept
 bool GameplayCpuStatics::history_retire_admit(std::uint64_t incarnation,
                                                std::uint32_t actual_end) const noexcept
 {
-    if(history_phase_!=HistoryPhase::EndpointSealed||!history_endpoint_closed_||
+    if((history_phase_!=HistoryPhase::EndpointSealed&&
+        history_phase_!=HistoryPhase::ConfirmedPrefix)||!history_endpoint_closed_||
        !incarnation||incarnation!=history_incarnation_||incarnation>3u||
        actual_end!=history_end_frame_||actual_end<=history_pre_frame_||
        actual_end-history_pre_frame_>7u||history_restore_count_>2u||
        !layout_valid()||!invariants_match())return false;
+    if(history_phase_==HistoryPhase::ConfirmedPrefix&&
+       (history_restore_incarnation_!=incarnation||
+        !history_confirmed_prefix_restore_count_||
+        history_confirmed_prefix_restore_count_!=history_restore_count_||
+        actual_end>=history_restore_end_||
+        history_restore_end_<=history_pre_frame_||
+        history_restore_end_-history_pre_frame_>7u))return false;
     std::size_t offset=0;
     for(const auto& row:rows_){
         if(std::memcmp(after_.data()+offset,

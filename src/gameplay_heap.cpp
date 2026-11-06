@@ -614,6 +614,12 @@ melee_web_gameplay_heap_history_observe(const HistorySnapshot* snapshot)
     observation.first_difference = UINT64_MAX;
     const auto* live = static_cast<const u8*>(snapshot->arena);
     observation.exact_equal = 1;
+    // Use the optimized exact compare for the common equal case. Keep the byte
+    // walk below for the original precise first-difference receipt on mismatch.
+    if (std::memcmp(live, snapshot->image.data(), snapshot->arena_bytes) == 0) {
+        observation.compared_bytes = snapshot->arena_bytes;
+        return observation;
+    }
     for (size_t i=0;i<snapshot->arena_bytes;++i) {
         ++observation.compared_bytes;
         if (live[i] != snapshot->image[i]) {

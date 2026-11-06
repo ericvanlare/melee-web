@@ -22,6 +22,10 @@ extern "C" int melee_web_source_memory_test_payload_index_range_case(
     const MeleeWebSourceMemoryPayloadSnapshot*, uint32_t);
 extern "C" int melee_web_source_memory_test_payload_index_tamper(
     MeleeWebSourceMemoryPayloadSnapshot*, uint32_t, uint32_t*, uint32_t*);
+extern "C" int melee_web_source_memory_test_history_allocation_equivalence(uint32_t);
+extern "C" int melee_web_source_memory_test_history_heap_equivalence(uint32_t);
+extern "C" int melee_web_source_memory_test_history_header_index_tamper(
+    const MeleeWebSourceMemoryHistory*, MeleeWebSourceMemoryPayloadSnapshot*);
 extern "C" uint32_t melee_web_source_memory_test_capture_source_overlap(void);
 
 namespace {
@@ -774,10 +778,12 @@ void source_memory_payload_index_controls() {
     constexpr size_t first_payload_bytes = 1317494;
     constexpr size_t second_payload_bytes = 1317542;
     std::vector<unsigned char> host_rows(second_payload_bytes, 0);
+    uintptr_t host_starts[second_rows]{};
     check(melee_web_source_memory_begin(1101, 6), "indexed payload owner begin");
     size_t host_offset = 0;
     for (size_t i = 0; i < first_rows; ++i) {
         const size_t bytes = i < 34 ? 381 : 380;
+        host_starts[i] = reinterpret_cast<uintptr_t>(&host_rows[host_offset]);
         check(melee_web_source_memory_alloc(6, &host_rows[host_offset],
                                             static_cast<uint32_t>(bytes)),
               "populate observed first payload row count");
@@ -841,6 +847,7 @@ void source_memory_payload_index_controls() {
           "indexed restore remains allocation-free and restores exact payload");
 
     for (size_t i = first_rows; i < second_rows; ++i) {
+        host_starts[i] = reinterpret_cast<uintptr_t>(&host_rows[host_offset]);
         check(melee_web_source_memory_alloc(6, &host_rows[host_offset], 12),
               "extend to observed second payload row count");
         host_offset += 12;
@@ -862,6 +869,35 @@ void source_memory_payload_index_controls() {
                 second_rows, static_cast<unsigned long long>(old_ns),
                 static_cast<unsigned long long>(indexed_ns));
 
+    const auto typed_pre = melee_web_source_memory_history_capture();
+    check(typed_pre.status == MELEE_WEB_SOURCE_MEMORY_HISTORY_OK && typed_pre.pre,
+          "capture typed arena history at observed 3471-row endpoint");
+    MeleeWebSourcePayloadEndpointHeader typed_header{};
+    allocation_budget = 0;
+    const auto typed_status = melee_web_source_memory_history_current_endpoint_header(
+        typed_pre.pre, second.snapshot, &typed_header);
+    bool typed_rows_match = typed_status == MELEE_WEB_SOURCE_MEMORY_HISTORY_OK &&
+        typed_header.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+        typed_header.row_count == second_rows &&
+        typed_header.payload_bytes == second_payload_bytes;
+    for (size_t i = 0; typed_rows_match && i < second_rows; ++i) {
+        MeleeWebSourceMemoryAllocation row{};
+        const auto read_status = melee_web_source_memory_history_current_allocation_read(
+            typed_pre.pre, &typed_header,
+            reinterpret_cast<const void*>(host_starts[i]), &row);
+        const uint32_t expected_bytes = i < first_rows
+            ? static_cast<uint32_t>(i < 34 ? 381 : 380) : 12u;
+        typed_rows_match = read_status == MELEE_WEB_SOURCE_MEMORY_READ_OK && row.live &&
+            row.requested_bytes == expected_bytes;
+    }
+    allocation_budget = -1;
+    check(typed_rows_match,
+          "typed arena header and binary host lookup match all 3471 current rows without allocation");
+    check(melee_web_source_memory_test_history_header_index_tamper(
+              typed_pre.pre, second.snapshot),
+          "typed header preserves same-owner saved-index corruption refusal");
+
+    melee_web_source_memory_history_destroy(typed_pre.pre);
     melee_web_source_memory_payload_snapshot_destroy(first.snapshot);
     melee_web_source_memory_payload_snapshot_destroy(second.snapshot);
     check(melee_web_source_memory_end(1101), "indexed payload owner end");
@@ -870,6 +906,16 @@ void source_memory_history_controls()
 {
     using Observation = MeleeWebSourceMemoryHistoryObservation;
     constexpr auto ok = MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+    const int allocation_equivalence[7] = {3, 1, 1, 1, 1, 1, 3};
+    for (uint32_t scenario = 0; scenario < 7; ++scenario)
+        check(melee_web_source_memory_test_history_allocation_equivalence(scenario) ==
+                  allocation_equivalence[scenario],
+              "history sorted range checks match all-pairs overlap and overflow outcomes");
+    const int heap_equivalence[8] = {3, 1, 1, 1, 1, 1, 1, 1};
+    for (uint32_t scenario = 0; scenario < 8; ++scenario)
+        check(melee_web_source_memory_test_history_heap_equivalence(scenario) ==
+                  heap_equivalence[scenario],
+              "history sorted heap checks match pairwise overlap and coalescing outcomes");
     alignas(32) unsigned char a[512]{}, b[512]{};
     check(melee_web_source_memory_history_capture().status ==
               MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, "inactive history capture");
@@ -915,6 +961,55 @@ void source_memory_history_controls()
         const auto selected = melee_web_source_memory_history_current_admit(captured.pre);
         allocation_budget = -1;
         check(selected == ok, "history admits selected topology without allocation");
+        MeleeWebSourcePayloadEndpointHeader current_header{};
+        allocation_budget = 0;
+        const auto current_header_status =
+            melee_web_source_memory_history_current_endpoint_header(
+                captured.pre, payload.snapshot, &current_header);
+        MeleeWebSourceMemoryAllocation current_row{};
+        const auto current_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &current_header, b, &current_row);
+        MeleeWebSourceMemoryAllocation interior_row{};
+        const auto interior_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &current_header, b + 1, &interior_row);
+        MeleeWebSourcePayloadEndpointHeader copied_header = current_header;
+        MeleeWebSourceMemoryAllocation refused_row{};
+        const auto copied_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &copied_header, b, &refused_row);
+        const auto stale_pointer_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &current_header, b, &refused_row);
+        MeleeWebSourcePayloadEndpointHeader bad_payload_header{};
+        const auto bad_payload_status =
+            melee_web_source_memory_history_current_endpoint_header(
+                captured.pre, nullptr, &bad_payload_header);
+        const auto invalidated_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &current_header, b, &refused_row);
+        allocation_budget = -1;
+        check(current_header_status == ok &&
+              current_header.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+              current_header.row_count == 2 && current_read == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              current_row.live && current_row.allocation_generation == previous_generation &&
+              interior_read == MELEE_WEB_SOURCE_MEMORY_READ_OK && !interior_row.live,
+              "typed current header and exact host lookup report reused live allocation without allocation");
+        check(copied_read == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT &&
+              stale_pointer_read == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT &&
+              bad_payload_status == ok &&
+              bad_payload_header.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT &&
+              invalidated_read == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,
+              "copied header and refused rebuild invalidate the borrowed typed view");
+        allocation_budget = 0;
+        const auto rebuilt_status =
+            melee_web_source_memory_history_current_endpoint_header(
+                captured.pre, payload.snapshot, &current_header);
+        allocation_budget = -1;
+        check(rebuilt_status == ok &&
+              current_header.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK,
+              "typed current header can be rebound after a refused view");
         const Observation branch = melee_web_source_memory_history_observe(captured.pre);
         check(branch.status == ok && !branch.exact_pre, "history reports different selected state");
         allocation_budget = 0;
@@ -925,6 +1020,11 @@ void source_memory_history_controls()
               "history failed preparation preserves live state");
         const auto prepared = melee_web_source_memory_history_prepare(captured.pre);
         check(prepared.status == ok && prepared.prepared, "history prepare");
+        const auto prepared_pointer_read =
+            melee_web_source_memory_history_current_allocation_read(
+                captured.pre, &current_header, b, &refused_row);
+        check(prepared_pointer_read == MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT,
+              "history preparation invalidates the borrowed current header before PRE copy");
         check(melee_web_source_memory_history_commit_prevalidated(prepared.prepared) ==
               MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, "history requires final admission");
         check(melee_web_source_memory_history_admit(prepared.prepared) == ok, "history final admission");

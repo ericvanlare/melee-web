@@ -1987,7 +1987,7 @@ deadlines are unchanged. [PR #363](https://github.com/ericvanlare/melee-web/pull
 merged as `f817f857` after all 15 checks on `331e3f64` completed with 13 successes
 and two expected skips. The merged and reviewed trees match.
 
-The next milestone, [#364](https://github.com/ericvanlare/melee-web/issues/364),
+Milestone [#364](https://github.com/ericvanlare/melee-web/issues/364),
 now passes two adjacent actual corrections in the same ordinary-runtime match
 and browser-owned relay sockets. Native and harness producer `21e508a0` uses
 confirmed retirement and an exact END-to-fresh-PRE rebase. P1 uses a new actual
@@ -2060,7 +2060,149 @@ rollback. Repeated arena rebase, paced forward presentation, public enablement,
 complete profile behavior and acceptance remain open. The structured receipt's
 `continuation_364` owns source, raw result, catalog, review and cleanup identities.
 The full 3,102-test regression passes with 242 skips, and ordinary/private Release
-builds pass at `7eda50d7`. Exact publication-head CI remains pending integration.
+builds pass at `7eda50d7`. [PR #365](https://github.com/ericvanlare/melee-web/pull/365)
+merged as `e8a6a842` after all 15 exact-head checks on `74e53237` completed
+with 13 successes and two expected skips. Reviewed and merged trees match.
+
+The first [#366](https://github.com/ericvanlare/melee-web/issues/366) experiment,
+producer `08960dc3`, passes two adjacent four-tick arena episodes in one live
+match, page-owned input timeline and connection. Four actual late-input corrections
+restore the current PRE exactly; every authoritative PAD row and both confirmed
+64-byte endpoint checksums match the on-time peer. Confirmed END4 → fresh PRE4
+preserves the Owner tuple, all 3,797 static rows and each page's audio phase.
+Actual poll and request identities advance across rebase; the effect authority
+retires and re-arms separately. Independent raw replay confirms all four nine-domain,
+12-particle comparisons and the declared rebase checks. Both native owners cleanly
+close and all 20 owned browser processes are absent. The seven observed renderer
+preparations perform no cache flush.
+
+This remains an eight-tick batch proof with presentation at sealed endpoints.
+Paced per-forward presentation and continuous/full-match play are unmeasured.
+Focused controls and the affected private Release build pass; full milestone
+integration remains pending. The structured receipt's `continuous_366` owns exact
+source, capture, review and cleanup identities; no successful recapture is planned.
+
+Producer `5c28d840` then passes the changed presentation hypothesis: every
+forward tick draws through the original callback, while corrective ticks remain
+no-draw until the corrected present frame. Native callback receipts record
+alpha's 12 presentations and beta's eight, with exact request/submission identities
+and contiguous serials across rebase. Intermediate source frames use command 19
+and the same strict completion gate; segment ends retain CPU_END → present →
+DRAW_END. All four strict typed PRE comparisons, eight authoritative PAD rows,
+and both confirmed 64-byte checksums pass independent replay. Native cleanup
+passes and all 19 owned browser processes are absent. Ten observed renderer
+preparations perform no cache flush. The exact source draw schedule and retained
+fixture failures are in `continuous_366.per_forward_present_v1`.
+
+This establishes serialized presentation semantics. The diagnostic still spends
+separate native animation callbacks on poll, step and presentation. Actual cadence
+is unmeasured. Fully confirmed rebase also does not solve persistent remote-input
+lag: advancing the confirmed anchor while preserving a speculative suffix remains
+a separate native lifecycle requirement. No deadline, history cap or comparison
+has been weakened to claim continuous play.
+
+Inline dispatch also passes the same eight-tick/four-correction proof. Native
+producer `dfc0acb2` and harness `c8b84e57` are distinct: the harness adds only
+a pure-JavaScript command-journal copy after cleanup. Independent replay verifies
+all restore, input, checksum, presentation, rebase and lifecycle checks. All 19
+owned browser processes are absent. The native command owner executes directly
+through Asyncify-aware calls; it retains exclusive ownership during suspension,
+blocks reentry, and enforces the original deadlines after completion. Sixteen
+renderer-preparation observations include two actual conditional flushes; the
+historical renderer timeout cause remains unproven.
+
+The observed serialized controller durations expose a history-work bottleneck:
+forward steps stay below 1.7 ms and no-draw replay below 1.1 ms, while capture
+ranges from 36–74 ms, seal 19–25 ms and restore 57–69 ms. These are command wall
+durations from this diagnostic, not native-only or foreground cadence evidence.
+The exact samples live in `continuous_366.inline_dispatch_v1`.
+
+A bounded CPU attribution run uses the same native producer with harness
+`c91bedc8`. The full eight-tick proof passes again, and all three owned profiles
+(first alpha capture, seal and restore) save without errors and detach cleanly.
+Four allocation-shadow paths dominate the disjoint self samples: live-range
+validation, heap-cell overlap checks, endpoint row-to-cell joins, and exact-host
+allocation lookup. They account for 394/518 capture samples, 119/133 seal samples
+and 310/430 restore samples. Profile elapsed time includes instrumentation;
+these are attribution counts, not exact native durations. The raw profiles,
+producer identities and independent review are pinned in
+`continuous_366.history_cpu_attribution_v1`.
+
+The indexed repair now passes at native/harness producer `6b666f41`. It uses
+freshly rebuilt, preallocated sorted indexes for typed arena admission and exact
+host lookup; original allocation/cell order, arithmetic, owner/lease checks,
+saved-index corruption refusal and the legacy APIs remain unchanged. Six focused
+controls and the private Release build pass. Independent replay of the identical
+unprofiled eight-tick witness confirms all four PRE restores, authoritative PAD,
+full checksums, 12/8 source presentations and confirmed rebase, now with 3,798
+static rows per page. Native cleanup passes and all 18 owned browser PIDs are
+absent. The structured receipt pins every producer and retained runner failure
+under `continuous_366.indexed_shadow_v1`.
+
+Alpha's observed command medians fall from 54.97 to 15.51 ms for capture,
+19.43 to 0.58 ms for seal, and 59.35 to 11.16 ms for restore. The two new captures
+are 25.32 ms initially and 5.70 ms at the confirmed rebase; the four restores
+range from 9.83 to 14.41 ms. These are serialized wall durations from one
+before/after witness, not sustained cadence or a combined correction budget.
+The CPU-only confirmed-prefix transfer now passes at native producer `703a0e83`
+and harness `245bdf10`. Alpha restores PRE0, re-simulates authoritative inputs to
+C2 while its old frontier is F4, closes and retires the actual C2 CPU endpoint,
+then captures fresh PRE2. Native-owned original tickets for ticks2/3 are adopted
+without polling or publishing again, and only the rebuilt current frontier is
+drawn. A later late input successfully restores that new PRE2 and corrects to F5.
+
+Independent raw review replays both exact arena/shadow PRE comparisons, all nine
+domains and twelve particle relations, every authoritative 44-byte input row,
+and the complete 64-byte checksums at C2/F5/F8. All agree with the on-time peer.
+There are exactly eight actual polls per peer and 10/8 source presentations;
+none occurs at the older C2 during the handoff. Exact owner, 3,798 static records,
+local audio phase and effect-token retirement/rearm are retained. Native cleanup,
+the Worker and all 19 owned browser processes are clean. The same receipt pins
+all producers, reviews, controls and retained drafts in
+`continuous_366.confirmed_prefix_v1`.
+
+The repeated handoff also passes at native `e8421d8a` / harness `02483dff`.
+After C2/F4, correct prediction allows PRE2 → C3 while F5 remains ahead;
+the original 176-byte tick3 receipt survives both transfers even though its
+current capsule forward input differs. A later wrong input restores fresh PRE3
+and corrects to F6. Independent raw review confirms exact PRE0/PRE2/PRE3 arena
+and shadow restores, all nine domains and the actual 12/11/8 particle relations,
+all eight authoritative PAD frames, and full checksums at C2/C3/F6/F8. The exact
+11/8 presentation schedule, six owner/statics/audio joins, checked whole-END8
+rebase with handoff clearance, and cleanup of all 18 owned browser processes
+pass. `continuous_366.repeated_prefix_v1` pins the sources, controls, build,
+reports and independent review; retained earlier drafts are unchanged.
+
+A page-owned paced eight-input run now passes at native/harness `a9e79a18`.
+It uses the existing 60 Hz clock and unchanged timing guard, with each actual
+poll and forward step separately granted. Both peers receive actual inputs;
+beta corrects a non-vacuous wrong prediction without drawing replay ticks.
+Clean confirmed-prefix transfers retain original suffix inputs. Independent raw
+review confirms all eight 44-byte authoritative PAD rows, the full 64-byte
+post-draw endpoint checksum, 9/10 source presentations, actual multi-step
+callback catch-up and owned cleanup. The checksum is compared locally after
+capture; this run does not exchange checksum messages. Endpoint admission is
+native typed validation, with no full raw endpoint publication during pacing.
+The earlier serialized strict restoration comparisons remain separate evidence.
+
+This is bounded functional pacing, not a real-time pass. Eight inputs take
+230.840 ms on alpha and 273.915 ms on beta, versus nominal 133.333 ms. They end
+with 5.8426 and 8.4280 ticks of debt. The first paced attempt at `7b6b26cf`
+stopped on the existing clock guard and remains retained. The reviewed repair
+adds an exact whole-arena equality fast path before the unchanged first-mismatch
+walker, bounded within-callback catch-up, and clean refresh at the existing
+seven-row capacity. No timing guard, history cap or deadline is enlarged.
+
+Thirteen focused controls, the full 3,108-test regression (242 skips), and both
+ordinary and private Release builds pass at executable source `a9e79a18`.
+Independent combined source and raw-result review passes. Publication-head CI
+and the merge outcome are tracked on #366. `continuous_366.paced_loop_v2` pins
+sources, builds, reports, failed attempts and reviews. Combat/KO, sustained
+60 Hz, full-match, complete-profile and public-relay rollback remain incomplete.
+Next is a small actual-SDK Wasm benchmark of exact arena-admission cost and a
+review of completion-driven GPU waiting before a longer paced run. Preserve
+the same comparisons, ownership checks and absolute deadlines; do not extend
+a near-guard run without a changed cost hypothesis.
 
 ## Stage decision dependencies, issue #333
 

@@ -12,6 +12,24 @@ struct MatchHistoryStatus {
  melee_web::RuntimeMatchHistoryMetadata history{};
  uint32_t input_ready{},gpu_pending{},endpoint_active{},renderer_errors{};
 };
+/* Copied immediately through the private pacing endpoint. Offsets are fixed:
+ * schema/bytes 0/4, phase/frame/steps/pending/stall/reason 8..28,
+ * elapsed/debt/trigger/threshold 32/40/48/56. */
+struct MatchHistoryPacingSample {
+ uint32_t schema=1,bytes=64,phase{},current_frame{},steps{},pending_steps{},stalled{},stall_reason{};
+ double elapsed_ms{},pending_ticks{},triggering_value{},threshold{};
+};
+static_assert(sizeof(MatchHistoryPacingSample)==64);
+static_assert(offsetof(MatchHistoryPacingSample,phase)==8);
+static_assert(offsetof(MatchHistoryPacingSample,current_frame)==12);
+static_assert(offsetof(MatchHistoryPacingSample,steps)==16);
+static_assert(offsetof(MatchHistoryPacingSample,pending_steps)==20);
+static_assert(offsetof(MatchHistoryPacingSample,stalled)==24);
+static_assert(offsetof(MatchHistoryPacingSample,stall_reason)==28);
+static_assert(offsetof(MatchHistoryPacingSample,elapsed_ms)==32);
+static_assert(offsetof(MatchHistoryPacingSample,pending_ticks)==40);
+static_assert(offsetof(MatchHistoryPacingSample,triggering_value)==48);
+static_assert(offsetof(MatchHistoryPacingSample,threshold)==56);
 struct MatchHistoryInput {
  uint32_t schema=1,bytes=168,input_ready{},corrected_ready{};
  uint64_t poll_serial{};
@@ -81,6 +99,7 @@ struct MatchHistoryControl {
  MatchHistoryStart start{};
  std::array<char,512> error{};
  std::unique_ptr<RuntimeMatchHistory> capsule;
+ melee_web::RuntimeMatchHistoryPrefixHandoff prefix_handoff{};
  std::unique_ptr<melee_web::GameplayCpuStatics> statics;
  std::vector<melee_web::CpuStaticRow> configured_rows;
  MeleeWebMenuMatchSelection selection{};
@@ -89,12 +108,18 @@ struct MatchHistoryControl {
  MeleeWebMenuHost* host_owner{};
  uint64_t asset_owner{};
  uint64_t submitted_frame{},cache_flush_frame{};
+ uint64_t presentation_serial{};
+ uint32_t presentation_command{},presentation_request_sequence{};
  std::array<char,2048> renderer_preparation{};
+ std::array<char,512> presentation_json{};
+ std::array<char,1024> prefix_handoff_json{};
+ MatchHistoryPacingSample pacing{};
+ bool pacing_started{},pacing_failed{};
  uint32_t requested_rebase_end{};
  uint32_t requested_ticket_id{};
  std::array<uint8_t,44> requested_plan{};
  std::array<uint8_t,11> remote{};
- bool remote_ready{},dispatching{},identity_ready{},episode_enabled{},arena_enabled{};
+ bool remote_ready{},dispatching{},identity_ready{},episode_enabled{},arena_enabled{},inline_dispatch{};
  melee_web::GameplayCpuArenaEndpoint arena_endpoint{};
  std::string identity;
  std::array<std::string,4> identity_host;
@@ -758,9 +783,15 @@ bool history_audio_step(GameplayMatchSession& session,void*) noexcept {
  catch(...){return history_refuse("Ordinary audio tick threw an unknown exception");}
 }
 melee_web::RuntimeMatchHistoryPresentResult history_present(
- GameplayMatchSession& session,uint32_t,void*) noexcept {
+ GameplayMatchSession& session,uint32_t expected_frame,void*) noexcept {
  using P=melee_web::RuntimeMatchHistoryPresentResult;
  try {
+  auto& c=match_history;
+  const uint32_t command=c.status.pending_command;
+  const uint32_t request_sequence=c.status.request_seq;
+  const uint32_t source_frame_before=session.source_frames();
+  if((command!=4&&command!=19)||!request_sequence||source_frame_before!=expected_frame||
+     c.presentation_serial==UINT64_MAX)return P::Refused;
   const auto* before=static_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observe_descriptor());
   if(!before)return P::Refused;
   const auto prior=before->lastEndFrameId;
@@ -771,7 +802,23 @@ melee_web::RuntimeMatchHistoryPresentResult history_present(
   const auto* after=aurora_get_stats();
   if(!after||after->lastEndFrameId<=prior||after->lastEndFrameId!=after->lastBeginFrameId)
    return P::Refused;
-  match_history.submitted_frame=after->lastEndFrameId;
+  c.submitted_frame=after->lastEndFrameId;
+  const uint32_t source_frame_after=session.source_frames();
+  if(source_frame_after!=expected_frame)return P::Refused;
+  const uint64_t serial=c.presentation_serial+1u;
+  const int bytes=std::snprintf(c.presentation_json.data(),c.presentation_json.size(),
+   "{\"schema\":1,\"command\":%u,\"requestSequence\":%u,"
+   "\"sourceFrameBefore\":%u,\"sourceFrameAfter\":%u,"
+   "\"priorSubmission\":\"%llu\",\"submission\":\"%llu\","
+   "\"presentationSerial\":\"%llu\"}",command,request_sequence,
+   source_frame_before,source_frame_after,static_cast<unsigned long long>(prior),
+   static_cast<unsigned long long>(after->lastEndFrameId),
+   static_cast<unsigned long long>(serial));
+  if(bytes<=0||static_cast<size_t>(bytes)>=c.presentation_json.size()){
+   c.presentation_json={};return P::Refused;
+  }
+  c.presentation_command=command;c.presentation_request_sequence=request_sequence;
+  c.presentation_serial=serial;
   return P::Submitted;
  }catch(const std::exception& e){history_refuse(e.what());return P::Refused;}
  catch(...){history_refuse("Ordinary present threw an unknown exception");return P::Refused;}
@@ -817,7 +864,15 @@ std::unique_ptr<melee_web::GameplayCpuStatics> history_configure_statics(MatchHi
 bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  using Gate=melee_web::RuntimeMatchHistoryGatePoint;
  using Result=melee_web::RuntimeMatchHistoryGateResult;
- if(c.episode_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
+ const bool had_prefix_handoff=c.prefix_handoff.active();
+ const auto prefix_suffix_complete=[&]{
+  return !had_prefix_handoff||
+      (c.prefix_handoff.active()&&
+       c.prefix_handoff.suffix_cursor()==c.prefix_handoff.suffix_count());
+ };
+ if(!prefix_suffix_complete())
+  return history_refuse("Confirmed rebase requires every retained prefix suffix ticket to be forwarded");
+ if(c.episode_enabled!=c.arena_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
     c.capsule->pre_frame()!=c.status.expected_frame||
     end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||!c.capsule->can_rebase_confirmed(end)||
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
@@ -828,11 +883,12 @@ bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  const auto& host=c.identity_host;
  auto next_identity=melee_web::slippi_profile::serialize_live_match_identity(
   *match,{host[0],host[1],host[2],host[3]});
- if(!c.capsule->can_rebase_confirmed(end)||
+ if(!prefix_suffix_complete()||!c.capsule->can_rebase_confirmed(end)||
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
   return history_refuse("Confirmed rebase lost the retired match END");
 
- // The host must copy the retired window's receipts before requesting rebase.
+ // The host must copy the retired window's receipts before requesting rebase;
+ // this native gate proves closed+retired ownership, not remote confirmation.
  // This transition never calls source tick, PAD poll, present, or audio.
  c.capsule.reset();
  c.statics=std::move(next_statics);
@@ -850,6 +906,55 @@ bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  c.motor_commit={};
  c.checksum={};
  match_history_pcm_frames=0;
+ if(had_prefix_handoff){
+  c.prefix_handoff.clear();
+  c.prefix_handoff_json={};
+ }
+ return true;
+}
+
+bool history_rebase_confirmed_prefix(MatchHistoryControl& c,uint32_t confirmed_end) {
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(!c.episode_enabled||!c.arena_enabled||!c.capsule||!c.identity_ready||c.statics||
+    c.remote_ready||!match||match.get()!=c.match_owner||
+    c.capsule->pre_frame()!=c.status.expected_frame||
+    confirmed_end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+    !c.capsule->can_rebase_confirmed_prefix(confirmed_end,c.prefix_handoff,
+                                             c.status.request_seq)||
+    history_boundary(*match,Gate::EndpointComplete,confirmed_end,nullptr)!=Result::Admitted)
+  return history_refuse("Confirmed-prefix rebase requires its actual retired CPU endpoint and retained suffix");
+
+ auto next_statics=history_configure_statics(c);
+ if(!next_statics)return history_refuse("Confirmed-prefix rebase could not configure the immutable statics table");
+ const auto& host=c.identity_host;
+ auto next_identity=melee_web::slippi_profile::serialize_live_match_identity(
+  *match,{host[0],host[1],host[2],host[3]});
+ if(!c.capsule->can_rebase_confirmed_prefix(confirmed_end,c.prefix_handoff,
+                                            c.status.request_seq)||
+    history_boundary(*match,Gate::EndpointComplete,confirmed_end,nullptr)!=Result::Admitted)
+  return history_refuse("Confirmed-prefix rebase lost its retired CPU owner or suffix receipts");
+
+ // Prefix transfer preserves the bounded original actual-poll rows. This
+ // boundary only reconfigures the same statics/identity at C; it does not tick,
+ // poll, publish, draw, or advance audio.
+ c.capsule.reset();
+ c.statics=std::move(next_statics);
+ c.identity=std::move(next_identity);
+ c.status.expected_frame=confirmed_end;
+ c.status.history={};
+ c.status.history.pre_frame=c.status.history.current_frame=confirmed_end;
+ c.status.history.pre_audio_phase=c.status.history.current_audio_phase=audio_phase;
+ c.status.input_ready=0;
+ c.input={};
+ c.record={};
+ c.particle_header={};
+ c.particle_row={};
+ c.motor={};
+ c.motor_commit={};
+ c.checksum={};
+ match_history_pcm_frames=0;
+ c.prefix_handoff_json={};
  return true;
 }
 
@@ -865,7 +970,9 @@ EM_BOOL history_dispatch(double,void*) {
    else {
     close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
     okay=!match&&!world&&!host&&!results&&!prize&&!c.capsule;
-    if(okay){c.status.owner_state=2;c.status.endpoint_active=0;}
+    if(okay){c.prefix_handoff.clear();c.prefix_handoff_json={};
+     c.pacing_started=false;
+     c.status.owner_state=2;c.status.endpoint_active=0;}
    }
   }else if(!c.status.first_failure&&match&&match.get()==c.match_owner){
    switch(command){
@@ -927,7 +1034,40 @@ EM_BOOL history_dispatch(double,void*) {
       c.requested_ticket_id,c.requested_plan.data(),c.requested_plan.size());break;
    case 16:okay=c.episode_enabled&&c.capsule&&c.capsule->finish_replay();break;
    case 17:okay=c.episode_enabled&&c.capsule&&c.capsule->begin_continuation();break;
-   case 18:okay=c.episode_enabled&&c.capsule&&c.capsule->begin_episode();break;
+   case 18:
+    if(c.episode_enabled&&c.capsule){
+     if(c.prefix_handoff.active()&&c.prefix_handoff.rebase_request_sequence()&&
+        c.capsule->pre_frame()==c.prefix_handoff.confirmed_frame())
+      okay=c.capsule->begin_episode(c.prefix_handoff);
+     else okay=c.capsule->begin_episode();
+    }
+    break;
+   case 19:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
+      c.capsule->submit_recording_present();break;
+   case 20:
+    if(c.episode_enabled&&c.arena_enabled&&c.capsule&&
+       c.capsule->finish_confirmed_prefix(c.requested_rebase_end))
+     okay=c.capsule->capture_confirmed_prefix_handoff(c.status.request_seq,c.prefix_handoff);
+    if(okay)c.prefix_handoff_json={};
+    break;
+   case 21:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
+      c.capsule->close_confirmed_prefix();break;
+   case 22:
+    if(c.episode_enabled&&c.arena_enabled&&c.capsule){
+     if(const auto* motor=c.capsule->motor_evidence())c.motor=*motor;
+     okay=c.capsule->retire_confirmed_prefix();
+     if(okay){if(const auto* receipt=melee_web_cpu_interval_motor_commit_receipt())c.motor_commit=*receipt;else okay=false;}
+    }
+    break;
+   case 23:okay=history_rebase_confirmed_prefix(c,c.requested_rebase_end);break;
+   case 24:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
+      c.capsule->adopt_next_prefix_ticket();break;
+   case 25:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
+      c.presentation_command==19&&c.presentation_serial&&c.submitted_frame&&
+      c.presentation_request_sequence<=UINT32_MAX-2u&&
+      c.presentation_request_sequence+2u==c.status.request_seq&&
+      c.status.last_completed_command==5&&c.status.complete_seq+1u==c.status.request_seq&&
+      c.capsule->seal_presented_frontier();break;
    default:break;
    }
   }
@@ -944,18 +1084,24 @@ EM_BOOL history_dispatch(double,void*) {
 }
 int history_request(unsigned command,uint32_t end_frame,bool explicit_episode_payload=false) {
  auto& c=match_history;
- const bool episode_command=command>=12&&command<=18;
- const bool legacy_execution=command==2||command==3||command==7||command==11;
+ const bool episode_command=command>=12&&command<=25;
+ const bool legacy_execution=command==2||command==3||command==7;
+ const bool unsupported_rebase=command==11&&c.episode_enabled!=c.arena_enabled;
  const bool frame_payload_command=command==13||command==15;
  if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
-    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>18||
-    (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||
+    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>25||
+    (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||unsupported_rebase||
+    (command>=20&&command<=25&&!c.arena_enabled)||
     (frame_payload_command!=explicit_episode_payload)||
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  c.requested_rebase_end=end_frame;
  ++c.status.request_seq;c.status.pending_command=command;
- // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
- (void)emscripten_request_animation_frame(history_dispatch,nullptr);
+ if(c.inline_dispatch){
+  (void)history_dispatch(0.0,nullptr);
+ }else{
+  // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
+  (void)emscripten_request_animation_frame(history_dispatch,nullptr);
+ }
  return 1;
 }
 } // namespace
@@ -1084,6 +1230,128 @@ const void* melee_web_native_menu_match_history_start_publication_data(){
  return &start.publication;
 }
 unsigned melee_web_native_menu_match_history_start_publication_bytes(){return sizeof(MatchHistoryPublication);}
+int melee_web_native_menu_match_history_pacing_start(){
+ auto& c=match_history;
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(c.pacing_started||c.pacing_failed||!match_history_terminal||c.status.owner_state!=1||
+    c.status.first_failure||c.status.pending_command||c.status.complete_seq!=c.status.request_seq||
+    c.dispatching||match_history_in_tick||!history_start_export_idle()||!c.identity_ready||
+    !c.episode_enabled||!c.arena_enabled||!c.capsule||!match||match.get()!=c.match_owner||
+    c.capsule->phase()!=Phase::Armed||c.capsule->current_frame()!=c.capsule->pre_frame()||
+    c.capsule->forward_steps()!=0||c.capsule->poll_serial()!=0||c.capsule->restore_count()!=0||
+    c.capsule->endpoint_active()||c.status.last_completed_command!=18||
+    c.status.request_seq==UINT32_MAX||
+    !c.capsule->can_admit_poll_ticket(c.status.request_seq+1u,c.status.local_port,c.status.remote_port)||
+    history_boundary(*match,Gate::ForwardBefore,c.capsule->current_frame(),nullptr)!=Result::Admitted)
+  return history_refuse("Pacing start requires the exact idle armed PRE after initial preparation");
+ // Take-over stopped the ordinary menu loop. Start this owner clock only now,
+ // after PRE, identity, arena mode and episode arming have all been admitted.
+ // Seed from the native clock so the first later sample measures elapsed time
+ // from pacing start rather than dropping an initial frame as the clock anchor.
+ menu_clock.reset();
+ const auto seeded=menu_clock.tick_with_budget(emscripten_get_now(),true,0u);
+ c.pacing={};
+ c.pacing.phase=static_cast<uint32_t>(c.capsule->phase());
+ c.pacing.current_frame=c.capsule->current_frame();
+ c.pacing.stalled=seeded.stalled?1u:0u;
+ c.pacing.stall_reason=static_cast<uint32_t>(seeded.reason);
+ c.pacing.elapsed_ms=seeded.interval_ms;
+ c.pacing.pending_ticks=menu_clock.pending_ticks();
+ c.pacing.triggering_value=seeded.triggering_value;
+ c.pacing.threshold=seeded.threshold;
+ if(seeded.stalled){
+  c.pacing_failed=true;
+  history_refuse("Native pacing clock could not seed a finite start time");
+  return 0;
+ }
+ c.pacing_started=true;
+ return 1;
+}
+const MatchHistoryPacingSample* melee_web_native_menu_match_history_pacing_sample(unsigned max_steps){
+ auto& c=match_history;
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(!c.pacing_started)return nullptr;
+ if(c.pacing_failed)return &c.pacing;
+ if(max_steps>1u){history_refuse("Pacing budget must be exactly zero or one");return nullptr;}
+ // A dispatched export can yield while the renderer's Asyncify continuation is
+ // active. Do not read the match or clock until the ordinary runtime is idle.
+ if(!history_runtime_idle()){
+  history_refuse("Pacing sample requires the idle native runtime");
+  return nullptr;
+ }
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||!match||
+    match.get()!=c.match_owner||c.dispatching||match_history_in_tick)
+  {history_refuse("Pacing sample lost its terminal match owner");return nullptr;}
+
+ const auto phase=c.capsule?c.capsule->phase():Phase::Failed;
+ const auto current=match->source_frames();
+ const bool recording=c.capsule&&c.episode_enabled&&c.arena_enabled&&
+     (phase==Phase::Armed||phase==Phase::EpisodeRecording);
+ const bool known_serialized_wait=c.status.pending_command!=0;
+ const bool known_endpoint_wait=c.capsule&&c.capsule->endpoint_active();
+ const bool known_present_wait=phase==Phase::EpisodePresentPending;
+ const bool known_unclaimed_ticket=c.status.last_completed_command==12||
+     c.status.last_completed_command==24;
+ const bool known_forward_present_wait=recording&&phase==Phase::EpisodeRecording&&
+     c.status.last_completed_command==13;
+ const bool known_prefix_suffix_wait=recording&&c.prefix_handoff.active()&&
+     c.prefix_handoff.rebase_request_sequence()&&
+     c.prefix_handoff.suffix_cursor()<c.prefix_handoff.suffix_count();
+ const bool known_wait=known_serialized_wait||known_endpoint_wait||known_present_wait||
+     known_unclaimed_ticket||known_forward_present_wait||known_prefix_suffix_wait||!recording;
+
+ unsigned effective_budget=0;
+ if(max_steps==1u&&!known_wait){
+  if(!recording||c.capsule->endpoint_active()||c.status.request_seq==UINT32_MAX||
+     (phase==Phase::Armed&&c.status.last_completed_command!=18)||
+     (phase==Phase::EpisodeRecording&&c.status.last_completed_command!=5&&
+      c.status.last_completed_command!=17)){
+   history_refuse("Pacing due step is outside the presented native recording boundary");
+   return nullptr;
+  }
+  if(!history_runtime_idle()||!history_gpu_idle()||
+     !c.capsule->can_admit_poll_ticket(c.status.request_seq+1u,
+          c.status.local_port,c.status.remote_port)||
+     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+   history_refuse("Pacing due step failed native input, owner, or renderer admission");
+   return nullptr;
+  }
+  effective_budget=1u;
+ }else if(!known_wait&&recording){
+  // Budget zero is an intentional network/host wait, but it must not disguise
+  // an owner or renderer failure at an otherwise live recording boundary.
+  if(!history_runtime_idle()||!history_gpu_idle()||
+     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+   history_refuse("Pacing wait detected a native owner or renderer failure");
+   return nullptr;
+  }
+ }
+
+ const auto elapsed=menu_clock.tick_with_budget(emscripten_get_now(),true,effective_budget);
+ c.pacing={};
+ c.pacing.phase=c.capsule?static_cast<uint32_t>(phase):0u;
+ c.pacing.current_frame=current;
+ c.pacing.steps=elapsed.steps;
+ c.pacing.pending_steps=elapsed.pending_steps;
+ c.pacing.stalled=elapsed.stalled?1u:0u;
+ c.pacing.stall_reason=static_cast<uint32_t>(elapsed.reason);
+ c.pacing.elapsed_ms=elapsed.interval_ms;
+ c.pacing.pending_ticks=menu_clock.pending_ticks();
+ c.pacing.triggering_value=elapsed.triggering_value;
+ c.pacing.threshold=elapsed.threshold;
+ if(elapsed.stalled){
+  c.pacing_failed=true;
+  history_refuse("Native pacing clock stalled; terminal due-step admission is disabled");
+ }
+ return &c.pacing;
+}
+unsigned melee_web_native_menu_match_history_pacing_sample_bytes(){
+ return sizeof(MatchHistoryPacingSample);
+}
 int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,unsigned remote) {
  auto& c=match_history;
  try {
@@ -1127,10 +1395,18 @@ int melee_web_native_menu_match_history_remote_pad(const uint8_t* bytes,unsigned
 }
 int melee_web_native_menu_match_history_request(unsigned command) {
  if(command==11)return history_refuse("Confirmed rebase requires an explicit END frame");
+ if(command==20||command==23)
+  return history_refuse("Confirmed prefix finish/rebase requires an explicit source frame");
  return history_request(command,0);
 }
 int melee_web_native_menu_match_history_request_rebase(uint32_t end_frame) {
  return history_request(11,end_frame);
+}
+int melee_web_native_menu_match_history_request_prefix_finish(uint32_t confirmed_frame) {
+ return history_request(20,confirmed_frame);
+}
+int melee_web_native_menu_match_history_request_prefix_rebase(uint32_t confirmed_frame) {
+ return history_request(23,confirmed_frame);
 }
 int melee_web_native_menu_match_history_episode_enable() {
  auto& c=match_history;
@@ -1145,6 +1421,19 @@ int melee_web_native_menu_match_history_episode_enable() {
 int melee_web_native_menu_match_history_arena_enable() {
  if(!melee_web_native_menu_match_history_episode_enable())return 0;
  match_history.arena_enabled=true;
+ return 1;
+}
+int melee_web_native_menu_match_history_inline_dispatch_enable() {
+ auto& c=match_history;
+ if(c.inline_dispatch||!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    c.status.request_seq||c.status.complete_seq||c.status.last_completed_command||
+    c.status.pending_command||c.dispatching||match_history_in_tick||c.capsule||c.remote_ready||
+    !c.identity_ready||!c.statics||!match||match.get()!=c.match_owner||
+    match->source_frames()!=c.status.expected_frame||!history_start_export_idle()||
+    history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::CapturePre,
+      c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
+  return history_refuse("Inline dispatch requires one initial idle pre-capture owner admission");
+ c.inline_dispatch=true;
  return 1;
 }
 int melee_web_native_menu_match_history_request_episode_forward(
@@ -1170,12 +1459,27 @@ int melee_web_native_menu_match_history_request_episode_replay(
 const char* melee_web_native_menu_match_history_rebase_identity_json(){
  const auto& c=match_history;
  if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
-    !history_start_export_idle()||c.status.last_completed_command!=11||
+    !history_start_export_idle()||
+    (c.status.last_completed_command!=11&&c.status.last_completed_command!=23)||
     c.capsule||!c.statics||!c.identity_ready||!match||
-    history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::PresentComplete,
+    history_boundary(*match,c.status.last_completed_command==23?
+      melee_web::RuntimeMatchHistoryGatePoint::EndpointComplete:
+      melee_web::RuntimeMatchHistoryGatePoint::PresentComplete,
       c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
   return nullptr;
  return c.identity.c_str();
+}
+const char* melee_web_native_menu_match_history_presentation_json(){
+ auto& c=match_history;
+ const uint32_t command=c.presentation_command;
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    !history_start_export_idle()||c.status.pending_command||c.dispatching||
+    c.status.complete_seq!=c.status.request_seq||
+    (command!=4&&command!=19)||c.status.last_completed_command!=command||
+    c.status.request_seq!=c.presentation_request_sequence||!c.presentation_serial||
+    !c.presentation_json[0]||!match||match.get()!=c.match_owner||
+    match->source_frames()!=c.status.history.current_frame)return nullptr;
+ return c.presentation_json.data();
 }
 const char* melee_web_native_menu_match_history_renderer_prepare_json(unsigned command){
  auto& c=match_history;
@@ -1190,7 +1494,7 @@ const char* melee_web_native_menu_match_history_renderer_prepare_json(unsigned c
  bool after_observed=false;
  unsigned action=0;
  if(owner==Gate::Admitted&&c.capsule&&!c.capsule->endpoint_active()&&
-    c.status.last_completed_command==4&&
+    (c.status.last_completed_command==4||c.status.last_completed_command==19)&&
     history_renderer_can_flush(before,c.submitted_frame,c.cache_flush_frame)){
   c.cache_flush_frame=c.submitted_frame;
   const bool flushed=aurora_flush_pipeline_cache();
@@ -1230,10 +1534,20 @@ unsigned melee_web_native_menu_match_history_ticket_bytes(){
 const MatchHistoryPollTicket* melee_web_native_menu_match_history_ticket_data(){
  auto& c=match_history;
  if(!c.episode_enabled||!c.capsule||c.status.first_failure||c.status.pending_command||
-    c.status.complete_seq!=c.status.request_seq||c.status.last_completed_command!=12||
+    c.status.complete_seq!=c.status.request_seq||
+    (c.status.last_completed_command!=12&&c.status.last_completed_command!=24)||
     !history_start_export_idle())return nullptr;
  const auto* ticket=c.capsule->latest_ticket();
- return ticket&&ticket->ticket_id==c.status.request_seq?ticket:nullptr;
+ if(!ticket)return nullptr;
+ if(c.status.last_completed_command==12)
+  return ticket->ticket_id==c.status.request_seq?ticket:nullptr;
+ const auto cursor=c.prefix_handoff.suffix_cursor();
+ const auto* origin=c.prefix_handoff.origin_row(cursor);
+ return origin&&cursor<c.prefix_handoff.suffix_count()&&
+    ticket->ticket_id==origin->ticket_id&&ticket->source_frame==origin->source_frame&&
+    ticket->incarnation==c.capsule->incarnation()&&ticket->local_port==origin->local_port&&
+    ticket->remote_port==origin->remote_port&&ticket->poll_serial==origin->poll_serial&&
+    ticket->raw_pad==origin->raw_pad?ticket:nullptr;
 }
 unsigned melee_web_native_menu_match_history_input_row_bytes(){
  return match_history.episode_enabled?sizeof(MatchHistoryEpisodeInputRow):0u;
@@ -1243,6 +1557,45 @@ const MatchHistoryEpisodeInputRow* melee_web_native_menu_match_history_input_row
  if(!c.episode_enabled||!c.capsule||c.status.first_failure||c.status.pending_command||
     c.status.complete_seq!=c.status.request_seq||!history_start_export_idle())return nullptr;
  return c.capsule->episode_input_row(ordinal);
+}
+const char* melee_web_native_menu_match_history_prefix_handoff_json(){
+ auto& c=match_history;
+ const auto& handoff=c.prefix_handoff;
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    !handoff.active()||!history_start_export_idle()||
+    c.status.complete_seq!=c.status.request_seq||!match||match.get()!=c.match_owner)
+  return nullptr;
+ const auto& owners=handoff.owners();
+ const auto count=std::snprintf(c.prefix_handoff_json.data(),c.prefix_handoff_json.size(),
+  "{\"schema\":\"melee-web-runtime-prefix-handoff-v1\",\"oldPreFrame\":%u,"
+  "\"confirmedFrame\":%u,\"selectedEndFrame\":%u,\"oldIncarnation\":%u,"
+  "\"finishRequestSequence\":%u,\"rebaseRequestSequence\":%u,"
+  "\"suffixCount\":%u,\"suffixCursor\":%u,\"localPort\":%u,\"remotePort\":%u,"
+  "\"worldGeneration\":\"%llu\",\"contextEpoch\":\"%llu\","
+  "\"ownerStorage\":\"%016llx\",\"ownerContext\":\"%016llx\","
+  "\"ownerFlow\":\"%016llx\",\"ownerAudio\":\"%016llx\"}",
+  handoff.old_pre_frame(),handoff.confirmed_frame(),handoff.selected_end_frame(),
+  handoff.old_incarnation(),handoff.finish_request_sequence(),
+  handoff.rebase_request_sequence(),handoff.suffix_count(),handoff.suffix_cursor(),
+  handoff.local_port(),handoff.remote_port(),
+  static_cast<unsigned long long>(owners.world),
+  static_cast<unsigned long long>(owners.context_epoch),
+  static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(owners.storage)),
+  static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(owners.context)),
+  static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(owners.flow)),
+  static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(owners.audio)));
+ return count>0&&static_cast<size_t>(count)<c.prefix_handoff_json.size()
+    ?c.prefix_handoff_json.data():nullptr;
+}
+unsigned melee_web_native_menu_match_history_prefix_origin_row_bytes(){
+ return match_history.prefix_handoff.active()?sizeof(MatchHistoryEpisodeInputRow):0u;
+}
+const MatchHistoryEpisodeInputRow*
+melee_web_native_menu_match_history_prefix_origin_row_data(unsigned ordinal){
+ auto& c=match_history;
+ if(!c.prefix_handoff.active()||c.status.first_failure||c.status.pending_command||
+    c.status.complete_seq!=c.status.request_seq||!history_start_export_idle())return nullptr;
+ return c.prefix_handoff.origin_row(ordinal);
 }
 const char* melee_web_native_menu_match_history_error(){return match_history.error.data();}
 const char* melee_web_native_menu_match_history_identity_json(const char* runtime,const char* assets,const char* save,const char* profile){
@@ -1332,20 +1685,45 @@ const void* melee_web_native_menu_match_history_checksum_data(){
     c.capsule->first_failure()!=melee_web::RuntimeMatchHistoryFailure::None)
   return nullptr;
  const auto phase=c.capsule->phase();
- const bool corrected=phase==Phase::CorrectedCpuCopied;
- if(phase!=Phase::PredictedCpuCopied&&!corrected)return nullptr;
+ const bool corrected=phase==Phase::CorrectedCpuCopied||
+     (phase==Phase::CorrectedComplete&&c.episode_enabled&&c.arena_enabled);
+ const bool prefix=phase==Phase::PrefixCpuCopied;
+ const bool presented=c.episode_enabled&&c.arena_enabled&&
+     ((phase==Phase::PresentedComplete&&c.capsule->endpoint_mask()==(1u<<8))||
+      (phase==Phase::CorrectedComplete&&(c.capsule->endpoint_mask()&96u)==96u));
+ if(phase==Phase::CorrectedComplete&&!presented)return nullptr;
+ if(phase!=Phase::PredictedCpuCopied&&!corrected&&!prefix&&!presented)return nullptr;
  const auto pre=c.capsule->pre_frame();
  if(pre!=c.status.expected_frame||pre==UINT32_MAX)return nullptr;
  const auto frame=c.capsule->current_frame();
  if(frame<=pre||c.capsule->sealed_end()!=frame||!c.capsule->poll_serial()||
     history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)return nullptr;
+ if(presented&&history_boundary(*match,Gate::PresentComplete,frame,nullptr)!=Result::Admitted)return nullptr;
+ const auto span=frame-pre;
+ if(prefix){
+  const auto old_selected_end=c.capsule->prefix_selected_end();
+  if(!c.episode_enabled||!c.arena_enabled||old_selected_end<=frame||
+     old_selected_end<=pre||old_selected_end-pre>7u||span>7u||
+     c.capsule->forward_steps()!=old_selected_end-pre||
+     c.capsule->replay_steps()!=span||!c.capsule->restore_count()||
+     c.capsule->restore_count()>2u||!(c.capsule->endpoint_mask()&(1u<<7)))return nullptr;
+ }else{
+  const bool episode_steps_ok=c.episode_enabled&&span>0&&span<=7u&&
+      c.capsule->forward_steps()==span&&
+      (corrected?c.capsule->replay_steps()==span:c.capsule->replay_steps()==0);
+  const bool legacy_steps_ok=!c.episode_enabled&&span==1&&
+      c.capsule->forward_steps()==1&&
+      c.capsule->replay_steps()==(corrected?1u:0u);
+  if(!episode_steps_ok&&!legacy_steps_ok)return nullptr;
+ }
  std::array<PADStatus,PAD_MAX_CONTROLLERS> decoded{};
  const PADStatus* pads=nullptr;uint32_t tick=pre;
  if(c.capsule->episode_mode()){
   const auto ordinal=frame-pre-1u;
   if(frame-pre>7u||ordinal>=7u)return nullptr;
   const auto* row=c.capsule->episode_input_row(ordinal);
-  if(!row||row->source_frame+1u!=frame||row->state==0||row->poll_serial==0)return nullptr;
+  if(!row||row->source_frame+1u!=frame||row->state==0||row->poll_serial==0||
+     ((corrected||prefix)&&row->state!=2u))return nullptr;
   const auto& bytes=row->state==2?row->selected_pad:row->forward_pad;
   for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port)
    if(!melee_web_net_decode_pad(bytes.data()+port*MELEE_WEB_NET_PAD_BYTES,

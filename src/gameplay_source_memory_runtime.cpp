@@ -612,6 +612,51 @@ struct PayloadSnapshotLayout {
     size_t block_bytes;
 };
 
+/* Typed history-only admission scratch. It is reserved before the history is
+ * armed and shared by the reusable PRE and any prepared copy. The global
+ * source allocation/cell vectors remain in original order. */
+struct HistoryValidationScratch {
+    std::vector<size_t> host_indices;
+    std::vector<size_t> source_indices;
+    std::vector<size_t> cell_indices;
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header = nullptr;
+    uint64_t owner_epoch = 0;
+    uint64_t world_generation = 0;
+    uint64_t topology_revision = 0;
+    uint64_t allocation_watermark = 0;
+    int source_heap_handle = -1;
+    uint32_t arena_begin = 0;
+    uint32_t arena_end = 0;
+    uint32_t heap_bytes = 0;
+    size_t row_count = 0;
+    size_t free_count = 0;
+    size_t allocated_count = 0;
+    size_t payload_bytes = 0;
+    size_t capacity = 0;
+
+    void invalidate_header() noexcept {
+        admitted_header = nullptr;
+        owner_epoch = world_generation = topology_revision = allocation_watermark = 0;
+        source_heap_handle = -1;
+        arena_begin = arena_end = heap_bytes = 0;
+        row_count = free_count = allocated_count = payload_bytes = 0;
+    }
+};
+
+bool reserve_history_validation_scratch(HistoryValidationScratch& scratch,
+                                        uint32_t heap_bytes)
+{
+    constexpr uint32_t largest_heap = 0x7fffffe0u;
+    if (heap_bytes < 64u || heap_bytes > largest_heap || heap_bytes % 32u)
+        return false;
+    const size_t capacity = heap_bytes / 64u;
+    scratch.host_indices.reserve(capacity);
+    scratch.source_indices.reserve(capacity);
+    scratch.cell_indices.reserve(capacity);
+    scratch.capacity = capacity;
+    return true;
+}
+
 bool add_size(size_t a, size_t b, size_t* out)
 {
     if (!out || b > std::numeric_limits<size_t>::max() - a) return false;
@@ -1077,6 +1122,71 @@ bool current_heap_state_valid(const melee_web::source::HeapState& state)
     return true;
 }
 
+bool current_heap_state_valid(const melee_web::source::HeapState& state,
+                              HistoryValidationScratch& scratch)
+{
+    constexpr uint32_t alignment = 32;
+    constexpr uint32_t minimum_cell = 64;
+    constexpr uint32_t largest_cell = 0x7fffffe0u;
+    if (!state.arena_begin.value() ||
+        state.arena_begin.value() >= state.arena_end.value() ||
+        state.arena_begin.value() % alignment || state.arena_end.value() % alignment ||
+        state.heap_bytes < minimum_cell || state.heap_bytes > largest_cell ||
+        state.heap_bytes / 64u > scratch.capacity ||
+        state.free.size() > scratch.capacity ||
+        state.allocated.size() > scratch.capacity - state.free.size())
+        return false;
+    uint64_t total = 0;
+    auto valid = [&](const melee_web::source::Cell& cell) {
+        const uint64_t end = uint64_t(cell.start.value()) + cell.bytes;
+        return cell.start.value() >= state.arena_begin.value() &&
+               cell.start.value() % alignment == 0 &&
+               cell.bytes >= minimum_cell && cell.bytes <= largest_cell &&
+               cell.bytes % alignment == 0 && end <= state.arena_end.value();
+    };
+    for (size_t i = 0; i < state.free.size(); ++i) {
+        const auto& cell = state.free[i];
+        if (!valid(cell) || uint64_t(cell.bytes) > UINT64_MAX - total)
+            return false;
+        total += cell.bytes;
+        if (i) {
+            const auto& previous = state.free[i - 1];
+            if (uint64_t(previous.start.value()) + previous.bytes >= cell.start.value())
+                return false;
+        }
+    }
+    for (const auto& cell : state.allocated) {
+        if (!valid(cell) || uint64_t(cell.bytes) > UINT64_MAX - total)
+            return false;
+        total += cell.bytes;
+    }
+    if (total != state.heap_bytes)
+        return false;
+
+    const size_t free_count = state.free.size();
+    const size_t cell_count = free_count + state.allocated.size();
+    scratch.cell_indices.resize(cell_count);
+    for (size_t i = 0; i < cell_count; ++i)
+        scratch.cell_indices[i] = i;
+    const auto cell_at = [&](size_t index) -> const melee_web::source::Cell& {
+        return index < free_count ? state.free[index] : state.allocated[index - free_count];
+    };
+    std::sort(scratch.cell_indices.begin(), scratch.cell_indices.end(),
+        [&](size_t left, size_t right) {
+            const uint32_t left_start = cell_at(left).start.value();
+            const uint32_t right_start = cell_at(right).start.value();
+            return left_start != right_start ? left_start < right_start : left < right;
+        });
+    uint64_t previous_end = 0;
+    for (size_t i = 0; i < cell_count; ++i) {
+        const auto& cell = cell_at(scratch.cell_indices[i]);
+        if (i && cell.start.value() < previous_end)
+            return false;
+        previous_end = uint64_t(cell.start.value()) + cell.bytes;
+    }
+    return true;
+}
+
 MeleeWebSourceMemoryPayloadSnapshotStatus current_endpoint_header_fence(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
     const MeleeWebSourcePayloadEndpointHeader* header)
@@ -1219,6 +1329,7 @@ struct MeleeWebSourceMemoryHistory {
     uint64_t piece_revision;
     uint32_t piece_watermark;
 #endif
+    std::shared_ptr<HistoryValidationScratch> validation_scratch;
 };
 
 struct MeleeWebSourceMemoryHistoryPrepared {
@@ -1333,11 +1444,50 @@ bool history_preserves_pre(const MeleeWebSourceMemorySnapshot& pre)
                         [](const FighterLease& lease) { return lease.live; });
 }
 
-bool history_live_shape_valid()
+bool rebuild_history_allocation_order(HistoryValidationScratch& scratch)
+{
+    const size_t count = allocations.size();
+    if (count > scratch.capacity)
+        return false;
+    scratch.host_indices.resize(count);
+    scratch.source_indices.resize(count);
+    for (size_t i = 0; i < count; ++i)
+        scratch.host_indices[i] = scratch.source_indices[i] = i;
+    std::sort(scratch.host_indices.begin(), scratch.host_indices.end(),
+        [](size_t left, size_t right) {
+            const auto left_host = allocations[left].host;
+            const auto right_host = allocations[right].host;
+            return left_host != right_host ? left_host < right_host : left < right;
+        });
+    std::sort(scratch.source_indices.begin(), scratch.source_indices.end(),
+        [](size_t left, size_t right) {
+            const auto left_source = allocations[left].source.value();
+            const auto right_source = allocations[right].source.value();
+            return left_source != right_source ? left_source < right_source : left < right;
+        });
+    return validate_indexed_ranges(allocations.data(), count,
+                                   scratch.host_indices.data(),
+                                   scratch.source_indices.data());
+}
+
+const HostAllocation* history_find_host_allocation(
+    uintptr_t host, const HistoryValidationScratch& scratch)
+{
+    const auto found = std::upper_bound(scratch.host_indices.begin(),
+        scratch.host_indices.end(), host,
+        [](uintptr_t value, size_t index) { return value < allocations[index].host; });
+    if (found == scratch.host_indices.begin())
+        return nullptr;
+    const auto& row = allocations[*std::prev(found)];
+    return host >= row.host && host - row.host < row.requested ? &row : nullptr;
+}
+
+bool history_live_shape_valid(HistoryValidationScratch& scratch)
 {
     const auto& heap = source_address_heap->state();
     if (allocations.size() != heap.allocated.size() ||
-        !validate_live_allocations(allocations) || !current_heap_state_valid(heap))
+        !rebuild_history_allocation_order(scratch) ||
+        !current_heap_state_valid(heap, scratch))
         return false;
     uint64_t previous_generation = 0;
     for (size_t i = 0; i < allocations.size(); ++i) {
@@ -1355,12 +1505,66 @@ bool history_live_shape_valid()
             return false;
         if (!lease.live)
             continue;
-        const auto* row = find_host_allocation(lease.host);
+        const auto* row = history_find_host_allocation(lease.host, scratch);
         if (!row || lease.allocation_generation <= row->generation ||
             lease.source != row->source.value() + (lease.host - row->host))
             return false;
     }
     return true;
+}
+
+MeleeWebSourceMemoryPayloadSnapshotStatus typed_current_payload_header(
+    const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
+    MeleeWebSourcePayloadEndpointHeader* out)
+{
+    if (!out)
+        return MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT;
+    *out = {};
+    const auto owner_status = payload_snapshot_owner_check(snapshot);
+    if (owner_status != MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK) {
+        out->status = owner_status;
+        return owner_status;
+    }
+    const bool rows_match = payload_rows_match(payload_rows(snapshot),
+                                               snapshot->row_count, allocations);
+    if (rows_match && !validate_indexed_payload_ranges(snapshot)) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+        return out->status;
+    }
+    uintptr_t snapshot_end = 0;
+    const uintptr_t snapshot_begin = reinterpret_cast<uintptr_t>(snapshot);
+    if (!host_interval(snapshot_begin, snapshot->block_bytes, &snapshot_end)) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+        return out->status;
+    }
+    if (host_ranges_overlap_allocations(snapshot_begin, snapshot_end, allocations)) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OVERLAPPING_STORAGE;
+        return out->status;
+    }
+    size_t payload_size = 0;
+    for (const auto& row : allocations) {
+        if (!add_size(payload_size, row.requested, &payload_size)) {
+            out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+            return out->status;
+        }
+    }
+    const auto& heap = source_address_heap->state();
+    out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+    out->schema = 1;
+    out->bytes = static_cast<uint32_t>(sizeof(*out));
+    out->source_heap_handle = source_heap_handle;
+    out->heap_bytes = heap.heap_bytes;
+    out->owner_epoch = owner_epoch;
+    out->world_generation = world_generation;
+    out->allocation_watermark = next_generation;
+    out->topology_revision = topology_revision;
+    out->arena_begin = heap.arena_begin.value();
+    out->arena_end = heap.arena_end.value();
+    out->row_count = allocations.size();
+    out->free_cell_count = heap.free.size();
+    out->allocated_cell_count = heap.allocated.size();
+    out->payload_bytes = payload_size;
+    return out->status;
 }
 
 bool history_heap_equal(const melee_web::source::HeapState& a,
@@ -1382,20 +1586,26 @@ melee_web_source_memory_history_capture(void)
 {
     if (!active)
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, nullptr};
-    if (!healthy || !source_address_heap || !source_address_heap->initialized() ||
-        !history_live_shape_valid())
+    if (!healthy || !source_address_heap || !source_address_heap->initialized())
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
-    if (!history_observer_admit())
-        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, nullptr};
     try {
-        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK, new MeleeWebSourceMemoryHistory{
+        auto scratch = std::make_shared<HistoryValidationScratch>();
+        if (!reserve_history_validation_scratch(*scratch,
+                source_address_heap->state().heap_bytes) ||
+            !history_live_shape_valid(*scratch))
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+        if (!history_observer_admit())
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, nullptr};
+        auto* history = new MeleeWebSourceMemoryHistory{
             {owner_epoch, source_heap_handle, world_generation, next_generation,
              source_address_heap->state(), allocations, fighters}, topology_revision
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
             , {piece_owner.cells, piece_owner.cells + piece_owner.count},
             piece_owner.instance, piece_owner.serial, piece_owner.next_generation
 #endif
-        }};
+            , std::move(scratch)
+        };
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK, history};
     } catch (const std::bad_alloc&) {
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED, nullptr};
     }
@@ -1406,6 +1616,9 @@ melee_web_source_memory_history_current_admit(const MeleeWebSourceMemoryHistory*
 {
     if (!pre)
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    if (!pre->validation_scratch)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+    pre->validation_scratch->invalidate_header();
     const auto status = history_owner_admit(pre->snapshot);
     if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
         return status;
@@ -1417,9 +1630,142 @@ melee_web_source_memory_history_current_admit(const MeleeWebSourceMemoryHistory*
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
 #endif
     if (topology_revision < pre->revision || next_generation < pre->snapshot.watermark ||
-        !history_live_shape_valid())
+        !history_live_shape_valid(*pre->validation_scratch))
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
     return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_current_endpoint_header(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebSourceMemoryPayloadSnapshot* payload,
+    MeleeWebSourcePayloadEndpointHeader* out)
+{
+    if (pre && pre->validation_scratch)
+        pre->validation_scratch->invalidate_header();
+    if (!out)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    *out = {};
+    if (!pre) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_ARGUMENT;
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    }
+    if (!pre->validation_scratch) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+    }
+    const auto shadow = melee_web_source_memory_history_current_admit(pre);
+    if (shadow != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK) {
+        out->status = MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
+        return shadow;
+    }
+    if (typed_current_payload_header(payload, out) !=
+        MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+
+    auto& scratch = *pre->validation_scratch;
+    const auto& heap = source_address_heap->state();
+    scratch.admitted_header = out;
+    scratch.owner_epoch = owner_epoch;
+    scratch.world_generation = world_generation;
+    scratch.topology_revision = topology_revision;
+    scratch.allocation_watermark = next_generation;
+    scratch.source_heap_handle = source_heap_handle;
+    scratch.arena_begin = heap.arena_begin.value();
+    scratch.arena_end = heap.arena_end.value();
+    scratch.heap_bytes = heap.heap_bytes;
+    scratch.row_count = allocations.size();
+    scratch.free_count = heap.free.size();
+    scratch.allocated_count = heap.allocated.size();
+    scratch.payload_bytes = out->payload_bytes;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+extern "C" MeleeWebSourceMemoryReadStatus
+melee_web_source_memory_history_current_allocation_read(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header,
+    const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out)
+{
+    if (out) *out = {};
+    if (!pre || !pre->validation_scratch || !admitted_header ||
+        !exact_host_payload || !out) {
+        if (pre && pre->validation_scratch)
+            pre->validation_scratch->invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    }
+    auto& scratch = *pre->validation_scratch;
+    if (scratch.admitted_header != admitted_header) {
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    }
+    if (!active) {
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;
+    }
+    if (!healthy) {
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_UNHEALTHY;
+    }
+    if (!source_address_heap || !source_address_heap->initialized()) {
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    }
+    const auto& heap = source_address_heap->state();
+    const bool current_header =
+        admitted_header->status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK &&
+        admitted_header->schema == 1 && admitted_header->bytes == sizeof(*admitted_header) &&
+        admitted_header->reserved == 0 &&
+        scratch.owner_epoch == owner_epoch && scratch.world_generation == world_generation &&
+        scratch.source_heap_handle == source_heap_handle &&
+        scratch.topology_revision == topology_revision &&
+        scratch.allocation_watermark == next_generation &&
+        scratch.arena_begin == heap.arena_begin.value() &&
+        scratch.arena_end == heap.arena_end.value() && scratch.heap_bytes == heap.heap_bytes &&
+        scratch.row_count == allocations.size() && scratch.free_count == heap.free.size() &&
+        scratch.allocated_count == heap.allocated.size() &&
+        admitted_header->source_heap_handle == scratch.source_heap_handle &&
+        admitted_header->owner_epoch == scratch.owner_epoch &&
+        admitted_header->world_generation == scratch.world_generation &&
+        admitted_header->allocation_watermark == scratch.allocation_watermark &&
+        admitted_header->topology_revision == scratch.topology_revision &&
+        admitted_header->arena_begin == scratch.arena_begin &&
+        admitted_header->arena_end == scratch.arena_end &&
+        admitted_header->heap_bytes == scratch.heap_bytes &&
+        admitted_header->row_count == scratch.row_count &&
+        admitted_header->free_cell_count == scratch.free_count &&
+        admitted_header->allocated_cell_count == scratch.allocated_count &&
+        admitted_header->payload_bytes == scratch.payload_bytes &&
+        scratch.host_indices.size() == scratch.row_count;
+    if (!current_header) {
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT;
+    }
+
+    const uintptr_t host = reinterpret_cast<uintptr_t>(exact_host_payload);
+    const auto found = std::lower_bound(scratch.host_indices.begin(),
+        scratch.host_indices.end(), host,
+        [](size_t index, uintptr_t value) { return allocations[index].host < value; });
+    out->source_heap_handle = source_heap_handle;
+    out->world_generation = world_generation;
+    if (found == scratch.host_indices.end() || allocations[*found].host != host)
+        return MELEE_WEB_SOURCE_MEMORY_READ_OK;
+    const auto& row = allocations[*found];
+    uintptr_t host_end = 0;
+    uint64_t source_end = 0;
+    if (!row.generation || row.generation > next_generation ||
+        !host_interval(row.host, row.requested, &host_end) ||
+        !source_interval(row.source.value(), row.requested, &source_end)) {
+        *out = {};
+        scratch.invalidate_header();
+        return MELEE_WEB_SOURCE_MEMORY_READ_UNHEALTHY;
+    }
+    (void)host_end;
+    (void)source_end;
+    out->requested_bytes = row.requested;
+    out->allocation_generation = row.generation;
+    out->live = 1;
+    return MELEE_WEB_SOURCE_MEMORY_READ_OK;
 }
 
 extern "C" MeleeWebSourceMemoryHistoryPrepareResult
@@ -1807,6 +2153,118 @@ extern "C" int melee_web_source_memory_test_payload_index_tamper(
     }
     if (saved_rows) saved_rows[0].generation = saved_generation;
     return 1;
+}
+
+/* Keep the optimized history admission validators pinned to the established
+ * all-pairs answers on small adversarial inputs. The return value packs
+ * bit 0 = old/new agree and bit 1 = accepted, so controls cover both outcomes. */
+extern "C" int melee_web_source_memory_test_history_allocation_equivalence(
+    uint32_t scenario)
+{
+    alignas(32) static unsigned char storage[2][128];
+    HostAllocation rows[2] = {
+        {reinterpret_cast<uintptr_t>(&storage[0][0]), 64, Address(0x2000), 1},
+        {reinterpret_cast<uintptr_t>(&storage[1][0]), 64, Address(0x2080), 2},
+    };
+    switch (scenario) {
+    case 0: break; // separated intervals
+    case 1: rows[1].host = rows[0].host + 32; break; // host overlap
+    case 2: rows[1].source = Address(0x2020); break; // source overlap
+    case 3:
+        rows[0].host = std::numeric_limits<uintptr_t>::max() - 1u;
+        rows[0].requested = 2;
+        break; // host end overflow
+    case 4:
+        rows[0].source = Address(UINT32_C(0xffffffff));
+        rows[0].requested = 2;
+        break; // source end overflow
+    case 5: rows[0].generation = 0; break; // missing allocation identity
+    case 6: // exactly adjacent intervals remain valid
+        rows[1].host = rows[0].host + 64;
+        rows[1].source = Address(0x2040);
+        break;
+    default: return 0;
+    }
+    size_t host_indices[2] = {0, 1};
+    size_t source_indices[2] = {0, 1};
+    std::sort(host_indices, host_indices + 2, [&](size_t a, size_t b) {
+        return rows[a].host != rows[b].host ? rows[a].host < rows[b].host : a < b;
+    });
+    std::sort(source_indices, source_indices + 2, [&](size_t a, size_t b) {
+        return rows[a].source.value() != rows[b].source.value()
+            ? rows[a].source.value() < rows[b].source.value() : a < b;
+    });
+    const std::vector<HostAllocation> old_rows(rows, rows + 2);
+    const bool old_valid = validate_live_allocations(old_rows);
+    const bool indexed_valid = validate_indexed_ranges(rows, 2, host_indices,
+                                                       source_indices);
+    return (old_valid == indexed_valid ? 1 : 0) | (indexed_valid ? 2 : 0);
+}
+
+extern "C" int melee_web_source_memory_test_history_heap_equivalence(
+    uint32_t scenario)
+{
+    melee_web::source::HeapState state{};
+    state.arena_begin = Address(0x1000);
+    state.arena_end = Address(0x1200);
+    state.heap_bytes = 512;
+    switch (scenario) {
+    case 0: // Exact adjacency across free and allocated cells.
+        state.free = {{Address(0x1000), 128}};
+        state.allocated = {{Address(0x1080), 128}, {Address(0x1100), 256}};
+        break;
+    case 1: // Allocated cells overlap.
+        state.free = {{Address(0x1000), 64}};
+        state.allocated = {{Address(0x1040), 192}, {Address(0x10c0), 256}};
+        break;
+    case 2: // Free and allocated cells overlap.
+        state.free = {{Address(0x1000), 128}};
+        state.allocated = {{Address(0x1000), 384}};
+        break;
+    case 3: // Touching free cells should already have been coalesced.
+        state.free = {{Address(0x1000), 64}, {Address(0x1040), 64}};
+        state.allocated = {{Address(0x1080), 384}};
+        break;
+    case 4: // Cell end lies outside the arena.
+        state.free = {{Address(0x1000), 448}};
+        state.allocated = {{Address(0x11e0), 64}};
+        break;
+    case 5: // Oversized cell extent.
+        state.free = {{Address(0x1000), 64}};
+        state.allocated = {{Address(0x1040), UINT32_C(0x7fffffe0)}};
+        break;
+    case 6: // Total cell bytes disagree with heap_bytes.
+        state.free = {{Address(0x1000), 128}};
+        state.allocated = {{Address(0x1080), 320}};
+        break;
+    case 7: // Free list order is an invariant independent of sorting scratch.
+        state.free = {{Address(0x1080), 64}, {Address(0x1000), 64}};
+        state.allocated = {{Address(0x10c0), 384}};
+        break;
+    default: return 0;
+    }
+    HistoryValidationScratch scratch;
+    if (!reserve_history_validation_scratch(scratch, state.heap_bytes))
+        return 0;
+    const bool old_valid = current_heap_state_valid(state);
+    const bool indexed_valid = current_heap_state_valid(state, scratch);
+    return (old_valid == indexed_valid ? 1 : 0) | (indexed_valid ? 2 : 0);
+}
+
+extern "C" int melee_web_source_memory_test_history_header_index_tamper(
+    const MeleeWebSourceMemoryHistory* pre,
+    MeleeWebSourceMemoryPayloadSnapshot* payload)
+{
+    if (!pre || !payload || payload->row_count < 2) return 0;
+    auto* indices = payload_host_indices(payload);
+    const size_t saved = indices[0];
+    indices[0] = payload->row_count;
+    MeleeWebSourcePayloadEndpointHeader header{};
+    const auto shadow = melee_web_source_memory_history_current_endpoint_header(
+        pre, payload, &header);
+    indices[0] = saved;
+    return shadow == MELEE_WEB_SOURCE_MEMORY_HISTORY_OK &&
+           header.status == MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_INVALID_STATE;
 }
 
 extern "C" uint32_t melee_web_source_memory_test_capture_source_overlap(void)

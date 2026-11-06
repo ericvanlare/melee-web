@@ -246,6 +246,42 @@ int main(int argc,char** argv)
     check(captured.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&captured.snapshot,
           "capture exact real PRE arena bytes and owner identity");
 
+    const auto equal_observation=melee_web_gameplay_heap_history_observe(captured.snapshot);
+    check(equal_observation.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+          equal_observation.schema==1&&equal_observation.bytes==64&&
+          equal_observation.exact_equal==1&&equal_observation.selected_heap==heap&&
+          equal_observation.owner_epoch==captured.snapshot->epoch&&
+          equal_observation.arena_base==reinterpret_cast<uintptr_t>(arena)&&
+          equal_observation.arena_bytes==kArenaBytes&&
+          equal_observation.compared_bytes==kArenaBytes&&
+          equal_observation.first_difference==UINT64_MAX,
+          "equal observer result preserves complete bytes and exact owner receipt");
+    const size_t observer_offsets[]={0,kArenaBytes/2,kArenaBytes-1,3};
+    for(const size_t offset:observer_offsets){
+        const u8 saved=captured.snapshot->image[offset];
+        captured.snapshot->image[offset]=static_cast<u8>(saved^0xFFu);
+        const auto difference=melee_web_gameplay_heap_history_observe(captured.snapshot);
+        check(difference.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK&&
+              difference.schema==1&&difference.bytes==64&&!difference.exact_equal&&
+              difference.selected_heap==heap&&
+              difference.owner_epoch==captured.snapshot->epoch&&
+              difference.arena_base==reinterpret_cast<uintptr_t>(arena)&&
+              difference.arena_bytes==kArenaBytes&&
+              difference.first_difference==offset&&
+              difference.compared_bytes==offset+1,
+              "observer reports exact first, middle, last, and unaligned differences");
+        captured.snapshot->image[offset]=saved;
+    }
+    const uint64_t saved_epoch=captured.snapshot->epoch;
+    ++captured.snapshot->epoch;
+    const auto refused_observation=melee_web_gameplay_heap_history_observe(captured.snapshot);
+    captured.snapshot->epoch=saved_epoch;
+    check(refused_observation.status==MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER&&
+          refused_observation.schema==0&&refused_observation.bytes==0&&
+          refused_observation.arena_base==0&&refused_observation.arena_bytes==0&&
+          refused_observation.compared_bytes==0,
+          "observer preserves stale-owner refusal before comparing arena bytes");
+
     auto* first=static_cast<unsigned char*>(OSAllocFromHeap(heap,kTrialBytes));
     check(first,"branch original allocation succeeds");
     const uintptr_t first_address=reinterpret_cast<uintptr_t>(first);

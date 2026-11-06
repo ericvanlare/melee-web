@@ -630,3 +630,52 @@ test('four-tick peer keeps later actual input unpublished across speculative con
     await Promise.allSettled([alpha.close(), beta.close()]);
   }
 });
+
+test('eight actual contributions keep one peer transport across the episode boundary',async()=>{
+  const bus=createEndpointBus();
+  const alpha=makePeer(bus,'alpha',{inputTicks:8}),beta=makePeer(bus,'beta',{inputTicks:8});
+  try{
+    const [started]=await Promise.all([alpha.start(),beta.start()]);
+    assert.equal(started.scope,'melee-web-runtime-two-episode-arena-history-peer-v1');
+    for(let tick=0;tick<8;++tick){
+      await alpha.publishLocal({port:0,tick,pollSerial:String(400+tick),pad:validPad(10+tick)});
+      await beta.publishLocal({port:1,tick,pollSerial:String(900+tick),pad:validPad(30+tick)});
+      const actual=await alpha.waitForRemoteSample({tick});
+      assert.deepEqual(actual.pad,[...validPad(30+tick)]);
+    }
+    await beta.waitForRemoteSample({tick:7});
+    await Promise.all([bus.flush('alpha'),bus.flush('beta')]);
+    for(const peer of [alpha,beta]){
+      const snapshot=peer.snapshot();
+      assert.equal(snapshot.agreement_hash,started.agreement_hash);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row=>row.protocol_input_tick),
+        [null,null,0,1,2,3,4,5,6,7]);
+    }
+    await assert.rejects(alpha.publishLocal({port:0,tick:8,pollSerial:'408',pad:validPad(18)}),
+      /contiguous index order/);
+  }finally{
+    await Promise.allSettled([alpha.close(),beta.close()]);
+  }
+});
+
+test('arena bridge refuses rebase outside the fully confirmed page timeline',async t=>{
+  t.after(()=>{
+    delete globalThis.__meleeRuntimePeerHistoryProbe;
+    delete globalThis.__meleeRuntimeMatchHistory;
+  });
+  let commands=0;
+  globalThis.__meleeRuntimeMatchHistory={
+    enableArenaHistory:()=>true,validatePad:()=>true,
+    status:()=>({expectedFrame:0,metadata:{preFrame:0}}),
+    command(){++commands;throw Error('Unexpected native command');},
+  };
+  installRuntimePeerHistoryProbe({role:'alpha',relayUrl:'ws://127.0.0.1:8787',
+    roomId:'a'.repeat(24),sourceIdentityJson:identityText(0),loadedIdentity,inputTicks:8,
+    initialRemotePad:[...Buffer.from(lockstepConstants.neutralPad,'hex')]});
+  const bridge=globalThis.__meleeRuntimePeerHistoryProbe;
+  await bridge.call('arenaEnable');
+  await assert.rejects(bridge.call('rebase',4),/page-owned timeline/);
+  await assert.rejects(bridge.call('episodeRebase',4),/fully confirmed selected END/);
+  assert.equal(commands,0);
+  assert.equal((await bridge.call('episodeTimeline')).confirmed_through,-1);
+});

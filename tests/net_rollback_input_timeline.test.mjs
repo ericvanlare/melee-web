@@ -250,6 +250,100 @@ test('the maximum safe tick is usable once without unsafe cursor arithmetic', ()
   assert.equal(value.status().confirmed_through, tick);
 });
 
+test('confirmed-prefix planning covers the clean full PRE window and commits only after acknowledgment',()=>{
+  const value=timeline({maxHistoryTicks:8});
+  for(let tick=0;tick<3;tick++)value.acceptRemote(tick,pad(40+tick));
+  for(let tick=0;tick<5;tick++){
+    value.recordLocal(tick,pad(10+tick));
+    value.commitForward(value.planForward());
+  }
+  const plan=value.planConfirmedPrefix({preFrame:0,confirmedEnd:3});
+  assert.equal(plan.kind,'confirmed-prefix');
+  assert.deepEqual([plan.from,plan.through,plan.confirmed_end,plan.frames.length,plan.speculative_ticks],
+    [0,4,3,5,2]);
+  assert.deepEqual(plan.frames.map(row=>row.tick),[0,1,2,3,4]);
+  assert.deepEqual(plan.frames.slice(0,3).map(row=>[row.remote_source,row.speculative]),
+    [['actual',false],['actual',false],['actual',false]]);
+  assert.deepEqual(plan.frames.slice(3).map(row=>[row.remote_source,row.speculative]),
+    [['last_known_prediction',true],['last_known_prediction',true]]);
+  assert.deepEqual(plan.frames.map(row=>row.local_pad),
+    Array.from({length:5},(_,tick)=>[...pad(10+tick)]));
+  assert.equal(value.status().simulated_through,4,'planning does not move the old simulation frontier');
+  assert.equal(value.status().plan_outstanding,true);
+  assert.throws(()=>value.planForward(),/plan is already outstanding/);
+  const committed=value.commitConfirmedPrefix(plan);
+  assert.equal(committed.simulated_through,4);
+  assert.equal(committed.remote_contiguous_through,2);
+  assert.equal(committed.dirty_from,null);
+  assert.equal(committed.plan_outstanding,false);
+  assert.throws(()=>value.commitConfirmedPrefix(plan),/stale|current plan/i,
+    'a confirmed-prefix plan can only be committed once');
+});
+
+test('confirmed-prefix replay resolves a dirty speculative tail but preserves actual prefix authority',()=>{
+  const value=timeline({maxHistoryTicks:8,initialRemotePad:pad(0)});
+  for(let tick=0;tick<5;tick++){
+    value.recordLocal(tick,pad(20+tick));
+    value.commitForward(value.planForward());
+  }
+  value.acceptRemote(3,pad(203));
+  value.acceptRemote(0,pad(0));value.acceptRemote(1,pad(0));
+  assert.equal(value.status().remote_contiguous_through,1);
+  assert.equal(value.status().dirty_from,3);
+  const plan=value.planConfirmedPrefix({preFrame:0,confirmedEnd:2});
+  assert.deepEqual([plan.from,plan.through,plan.confirmed_end,plan.speculative_ticks],[0,4,2,3]);
+  assert.deepEqual(plan.frames.slice(0,2).map(row=>[row.remote_source,row.speculative]),
+    [['actual',false],['actual',false]]);
+  assert.deepEqual(plan.frames.slice(2).map(row=>[row.remote_source,row.speculative]),
+    [['last_known_prediction',true],['actual',true],['last_known_prediction',true]],
+    'an actual sample after gap 2 remains speculative inside the suffix');
+  assert.equal(value.status().dirty_from,3,'planning leaves correction state pending');
+  assert.equal(value.status().simulated_through,4);
+  const committed=value.commitConfirmedPrefix(plan);
+  assert.equal(committed.dirty_from,null);
+  assert.equal(committed.simulated_through,4);
+  assert.equal(committed.remote_contiguous_through,1,
+    'replaying resolved rows does not invent remote confirmation');
+  assert.throws(()=>value.commitConfirmedPrefix(plan),/stale|current plan/i);
+});
+
+test('confirmed-prefix admission rejects unretained, stale, noninterior and unsafe frontiers atomically',()=>{
+  const retained=timeline({maxHistoryTicks:8});
+  for(let tick=0;tick<12;tick++){
+    retained.acceptRemote(tick,pad(tick));
+    retained.recordLocal(tick,pad(tick+20));
+    retained.commitForward(retained.planForward());
+  }
+  const before=retained.status();
+  assert.throws(()=>retained.planConfirmedPrefix({preFrame:0,confirmedEnd:11}),/retained/);
+  assert.equal(retained.status().plan_outstanding,false);
+  assert.equal(retained.status().simulated_through,before.simulated_through);
+
+  const value=timeline({maxHistoryTicks:8});
+  for(let tick=0;tick<5;tick++){
+    value.recordLocal(tick,pad(30+tick));
+    value.commitForward(value.planForward());
+  }
+  for(let tick=0;tick<3;tick++)value.acceptRemote(tick,pad(0));
+  for(const confirmedEnd of [2,5])
+    assert.throws(()=>value.planConfirmedPrefix({preFrame:0,confirmedEnd}),/confirmed input frontier|inside/);
+  assert.throws(()=>value.planConfirmedPrefix({preFrame:Number.MAX_SAFE_INTEGER+1,confirmedEnd:3}),/safe integer/);
+  assert.throws(()=>value.planConfirmedPrefix({preFrame:0,confirmedEnd:Number.MAX_SAFE_INTEGER+1}),/safe integer/);
+  assert.equal(value.status().plan_outstanding,false);
+
+  const dirtyBefore=timeline({maxHistoryTicks:8,initialRemotePad:pad(0)});
+  for(let tick=0;tick<5;tick++){
+    dirtyBefore.recordLocal(tick,pad(50+tick));
+    dirtyBefore.commitForward(dirtyBefore.planForward());
+  }
+  dirtyBefore.acceptRemote(1,pad(199));
+  dirtyBefore.acceptRemote(0,pad(0));dirtyBefore.acceptRemote(2,pad(0));
+  assert.equal(dirtyBefore.status().dirty_from,1);
+  assert.throws(()=>dirtyBefore.planConfirmedPrefix({preFrame:2,confirmedEnd:3}),/retained, live/,
+    'the requested PRE must cover every outstanding dirty tick');
+  assert.equal(dirtyBefore.status().plan_outstanding,false);
+});
+
 test('paired timelines converge with delayed, crossing, out-of-order remote samples and a toy-state oracle', () => {
   const count = 18;
   const agreedInitialRemotePad = pad(77);

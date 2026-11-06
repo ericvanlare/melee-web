@@ -58,7 +58,8 @@ public:
     bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
     bool seal_history_incarnation(const GameplayMatchSession&,
                                   const char** refusal=nullptr) noexcept;
-    bool history_endpoint_admit(const GameplayMatchSession&) const noexcept;
+    bool history_endpoint_admit(const GameplayMatchSession&,
+                                MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
     /* Archive a predicted endpoint before PRE restore. This closes only the
      * reusable CPU static bank; ActionStore remains open for correction. */
     bool archive_history_endpoint(const GameplayMatchSession&) noexcept;
@@ -67,6 +68,12 @@ public:
     bool close_history_endpoint(const GameplayMatchSession&) noexcept;
     GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&) noexcept;
     bool finish_history_replay(const GameplayMatchSession&) noexcept;
+    /* Finalize only the actual authoritative prefix C inside the restored
+     * interval. The caller proves remote confirmation; this owner proves the
+     * source frame and typed leaves. The result is CPU-only and retirement-only,
+     * never a drawn endpoint or another continuation of the old capsule. */
+    bool finish_history_confirmed_prefix(const GameplayMatchSession&,
+                                         std::uint32_t confirmed_end) noexcept;
     bool retire_history_confirmed(const GameplayMatchSession&) noexcept;
     GameplayActionStoreHistory* history_actions() const noexcept {
         return history_actions_.get();
@@ -101,7 +108,8 @@ private:
     enum class Phase { Captured, Recording, Sealed, Replaying, Correcting, CorrectedSealed,
                        HistoryReady, HistoryRecording, HistorySealed,
                        HistoryCorrecting, HistoryCorrectedSealed,
-                       Finished, Failed, ConfirmedDetached, Retired };
+                       Finished, Failed, ConfirmedDetached, Retired,
+                       HistoryConfirmedPrefixSealed };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop)
         :span_(span),reusable_loop_(reusable_loop){}
@@ -115,8 +123,8 @@ private:
     const bool reusable_loop_;
     std::uint64_t motor_token_{};
     bool same_owner(const GameplayMatchSession&) const noexcept;
-    bool history_payload_admit() const noexcept;
-    const char* history_arena_failure() const noexcept;
+    bool history_payload_admit(MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
+    const char* history_arena_failure(MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);
     bool matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>&,const AudioRanges&,std::size_t) noexcept;

@@ -21,6 +21,10 @@ namespace melee_web {
 enum class RuntimeMatchHistoryCommand : std::uint32_t {
     Capture=1, Begin=2, Forward=3, Present=4, AdmitIdle=5, Restore=6,
     Correct=7, CloseEndpoint=8, Retire=9, Cleanup=10, RebaseConfirmed=11,
+    RecordingPresent=19,
+    FinishConfirmedPrefix=20, CloseConfirmedPrefix=21,
+    RetireConfirmedPrefix=22, RebaseConfirmedPrefix=23,
+    AdoptPrefixTicket=24,
 };
 
 enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
@@ -58,7 +62,9 @@ enum class RuntimeMatchHistoryPhase : std::uint32_t {
     Restored=11, CorrectedSealed=12, CorrectedCpuCopied=13,
     CorrectedDrawPending=14, CorrectedDrawIdle=15, CorrectedComplete=16,
     Closed=17, Retired=18, Failed=19, MatchClosed=20,
-    EpisodeRecording=21,
+    EpisodeRecording=21, EpisodePresentPending=22,
+    PrefixSealed=23, PrefixCpuCopied=24, PrefixClosed=25, PrefixRetired=26,
+    PresentedSealed=27, PresentedComplete=28,
 };
 
 enum class RuntimeMatchHistoryFailure : std::uint32_t {
@@ -108,6 +114,44 @@ struct RuntimeMatchHistoryInputReceipt {
 };
 static_assert(sizeof(RuntimeMatchHistoryInputReceipt)==176);
 
+/* Native-owned, fixed suffix handoff created only from actual retired input
+ * receipts. The menu keeps one instance across the sole prefix rebase; browser
+ * arguments can read its evidence but cannot construct or edit its rows. */
+class RuntimeMatchHistoryPrefixHandoff final {
+public:
+    RuntimeMatchHistoryPrefixHandoff() noexcept = default;
+    RuntimeMatchHistoryPrefixHandoff(const RuntimeMatchHistoryPrefixHandoff&) = delete;
+    RuntimeMatchHistoryPrefixHandoff& operator=(const RuntimeMatchHistoryPrefixHandoff&) = delete;
+    bool active() const noexcept { return active_; }
+    std::uint32_t old_pre_frame() const noexcept { return old_pre_frame_; }
+    std::uint32_t confirmed_frame() const noexcept { return confirmed_frame_; }
+    std::uint32_t selected_end_frame() const noexcept { return selected_end_frame_; }
+    std::uint32_t old_incarnation() const noexcept { return old_incarnation_; }
+    std::uint32_t finish_request_sequence() const noexcept { return finish_request_sequence_; }
+    std::uint32_t rebase_request_sequence() const noexcept { return rebase_request_sequence_; }
+    std::uint32_t suffix_count() const noexcept { return suffix_count_; }
+    std::uint32_t suffix_cursor() const noexcept { return suffix_cursor_; }
+    unsigned local_port() const noexcept { return local_port_; }
+    unsigned remote_port() const noexcept { return remote_port_; }
+    const GameplayMatchCpuOwners& owners() const noexcept { return owners_; }
+    const RuntimeMatchHistoryInputReceipt* origin_row(std::uint32_t ordinal) const noexcept {
+        return active_&&ordinal<suffix_count_?&suffix_[ordinal]:nullptr;
+    }
+    void clear() noexcept {
+        active_=false;owners_={};old_pre_frame_=confirmed_frame_=selected_end_frame_=0;
+        old_incarnation_=finish_request_sequence_=rebase_request_sequence_=0;
+        suffix_count_=suffix_cursor_=local_port_=remote_port_=0;suffix_={};
+    }
+private:
+    friend class RuntimeMatchHistory;
+    bool active_{};
+    GameplayMatchCpuOwners owners_{};
+    std::uint32_t old_pre_frame_{},confirmed_frame_{},selected_end_frame_{};
+    std::uint32_t old_incarnation_{},finish_request_sequence_{},rebase_request_sequence_{};
+    std::uint32_t suffix_count_{},suffix_cursor_{},local_port_{},remote_port_{};
+    std::array<RuntimeMatchHistoryInputReceipt,7> suffix_{};
+};
+
 /* Legacy mode remains one actual forward source tick and one restored-PRE
  * correction. The explicitly enabled private episode mode uses the fixed
  * seven-row receipts above across at most three source incarnations and two
@@ -149,7 +193,18 @@ public:
                        const std::uint8_t* planned_frame,
                        unsigned planned_frame_bytes) noexcept;
     bool finish_replay() noexcept;
+    bool finish_confirmed_prefix(std::uint32_t confirmed_end) noexcept;
+    bool capture_confirmed_prefix_handoff(
+        std::uint32_t finish_request_sequence,
+        RuntimeMatchHistoryPrefixHandoff&) const noexcept;
+    bool close_confirmed_prefix() noexcept;
+    bool retire_confirmed_prefix() noexcept;
+    bool can_rebase_confirmed_prefix(
+        std::uint32_t confirmed_end,RuntimeMatchHistoryPrefixHandoff&,
+        std::uint32_t rebase_request_sequence) const noexcept;
     bool begin_continuation() noexcept;
+    bool begin_episode(RuntimeMatchHistoryPrefixHandoff&) noexcept;
+    bool adopt_next_prefix_ticket() noexcept;
     bool forward_from_poll(const PADStatus raw[PAD_MAX_CONTROLLERS],
                            std::uint64_t poll_serial,
                            unsigned local_port, unsigned remote_port,
@@ -163,7 +218,11 @@ public:
      * inside Aurora begin/end. Completion is admitted separately only after
      * the host's actual GPU/Asyncify fence boundary has become idle. */
     bool submit_present() noexcept;
+    bool submit_recording_present() noexcept;
     bool admit_present_completion() noexcept;
+    /* Opt in to a post-draw frontier after the current recording present idles. */
+    bool seal_presented_frontier() noexcept;
+    std::uint32_t recording_present_count() const noexcept { return recording_present_count_; }
 
     /* Copy the entire strict 9-domain endpoint and particle sidecar batch
      * through these accessors, then call end_endpoint_batch(). That method
@@ -198,9 +257,14 @@ public:
     std::uint32_t pre_frame() const noexcept { return pre_frame_; }
     std::uint32_t current_frame() const noexcept;
     std::uint32_t sealed_end() const noexcept { return sealed_end_; }
+    std::uint32_t prefix_selected_end() const noexcept { return prefix_selected_end_; }
+    std::uint32_t prefix_suffix_cursor() const noexcept;
+    std::uint32_t prefix_suffix_remaining() const noexcept;
     std::uint32_t incarnation() const noexcept { return incarnation_; }
     std::uint32_t restore_count() const noexcept { return restore_count_; }
     std::uint32_t endpoint_mask() const noexcept { return endpoint_mask_; }
+    std::uint32_t forward_steps() const noexcept { return forward_steps_; }
+    std::uint32_t replay_steps() const noexcept { return replay_steps_; }
     std::uint64_t poll_serial() const noexcept { return poll_serial_; }
     bool episode_mode() const noexcept { return episode_mode_; }
     const RuntimeMatchHistoryPollTicket* latest_ticket() const noexcept;
@@ -212,11 +276,11 @@ private:
     enum EndpointBit : std::uint32_t {
         CapturedPre=1u<<0, ArmedPre=1u<<1, PredictedCpu=1u<<2,
         PredictedDraw=1u<<3, RestoredPre=1u<<4, CorrectedCpu=1u<<5,
-        CorrectedDraw=1u<<6,
+        CorrectedDraw=1u<<6, PrefixCpu=1u<<7, PresentedFrontier=1u<<8,
     };
     enum class EndpointRole : std::uint32_t {
         None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
-        RestoredPre, CorrectedCpu, CorrectedDraw,
+        RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier,
     };
 
     RuntimeMatchHistory(GameplayMatchSession&, RuntimeMatchHistoryBoundaryCheck,
@@ -247,14 +311,21 @@ private:
     std::uint32_t pre_frame_{},sealed_end_{},incarnation_{},restore_count_{};
     std::uint32_t endpoint_mask_{};
     std::uint32_t forward_steps_{},replay_steps_{};
+    std::uint32_t last_present_source_frame_{},recording_present_count_{};
     std::uint32_t local_port_{},remote_port_{};
     std::uint64_t poll_serial_{};
     mutable bool endpoint_read_failure_{};
     bool has_input_{},source_step_possible_{};
-    bool episode_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
+    bool episode_mode_{},arena_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
+    bool last_present_source_frame_valid_{};
     std::uint32_t segment_start_frame_{},replay_target_end_{},ticket_count_{},last_ticket_id_{};
+    std::uint32_t prefix_selected_end_{},prefix_suffix_cursor_{},prefix_adopted_cursor_{};
+    bool prefix_handoff_imported_{},prefix_adoption_pending_{};
+    RuntimeMatchHistoryPrefixHandoff* prefix_handoff_{};
     RuntimeMatchHistoryPollTicket latest_ticket_{};
     std::array<RuntimeMatchHistoryInputReceipt,7> episode_rows_{};
+    std::array<RuntimeMatchHistoryInputReceipt,7> episode_origin_rows_{};
+    std::array<RuntimeMatchHistoryInputReceipt,7> prefix_suffix_rows_{};
 };
 
 } // namespace melee_web

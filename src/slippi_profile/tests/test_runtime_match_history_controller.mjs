@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
   decodeRuntimeMatchHistoryInput,decodeRuntimeMatchHistoryPollTicket,
-  decodeRuntimeMatchHistoryEpisodeInputRow,validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
+  decodeRuntimeMatchHistoryEpisodeInputRow,decodeRuntimeMatchHistoryPrefixHandoff,
+  validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
 const HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
@@ -164,6 +165,167 @@ function episodeFixture(){
   writeMetadata();
   return {...f,episodeState:()=>({current,phase,incarnation,forwardSteps,replaySteps,restoreCount,ownerState,
     pollSerial,lastPlan,enableCalls,ticketPointer,rowPointer})};
+}
+
+function confirmedPrefixFixture({failCommand=0,oldIncarnation=1,originIncarnation=1,
+  boundaryIncarnation=1}={}){
+  const f=episodeFixture(),{module,put,view}=f;
+  const stringPointer=2048,ticketPointer=16384,originPointer=16768,boundaryPointer=16960,checksumPointer=17152;
+  const rows=[2,3].map((sourceFrame,index)=>{
+    const raw=Uint8Array.from({length:44},(_,offset)=>(index*53+offset*11+7)&255);
+    const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
+    [1,176,700+index,sourceFrame,originIncarnation,0,1,1]
+      .forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,9007199254741001n+BigInt(index),true);
+    bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
+    return {bytes,ticketId:700+index,sourceFrame,incarnation:originIncarnation,localPort:0,remotePort:1,
+      pollSerial:(9007199254741001n+BigInt(index)).toString(),raw};
+  });
+  const state={ownerState:0,firstFailure:0,pending:0,lastCommand:0,requestSequence:0,completeSequence:0,
+    expectedFrame:0,localPort:0,remotePort:1,phase:0,preFrame:0,currentFrame:0,sealedEnd:0,
+    incarnation:0,restoreCount:0,endpointMask:0,forwardSteps:0,replaySteps:0,pollSerial:0n,
+    identityFrame:0,handoffCleared:false,
+    inputReady:0,gpuPending:0,endpointActive:0,rendererErrors:0,confirmedFrame:2,
+    latestTicketId:0,latestRaw:new Uint8Array(44),forwarded:[],descriptor:{
+      schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+      selectedEndFrame:4,oldIncarnation,finishRequestSequence:0,rebaseRequestSequence:0,
+      suffixCount:2,suffixCursor:0,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+      ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+      ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'}};
+  let ticketBytesReads=0,ticketDataReads=0;
+  const writeStatus=()=>{
+    put(0,1);put(4,128);put(8,state.ownerState);put(12,state.firstFailure);put(16,state.pending);
+    put(20,state.lastCommand);put(24,state.requestSequence);put(28,state.completeSequence);
+    put(32,state.expectedFrame);put(36,state.localPort);put(40,state.remotePort);put(44,0);
+    put(48,1);put(52,64);put(56,state.phase);put(60,0);put(64,state.preFrame);
+    put(68,state.currentFrame);put(72,state.sealedEnd);put(76,state.incarnation);
+    put(80,state.restoreCount);put(84,state.endpointMask);put(88,state.forwardSteps);
+    put(92,state.replaySteps);view.setBigUint64(352,state.pollSerial,true);
+    put(104,0);put(108,0);put(112,state.inputReady);put(116,state.gpuPending);
+    put(120,state.endpointActive);put(124,state.rendererErrors);
+  };
+  const writeString=value=>{
+    const bytes=new TextEncoder().encode(value+'\0');module.HEAPU8.set(bytes,stringPointer);return stringPointer;
+  };
+  const writeTicket=(ticketId,sourceFrame,incarnation,pollSerial,raw)=>{
+    const bytes=new Uint8Array(88),data=new DataView(bytes.buffer);
+    [1,88,ticketId,sourceFrame,incarnation,0,1,0]
+      .forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,BigInt(pollSerial),true);bytes.set(raw,40);
+    module.HEAPU8.set(bytes,ticketPointer);
+  };
+  const sourceBoundary=()=>{
+    const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
+    [1,176,500,1,boundaryIncarnation,0,1,2].forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,8800n,true);
+    const raw=Uint8Array.from({length:44},(_,offset)=>(offset*9+5)&255);
+    bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
+    module.HEAPU8.set(bytes,boundaryPointer);
+  };
+  const request=command=>{
+    f.calls.push(command);state.pending=command;state.requestSequence++;writeStatus();
+    queueMicrotask(()=>{
+      state.pending=0;state.completeSequence=state.requestSequence;state.lastCommand=command;
+      if(command===failCommand){state.firstFailure=9;writeStatus();return;}
+      if(command===1){state.phase=1;state.inputReady=0;}
+      else if(command===18){state.phase=3;state.incarnation=1;state.currentFrame=state.preFrame;
+        state.forwardSteps=0;state.replaySteps=0;state.restoreCount=0;state.inputReady=0;}
+      else if(command===20){state.phase=23;state.currentFrame=state.confirmedFrame;
+        state.sealedEnd=state.confirmedFrame;state.inputReady=1;
+        state.descriptor.finishRequestSequence=state.requestSequence;}
+      else if(command===21){state.phase=25;}
+      else if(command===22){state.phase=26;}
+      else if(command===23){state.expectedFrame=state.confirmedFrame;state.preFrame=state.confirmedFrame;
+        state.currentFrame=state.confirmedFrame;state.sealedEnd=0;state.phase=0;state.incarnation=0;
+        state.restoreCount=0;state.endpointMask=0;state.forwardSteps=0;state.replaySteps=0;
+        state.pollSerial=0n;state.inputReady=0;state.identityFrame=state.confirmedFrame;
+        state.descriptor.rebaseRequestSequence=state.requestSequence;}
+      else if(command===24){
+        const origin=rows[state.descriptor.suffixCursor];
+        if(origin){state.latestTicketId=origin.ticketId;state.latestRaw=origin.raw.slice();
+          state.currentFrame=state.confirmedFrame+state.descriptor.suffixCursor;
+          state.pollSerial=BigInt(origin.pollSerial);state.inputReady=1;
+          writeTicket(origin.ticketId,origin.sourceFrame,state.incarnation,origin.pollSerial,origin.raw);}
+      }else if(command===12){
+        state.latestTicketId=state.requestSequence;state.latestRaw=Uint8Array.from({length:44},(_,i)=>(i+3)&255);
+        state.pollSerial=9007199254741111n+BigInt(state.requestSequence);
+        state.inputReady=1;state.phase=state.phase===4?4:21;
+        writeTicket(state.latestTicketId,state.currentFrame,state.incarnation,state.pollSerial,state.latestRaw);
+      }else if(command===13){
+        state.currentFrame++;state.phase=21;state.forwardSteps++;state.inputReady=1;
+        state.descriptor.suffixCursor++;
+      }else if(command===11){
+        state.expectedFrame=state.confirmedFrame;state.preFrame=state.confirmedFrame;
+        state.currentFrame=state.confirmedFrame;state.sealedEnd=0;state.phase=0;state.incarnation=0;
+        state.restoreCount=0;state.endpointMask=0;state.forwardSteps=0;state.replaySteps=0;
+        state.pollSerial=0n;state.inputReady=0;state.identityFrame=state.confirmedFrame;
+        state.handoffCleared=true;
+      }
+      if(command===10)state.ownerState=2;
+      writeStatus();
+    });
+    return 1;
+  };
+  module[prefix+'take_over']=(frame,local,remote)=>{
+    state.ownerState=1;state.expectedFrame=frame;state.preFrame=frame;state.currentFrame=frame;
+    state.localPort=local;state.remotePort=remote;writeStatus();return 1;
+  };
+  module[prefix+'request']=request;
+  module[prefix+'request_rebase']=end=>{state.confirmedFrame=end;return request(11);};
+  module[prefix+'request_prefix_finish']=frame=>{state.confirmedFrame=frame;return request(20);};
+  module[prefix+'request_prefix_rebase']=frame=>{state.confirmedFrame=frame;return request(23);};
+  module[prefix+'episode_enable']=()=>1;module[prefix+'arena_enable']=()=>1;
+  module[prefix+'cpu_arena_endpoint_data']=()=>19000;
+  module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  module[prefix+'identity_json']=()=>writeString(JSON.stringify({...host,source_frame:0,
+    current_rng:'fedcba98',selection:{stage:2}}));
+  module[prefix+'rebase_identity_json']=()=>writeString(JSON.stringify({...host,source_frame:state.identityFrame,
+    current_rng:'01234567',selection:{stage:2}}));
+  module[prefix+'prefix_handoff_json']=()=>state.handoffCleared?0:writeString(JSON.stringify(state.descriptor));
+  module[prefix+'prefix_origin_row_bytes']=()=>state.handoffCleared?0:176;
+  module[prefix+'prefix_origin_row_data']=ordinal=>{
+    if(state.handoffCleared)return 0;
+    const row=rows[ordinal];if(!row)return 0;
+    module.HEAPU8.set(row.bytes,originPointer);return originPointer;
+  };
+  module[prefix+'input_row_bytes']=()=>176;
+  module[prefix+'input_row_data']=ordinal=>{sourceBoundary();return ordinal===1?boundaryPointer:0;};
+  module[prefix+'ticket_bytes']=()=>{ticketBytesReads++;return 88;};
+  module[prefix+'ticket_data']=()=>{ticketDataReads++;return ticketPointer;};
+  module[prefix+'request_episode_forward']=(ticketId,pointer,size)=>{
+    if(size!==44||ticketId!==state.latestTicketId)return 0;
+    state.forwarded.push(module.HEAPU8.slice(pointer,pointer+size));return request(13);
+  };
+  module[prefix+'checksum_data']=()=>checksumPointer;
+  module[prefix+'checksum_bytes']=()=>64;
+  const checksum=new Uint8Array(64),checksumView=new DataView(checksum.buffer);
+  checksumView.setUint32(0,1,true);checksumView.setUint32(4,3,true);checksumView.setUint32(12,2,true);
+  module.HEAPU8.set(checksum,checksumPointer);
+  writeStatus();
+  return {...f,state,rows,originPointer,writeStatus,setPhase:(phase,extra={})=>{
+    Object.assign(state,{phase},extra);writeStatus();
+  },mutateHandoff:fn=>{fn(state.descriptor);},writeString,
+  ticketReads:()=>({bytes:ticketBytesReads,data:ticketDataReads})};
+}
+
+async function preparePrefixAdoption({failCommand=0,oldIncarnation=1,originIncarnation=1,
+  boundaryIncarnation=1}={}){
+  const f=confirmedPrefixFixture({failCommand,oldIncarnation,originIncarnation,boundaryIncarnation}),
+    owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);owner.enableArenaHistory();
+  await owner.command('capture');
+  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:oldIncarnation,
+    restoreCount:1,forwardSteps:4,replaySteps:2,pollSerial:990n,inputReady:1});
+  await owner.command('finishPrefix',2);
+  f.setPhase(24);
+  const checksum=owner.checksum();
+  const origins=[owner.prefixOrigin(0),owner.prefixOrigin(1)];
+  await owner.command('closePrefix');await owner.command('retirePrefix');
+  const rebase=await owner.command('rebaseConfirmedPrefix',2);
+  await owner.command('capture');await owner.command('beginEpisode');
+  f.setPhase(4);
+  return {f,owner,checksum,origins,rebase};
 }
 
 const host=Object.freeze({runtime_sha256:'a'.repeat(64),asset_identity_sha256:'b'.repeat(64),
@@ -418,6 +580,168 @@ test('episode receipt decoders preserve uint64 serials and reject malformed tick
   [1,176,7,176,1,0,1,0].forEach((value,index)=>emptyView.setUint32(index*4,value,true));
   emptyView.setBigUint64(32,1n,true);nonzeroEmpty[84]=1;
   assert.throws(()=>decodeRuntimeMatchHistoryEpisodeInputRow(nonzeroEmpty),/Unconsumed episode ticket/);
+});
+
+test('confirmed-prefix handoff decoder preserves bounded source identity and rejects stale metadata',()=>{
+  const handoff={schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+    selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:7,rebaseRequestSequence:0,
+    suffixCount:2,suffixCursor:1,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+    ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+    ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'};
+  assert.deepEqual(decodeRuntimeMatchHistoryPrefixHandoff(JSON.stringify(handoff)),handoff);
+  const reject=(label,mutate,pattern=/Runtime prefix handoff/)=>{
+    const value=structuredClone(handoff);mutate(value);
+    assert.throws(()=>decodeRuntimeMatchHistoryPrefixHandoff(JSON.stringify(value)),pattern,label);
+  };
+  reject('extra fields are refused',value=>{value.reserved=0;},/exact field set/);
+  reject('confirmed frame must be strictly inside the selected interval',value=>{value.confirmedFrame=4;});
+  reject('suffix count must describe the untouched tail',value=>{value.suffixCount=1;});
+  reject('rebase request must follow finish',value=>{value.rebaseRequestSequence=7;});
+  reject('uint64 metadata stays canonical decimal',value=>{value.worldGeneration='041';},/canonical uint64 decimal/);
+  reject('owner tokens stay fixed-width lowercase hex',value=>{value.ownerFlow='00000000000000AF';},/owner token/);
+  reject('zero owner tokens are invalid',value=>{value.ownerAudio='0000000000000000';},/owner token/);
+});
+
+test('confirmed-prefix controller copies the actual C checksum and replays suffix tickets without polling',async()=>{
+  const {f,owner,checksum,origins,rebase}=await preparePrefixAdoption();
+  const record=new DataView(checksum.buffer);
+  assert.deepEqual([record.getUint32(0,true),record.getUint32(4,true),record.getUint32(12,true)],[1,3,2]);
+  assert.deepEqual([rebase.status.expectedFrame,rebase.status.metadata.preFrame,
+    rebase.status.completeSequence,rebase.status.lastCompletedCommand],[2,2,5,23]);
+  assert.deepEqual(owner.prefixHandoff(),{
+    schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+    selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:2,rebaseRequestSequence:5,
+    suffixCount:2,suffixCursor:0,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+    ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+    ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'});
+  f.module.HEAPU8.fill(0,f.originPointer,f.originPointer+176);
+  assert.equal(origins[0].sourceFrame,2);
+  assert.deepEqual(origins[0].rawBytes.slice(40,84),origins[0].raw,
+    'the origin accessor returned an owned copy of the immutable 176-byte row');
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18]);
+  let ticketReads=f.ticketReads();
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    assert.equal(ticket.ticketId,origin.ticketId);
+    assert.notEqual(ticket.ticketId,f.state.requestSequence,
+      'the preserved source ticket ID is not the new capsule request sequence');
+    assert.equal(ticket.sourceFrame,origin.sourceFrame);
+    assert.equal(ticket.incarnation,1,'the adopted ticket binds to the fresh capsule incarnation');
+    assert.equal(ticket.pollSerial,origin.pollSerial);
+    assert.deepEqual(ticket.raw,origin.raw);
+    const reads=f.ticketReads();
+    assert.deepEqual({bytes:reads.bytes-ticketReads.bytes,data:reads.data-ticketReads.data},{bytes:1,data:1},
+      'one cmd24 completion yields one copied 88-byte ticket');
+    ticketReads=reads;
+    const plan=ticket.raw.slice();plan[11]^=0x40;
+    await owner.forwardTicket(ticket.ticketId,plan);
+    assert.deepEqual(f.state.forwarded.at(-1),plan);
+  }
+  assert.equal(owner.prefixHandoff().suffixCursor,2);
+  await owner.command('pollTicket');
+  assert.equal(owner.ticket().sourceFrame,4,'fresh polling resumes only after the preserved suffix ends');
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24,13,24,13,12]);
+  for(const command of [20,21,22,23,24,13,12])
+    assert.equal(f.calls.filter(value=>value===command).length,command===13?2:command===24?2:1,
+      `native command ${command} is dispatched exactly once per suffix boundary`);
+});
+
+test('confirmed-prefix controller rejects stale handoffs, malformed origins, and mismatched adopted tickets',async()=>{
+  const stale=await preparePrefixAdoption();
+  stale.f.mutateHandoff(value=>{value.finishRequestSequence=100;value.rebaseRequestSequence=101;});
+  assert.throws(()=>stale.owner.prefixHandoff(),/request sequence is ahead/);
+
+  const malformed=await preparePrefixAdoption();
+  malformed.f.rows[0].bytes[0]=9;
+  assert.throws(()=>malformed.owner.prefixOrigin(0),/metadata violation/);
+
+  const mismatch=await preparePrefixAdoption();
+  await mismatch.owner.command('adoptNextPrefixTicket');
+  const wrong={...mismatch.origins[0],rawBytes:mismatch.origins[0].rawBytes.slice()};
+  wrong.rawBytes[40]^=1;
+  const reads=mismatch.f.ticketReads();
+  assert.throws(()=>mismatch.owner.adoptedTicket(wrong),/exact immutable origin row/);
+  assert.deepEqual(mismatch.f.ticketReads(),reads,
+    'a mismatched caller row is rejected before reading adopted ticket storage');
+});
+
+test('confirmed-prefix generic close refusal is dispatched once and remains terminal',async()=>{
+  const f=confirmedPrefixFixture({failCommand:21}),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});owner.identity(host);owner.enableArenaHistory();
+  await owner.command('capture');
+  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:1,
+    restoreCount:1,forwardSteps:4,replaySteps:2,pollSerial:990n,inputReady:1});
+  await owner.command('finishPrefix',2);f.setPhase(24);
+  await assert.rejects(owner.command('closePrefix'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21]);
+  await assert.rejects(owner.command('retirePrefix'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21],'the failed close is never retried and later work is blocked');
+});
+
+test('confirmed-prefix ticket adoption refusal does not read or repeat the native ticket',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption({failCommand:24});
+  await assert.rejects(owner.command('adoptNextPrefixTicket'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24]);
+  assert.deepEqual(f.ticketReads(),{bytes:0,data:0});
+  assert.throws(()=>owner.adoptedTicket(origins[0]),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24]);
+});
+
+test('confirmed-prefix origin and C−1 receipts may come from an earlier bounded incarnation',async()=>{
+  const {f,owner,origins,checksum}=await preparePrefixAdoption({
+    oldIncarnation:2,originIncarnation:1,boundaryIncarnation:1});
+  assert.equal(owner.prefixHandoff().oldIncarnation,2);
+  assert.equal(origins[0].incarnation,1,'native origin preserves the original 176-byte row');
+  assert.equal(new DataView(checksum.buffer).getUint32(0,true),1,
+    'the selected C−1 checksum accepts the prior source incarnation');
+  await owner.command('adoptNextPrefixTicket');
+  const ticket=owner.adoptedTicket(origins[0]);
+  assert.equal(ticket.incarnation,1,'the adopted ticket binds to the fresh capsule incarnation');
+  assert.deepEqual(ticket.raw,origins[0].raw);
+  assert.equal(f.state.descriptor.suffixCursor,0,'adoption alone does not consume the suffix row');
+});
+
+test('confirmed-prefix C−1 checksum rejects a row newer than its current owner',async()=>{
+  await assert.rejects(preparePrefixAdoption({oldIncarnation:2,boundaryIncarnation:3}),
+    /exact old-incarnation selected C−1 input row/);
+});
+
+test('whole-END rebase clears exhausted prefix latches only after native cleanup succeeds',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption();
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    await owner.forwardTicket(ticket.ticketId,ticket.raw);
+  }
+  f.setPhase(18,{expectedFrame:2,preFrame:2,currentFrame:4,sealedEnd:4,incarnation:1,
+    restoreCount:1,endpointMask:40,forwardSteps:2,replaySteps:2,pollSerial:990n,inputReady:1});
+  const result=await owner.command('rebase',4);
+  assert.equal(result.status.expectedFrame,4);
+  assert.equal(f.state.handoffCleared,true);
+  assert.equal(f.module[prefix+'prefix_handoff_json'](),0);
+  assert.equal(f.module[prefix+'prefix_origin_row_bytes'](),0);
+  await owner.command('capture');await owner.command('beginEpisode');
+  f.setPhase(4,{expectedFrame:4,preFrame:4,currentFrame:4,sealedEnd:0,incarnation:1,
+    restoreCount:0,endpointMask:40,forwardSteps:0,replaySteps:0,pollSerial:0n,inputReady:0});
+  await owner.command('pollTicket');
+  assert.equal(owner.ticket().ticketId,f.state.requestSequence,
+    'normal tickets resume after native clears the exhausted handoff');
+});
+
+test('failed whole-END rebase preserves the active prefix handoff',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption({failCommand:11});
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    await owner.forwardTicket(ticket.ticketId,ticket.raw);
+  }
+  f.setPhase(18,{expectedFrame:2,preFrame:2,currentFrame:4,sealedEnd:4,incarnation:1,
+    restoreCount:1,endpointMask:40,forwardSteps:2,replaySteps:2,pollSerial:990n,inputReady:1});
+  await assert.rejects(owner.command('rebase',4),/Native history refused/);
+  assert.equal(f.state.handoffCleared,false);
+  assert.notEqual(f.module[prefix+'prefix_handoff_json'](),0);
+  assert.equal(f.module[prefix+'prefix_origin_row_bytes'](),176);
 });
 
 test('agreed-start forwards host identities and seed while returning exact native bytes and held-frame receipt',()=>{
@@ -689,4 +1013,296 @@ test('alternate renderer work retains its receipt on the original idle and clean
   await assert.rejects(owner.command('cleanup'),/cleanup exceeded its 30 ms deadline.*pendingStaging/);
   assert.deepEqual(f.calls,[]);
   assert.equal(owner.journal()[1].rendererPreparation.latest.command,10);
+});
+
+test('arena controller rebases a four-tick retired END and keeps episode mode for the next capture',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  const identity=source_frame=>JSON.stringify({...host,source_frame,
+    current_rng:source_frame?'01234567':'fedcba98',selection:{stage:2}});
+  const publish=frame=>{
+    f.module.HEAPU8.set(new TextEncoder().encode(identity(frame)+'\0'),2048);
+    return 2048;
+  };
+  f.module[prefix+'identity_json']=()=>publish(0);
+  f.module[prefix+'rebase_identity_json']=()=>publish(4);
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  f.module[prefix+'request_rebase']=end=>{
+    assert.equal(end,4);
+    f.put(32,end);f.put(56,0);f.put(64,end);f.put(68,end);f.put(72,0);
+    f.put(76,0);f.put(80,0);f.put(84,0);f.put(88,0);f.put(92,0);
+    f.view.setBigUint64(352,0n,true);
+    f.put(104,40);f.put(112,0);
+    return f.module[prefix+'request'](11);
+  };
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);
+  owner.enableArenaHistory();
+  await owner.command('capture');
+  f.put(56,18);f.put(68,4);f.put(72,4);f.put(76,3);f.put(80,2);
+  f.put(88,4);f.put(92,4);f.put(108,40);f.put(112,1);
+  f.view.setBigUint64(352,465n,true);
+  const fresh=await owner.command('rebase',4);
+  assert.equal(fresh.identity,identity(4));
+  assert.deepEqual([fresh.status.expectedFrame,fresh.status.metadata.currentFrame,
+    fresh.status.completeSequence,fresh.status.metadata.pollSerial],[4,4,2,'0']);
+  assert.equal((await owner.command('capture')).completeSequence,3);
+  await assert.rejects(owner.command('forward'),/Legacy one-window/);
+  assert.deepEqual(f.calls,[1,11,1]);
+});
+
+test('recording present and idle preserve the actual forward source boundary',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  await assert.rejects(owner.command('recordingPresent'),/explicit arena history/);
+  owner.enableArenaHistory();
+  await owner.command('capture');
+  f.put(56,21);f.put(68,1);f.put(76,1);f.put(88,1);f.put(108,20);f.put(112,1);
+  f.view.setBigUint64(352,9007199254740993n,true);
+  const request=f.module[prefix+'request'];
+  f.module[prefix+'request']=command=>{
+    const result=request(command);
+    queueMicrotask(()=>{
+      if(command===19){f.put(56,22);f.put(116,1);}
+      if(command===5)f.put(56,21);
+    });
+    return result;
+  };
+  const submitted=await owner.command('recordingPresent');
+  assert.equal(submitted.metadata.phase,22);
+  const receipt={schema:1,command:19,requestSequence:submitted.completeSequence,
+    sourceFrameBefore:1,sourceFrameAfter:1,priorSubmission:'9007199254741001',
+    submission:'9007199254741002',presentationSerial:'1'};
+  const publish=value=>f.module.HEAPU8.set(new TextEncoder().encode(JSON.stringify(value)+'\0'),2048);
+  f.module[prefix+'presentation_json']=()=>2048;
+  publish(receipt);
+  const copied=owner.presentation();
+  assert.deepEqual(copied,receipt);
+  publish({...receipt,sourceFrameAfter:2});
+  assert.throws(()=>owner.presentation(),/differs from completed native draw/);
+  assert.deepEqual(copied,receipt);
+  publish({...receipt,submission:receipt.priorSubmission});
+  assert.throws(()=>owner.presentation(),/submission did not advance/);
+  publish({...receipt,presentationSerial:'18446744073709551616'});
+  assert.throws(()=>owner.presentation(),/outside uint64 bounds/);
+  f.put(116,0);
+  const idle=await owner.command('idle');
+  assert.equal(idle.metadata.phase,21);
+  assert.equal(idle.metadata.currentFrame,1);
+  assert.equal(idle.metadata.pollSerial,'9007199254740993');
+  assert.throws(()=>owner.presentation(),/completed draw before idle/);
+  for(const phase of [7,14]){
+    f.put(56,phase);f.put(20,4);
+    const sealed={...receipt,command:4,requestSequence:idle.completeSequence};
+    publish(sealed);
+    assert.deepEqual(owner.presentation(),sealed);
+  }
+  assert.deepEqual(f.calls,[1,19,5]);
+});
+
+function inlineFixture(options){
+  const f=episodeFixture();
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  let enableCalls=0;
+  f.module[prefix+'inline_dispatch_enable']=()=>{enableCalls++;return 1;};
+  const owner=createRuntimeMatchHistoryController(f.module,options);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  return {...f,owner,inlineEnableCalls:()=>enableCalls};
+}
+
+test('native endpoint admission revalidates without publishing raw rows and latches refusal',async()=>{
+  for(const failure of [null,'begin','end']){
+    const f=inlineFixture(),{owner,module}=f;
+    owner.enableArenaHistory();
+    module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+    owner.enableInlineDispatch();
+    await owner.command('capture');f.put(56,1);
+    const calls=[];
+    module[prefix+'cpu_endpoint_begin']=(view,provenance)=>{
+      calls.push(['begin',view,provenance]);
+      if(failure==='begin')return 1;
+      f.put(120,1);return 0;
+    };
+    module[prefix+'cpu_endpoint_end']=()=>{
+      calls.push(['end']);
+      if(failure==='end')return 1;
+      f.put(120,0);f.put(56,2);f.put(84,1);return 0;
+    };
+    module[prefix+'cpu_endpoint_record']=()=>{throw Error('Native-only admission must not claim raw row publication');};
+    if(failure){
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
+      assert.deepEqual(calls,failure==='begin'?[['begin',1,1]]:[['begin',1,1],['end']]);
+    }else{
+      f.put(116,1);
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/idle owner/);
+      assert.deepEqual(calls,[]);f.put(116,0);
+      const receipt=owner.admitEndpoint({view:1,provenance:1});
+      assert.equal(receipt.scope,'native-typed-admission-only');
+      assert.equal(receipt.rawRowsPublished,false);
+      assert.deepEqual([receipt.before.metadata.phase,receipt.after.metadata.phase],[1,2]);
+      assert.deepEqual(calls,[['begin',1,1],['end']]);
+    }
+  }
+});
+
+test('paced controller retains the native clock stall before generic owner failure',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();await owner.command('capture');f.put(56,4);
+  const pointer=24576,bytes=new Uint8Array(64),data=new DataView(bytes.buffer);
+  [1,64,4,0,0,0,1,1].forEach((value,index)=>data.setUint32(index*4,value,true));
+  data.setFloat64(32,150,true);data.setFloat64(40,0,true);
+  data.setFloat64(48,9,true);data.setFloat64(56,8,true);module.HEAPU8.set(bytes,pointer);
+  let samples=0;
+  module[prefix+'pacing_start']=()=>1;
+  module[prefix+'pacing_sample_bytes']=()=>64;
+  module[prefix+'pacing_sample']=()=>{samples++;f.put(12,9);return pointer;};
+  owner.pacingStart();
+  assert.throws(()=>owner.pacingSample(0),error=>{
+    assert.match(error.message,/clock stalled/);
+    assert.equal(error.pacingSample.triggeringValue,9);
+    assert.equal(error.pacingSample.threshold,8);return true;
+  });
+  assert.equal(owner.pacingJournal()[0].stalled,1);
+  assert.throws(()=>owner.pacingSample(1),/clock stalled/);
+  assert.equal(samples,1,'failed pacing must not silently restart the native clock');
+});
+
+test('inline forward retains the plan and forbids native reentry while Asyncify is suspended',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  assert.throws(()=>owner.enableInlineDispatch(),/explicit arena history/);
+  owner.enableArenaHistory();
+  assert.throws(()=>owner.enableInlineDispatch(),/requires Asyncify ccall/);
+  let resolveForward,startedForward;
+  const forwardStarted=new Promise(resolve=>{startedForward=resolve;});
+  let statusCalls=0,callInFlight=false;
+  const status=module[prefix+'status'];
+  module[prefix+'status']=()=>{
+    assert.equal(callInFlight,false,'status entered native during Asyncify');
+    statusCalls++;
+    return status();
+  };
+  module.ccall=async(name,result,types,args,options)=>{
+    assert.equal(result,'number');
+    assert.deepEqual(types,args.map(()=>'number'));
+    assert.deepEqual(options,{async:true});
+    if(name===prefix.slice(1)+'request_episode_forward'){
+      callInFlight=true;
+      startedForward(args);
+      await new Promise(resolve=>{resolveForward=resolve;});
+      callInFlight=false;
+    }
+    return module['_'+name](...args);
+  };
+  assert.equal(owner.enableInlineDispatch(),true);
+  assert.equal(f.inlineEnableCalls(),1);
+  assert.throws(()=>owner.enableInlineDispatch(),/enabled once/);
+  await owner.command('capture');
+  await owner.command('beginEpisode');
+  f.put(56,4); // Armed PRE is available after its endpoint copy.
+  await owner.command('pollTicket');
+  const ticket=owner.ticket(),plan=ticket.raw.slice();
+  plan[12]^=1;
+  const expected=plan.slice();
+  const task=owner.forwardTicket(ticket.ticketId,plan);
+  const [id,pointer,size]=await forwardStarted;
+  assert.equal(id,ticket.ticketId);
+  assert.equal(size,44);
+  const reads=statusCalls;
+  plan.fill(0);
+  assert.throws(()=>owner.status(),/Asyncify call is in progress/);
+  assert.throws(()=>owner.ticket(),/command is in progress/);
+  await assert.rejects(owner.command('cleanup'),/cleanup owner unavailable/);
+  await assert.rejects(owner.command('pollTicket'),/command is in progress/);
+  assert.equal(statusCalls,reads);
+  assert.deepEqual(f.frees,[]);
+  assert.deepEqual(module.HEAPU8.slice(pointer,pointer+size),expected);
+  resolveForward();
+  assert.equal((await task).metadata.currentFrame,1);
+  assert.deepEqual(owner.receipt(0).forward,expected);
+  await owner.command('cleanup');
+  assert.equal(f.frees.length,2);
+});
+
+test('inline idle waits for yielded renderer preparation and rejects a late return without dispatch',async(t)=>{
+  const f=inlineFixture({commandTimeoutMs:30}),{owner,module}=f;
+  const clock=t.mock.method(performance,'now',()=>now);
+  let now=0,resolvePreparation,startedPreparation;
+  const preparationStarted=new Promise(resolve=>{startedPreparation=resolve;});
+  module[prefix+'renderer_prepare_json']=()=>assert.fail('direct renderer preparation call');
+  module.ccall=async(name,result,types,args,options)=>{
+    assert.deepEqual(options,{async:true});
+    if(name!==prefix.slice(1)+'renderer_prepare_json')return module['_'+name](...args);
+    assert.deepEqual([result,types,args],['number',['number'],[5]]);
+    startedPreparation();
+    await new Promise(resolve=>{resolvePreparation=resolve;});
+    f.put(116,0);
+    return 2048;
+  };
+  const utf8=module.UTF8ToString;
+  module.UTF8ToString=pointer=>pointer===2048?JSON.stringify({schema:1,command:5,action:1,
+    before:{cacheStatus:1},after:{cacheStatus:0}}):utf8(pointer);
+  owner.enableArenaHistory();
+  owner.enableInlineDispatch();
+  f.put(116,1);
+  const idle=owner.command('idle');
+  await preparationStarted;
+  now=31;
+  assert.throws(()=>owner.status(),/Asyncify call is in progress/);
+  await assert.rejects(owner.command('cleanup'),/cleanup owner unavailable/);
+  assert.deepEqual(f.calls,[]);
+  resolvePreparation();
+  await assert.rejects(idle,/idle exceeded its 30 ms deadline/);
+  assert.deepEqual(f.calls,[]);
+  assert.equal(owner.journal()[0].rendererPreparation.flush.after.cacheStatus,0);
+  await owner.command('cleanup');
+  assert.deepEqual(f.calls,[10]);
+  clock.mock.restore();
+});
+
+test('inline request refusal and Asyncify rejection preserve first failure and allow owned cleanup',async()=>{
+  for(const failure of ['refuse','reject','native']){
+    const f=inlineFixture(),{owner,module}=f;
+    const original=Error('Asyncify rejected after settling');
+    module.ccall=async(name,_type,_types,args)=>{
+      if(args[0]===1){
+        if(failure==='refuse')return 0;
+        if(failure==='reject')throw original;
+        f.put(12,9);
+      }
+      return module['_'+name](...args);
+    };
+    owner.enableArenaHistory();
+    owner.enableInlineDispatch();
+    const expected=failure==='reject'?original:/Native history .*refused: synthetic refusal/;
+    await assert.rejects(owner.command('capture'),expected);
+    await assert.rejects(owner.command('capture'),expected);
+    assert.equal((await owner.command('cleanup')).ownerState,2);
+  }
+});
+
+test('inline dispatch does not accept a completed command after its deadline',async(t)=>{
+  const f=inlineFixture({commandTimeoutMs:30}),{owner,module}=f;
+  let now=0;
+  t.mock.method(performance,'now',()=>now);
+  module.ccall=async(name,_type,_types,args)=>{
+    const result=module['_'+name](...args);
+    if(args[0]===1)now=31;
+    return result;
+  };
+  owner.enableArenaHistory();
+  owner.enableInlineDispatch();
+  await assert.rejects(owner.command('capture'),/capture exceeded its 30 ms deadline/);
+  assert.equal(owner.status().lastCompletedCommand,1);
+  assert.deepEqual(f.frees,[]);
+  assert.equal((await owner.command('cleanup')).ownerState,2);
+  assert.equal(f.frees.length,2);
 });

@@ -26,7 +26,7 @@ enum class CpuStaticEndpointStatus : std::uint32_t {
     InvalidIndex = 4,
 };
 enum class CpuStaticEndpointPhase : std::uint32_t {
-    Captured = 1, Sealed = 2, Restored = 3,
+    Captured = 1, Sealed = 2, Restored = 3, ConfirmedPrefix = 4,
 };
 struct CpuStaticEndpointHeader {
     CpuStaticEndpointStatus status{};
@@ -70,6 +70,11 @@ public:
                                     std::uint32_t pre_frame) const noexcept;
     bool history_seal_endpoint(std::uint64_t incarnation,
                                std::uint32_t actual_end) noexcept;
+    /* Retirement-only endpoint for a confirmed CPU prefix inside a restored
+     * older END. restore_count binds this to the exact committed PRE restore. */
+    bool history_seal_confirmed_prefix(std::uint64_t incarnation,
+                                       std::uint32_t restore_count,
+                                       std::uint32_t confirmed_end) noexcept;
     CpuStaticEndpointHeader history_endpoint_header() const noexcept;
     CpuStaticEndpointRow history_endpoint_row(std::uint64_t index) const noexcept;
     bool history_close_endpoint(std::uint64_t incarnation,
@@ -101,7 +106,8 @@ public:
 private:
     enum class Phase { Configured, Captured, Sealed, Prepared, Restored };
     enum class HistoryPhase { Disabled, Ready, Recording, EndpointSealed,
-                              Prepared, Restored, Retired, Failed };
+                              Prepared, Restored, Retired, Failed,
+                              ConfirmedPrefix };
     GameplayCpuStatics() = default;
     bool layout_valid() const noexcept;
     bool invariants_match() const noexcept;
@@ -116,6 +122,7 @@ private:
     std::uint64_t history_prepared_incarnation_{};
     std::uint32_t history_pre_frame_{},history_start_frame_{},history_end_frame_{};
     std::uint32_t history_restore_end_{},history_restore_count_{},history_prepared_end_{};
+    std::uint32_t history_confirmed_prefix_restore_count_{};
     bool history_endpoint_closed_{};
 };
 }
