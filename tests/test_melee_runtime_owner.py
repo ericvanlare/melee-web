@@ -327,7 +327,7 @@ int main() {{
         self.assertLess(main.index("startup_ownerless_present_submitted=false;"),
                         main.index("aurora_initialize(argc,argv,&config);"))
         fallback_begin = source.index("const bool startup_fallback_preparation_draws_source=")
-        fallback_end = source.index("if(!first_css_draw_terminal&&preparation.warming()", fallback_begin)
+        fallback_end = source.index("if(!agreed_prefix_final_draw&&!first_css_draw_terminal&&preparation.warming()", fallback_begin)
         fallback = source[fallback_begin:fallback_end]
         self.assertIn("source_frames.steps()==0", fallback)
         self.assertIn("source_frames.draws(),source_frames.pending()", fallback)
@@ -507,7 +507,7 @@ int main(){
         service = service.replace(stop_query, "owner_stopped")
 
         fallback_begin = source.index("const bool startup_fallback_preparation_draws_source=")
-        fallback_end = source.index("if(!first_css_draw_terminal&&preparation.warming()", fallback_begin)
+        fallback_end = source.index("if(!agreed_prefix_final_draw&&!first_css_draw_terminal&&preparation.warming()", fallback_begin)
         fallback = source[fallback_begin:fallback_end]
         finish_line = "  source_frames.finish(present_source);"
         finish_pos = source.rfind(finish_line, 0, fallback_begin)

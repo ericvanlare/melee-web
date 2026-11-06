@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 from owned_test_workspace import OwnedWorkspaceTests
 from test_stadium_current_sss_exit import run
+from test_stadium_later_sss_continuation import function
 ROOT=Path(os.environ.get('MELEE_LATER_SETUP_SOURCE_ROOT',Path(__file__).resolve().parents[1]))
 BASE=Path(os.environ.get('MELEE_LATER_SETUP_BASE_ROOT',ROOT))
 
@@ -17,7 +18,7 @@ class LaterSssPreparedSetupControls(OwnedWorkspaceTests):
                       cut(text,'struct LaterSssContinuation {','bool later_sss_recipe_valid(const melee_web::RetailReplayRecipe&);')+
                       cut(text,'enum class FirstSssVsSetupOrigin : unsigned', 'enum class StadiumCfObservationScope'))
         difference=cut(text,'std::string current_sss_selection_difference(', 'void current_sss_exit_before_leave(')
-        begin=cut(text,'int current_sss_prepared_setup_begin(){','\n#endif\n\nvoid tick(){')
+        begin=function(text,'int current_sss_prepared_setup_begin(){')
         finish=cut(text,'bool first_sss_vs_setup_finish_handoff(){','\n#endif\nbool finish_asset_handoff(){')
         fixture='#include "'+str(ROOT/'src/private_sha256.hpp')+'"\n#include "'+str(ROOT/'src/stadium_later_reference.hpp')+'"\n'+r'''
 #include <array>

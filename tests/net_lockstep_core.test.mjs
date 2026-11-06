@@ -477,6 +477,75 @@ test('accepted remote PAD batches reach the timeline before a full native frame 
   assert.ok(pushed.alpha.includes(2), 'the unchanged native path pushes only after both literal inputs exist');
 });
 
+test('pending remote contribution admission blocks the frame pump and outbound acknowledgements', async t => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+
+  for (const outcome of ['accepted', 'refused']) await t.test(outcome, async () => {
+    const wire = {alpha: [], beta: []}, pushed = {alpha: [], beta: []};
+    const observerEntered = deferred(), observerRelease = deferred();
+    const terminalEntered = deferred(), terminalRelease = deferred();
+    const refusal = Error('remote timeline refused contribution batch');
+    const agreement = {protocol: 'match-scoped-test-v1', match: 'admission-race'};
+    const makePeer = role => new core.LockstepPeer({role, sourceTicks: 4, inputTicks: 2,
+      pushFrame: async (firstTick, bytes) => {
+        for (let offset = 0; offset < bytes.length; offset += core.NET_FRAME_BYTES)
+          pushed[role].push(firstTick + offset / core.NET_FRAME_BYTES);
+      },
+      onRemoteContributionBatch: role === 'alpha' ? async () => {
+        observerEntered.resolve();
+        await observerRelease.promise;
+        if (outcome === 'refused') throw refusal;
+      } : undefined,
+      onTerminal: role === 'alpha' && outcome === 'refused' ? async () => {
+        terminalEntered.resolve();
+        await terminalRelease.promise;
+      } : undefined,
+    });
+    const peers = {alpha: makePeer('alpha'), beta: makePeer('beta')};
+    for (const role of ['alpha', 'beta']) peers[role].attach(async text => wire[role].push(text));
+    await Promise.all([peers.alpha.start(agreement), peers.beta.start(agreement)]);
+    await Promise.all([peers.alpha.receive(wire.beta[0]), peers.beta.receive(wire.alpha[0])]);
+    assert.deepEqual(pushed.alpha, [0, 1]);
+
+    await peers.beta.addLocalInput(0, sample(7));
+    const remoteState = wire.beta.at(-1);
+    const receivePromise = peers.alpha.receive(remoteState);
+    await observerEntered.promise;
+
+    // This outgoing publication can race the asynchronous page observer. It
+    // must not let the pump consume the staged remote row or acknowledge it.
+    await peers.alpha.addLocalInput(0, sample(31));
+    assert.deepEqual(pushed.alpha, [0, 1], 'no source tick consumes an unadmitted remote PAD row');
+    assert.equal(peers.alpha.remote.has(0), false, 'the received row remains staged');
+    const concurrentState = wire.alpha.map(text => JSON.parse(text)).find(packet =>
+      packet.type === 'state' && packet.unacknowledged.some(row => row.tick === 0));
+    assert.equal(concurrentState.ack_sequence, null, 'pending packet sequence is not acknowledged');
+    assert.equal(concurrentState.ack_input, null, 'pending remote input is not acknowledged');
+
+    observerRelease.resolve();
+    if (outcome === 'accepted') {
+      await receivePromise;
+      assert.deepEqual(pushed.alpha, [0, 1, 2]);
+      assert.deepEqual(peers.alpha.remote.get(0), sample(7));
+      const ack = wire.alpha.map(text => JSON.parse(text)).find(packet =>
+        packet.type === 'state' && packet.ack_sequence === 0);
+      assert.ok(ack, 'accepted packet receives its sequence acknowledgement');
+      assert.equal(ack.ack_input, 0, 'accepted PAD row becomes acknowledgeable');
+      return;
+    }
+
+    await terminalEntered.promise;
+    assert.equal(peers.alpha.terminal.kind, 'protocol');
+    assert.deepEqual(pushed.alpha, [0, 1], 'refusal cannot release the frame pump');
+    assert.equal(peers.alpha.remote.has(0), false, 'refused row is never committed');
+    assert.equal(wire.alpha.map(text => JSON.parse(text)).some(packet =>
+      packet.type === 'state' && packet.ack_sequence === 0), false, 'refused packet is never acknowledged');
+    terminalRelease.resolve();
+    await assert.rejects(receivePromise, error => error === refusal);
+    assert.equal(peers.alpha.terminal.kind, 'protocol');
+  });
+});
+
 test('remote observer publishes neither a valid prefix of a malformed packet nor a checksum mismatch', async t => {
   const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
   const agreement = {protocol: 'match-scoped-test-v1', match: 'same'};

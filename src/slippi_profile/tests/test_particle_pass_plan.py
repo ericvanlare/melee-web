@@ -29,7 +29,8 @@ SOURCE_PINS = {
     BASELIB / "gobjplink.c": "0dd495c0dc5ea268e2f9b4a0932c6b2179e25526dc81593367831f4e3c52089e",
     BASELIB / "gobjgxlink.c": "b6c199614c8e5bca821a0e448a28b541947d77ea2dcfc9a517a5810e20b55bfb",
     BASELIB / "lobj.c": "500352c3a6bf1ff1ddfc4ce79a51775fdd999b5a44bd5cc2aa3c3d29c8e024ca",
-    ROOT / "patches/melee-gameplay.patch": "96b284fffada9c553ecf6e4a4ca8f8690002d243bd74f009c8cae0f9049af1e6",
+    # 49799236 adds only the source-owned SSS input gate to this patch.
+    ROOT / "patches/melee-gameplay.patch": "ad8b7eba12954f442aafe98ad1e4118982b634ecd339361d7a526513060cdde7",
     PROFILE / "effect_matrix.c": "928edfb6524bc45fbfba2393bda1c765069352d2ea53587112f97a08749ba570",
 }
 
