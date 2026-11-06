@@ -93,7 +93,8 @@ struct MatchHistoryControl {
  uint32_t requested_ticket_id{};
  std::array<uint8_t,44> requested_plan{};
  std::array<uint8_t,11> remote{};
- bool remote_ready{},dispatching{},identity_ready{},episode_enabled{};
+ bool remote_ready{},dispatching{},identity_ready{},episode_enabled{},arena_enabled{};
+ melee_web::GameplayCpuArenaEndpoint arena_endpoint{};
  std::string identity;
  std::array<std::string,4> identity_host;
  melee_web::GameplayCpuEndpointRecord record{};
@@ -822,7 +823,7 @@ EM_BOOL history_dispatch(double,void*) {
     if(c.capsule||!c.statics||!c.identity_ready||match->source_frames()!=c.status.expected_frame){history_refuse("Capture requires a frame-bound identity and reviewed statics configuration");break;}
     melee_web::CpuCaptureDiagnostic diagnostic{};
     c.capsule=RuntimeMatchHistory::capture(*match,std::move(c.statics),diagnostic,
-      history_boundary,history_present,history_audio_step,audio_phase,nullptr,c.episode_enabled);
+      history_boundary,history_present,history_audio_step,audio_phase,nullptr,c.episode_enabled,c.arena_enabled);
     okay=bool(c.capsule);if(!okay)history_refuse(diagnostic.message.data());break;
    }
    case 2:okay=c.capsule&&!c.episode_enabled&&c.capsule->begin();break;
@@ -1091,6 +1092,11 @@ int melee_web_native_menu_match_history_episode_enable() {
   return history_refuse("Episode mode must be explicitly enabled before PRE capture");
  c.episode_enabled=true;return 1;
 }
+int melee_web_native_menu_match_history_arena_enable() {
+ if(!melee_web_native_menu_match_history_episode_enable())return 0;
+ match_history.arena_enabled=true;
+ return 1;
+}
 int melee_web_native_menu_match_history_request_episode_forward(
  uint32_t ticket_id,const uint8_t* plan,unsigned length) {
  auto& c=match_history;
@@ -1191,6 +1197,14 @@ int melee_web_native_menu_match_history_cpu_endpoint_record(unsigned domain,unsi
 }
 const void* melee_web_native_menu_match_history_cpu_endpoint_data(){return &match_history.record;}
 unsigned melee_web_native_menu_match_history_cpu_endpoint_bytes(){return sizeof(match_history.record);}
+const void* melee_web_native_menu_match_history_cpu_arena_endpoint_data(){
+ auto& c=match_history;c.arena_endpoint={};
+ return c.arena_enabled&&c.capsule&&!c.dispatching&&!c.status.pending_command&&
+    !c.status.first_failure&&c.capsule->endpoint_arena(c.arena_endpoint)?&c.arena_endpoint:nullptr;
+}
+unsigned melee_web_native_menu_match_history_cpu_arena_endpoint_bytes(){
+ return match_history.arena_enabled?sizeof(melee_web::GameplayCpuArenaEndpoint):0;
+}
 int melee_web_native_menu_match_history_cpu_endpoint_end(){
  auto& c=match_history;
  if(!c.capsule||c.dispatching||c.status.pending_command||!c.capsule->end_endpoint_batch()){history_refuse("Endpoint completion refused");return 1;}history_sync();return 0;

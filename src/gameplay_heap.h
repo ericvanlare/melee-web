@@ -2,6 +2,7 @@
 #define MELEE_WEB_GAMEPLAY_HEAP_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +40,81 @@ void* melee_web_gameplay_heap_initialize(void* arena, size_t bytes,
  * exclusive ownership; changed arena identity is detected before release. */
 int melee_web_gameplay_heap_release(void* expected_arena,
                                    char* error, size_t error_size);
+
+/* Experimental retained SDK arena checkpoint leaf. The snapshot owns a
+ * private copy of the exact current arena extent. Preparation retains all
+ * restore storage and a full live-byte mutation fence. Admit after preparing
+ * every companion owner. The checked commit is for standalone controls and
+ * repeats the owner/byte-fence checks before its first write. Aggregate callers
+ * use `commit_prevalidated` only after all owners admitted before any writes;
+ * that leaf is a fixed same-base memcpy with no late check/failure/allocation.
+ * The PRE snapshot must outlive its prepared plan. This leaf does not restore
+ * the source-memory shadow, external borrowers, or any other owner. */
+typedef enum MeleeWebGameplayHeapHistoryStatus {
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK = 0,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT = 1,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INACTIVE = 2,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER = 3,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_ALLOCATION_FAILED = 4,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_STATE = 5,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_LIVE_STATE = 6,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_NOT_ADMITTED = 7,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_ALREADY_COMMITTED = 8,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_VISITOR_STOPPED = 9,
+} MeleeWebGameplayHeapHistoryStatus;
+typedef struct MeleeWebGameplayHeapHistorySnapshot MeleeWebGameplayHeapHistorySnapshot;
+typedef struct MeleeWebGameplayHeapHistoryPrepared MeleeWebGameplayHeapHistoryPrepared;
+typedef struct MeleeWebGameplayHeapHistoryCaptureResult {
+    MeleeWebGameplayHeapHistoryStatus status;
+    MeleeWebGameplayHeapHistorySnapshot* snapshot;
+} MeleeWebGameplayHeapHistoryCaptureResult;
+typedef struct MeleeWebGameplayHeapHistoryPrepareResult {
+    MeleeWebGameplayHeapHistoryStatus status;
+    MeleeWebGameplayHeapHistoryPrepared* prepared;
+} MeleeWebGameplayHeapHistoryPrepareResult;
+typedef struct MeleeWebGameplayHeapHistoryObservation {
+    MeleeWebGameplayHeapHistoryStatus status;
+    uint32_t schema;
+    uint32_t bytes;
+    uint32_t exact_equal;
+    int32_t selected_heap;
+    uint64_t owner_epoch;
+    uint64_t arena_base;
+    uint64_t arena_bytes;
+    uint64_t compared_bytes;
+    uint64_t first_difference;
+} MeleeWebGameplayHeapHistoryObservation;
+MeleeWebGameplayHeapHistoryCaptureResult melee_web_gameplay_heap_history_capture(void);
+MeleeWebGameplayHeapHistoryPrepareResult melee_web_gameplay_heap_history_prepare(
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot);
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_admit(
+    MeleeWebGameplayHeapHistoryPrepared* prepared);
+/* No-allocation selected-current proof; owner and live allocator graph only,
+ * without requiring the current arena to equal the frozen PRE image. */
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_current_admit(
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot);
+/* Reports exact bytes compared from live storage against PRE; first_difference
+ * is UINT64_MAX on equality. This never re-emits saved bytes as live evidence. */
+MeleeWebGameplayHeapHistoryObservation melee_web_gameplay_heap_history_observe(
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot);
+/* Enumerates the validated live original-SDK allocated chain without storing a
+ * second row registry. payload_capacity is the original cell referent extent;
+ * cross-check exact requested bytes/generation through the source-shadow owner.
+ * The visitor is read-only and serialized; returning zero stops enumeration. */
+typedef int (*MeleeWebGameplayHeapHistoryAllocationVisitor)(
+    void* user, uint64_t ordinal, const void* payload, uint32_t payload_capacity);
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_visit_allocations(
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot,
+    MeleeWebGameplayHeapHistoryAllocationVisitor visitor, void* user,
+    uint64_t* out_count);
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_commit(
+    MeleeWebGameplayHeapHistoryPrepared* prepared);
+void melee_web_gameplay_heap_history_commit_prevalidated(
+    MeleeWebGameplayHeapHistoryPrepared* prepared);
+void melee_web_gameplay_heap_history_snapshot_destroy(
+    MeleeWebGameplayHeapHistorySnapshot* snapshot);
+void melee_web_gameplay_heap_history_prepared_destroy(
+    MeleeWebGameplayHeapHistoryPrepared* prepared);
 
 /* Recreate the original OS heap over the exact owned arena after its previous
  * heap handle has been destroyed. This resets the SDK free list and descriptor

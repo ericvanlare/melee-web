@@ -226,7 +226,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     throw Error('Private runtime history exports are unavailable');
   if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||module[PREFIX+'input_bytes']()!==INPUT_BYTES)
     throw Error('Private runtime history ABI differs from its controller');
-  let busy=false,failed=null,terminal=false,captured=false,episodeMode=false;
+  let busy=false,failed=null,terminal=false,captured=false,episodeMode=false,arenaMode=false;
   let identityText=null;
   const journal=[];
   const read=(pointer,size)=>{
@@ -426,6 +426,20 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       check(status());
       return true;
     },
+    enableArenaHistory(){
+      active();
+      if(captured)throw Error('Arena history must be enabled before PRE capture');
+      if(episodeMode)throw Error('Runtime episode mode is already enabled');
+      check(status());
+      episodeExport('arena_enable');
+      episodeExport('cpu_arena_endpoint_data');
+      episodeExport('cpu_arena_endpoint_bytes');
+      allocateFrameArgument();
+      requireEpisodeSuccess('arena_enable');
+      episodeMode=true;arenaMode=true;
+      check(status());
+      return true;
+    },
     startEnable(){
       startPreflight('start_enable',{inspectState:true});
       if(startExport('start_enable')()!==1)startRefusal('start_enable');
@@ -558,7 +572,17 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         throw latch(Error('Native input receipt differs from its live owner'));
       return result;
     },
-    endpoint(request){active();check(status());return collectCpuEndpointInPage(request,{runtime:'match-history',module});},
+    endpoint(request){
+      active();check(status());
+      if(arenaMode){
+        if(request?.arenaHistoryEndpoint===false||request?.particleCellEndpoint===false)
+          throw Error('Arena history requires its typed arena and particle receipts');
+        return collectCpuEndpointInPage({...request,arenaHistoryEndpoint:true,particleCellEndpoint:true},
+          {runtime:'match-history',module});
+      }
+      if(request?.arenaHistoryEndpoint)throw Error('Arena history was not enabled before capture');
+      return collectCpuEndpointInPage(request,{runtime:'match-history',module});
+    },
     motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
     motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
     pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},

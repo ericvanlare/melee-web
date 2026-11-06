@@ -336,6 +336,9 @@ test('agreed-start exports stay optional until called on an older production mod
   assert.throws(()=>owner.startEnable(),/start_enable is unavailable/);
   assert.throws(()=>owner.startPrefix(),/start_state is unavailable/);
   assert.throws(()=>owner.enableEpisode(),/episode_enable is unavailable/);
+  assert.throws(()=>owner.enableArenaHistory(),/episode_enable is unavailable/);
+  const fresh=fixture({agreedStartExports:false});
+  assert.throws(()=>createRuntimeMatchHistoryController(fresh.module).enableArenaHistory(),/arena_enable is unavailable/);
   assert.deepEqual(f.allocations.map(row=>row.size),[11]);
   assert.deepEqual(f.frees,[]);
 });
@@ -632,4 +635,24 @@ test('confirmed rebase rejects an unretired capsule before asking the native own
   await assert.rejects(owner.command('capture'),/actual retired END/);
   await owner.command('cleanup');
   assert.deepEqual(f.calls,[1,10]);
+});
+
+
+test('arena history requires explicit native enablement before capture and keeps legacy mode separate',async()=>{
+  const f=episodeFixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  let arenaCalls=0;
+  f.module[prefix+'arena_enable']=()=>{arenaCalls++;return f.module[prefix+'episode_enable']();};
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  assert.equal(owner.enableArenaHistory(),true);
+  assert.equal(arenaCalls,1);
+  assert.throws(()=>owner.enableArenaHistory(),/already enabled/);
+  assert.throws(()=>owner.enableEpisode(),/already enabled/);
+  assert.throws(()=>owner.endpoint({arenaHistoryEndpoint:false}),/requires its typed arena/);
+  assert.throws(()=>owner.endpoint({particleCellEndpoint:false}),/requires its typed arena/);
+  await owner.command('capture');
+  assert.throws(()=>owner.enableArenaHistory(),/before PRE capture/);
+  const g=episodeFixture(),legacy=createRuntimeMatchHistoryController(g.module);
+  assert.throws(()=>legacy.endpoint({arenaHistoryEndpoint:true}),/was not enabled/);
 });

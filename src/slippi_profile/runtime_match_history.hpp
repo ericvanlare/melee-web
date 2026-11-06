@@ -124,7 +124,7 @@ public:
         CpuCaptureDiagnostic&, RuntimeMatchHistoryBoundaryCheck,
         RuntimeMatchHistoryPresentSubmit, RuntimeMatchHistoryAudioStep,
         unsigned& audio_phase, void* callback_context,
-        bool episode_mode=false) noexcept;
+        bool episode_mode=false,bool arena_mode=false) noexcept;
     ~RuntimeMatchHistory();
     RuntimeMatchHistory(const RuntimeMatchHistory&)=delete;
     RuntimeMatchHistory& operator=(const RuntimeMatchHistory&)=delete;
@@ -172,6 +172,7 @@ public:
     bool begin_endpoint_batch(View, Provenance) noexcept;
     GameplayCpuEndpointRecord endpoint_record(Domain, RowKind,
                                                std::uint32_t index=0) const noexcept;
+    bool endpoint_arena(GameplayCpuArenaEndpoint&) const noexcept;
     bool endpoint_particle_header(SlippiParticleCellEndpointHeader&) const noexcept;
     bool endpoint_particle_row(std::uint32_t kind, std::uint32_t index,
                                SlippiParticleCellEndpointRow&) const noexcept;

@@ -408,14 +408,26 @@ void slippi_particle_presentation_anchor_disarm(SlippiParticlePresentationAnchor
         a.serial!=state.anchor_serial || state.drawing)) { fail(); return; }
     state.anchor_token=state.anchor_serial=0; state.interval=0;
 }
+static int captured_pools_match(void)
+{
+    for(const Cell* c=state.cells;c;c=c->next) if(c->captured &&
+        !melee_web_source_memory_pool_cell_matches(c->object,c->pool,
+            c->app?state.app_extent:state.particle_extent,&c->identity)) return 0;
+    return 1;
+}
+int slippi_particle_presentation_captured_pools_admit(SlippiParticlePresentationAnchor a)
+{
+    /* The anchor is checked separately by the aggregate. This function is pure. */
+    return a.world==state.world && a.token && a.token==state.anchor_token &&
+        a.serial==state.anchor_serial && !state.failed && !state.drawing &&
+        captured_pools_match();
+}
 int slippi_particle_presentation_reset_after_restore(SlippiParticlePresentationAnchor a)
 {
     Cell* c;
     if(!slippi_particle_presentation_anchor_admit(a)) return 0;
     /* Admit every captured cell before changing any host receipt. */
-    for(c=state.cells;c;c=c->next) if(c->captured &&
-        !melee_web_source_memory_pool_cell_matches(c->object,c->pool,
-            c->app?state.app_extent:state.particle_extent,&c->identity)) return fail();
+    if(!captured_pools_match())return fail();
     for(c=state.cells;c;c=c->next) c->live=c->captured;
     discard();
     memset(state.caches,0,sizeof(state.caches));

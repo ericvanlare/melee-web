@@ -16,13 +16,17 @@ unsigned legacy_action_writes=0,corrected_action_writes=0;
 unsigned fighter_fields=9, private_slots=9,audio_value=9,flow_value=9,bootstrap_value=9,context_value=9;
 unsigned static_value=3, invariant=5;
 bool stable_owner=true,stable_topology=true,corrected_action_ok=true;
-std::unique_ptr<GameplayCpuStatics> statics(){
+std::unique_ptr<GameplayCpuStatics> statics(bool history=false){
     CpuStaticRow rows[2]={{uint32_t(uintptr_t(&static_value)),sizeof(static_value),CpuStaticPolicy::Restore,CpuStaticDomain::OriginalSourceC},
                          {uint32_t(uintptr_t(&invariant)),sizeof(invariant),CpuStaticPolicy::Invariant,CpuStaticDomain::OriginalSourceC}};
     if(rows[1].address<rows[0].address)std::swap(rows[0],rows[1]);
     CpuStaticBounds bounds{rows[0].address,std::uintptr_t(rows[1].address)+rows[1].bytes};
     auto s=GameplayCpuStatics::configure(rows,bounds,{});assert(s&&s->capture());
-    static_value=9;assert(s->seal_post());return s;
+    if(history)assert(s->begin_history(100)&&s->history_begin_incarnation(1,100));
+    static_value=9;
+    if(history)assert(s->history_seal_endpoint(1,102)&&s->history_close_endpoint(1,102));
+    else assert(s->seal_post());
+    return s;
 }
 bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topology;}
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
@@ -53,7 +57,111 @@ int melee_web_gameplay_bootstrap_snapshot_restore(const MeleeWebGameplayBootstra
 int melee_web_match_context_snapshot_restore(MeleeWebMatchContext* c,const MeleeWebMatchContextSnapshot* s,char*,size_t){if(!melee_web_match_context_snapshot_admit(c,s,nullptr,0))return 0;write(5);context_value=3;return 1;}
 MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_restore(const MeleeWebSourceMemoryPayloadSnapshot* s){auto r=melee_web_source_memory_payload_snapshot_admit(s);if(r)return r;write(6);fighter_fields=3;return r;}
 }
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+namespace {
+unsigned arena_refusal;
+unsigned char physical_arena[128];
+uint32_t audio_scalar;
+}
+GameplayActionStoreHistory::GameplayActionStoreHistory(MeleeWebActionInterval* capsule) noexcept
+    :capsule_(capsule){}
+GameplayActionStoreHistory::~GameplayActionStoreHistory()=default;
+std::unique_ptr<GameplayActionStoreHistory> GameplayActionStoreHistory::capture()
+{ return std::unique_ptr<GameplayActionStoreHistory>(new GameplayActionStoreHistory(nullptr)); }
+bool GameplayActionStoreHistory::prepare_restore(uint64_t incarnation) noexcept
+{ assert(incarnation==1&&!writes);return true; }
+bool GameplayActionStoreHistory::admit_restore(uint64_t incarnation) const noexcept
+{ assert(incarnation==1&&!writes);return true; }
+bool GameplayActionStoreHistory::restore_pre(uint64_t incarnation) noexcept
+{ assert(incarnation==1&&fighter_fields==9);write(1);private_slots=3;return true; }
+extern "C" {
+uint64_t melee_web_audio_generation(MeleeWebAudio*){return 1;}
+MeleeWebAudioCpuStorage melee_web_audio_cpu_storage(MeleeWebAudio*,uint64_t)
+{ return {&audio_scalar,&audio_scalar}; }
+MeleeWebAudioRangeVisitResult melee_web_audio_visit_owned_ranges(
+    MeleeWebAudio* audio,uint64_t generation,size_t,MeleeWebAudioOwnedRangeVisitor visit,void* context)
+{
+    assert(!writes&&generation==1);
+    MeleeWebAudioOwnedRange range{MELEE_WEB_AUDIO_RANGE_AUDIO_OWNER,
+        arena_refusal==2?static_cast<const void*>(physical_arena):&audio_scalar,
+        sizeof(audio_scalar),audio,generation};
+    return visit(&range,context)?MELEE_WEB_AUDIO_RANGE_VISIT_COMPLETE:MELEE_WEB_AUDIO_RANGE_VISIT_STOPPED;
+}
+int slippi_particle_presentation_captured_pools_admit(SlippiParticlePresentationAnchor)
+{ assert(!writes);return arena_refusal!=3; }
+int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,uint64_t inc,uint32_t end)
+{ assert(!writes);return token==4&&inc==1&&end==102; }
+void melee_web_cpu_interval_motor_history_restore_commit(uint64_t,uint64_t,uint32_t)
+{ assert(static_value==3&&fighter_fields==3);write(8); }
+MeleeWebGameplayHeapHistoryPrepareResult melee_web_gameplay_heap_history_prepare(
+    const MeleeWebGameplayHeapHistorySnapshot*)
+{
+    assert(!writes);
+    return arena_refusal==1?MeleeWebGameplayHeapHistoryPrepareResult{
+        MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT,nullptr}:
+        MeleeWebGameplayHeapHistoryPrepareResult{MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK,
+            reinterpret_cast<MeleeWebGameplayHeapHistoryPrepared*>(1)};
+}
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_admit(
+    MeleeWebGameplayHeapHistoryPrepared*)
+{
+    assert(!writes);
+    return arena_refusal==4?MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT:
+        MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK;
+}
+void melee_web_gameplay_heap_history_commit_prevalidated(MeleeWebGameplayHeapHistoryPrepared*)
+{
+    assert(private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3);
+    assert(fighter_fields==9&&static_value==9);write(6);fighter_fields=3;
+}
+void melee_web_gameplay_heap_history_prepared_destroy(MeleeWebGameplayHeapHistoryPrepared*){}
+MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare(
+    const MeleeWebSourceMemoryHistory*)
+{ assert(!writes);return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
+                         reinterpret_cast<MeleeWebSourceMemoryHistoryPrepared*>(1)}; }
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(
+    const MeleeWebSourceMemoryHistoryPrepared*)
+{
+    assert(!writes);
+    return arena_refusal==5?MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE:
+        MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_commit_prevalidated(
+    MeleeWebSourceMemoryHistoryPrepared*) noexcept
+{ assert(fighter_fields==3&&static_value==9);write(7);return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK; }
+void melee_web_source_memory_history_prepared_destroy(MeleeWebSourceMemoryHistoryPrepared*){}
+}
+static void arena_coordinator()
+{
+    using R=GameplayCpuCommitResult;
+    const R expected[]{R::Ok,R::Payload,R::Audio,R::Particle,R::Payload,R::Payload};
+    for(arena_refusal=0;arena_refusal<sizeof(expected)/sizeof(*expected);++arena_refusal){
+        writes=order=fail_admission=0;
+        fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
+        static_value=3;invariant=5;
+        auto s=statics(true);
+        auto actions=GameplayActionStoreHistory::capture();
+        GameplayCpuCommitOwners o{nullptr,reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
+            reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),
+            reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),reinterpret_cast<MeleeWebMatchContext*>(7),
+            reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
+        o.action_history=actions.get();o.history_incarnation=1;o.history_end_frame=102;
+        o.arena=reinterpret_cast<const MeleeWebGameplayHeapHistorySnapshot*>(1);
+        o.shadow=reinterpret_cast<MeleeWebSourceMemoryHistory*>(1);
+        o.arena_base=physical_arena;o.arena_bytes=sizeof(physical_arena);
+        assert(gameplay_cpu_commit_history_pre(o)==expected[arena_refusal]);
+        if(arena_refusal)
+            assert(writes==0&&static_value==9&&fighter_fields==9&&private_slots==9);
+        else
+            assert(writes==8&&static_value==3&&fighter_fields==3&&private_slots==3);
+    }
+    puts("Owned arena coordinator rejects before writes and commits in order");
+}
+#endif
 int main(){
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    arena_coordinator();
+#endif
     using R=GameplayCpuCommitResult;
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
     const unsigned last_refusal=9

@@ -22,6 +22,7 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
         tests = ROOT / 'src/slippi_profile/tests'
         result = subprocess.run([str(node_runtime(ROOT)), '--test',
             str(tests / 'test_runtime_match_history_controller.mjs'),
+            str(tests / 'test_cpu_arena_endpoint.mjs'),
             str(ROOT / 'tests/runtime_match_history_peer.test.mjs')], cwd=ROOT,
             capture_output=True, text=True, timeout=30)
         (self.work / 'host-controls.log').write_text(result.stdout + result.stderr)

@@ -1,4 +1,13 @@
 #include "gameplay_source_memory_runtime.h"
+#if defined(MELEE_WEB_SOURCE_MEMORY_HISTORY_TRACKING_TEST)
+#include "original_startup_compat.h"
+extern "C" {
+#include <sysdolphin/baselib/jobj.h>
+// Link-only root for the unrelated legacy JObj trace. This control exercises
+// the real class-piece cold/alloc/origin/free hooks, without JObj tracing.
+HSD_JObjInfo hsdJObj{};
+}
+#endif
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -857,8 +866,161 @@ void source_memory_payload_index_controls() {
     melee_web_source_memory_payload_snapshot_destroy(second.snapshot);
     check(melee_web_source_memory_end(1101), "indexed payload owner end");
 }
+void source_memory_history_controls()
+{
+    using Observation = MeleeWebSourceMemoryHistoryObservation;
+    constexpr auto ok = MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+    alignas(32) unsigned char a[512]{}, b[512]{};
+    check(melee_web_source_memory_history_capture().status ==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, "inactive history capture");
+    check(melee_web_source_memory_begin(1701, 3), "history owner begin");
+    check(melee_web_source_memory_alloc(3, a, sizeof(a)), "history PRE allocation");
+    MeleeWebSourceFighterAddress lease{};
+    check(melee_web_source_memory_fighter_acquire(a + 256, 64, &lease), "history PRE lease");
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    check(melee_web_source_memory_history_capture().status ==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, "history refuses uninitialized tracking");
+    melee_web_class_piece_cold(nullptr, 0);
+    melee_web_class_piece_alloc(a, 64, 64);
+    melee_web_class_piece_origin(a, 64, 1);
+    melee_web_source_memory_origin_event(a, sizeof(a), __FILE__, __LINE__, 1);
+    melee_web_source_memory_objalloc_event(a, b, 64, 8, 31, sizeof(a), 0);
+    auto armed = melee_web_class_piece_arm();
+    check(armed.ready, "history test arms legacy observer");
+    check(melee_web_source_memory_history_capture().status ==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, "history refuses armed tracking");
+    melee_web_class_piece_disarm(armed);
+#endif
+    const auto payload = melee_web_source_memory_payload_snapshot_capture();
+    check(payload.snapshot != nullptr, "history test legacy payload snapshot");
+    const auto captured = melee_web_source_memory_history_capture();
+    check(captured.status == ok && captured.pre, "history PRE capture");
+    const auto initial = melee_web_source_memory_history_observe(captured.pre);
+    check(initial.status == ok && initial.exact_pre &&
+          initial.pre_revision == initial.current_revision &&
+          initial.pre_watermark == initial.current_watermark, "history PRE exact");
+
+    uint64_t previous_generation = initial.pre_watermark;
+    for (unsigned replay = 0; replay != 2; ++replay) {
+        check(melee_web_source_memory_alloc(3, b, sizeof(b)), "history speculative allocation");
+        check(melee_web_source_memory_free(3, b), "history speculative free");
+        check(melee_web_source_memory_alloc(3, b, sizeof(b)), "history speculative same-host reuse");
+        const auto reused = allocation(b);
+        check(reused.allocation_generation > previous_generation, "history fresh allocation identity");
+        previous_generation = reused.allocation_generation;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        melee_web_class_piece_alloc(b, 32, 32);
+#endif
+        allocation_budget = 0;
+        const auto selected = melee_web_source_memory_history_current_admit(captured.pre);
+        allocation_budget = -1;
+        check(selected == ok, "history admits selected topology without allocation");
+        const Observation branch = melee_web_source_memory_history_observe(captured.pre);
+        check(branch.status == ok && !branch.exact_pre, "history reports different selected state");
+        allocation_budget = 0;
+        const auto failed = melee_web_source_memory_history_prepare(captured.pre);
+        allocation_budget = -1;
+        check(failed.status == MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED &&
+              !failed.prepared && allocation(b).allocation_generation == previous_generation,
+              "history failed preparation preserves live state");
+        const auto prepared = melee_web_source_memory_history_prepare(captured.pre);
+        check(prepared.status == ok && prepared.prepared, "history prepare");
+        check(melee_web_source_memory_history_commit_prevalidated(prepared.prepared) ==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, "history requires final admission");
+        check(melee_web_source_memory_history_admit(prepared.prepared) == ok, "history final admission");
+        a[0] = static_cast<unsigned char>(replay + 1); // Earlier companion writer.
+
+        allocation_budget = 0;
+        const auto committed = replay == 0
+            ? melee_web_source_memory_history_commit(prepared.prepared)
+            : melee_web_source_memory_history_commit_prevalidated(prepared.prepared);
+        allocation_budget = -1;
+        check(committed == ok && a[0] == replay + 1,
+              "history no-allocation commit leaves companion payload bytes alone");
+        const auto restored = melee_web_source_memory_history_observe(captured.pre);
+        check(restored.status == ok && restored.exact_pre &&
+              restored.current_revision == branch.current_revision + 1 &&
+              restored.current_watermark == branch.current_watermark,
+              "history restored exact PRE with monotonic fences");
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        check(restored.current_piece_revision == branch.current_piece_revision + 1 &&
+              restored.current_piece_watermark == branch.current_piece_watermark &&
+              restored.current_piece_watermark > initial.pre_piece_watermark,
+              "history restores class cells with monotonic observer fences");
+#endif
+        MeleeWebSourceMemoryAllocation discarded{};
+        check(melee_web_source_memory_allocation_read(b, &discarded) == MELEE_WEB_SOURCE_MEMORY_READ_OK &&
+              !discarded.live, "history removes speculative allocation");
+        same_fighter(lease, fighter(a + 256));
+        check(melee_web_source_memory_history_commit(prepared.prepared) ==
+              MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, "history refuses repeat commit");
+        melee_web_source_memory_history_prepared_destroy(prepared.prepared);
+    }
+    check(melee_web_source_memory_payload_snapshot_admit(payload.snapshot) ==
+          MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED, "legacy PRE remains stale");
+
+    const auto stale = melee_web_source_memory_history_prepare(captured.pre);
+    check(stale.status == ok, "prepare stale fence control");
+    check(melee_web_source_memory_alloc(3, b, sizeof(b)) &&
+          melee_web_source_memory_free(3, b), "balanced change after preparation");
+    check(melee_web_source_memory_history_commit(stale.prepared) ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, "history refuses balanced stale prepare");
+    melee_web_source_memory_history_prepared_destroy(stale.prepared);
+
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    const auto stale_piece = melee_web_source_memory_history_prepare(captured.pre);
+    check(stale_piece.status == ok, "prepare class-cell fence control");
+    melee_web_class_piece_alloc(a + 64, 32, 32);
+    melee_web_class_piece_free(a + 64, 32);
+    check(melee_web_source_memory_history_commit(stale_piece.prepared) ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, "history refuses class-cell-only stale prepare");
+    melee_web_source_memory_history_prepared_destroy(stale_piece.prepared);
+#endif
+    check(melee_web_source_memory_alloc(3, b, sizeof(b)), "history unknown lease backing");
+    MeleeWebSourceFighterAddress unknown{};
+    check(melee_web_source_memory_fighter_acquire(b, 64, &unknown), "history unknown live lease");
+    check(melee_web_source_memory_history_prepare(captured.pre).status ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, "history refuses unknown live lease");
+    check(melee_web_source_memory_fighter_release(b), "retire unknown lease");
+    const auto missing = melee_web_source_memory_history_prepare(captured.pre);
+    check(missing.status == ok, "prepare changed PRE lease control");
+    check(melee_web_source_memory_fighter_release(a + 256), "history release PRE lease");
+    check(melee_web_source_memory_history_commit(missing.prepared) ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, "history catches lease release without fence bump");
+    melee_web_source_memory_history_prepared_destroy(missing.prepared);
+    check(melee_web_source_memory_free(3, a) && melee_web_source_memory_alloc(3, a, sizeof(a)),
+          "history PRE same-host replacement");
+    check(melee_web_source_memory_history_current_admit(captured.pre) == ok,
+          "current endpoint read does not require PRE survival");
+    check(melee_web_source_memory_history_prepare(captured.pre).status ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, "history refuses missing PRE identity");
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    armed = melee_web_class_piece_arm();
+    check(armed.ready, "legacy observer still arms after history");
+    melee_web_class_piece_alloc(b, 32, 32);
+    melee_web_class_piece_disarm(armed);
+    check(melee_web_source_memory_history_prepare(captured.pre).status ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, "history does not clear observer poison");
+    const auto poisoned = melee_web_source_memory_history_observe(captured.pre);
+    check(poisoned.status == MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED &&
+          poisoned.piece_refusal == 7 && !poisoned.exact_pre, "history reports actual observer poison");
+#endif
+    check(melee_web_source_memory_end(1701) && melee_web_source_memory_begin(1701, 3),
+          "history owner restart with recycled world");
+    check(melee_web_source_memory_history_prepare(captured.pre).status ==
+          MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, "history refuses restarted owner");
+    check(melee_web_source_memory_end(1701), "history owner end");
+    melee_web_source_memory_history_destroy(captured.pre);
+    melee_web_source_memory_payload_snapshot_destroy(payload.snapshot);
 }
-int main() {
+
+}
+int main(int argc, char** argv) {
+    source_memory_history_controls();
+    if (argc == 2 && std::strcmp(argv[1], "history-only") == 0) {
+        std::puts("Source-memory history controls: passed");
+        return 0;
+    }
     using Snapshot = MeleeWebSourceMemorySnapshot;
     source_memory_witness_controls();
     source_memory_payload_controls();

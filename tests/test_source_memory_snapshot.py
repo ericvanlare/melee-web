@@ -2,6 +2,7 @@
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import unittest
 
 from owned_test_workspace import OwnedWorkspaceTests
@@ -86,6 +87,31 @@ class SourceMemorySnapshotTests(OwnedWorkspaceTests):
         run = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
         self.assertIn("Source-memory mirror snapshot controls: passed", run.stdout)
+
+    def test_prepared_history_with_active_class_piece_tracking(self):
+        compiler = shutil.which("c++")
+        if not compiler:
+            self.skipTest("native C++ compiler unavailable")
+        source = ROOT / "build/gameplay-source-slippi-profile/src"
+        fmt = ROOT / "build/browser-match-history-release/_deps/fmt-src/include"
+        if not (source / "sysdolphin/baselib/jobj.h").is_file() or not (fmt / "fmt/core.h").is_file():
+            self.skipTest("private match-history generated source and headers unavailable")
+        binary = self.directory / "history-active-tracking-control"
+        sources = [ROOT / path for path in (
+            "tests/source_memory_snapshot_trace.cpp", "src/gameplay_source_memory_runtime.cpp",
+            "src/source_address_context.cpp", "src/source_game_heap_context.cpp")]
+        linker = "-Wl,-dead_strip" if sys.platform == "darwin" else "-Wl,--gc-sections"
+        built = subprocess.run([
+            compiler, "-std=c++20", "-w", "-DTARGET_PC", "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1",
+            "-DMELEE_WEB_SOURCE_MEMORY_TESTING=1", "-DMELEE_WEB_SOURCE_MEMORY_HISTORY_TRACKING_TEST=1",
+            "-ffunction-sections", linker, "-I", str(ROOT / "src"),
+            "-I", str(ROOT / ".deps/aurora/include"), "-I", str(source), "-I", str(fmt),
+            *map(str, sources), "-o", str(binary)],
+            capture_output=True, text=True, timeout=60)
+        self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+        run = subprocess.run([str(binary), "history-only"], capture_output=True, text=True, timeout=10)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("Source-memory history controls: passed", run.stdout)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,8 @@ import {createRuntimeMatchAdmission} from './runtime_match_history_admission.mjs
 import {validateCpuRestoreConfiguration} from '../src/slippi_profile/tests/cpu_restore_runner.mjs';
 import {compareCpuReferenceParticleEndpoints,CPU_ENDPOINT_PROVENANCE,CPU_ENDPOINT_VIEW,
   decodeCpuParticleEndpointResult} from '../src/slippi_profile/tests/cpu_endpoint.mjs';
+import {decodeCpuArenaEndpointResult,compareCpuArenaRestoredPre}
+  from '../src/slippi_profile/tests/cpu_arena_endpoint.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
@@ -29,13 +31,15 @@ const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
-const {values}=parseArgs({options:Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),strict:true});
+const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
+  'arena-history':{type:'boolean',default:false}},strict:true});
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
 assert(['held-statics','peer-correction','four-tick-correction'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 if(values.phase!=='peer-correction')assert.equal(values.windows,'1','--windows applies only to peer-correction');
+if(values['arena-history'])assert.equal(values.phase,'four-tick-correction','--arena-history requires four-tick-correction');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
@@ -157,7 +161,8 @@ for(const binding of diagnosticBindings){
 }
 
 const report={schema:values.phase==='four-tick-correction'?
-    'melee-web-runtime-four-tick-peer-correction-v1':values.phase==='held-statics'?
+    (values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
+      'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
@@ -174,6 +179,9 @@ const report={schema:values.phase==='four-tick-correction'?
     policy_sha256:policySha256,manifest_path:manifestPath,manifest_sha256:manifestSha256,
     map_path:mapPath,map_sha256:mapSha256,wire_rows:wire.length,
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
+  arena_history_mode:values['arena-history'],
+  arena_comparator:{path:'src/slippi_profile/tests/cpu_arena_endpoint.mjs',
+    sha256:await hashFile(path.join(ROOT,'src/slippi_profile/tests/cpu_arena_endpoint.mjs'))},
   diagnostic_module_bindings:diagnosticBindings,
   diagnostic_relative_import_resolutions:diagnosticImportResolutions,
   coordination:{type:'Node-local diagnostic offer/agreement exchange only',seed_source:'alpha native CSS/SSS offer',
@@ -668,10 +676,12 @@ async function retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,pha
   await fs.writeFile(path.join(out,file),content,{flag:'wx'});
   const retained={file,bytes:Buffer.byteLength(content),sha256:sha256(Buffer.from(content)),
     view,provenance,source_frame:String(sourceFrame),domains:9,
-    provenance_note:'full locally copied native raw nine-domain and particle endpoint envelope'};
+    provenance_note:values['arena-history']?
+      'full live raw nine-domain and particle rows with typed arena/shadow exact-state and real monotonic fences':
+      'full locally copied native raw nine-domain and particle endpoint envelope'};
   const pageHistory=report.pages[item.role].match_history;
   pageHistory.endpoints[label]=retained;
-  const decoded=decodeCpuParticleEndpointResult(wire);
+  const decoded=values['arena-history']?decodeCpuArenaEndpointResult(wire):decodeCpuParticleEndpointResult(wire);
   assert.equal(decoded.view,view,`${item.role} ${label} endpoint view differs`);
   assert.equal(decoded.provenance,provenance,`${item.role} ${label} endpoint provenance differs`);
   assert.equal(decoded.sourceFrame,String(sourceFrame),`${item.role} ${label} endpoint frame differs`);
@@ -1072,6 +1082,7 @@ async function runFourTickEpisode(alpha,beta){
   const pollSerials={alpha:prefix.alpha.pollSerial,beta:prefix.beta.pollSerial};
   const tickets={alpha:[],beta:[]};
   const selected={alpha:[],beta:[]};
+  const selectedEndpoints={alpha:null,beta:null};
   const log=async(item,operation,value)=>{
     const event={role:item.role,operation,value};
     proof.events.push(event);
@@ -1084,7 +1095,7 @@ async function runFourTickEpisode(alpha,beta){
   const pre=(item,label,phase)=>endpoint(item,label,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,0,phase);
   const command=(item,name,phase,frame,counters)=>historyCommand(item,name,opts(phase,frame,counters));
 
-  await joinOwned('episode-enable',items.map(item=>log(item,'episodeEnable')));
+  await joinOwned('episode-enable',items.map(item=>log(item,values['arena-history']?'arenaEnable':'episodeEnable')));
   await joinOwned('episode-capture',items.map(item=>command(item,'capture',1,0)));
   const captured=await joinOwned('episode-capture-pre',items.map(item=>pre(item,'episode-capture-pre',2)));
   for(const e of captured)assert.equal(effectToken(e),'0');
@@ -1143,13 +1154,15 @@ async function runFourTickEpisode(alpha,beta){
     const checksum=await retainChecksum(item,`${label}-cpu`,{tick:frame-1,sourceFrame:frame});
     await command(item,'present',corrected?14:7,frame);
     await command(item,'idle',corrected?15:8,frame,{gpuIdle:true});
-    await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,prov,frame,corrected?16:9);
+    selectedEndpoints[item.role]=await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,prov,frame,corrected?16:9);
     return checksum;
   };
   const correct=async(frame,dirty,speculative,restoreCount)=>{
     await command(alpha,'restore',10,0,{restoreCount,forwardSteps:frame,replaySteps:0});
     const restored=await pre(alpha,`episode-restored-${frame}`,11);
-    const strict=compareCpuReferenceParticleEndpoints(armed[0],restored);
+    const strict=values['arena-history']?
+      compareCpuArenaRestoredPre(armed[0],restored,selectedEndpoints.alpha):
+      compareCpuReferenceParticleEndpoints(armed[0],restored);
     proof.comparisons[`restored_pre_${frame}`]=strict;
     assert(strict.equal);
     const result=await log(alpha,'episodeReplay',{dirty,through:frame-1,speculative});

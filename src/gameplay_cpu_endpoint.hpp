@@ -106,6 +106,22 @@ static_assert(offsetof(GameplayCpuEndpointRecord,borrowed_address)==296);
 static_assert(offsetof(GameplayCpuEndpointRecord,borrowed_bytes)==304);
 static_assert(offsetof(GameplayCpuEndpointRecord,reserved)==308);
 
+/* Arena-mode sidecar. The nine schema-1 raw domains retain live values. */
+struct alignas(8) GameplayCpuArenaEndpoint {
+    std::uint32_t schema{},bytes{},view{},provenance{};
+    std::uint32_t source_frame{},incarnation{},restore_count{},flags{};
+    std::uint32_t pre_piece_watermark{},current_piece_watermark{};
+    std::uint32_t pool_refusal{},origin_refusal{},piece_refusal{},reserved{};
+    std::uint64_t effect_token{},pre_revision{},current_revision{};
+    std::uint64_t pre_watermark{},current_watermark{},pre_piece_revision{},current_piece_revision{};
+    std::uint64_t arena_base{},arena_bytes{},bytes_compared{},first_mismatch_offset{};
+};
+static_assert(std::is_trivially_copyable_v<GameplayCpuArenaEndpoint>);
+static_assert(sizeof(GameplayCpuArenaEndpoint)==144);
+static_assert(offsetof(GameplayCpuArenaEndpoint,effect_token)==56);
+static_assert(offsetof(GameplayCpuArenaEndpoint,arena_base)==112);
+static_assert(offsetof(GameplayCpuArenaEndpoint,first_mismatch_offset)==136);
+
 /* A stack-resident synchronous collector. begin() performs the full owner
  * admissions and bounded audio inventory once. record() is indexed and
  * allocation-free. revalidate() repeats admissions after the host has copied
@@ -124,6 +140,7 @@ public:
                                      std::uint32_t index=0) const noexcept;
     // Optional typed particle receipt sidecar. The original 312-byte records
     // and their strict comparison remain unchanged.
+    bool arena(GameplayCpuArenaEndpoint&) const noexcept;
     bool particle_header(SlippiParticleCellEndpointHeader&) const noexcept;
     bool particle_row(std::uint32_t kind,std::uint32_t index,
                       SlippiParticleCellEndpointRow&) const noexcept;
@@ -134,6 +151,7 @@ private:
     struct BatchData {
         MeleeWebActionEndpointHeader actions{};
         MeleeWebSourcePayloadEndpointHeader payload{};
+        GameplayCpuArenaEndpoint arena{};
         MeleeWebMatchFlowCpuEndpoint flow{};
         MeleeWebMatchContextRange context{};
         MeleeWebBootstrapCpuStorage bootstrap{};

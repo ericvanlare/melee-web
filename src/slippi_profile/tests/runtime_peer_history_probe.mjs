@@ -55,6 +55,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
     try {
       switch (operation) {
         case 'episodeEnable': return owner.enableEpisode();
+        case 'arenaEnable': return owner.enableArenaHistory();
         case 'episodePoll': {
           const status = await owner.command('pollTicket'), ticket = owner.ticket();
           if (ticket.sourceFrame !== value.tick || ticket.ticketId !== status.completeSequence ||

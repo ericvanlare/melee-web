@@ -30,14 +30,14 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_span(
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_history(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
-    CpuCaptureDiagnostic& diagnostic) noexcept {
+    CpuCaptureDiagnostic& diagnostic,CpuHistoryStorage storage) noexcept {
     return capture_checked(session,std::move(statics),diagnostic,
-                           MELEE_WEB_CPU_MOTOR_MAX_SPAN,true,true);
+                           MELEE_WEB_CPU_MOTOR_MAX_SPAN,true,true,storage);
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
     const GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,std::uint32_t span,bool allow_variable,
-    bool history_mode) noexcept {
+    bool history_mode,CpuHistoryStorage storage) noexcept {
     /* Internal caller supplies fresh private stack storage. No diagnostic
      * pointer is exported and no source owner is written by this attribution. */
     diagnostic={};
@@ -128,6 +128,40 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
         if(!slippi_particle_presentation_anchor_admit(c->commit_.particle_anchor)){
             refused(CpuComparisonDomain::Owner,code(CpuCaptureRefusal::ParticleOwner),
                     "Particle constructor ownership capture refused");return {};
+        }
+        if(storage==CpuHistoryStorage::OwnedArena){
+            stage=CpuComparisonDomain::Payload;
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+            if(!history_mode||!melee_web_gameplay_active_arena_view(
+                    &c->commit_.arena_base,&c->commit_.arena_bytes)){
+                refused(stage,0,"Owned SDK arena identity is unavailable");return {};
+            }
+            const auto arena=melee_web_gameplay_heap_history_capture();
+            c->commit_.arena=arena.snapshot;
+            if(arena.status!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||!c->commit_.arena){
+                refused(stage,static_cast<std::uint32_t>(arena.status),
+                        "Owned SDK arena PRE capture refused");return {};
+            }
+            const auto shadow=melee_web_source_memory_history_capture();
+            c->commit_.shadow=shadow.pre;
+            if(shadow.status!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK||!c->commit_.shadow){
+                refused(stage,static_cast<std::uint32_t>(shadow.status),
+                        "Owned SDK arena shadow PRE capture refused");return {};
+            }
+            if(const char* error=c->history_arena_failure()){
+                refused(stage,0,error);return {};
+            }
+            if(!gameplay_cpu_history_audio_disjoint(c->commit_)){
+                refused(CpuComparisonDomain::Audio,0,"Audio-owned ranges overlap SDK arena or are unavailable");return {};
+            }
+            if(!slippi_particle_presentation_captured_pools_admit(c->commit_.particle_anchor)){
+                refused(CpuComparisonDomain::Owner,0,"Captured particle pool ownership refused at arena PRE");return {};
+            }
+            c->phase_=Phase::HistoryReady;
+            return c;
+#else
+            refused(stage,0,"Owned SDK arena history requires the private match-history profile");return {};
+#endif
         }
         // Diagnostic arm is not a CPU-admission condition. It owns no source
         // memory, and its serial/table are never captured or restored.
@@ -271,10 +305,15 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
         return refused(CpuComparisonDomain::Bootstrap,"History seal bootstrap snapshot refused");
     if(!melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0))
         return refused(CpuComparisonDomain::Context,"History seal match-context snapshot refused");
-    const auto payload=melee_web_source_memory_payload_snapshot_admit(commit_.payload);
-    if(payload!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
-        return refused(CpuComparisonDomain::Payload,"History seal payload snapshot refused",
-                       static_cast<std::uint32_t>(payload));
+    if(commit_.arena){
+        if(const char* error=history_arena_failure())
+            return refused(CpuComparisonDomain::Payload,error);
+    }else{
+        const auto payload=melee_web_source_memory_payload_snapshot_admit(commit_.payload);
+        if(payload!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+            return refused(CpuComparisonDomain::Payload,"History seal payload snapshot refused",
+                           static_cast<std::uint32_t>(payload));
+    }
     if(actual_end<=history_start_frame_||actual_end<=owner_.frame||
        actual_end-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN)
         return refused(CpuComparisonDomain::Owner,"History seal END is outside the retained frame span");
@@ -296,6 +335,45 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
     return true;
 }
 
+bool GameplayCpuCheckpoint::history_payload_admit() const noexcept
+{
+    return commit_.arena?!history_arena_failure():
+        melee_web_source_memory_payload_snapshot_admit(commit_.payload)==
+            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
+}
+
+const char* GameplayCpuCheckpoint::history_arena_failure() const noexcept
+{
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    const void* base=nullptr;
+    size_t bytes=0;
+    if(!melee_web_gameplay_active_arena_view(&base,&bytes)||base!=commit_.arena_base||
+       bytes!=commit_.arena_bytes)return "Owned SDK arena identity or extent changed";
+    if(melee_web_source_memory_history_current_admit(commit_.shadow)!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return "Owned SDK arena selected shadow state refused";
+    const auto shadow=melee_web_source_memory_payload_current_endpoint_header(commit_.payload);
+    if(shadow.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return "Owned SDK arena shadow payload observation refused";
+    auto shadow_owner=shadow;
+    const auto visit=[](void* context,uint64_t,const void* payload,uint32_t capacity)->int {
+        const auto& owner=*static_cast<const MeleeWebSourcePayloadEndpointHeader*>(context);
+        MeleeWebSourceMemoryAllocation row{};
+        return melee_web_source_memory_allocation_read(payload,&row)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+            row.live&&row.source_heap_handle==owner.source_heap_handle&&
+            row.world_generation==owner.world_generation&&row.allocation_generation&&
+            row.requested_bytes&&row.requested_bytes<=capacity;
+    };
+    uint64_t count=0;
+    if(melee_web_gameplay_heap_history_visit_allocations(
+        commit_.arena,visit,&shadow_owner,&count)!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+        return "Owned SDK arena allocation chain or shadow row refused";
+    if(count!=shadow.row_count)return "Owned SDK arena and shadow allocation counts disagree";
+    return nullptr;
+#else
+    return "Owned SDK arena history requires the private match-history profile";
+#endif
+}
+
 bool GameplayCpuCheckpoint::history_endpoint_admit(
     const GameplayMatchSession& session) const noexcept {
     const bool selected=phase_==Phase::HistorySealed||
@@ -313,8 +391,7 @@ bool GameplayCpuCheckpoint::history_endpoint_admit(
         melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)&&
         melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)&&
         melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)&&
-        melee_web_source_memory_payload_snapshot_admit(commit_.payload)==
-            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK&&
+        history_payload_admit()&&
         history_actions_&&
         history_actions_->endpoint_admit()==MELEE_WEB_ACTION_ENDPOINT_OK&&
         statics_->history_endpoint_header().status==CpuStaticEndpointStatus::Ok&&
@@ -357,6 +434,7 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
        history_endpoint_closed_||
        !same_owner(session)||session.source_frames()!=history_end_frame_||
        !session.diagnostic_source_files_quiescent()||
+       (commit_.arena&&!history_payload_admit())||
        !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot))
         return GameplayCpuCommitResult::MissingOwner;
     commit_.action_history=history_actions_.get();
@@ -393,8 +471,7 @@ bool GameplayCpuCheckpoint::finish_history_replay(
        !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
        !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
        !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
-       melee_web_source_memory_payload_snapshot_admit(commit_.payload)!=
-            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
+       !history_payload_admit()||
        !history_actions_||history_actions_->active_failure()!=0||
        !melee_web_cpu_interval_motor_history_replay_finish(commit_.effect_token,
             history_incarnation_,history_restore_end_)||
@@ -859,6 +936,11 @@ void GameplayCpuCheckpoint::release() noexcept {
     melee_web_match_flow_cpu_snapshot_destroy(const_cast<MeleeWebMatchFlowCpuSnapshot*>(commit_.flow_snapshot));
     melee_web_match_context_snapshot_destroy(const_cast<MeleeWebMatchContextSnapshot*>(commit_.context_snapshot));
     melee_web_gameplay_bootstrap_snapshot_destroy(const_cast<MeleeWebGameplayBootstrapSnapshot*>(commit_.bootstrap));
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    melee_web_source_memory_history_destroy(commit_.shadow);
+    melee_web_gameplay_heap_history_snapshot_destroy(
+        const_cast<MeleeWebGameplayHeapHistorySnapshot*>(commit_.arena));
+#endif
     melee_web_source_memory_payload_snapshot_destroy(const_cast<MeleeWebSourceMemoryPayloadSnapshot*>(commit_.payload));
     melee_web_source_memory_payload_snapshot_destroy(post_payload_);
     melee_web_match_flow_cpu_snapshot_destroy(post_flow_);

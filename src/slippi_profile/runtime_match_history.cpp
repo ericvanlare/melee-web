@@ -77,10 +77,10 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
     GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,RuntimeMatchHistoryBoundaryCheck boundary,
     RuntimeMatchHistoryPresentSubmit present,RuntimeMatchHistoryAudioStep audio_step,
-    unsigned& audio_phase,void* callback_context,bool episode_mode) noexcept
+    unsigned& audio_phase,void* callback_context,bool episode_mode,bool arena_mode) noexcept
 {
     diagnostic={};
-    if(!statics||!boundary||!present||!audio_step||audio_phase>=60){
+    if(!statics||!boundary||!present||!audio_step||audio_phase>=60||(arena_mode&&!episode_mode)){
         capture_refusal(diagnostic,RuntimeMatchHistoryFailure::Capture,
                         "Private runtime history requires injected statics and ordinary owner callbacks");
         return {};
@@ -111,7 +111,8 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
     result->segment_start_frame_=owners.frame;
     result->episode_mode_=episode_mode;
     result->checkpoint_=GameplayCpuCheckpoint::capture_history(
-        session,std::move(statics),diagnostic);
+        session,std::move(statics),diagnostic,
+        arena_mode?CpuHistoryStorage::OwnedArena:CpuHistoryStorage::StablePayload);
     if(!result->checkpoint_){
         result->phase_=RuntimeMatchHistoryPhase::Failed;
         result->failure_=RuntimeMatchHistoryFailure::Capture;
@@ -619,6 +620,12 @@ GameplayCpuEndpointRecord RuntimeMatchHistory::endpoint_record(
     auto result=reader_.record(domain,kind,index);
     if(result.status)endpoint_read_failure_=true;
     return result;
+}
+
+bool RuntimeMatchHistory::endpoint_arena(GameplayCpuArenaEndpoint& out) const noexcept
+{
+    out={};
+    return reader_.active()&&endpoint_role_!=EndpointRole::None&&reader_.arena(out);
 }
 
 bool RuntimeMatchHistory::endpoint_particle_header(

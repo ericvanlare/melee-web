@@ -301,11 +301,16 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
     ]),
   ];
   const view = request && request.view, provenance = request && request.provenance;
-  if (!request || Object.keys(request).some(key=>!['view','provenance','expectedSourceFrame','particleCellEndpoint'].includes(key)))
+  if (!request || Object.keys(request).some(key=>!['view','provenance','expectedSourceFrame','particleCellEndpoint','arenaHistoryEndpoint'].includes(key)))
     failPage('request contains unsupported fields');
   if (request.particleCellEndpoint !== undefined && typeof request.particleCellEndpoint !== 'boolean')
     failPage('particle-cell endpoint option must be boolean');
+  if (request.arenaHistoryEndpoint !== undefined && typeof request.arenaHistoryEndpoint !== 'boolean')
+    failPage('arena-history endpoint option must be boolean');
   const includeParticleCells = request.particleCellEndpoint === true;
+  const includeArenaHistory = request.arenaHistoryEndpoint === true;
+  if(includeArenaHistory&&(!includeParticleCells||binding?.runtime!=='match-history'))
+    failPage('arena-history endpoint requires the particle sidecar and explicit match-history runtime binding');
   if (![1,2,3].includes(view) || ![1,2,3].includes(provenance) ||
       ((view === 1) !== (provenance === 1)))
     failPage('view/provenance request is invalid');
@@ -362,6 +367,7 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
     prefix+'cpu_particle_endpoint_row',
     prefix+'cpu_particle_endpoint_row_data',
     prefix+'cpu_particle_endpoint_row_bytes');
+  if(includeArenaHistory)required.push(prefix+'cpu_arena_endpoint_data',prefix+'cpu_arena_endpoint_bytes');
   if (required.some(name => typeof module[name] !== 'function')) failPage('native direct endpoint exports are unavailable');
   const wasmPointer = (value, name) => {
     if (!Number.isInteger(value) || value < -0x8000_0000 || value > u32max)
@@ -616,7 +622,7 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
     if (typeof ownerSourceFrame !== 'bigint') failPage('owner source-frame field is not a u64');
     if (expectedSourceFrame !== undefined && expectedSourceFrame !== ownerSourceFrame)
       failPage('owner source-frame stamp differs from the requested frame');
-    let particleCells = null;
+    let particleCells = null,arenaHistoryEndpointBytes=null;
     if (includeParticleCells) {
       const readFixedBuffer = (pointerExport, bytesExport, expectedBytes, label) => {
         const pointer = wasmPointer(module[pointerExport](), `${label} buffer`);
@@ -696,10 +702,45 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
         capturedCount:beforeHeader.capturedCount,world:beforeHeader.world.toString(10),
         anchorSerial:beforeHeader.anchorSerial.toString(10),anchorToken:beforeHeader.anchorToken.toString(10),
         historySerial:beforeHeader.historySerial.toString(10),liveRows,capturedRows};
+      if(includeArenaHistory){
+        const pointer=wasmPointer(module[prefix+'cpu_arena_endpoint_data'](),'arena-history endpoint buffer');
+        assertHeap();
+        const extent=module[prefix+'cpu_arena_endpoint_bytes']();
+        assertHeap();
+        if(!pointer||extent!==144||pointer+extent>heapLength)
+          failPage('native arena-history endpoint extent is not exactly 144 bytes');
+        arenaHistoryEndpointBytes=heap.slice(pointer,pointer+extent);
+        if(arenaHistoryEndpointBytes.byteLength!==144)failPage('native arena-history endpoint was truncated');
+        const data=new DataView(arenaHistoryEndpointBytes.buffer,arenaHistoryEndpointBytes.byteOffset,
+          arenaHistoryEndpointBytes.byteLength);
+        const effectToken=domains[1].records.find(item=>item.kindName==='EffectToken')?.fields[0];
+        const arenaBase=data.getBigUint64(112,true),arenaBytes=data.getBigUint64(120,true);
+        const bytesCompared=data.getBigUint64(128,true),firstMismatch=data.getBigUint64(136,true);
+        const flags=data.getUint32(28,true),exactArena=(flags&1)!==0;
+        if(data.getUint32(0,true)!==1||data.getUint32(4,true)!==144||
+           data.getUint32(8,true)!==view||data.getUint32(12,true)!==provenance||
+           BigInt(data.getUint32(16,true))!==ownerSourceFrame||
+           (flags&~3)!==0||data.getUint32(52,true)!==0||
+           data.getUint32(40,true)!==0||data.getUint32(44,true)!==0||data.getUint32(48,true)!==0||
+           data.getBigUint64(56,true)!==effectToken||arenaBase===0n||arenaBase>0xffff_ffffn||
+           arenaBytes===0n||arenaBytes>0xffff_ffffn||arenaBase+arenaBytes>0x1_0000_0000n||
+           (exactArena?(firstMismatch!==0xffff_ffff_ffff_ffffn||bytesCompared!==arenaBytes):
+             (firstMismatch>=arenaBytes||bytesCompared!==firstMismatch+1n)))
+          failPage('native arena-history endpoint header, exactness, refusal, range, or source join is invalid');
+        if(view===1&&(flags&3)!==3)
+          failPage('PRE arena-history endpoint did not prove exact arena and shadow bytes');
+        const incarnation=data.getUint32(20,true);
+        if((incarnation===0)!==(effectToken===0n)||
+           (incarnation===0&&(view!==1||data.getUint32(24,true)!==0)))
+          failPage('native arena-history zero-token PRE/incarnation join is invalid');
+      }
     }
     captured = includeParticleCells
-      ? {schema:particleV2Schema,rawSchema:schema,recordBytes,view,provenance,
-        sourceFrame:ownerSourceFrame,revalidated:true,domains,particleCells}
+      ? (includeArenaHistory
+        ? {schema:3,rawSchema:schema,recordBytes,view,provenance,
+          sourceFrame:ownerSourceFrame,revalidated:true,domains,particleCells,arenaHistoryEndpointBytes}
+        : {schema:particleV2Schema,rawSchema:schema,recordBytes,view,provenance,
+          sourceFrame:ownerSourceFrame,revalidated:true,domains,particleCells})
       : {schema,recordBytes,view,provenance,sourceFrame:ownerSourceFrame,domains};
   } catch (error) {
     firstFailure = error instanceof Error ? error : new Error(String(error));
@@ -732,6 +773,8 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
     domains:captured.domains.map(item=>({id:item.id,name:item.name,records:item.records.map(wirePageRecord)})),
   };
   if(captured.particleCells)wire.particleCells=captured.particleCells;
+  if(captured.arenaHistoryEndpointBytes)
+    wire.arenaHistoryEndpointBase64=encodePageBase64(captured.arenaHistoryEndpointBytes);
   return wire;
 }
 
