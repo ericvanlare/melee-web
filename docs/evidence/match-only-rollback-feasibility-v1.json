@@ -13842,6 +13842,643 @@
                   "sha256": "59e6282b50392fb178926b394b224cf536beb25f3514d0cef588345c0d290c1c"
                 }
               }
+            },
+            "issue_368_paced_120_v1": {
+              "issue": 368,
+              "status": "BOUNDED_PACED_120_INPUT_PASS; ISSUE_368_OPEN_FOR_LATE_CORRECTION",
+              "baseline_and_scope": "Finite page-owned 120-input paced trace on unchanged seven-row / three-incarnation / two-restore native bounds. The v5 browser correction is PRE0/F1 with dirty=0; no late class-piece restore, full-match, sustained-60Hz, complete-profile, or public-relay acceptance.",
+              "prior_evidence_draft": {
+                "path": "runtime368-status-receipt-draft.json",
+                "sha256": "29e0e8534460cdd1bc513c75193112ab68d96f2b870f97795a844e209a326fe3",
+                "preserved_fields": {
+                  "completion_wait_source": "c9b34dc4fe210cdc4af1a194ddb00b939ff7dfc7",
+                  "error_category_source": "63f74d0aae380fdb3bf0faac93cbcd54301722be",
+                  "error_lifetime_source": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                  "scope": [
+                    "Finite120 actual polls, unchanged native seven-row capsule and original timing bounds.",
+                    "Private GPU callback only wakes existing wait; exact native idle and owner predicates still admit.",
+                    "No120 completion, full-match, public-relay rollback or steady60Hz pass."
+                  ],
+                  "retained_attempts": [
+                    {
+                      "attempt": 1,
+                      "native_producer": "c9b34dc4fe210cdc4af1a194ddb00b939ff7dfc7",
+                      "harness_producer": "c9b34dc4fe210cdc4af1a194ddb00b939ff7dfc7",
+                      "status": "FAIL",
+                      "summary": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v1/result-summary.json",
+                        "sha256": "ad4fe9ce35abf652aa2e9aeb6dc9c4aab6dbcf341ca94ab5c89a21dc2b1c9c30"
+                      },
+                      "raw": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v1/browser/result.json",
+                        "sha256": "30a86b4a5b4900d3709161343b6b00ff0c9960a7ff8d34b0adcc98eb4f180bcc"
+                      },
+                      "owner": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v1/owner.json",
+                        "sha256": "dd7b9958bde7a162b71546b7fee46a6ba17459b73443c73a22c9ad058db2837a"
+                      },
+                      "independent_review": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v1/independent-result-review.json",
+                        "sha256": "d0b2c7e9ca1a33f19010214265d21f9302b17eab9e674cbf54e8127719260587"
+                      },
+                      "producer_archive": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-producer-v1/archive.json",
+                        "sha256": "acdf6bf544eefeecfa30efa4b6a8cb976f80e46600f68fa2bb0f025009d208f2"
+                      },
+                      "linked_configuration": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-catalog-v1/final-linked-configuration-v1.json",
+                        "sha256": "7ff98a03b51720c8467a29592375853b0d148e775798bd1f8aed32b31eca385b"
+                      },
+                      "owned_pids_absent": 21,
+                      "runtime_and_harness_pins_unchanged": true
+                    },
+                    {
+                      "attempt": 2,
+                      "native_producer": "63f74d0aae380fdb3bf0faac93cbcd54301722be",
+                      "harness_producer": "63f74d0aae380fdb3bf0faac93cbcd54301722be",
+                      "status": "FAIL",
+                      "summary": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v2/result-summary.json",
+                        "sha256": "14afcafde181e59c9397d32489437d1b862c676ce8645680749603b9be2e6ef1"
+                      },
+                      "raw": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v2/browser/result.json",
+                        "sha256": "377fc474fc5a978c72d454ae11fbcfaf106a273a5e0f38e1c8ad446f9ff4b3df"
+                      },
+                      "owner": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v2/owner.json",
+                        "sha256": "69163fbae6c29f9b7b278e542c07e5a7e7639fc9a7e9b0e8f4810cd070773501"
+                      },
+                      "independent_review": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v2/independent-result-review.json",
+                        "sha256": "32194d3f6f2832f2ca639fdd3dfd7aacab902dc26fe3d4c90e1a5b420df70489"
+                      },
+                      "producer_archive": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-producer-v2/archive.json",
+                        "sha256": "6888a6458e134327769d789d2af198580765049a019e732570338e7dd6169a43"
+                      },
+                      "linked_configuration": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-catalog-v2/final-linked-configuration-v1.json",
+                        "sha256": "7739465ecaee5e4baf975f4f76bb1a838dbb1e194945127265ed6b11fec49cbd"
+                      },
+                      "owned_pids_absent": 19,
+                      "runtime_and_harness_pins_unchanged": true
+                    },
+                    {
+                      "attempt": 3,
+                      "native_producer": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                      "harness_producer": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                      "status": "FAIL",
+                      "summary": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v3/result-summary.json",
+                        "sha256": "e8985d6045323591f7ce3c294e150f73cacc00b6efe602d7ce6ca97fc902b568"
+                      },
+                      "raw": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v3/browser/result.json",
+                        "sha256": "73f6ba9dcdb4ca5f1f323fe3d7dfbfc14bc28e33c7e5c9b79576d00f5c603d76"
+                      },
+                      "owner": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v3/owner.json",
+                        "sha256": "31f48b29118a0dbc7b43fd1dd2ef35a7294ff5bdfcd064338b7872d7db1c68ed"
+                      },
+                      "independent_review": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-120-v3/independent-result-review.json",
+                        "sha256": "59410e12e3feb181f531068adc8dfb66b6d2d3329d4012ef34f639b35b2f613c"
+                      },
+                      "producer_archive": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-producer-v3/archive.json",
+                        "sha256": "350bad9743fbc795a733adc18ee7ca4664276dd5021f13c6a6ba6eb501f991dc"
+                      },
+                      "linked_configuration": {
+                        "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-catalog-v3/final-linked-configuration-v1.json",
+                        "sha256": "5b86cfc3704754309e47ad7d5131677d63f28eada821be0fddaa47b82c084d9a"
+                      },
+                      "owned_pids_absent": 19,
+                      "runtime_and_harness_pins_unchanged": true
+                    }
+                  ],
+                  "reduced_memory": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime368-reduced-memory-v1/reduced-result.json",
+                    "sha256": "102e73c3b14f01d50c2b5b3baa47ac70708642673aba3c7921d21ee61c783fed"
+                  },
+                  "diagnostic_source_review": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-120-root-source-review-v3.json",
+                    "sha256": "de7a2055daebce2a47a0976cd3508947ef4325f236d320ac1fccf201fe58d7a0"
+                  },
+                  "diagnostic_focused": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime368-focused-v1/payload-diagnostic-final-result.json",
+                    "sha256": "49331808c266cd9ca9369b8d39e653c91e9d20cf74daaac13d26742a88c55c61"
+                  },
+                  "rejected_microbenchmark": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-sdk-arena-observe-micro-run-v1/independent-result-review.json",
+                    "sha256": "0bd38df8bbe4898b0abcc5920d89b750c93edbdf9e5da3062e57005359445007"
+                  },
+                  "integration_366": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-receipt-v1.json",
+                    "sha256": "91c4aadd295eabbb00b524195443f2fe0f99783d94e9a6d76234d4b72a9129b6"
+                  }
+                }
+              },
+              "attempts": {
+                "v4": {
+                  "native_and_harness_producer": "00dcf16c7b09b3daf297aa985a3f2829c82a5830",
+                  "result": "FAIL",
+                  "run_scope": null,
+                  "elapsed_ms": 18372,
+                  "cleanup": {
+                    "owned_pids_absent": 20,
+                    "owned_pids_still_present": [],
+                    "owner_cleanup_passed": true,
+                    "pins_unchanged": true,
+                    "unique_owned_browser_pids_absent": 20
+                  },
+                  "run_files": {
+                    "result_summary": {
+                      "path": "runtime-peer-paced-120-v4/result-summary.json",
+                      "sha256": "a9aa9f0c9426991dcb5a023286e6b556a280d5a7f584519fb042cc7dfc431ba9"
+                    },
+                    "browser_report": {
+                      "path": "runtime-peer-paced-120-v4/browser/result.json",
+                      "sha256": "f5263856ea5f386723f66ed0c9528142f75c64a8dbbb06bb877108cdfb921936"
+                    },
+                    "owner": {
+                      "path": "runtime-peer-paced-120-v4/owner.json",
+                      "sha256": "dd635cc1a013fe523cd10652811cef10c721a3eeb5f5ec3347ad40eb71240dde"
+                    },
+                    "command": {
+                      "path": "runtime-peer-paced-120-v4/command.json",
+                      "sha256": "ce134b6d3e678f9a93ee9e3bc0aebe0561d9caec06834443bf3915ae6b2ed711"
+                    }
+                  },
+                  "root_capture_review": {
+                    "path": "runtime-peer-paced-120-root-review-v4.json",
+                    "sha256": "d67f1787de2b401be476ac2e0de1f513e0763662578b04d13ca9bc0c96d66cb0"
+                  },
+                  "independent_result_review": {
+                    "path": "runtime-peer-paced-120-v4/independent-result-review.json",
+                    "sha256": "6b4f777a4a2efd030dffc1977a4846f8f3f979c7a513e38b3c0e127119bda319"
+                  },
+                  "producer_archive": {
+                    "path": "runtime-paced-120-producer-v4/archive.json",
+                    "sha256": "d581ef2906a5e5290a0201ec6911e658d3086db469c107ff1d9f52f80c9d2919",
+                    "source_head": "00dcf16c7b09b3daf297aa985a3f2829c82a5830",
+                    "source_clean_at_build_start": true,
+                    "build_receipt": {
+                      "path": "runtime-paced-120-build-v4/result.json",
+                      "sha256": "ed87a6ce8971f77f09003b512994b52c582e8b126b1c98a9ffcd51007cc9c4e8",
+                      "exit_code": 0,
+                      "elapsed_seconds": 62.15018637524918,
+                      "log_sha256": "d92767f78055bb59f8dd4dbeda1d236f068d41dc84057053f0f344108906605a",
+                      "command": [
+                        "python3",
+                        "scripts/build.py",
+                        "--target",
+                        "runtime-match-history-diagnostic",
+                        "--configuration",
+                        "Release"
+                      ]
+                    },
+                    "artifact_sha256": {
+                      "gameplay_menu_browser_match_history.source-state.json": "30f00a58105e2f283fdc4d7de4d95749540671c3b82885fc7ba542a386780718",
+                      "gameplay_menu_browser_match_history.map": "f934a4997fe557c5c2b7204683b6246407d47cfc8047ec9f8e2d26653dd6e473",
+                      "gameplay_menu_browser.wasm": "908136e155f753fdc9557a14949029631d24950a24c96ffb4094285941f0ff26",
+                      "gameplay_menu_browser.js": "5eb3efff9de314a248bf437790f1230a0f7fde032c38c0dbe4f3d1071f503231",
+                      "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6",
+                      "gameplay_menu_browser_match_history_producers.tsv": "8d30bd71a9da5fa76db2c5976ae4e44379cfef872047301283cf683e5786e355",
+                      "CMakeCache.txt": "6caaf52231141746c72c1de3b418a29161f92d79612861204e2af1cde0d70e5f",
+                      "compile_commands.json": "ef8532b0e26eaca9972c913c50c5c199596f86ae6ddbc2b95d8ab31ff7e7cb3d",
+                      "build.ninja": "0f497931d48587626b5cee7d6ecb9e2979637020fa52b70014caddd2be710c59"
+                    }
+                  },
+                  "linked_configuration": {
+                    "path": "runtime-paced-120-catalog-v4/final-linked-configuration-v1.json",
+                    "sha256": "d842a4bac1a930f0ddd1f6effaf9efff5a05a2b2f9683244b4d26a07477dde9b",
+                    "schema": "aggregate-cpu-final-linked-configuration-v1",
+                    "wasm_sha256": "908136e155f753fdc9557a14949029631d24950a24c96ffb4094285941f0ff26",
+                    "map_sha256": "f934a4997fe557c5c2b7204683b6246407d47cfc8047ec9f8e2d26653dd6e473",
+                    "manifest_sha256": "30f00a58105e2f283fdc4d7de4d95749540671c3b82885fc7ba542a386780718",
+                    "policy_sha256": "9f3e2575556fdc64a9a2613387908efc277d9a748afd1e2f615a0d5e37384180"
+                  },
+                  "root_source_review": {
+                    "path": "runtime-paced-120-root-source-review-v4.json",
+                    "sha256": "f422cffe65a90ff4f92c16b16c3a5574fd1b7f7762ed7379f56b00a9ad03a44f",
+                    "decision": "GO_FOCUSED_AND_BUILD",
+                    "source_head": "16eb6f8e7be962a5f9f44c09ec567652c66773fb"
+                  },
+                  "failure_detail": {
+                    "stage": "first capture; zero input polls",
+                    "browser_error": "Owned SDK arena shadow PRE binding refused",
+                    "root_captured_numeric_status": false,
+                    "source_review_inference": "INVALID_STATE (3), inferred from actual compile flags and the private bind fallback",
+                    "actual_compile_flags": {
+                      "cpu_interval_enabled": true,
+                      "match_history_diagnostic_defined": false,
+                      "compile_command_receipt": {
+                        "path": "runtime-peer-paced-120-v4/reviewed-source-memory-compile-command.json",
+                        "sha256": "efdb45bd22639b51fcb005a28130f821bb2149996c4d42a696919386158c6b89"
+                      }
+                    }
+                  },
+                  "context": {
+                    "first_browser_attempt_overall": false,
+                    "first_browser_attempt_with_coupled_piece_repair": true,
+                    "retained_prior_browser_attempts": [
+                      "v1",
+                      "v2",
+                      "v3"
+                    ],
+                    "failure_scope": "Failed before any PAD input because the actual source-memory compile lacked MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC; private bind returned unavailable INVALID_STATE, inferred from pinned compile flags/source."
+                  }
+                },
+                "v5": {
+                  "native_and_harness_producer": "6eb8106b1641f95c3dcfe1148e8245c295eaaecf",
+                  "result": "PACED_120_INPUTS_COMPLETE",
+                  "run_scope": "120 actual PAD polls per page; 120 equal authoritative 44-byte PAD rows; final 64-byte native checksum compared locally (no peer checksum exchange). One near-start restore per page at PRE0/F1 with dirty=0, followed by 120 forward draws and one corrected draw. No restore after frame 28, no late class-piece restoration, no sustained 60 Hz or full-match claim.",
+                  "elapsed_ms": 20220,
+                  "cleanup": {
+                    "owned_pids_absent": 19,
+                    "owned_pids_still_present": [],
+                    "owner_cleanup_passed": true,
+                    "pins_unchanged": true
+                  },
+                  "run_files": {
+                    "result_summary": {
+                      "path": "runtime-peer-paced-120-v5/result-summary.json",
+                      "sha256": "ac168b2fc7486078b93a07f7578962fdfc820492421f3175efe8ab0ed7fc7cf7"
+                    },
+                    "browser_report": {
+                      "path": "runtime-peer-paced-120-v5/browser/result.json",
+                      "sha256": "146ddc6a7a3d28d24e65b2e91c4ae70c9bc6afe8133a08a055d3c3a67928364e"
+                    },
+                    "owner": {
+                      "path": "runtime-peer-paced-120-v5/owner.json",
+                      "sha256": "84d23e433575a3250c5abf49d78d69676a567a827739cc54e9eda46ee6c97947"
+                    },
+                    "command": {
+                      "path": "runtime-peer-paced-120-v5/command.json",
+                      "sha256": "e3cbf4dc8adf3a04c8292a467a68735ebe5bedbc50c1f8a731c882de66f23a20"
+                    }
+                  },
+                  "root_capture_review": {
+                    "path": "runtime-peer-paced-120-root-review-v5.json",
+                    "sha256": "fb5a140f36fa0ffc5085fe2b7162ed521623f4c34319a4e6df3c1dbf88d71ecf"
+                  },
+                  "independent_result_review": {
+                    "path": "runtime-peer-paced-120-v5/independent-result-review.json",
+                    "sha256": "e95dce9e6f0d0c2904c26fac4a4bdd69ef699c5adf8effe3a3250743e30376b0"
+                  },
+                  "producer_archive": {
+                    "path": "runtime-paced-120-producer-v5/archive.json",
+                    "sha256": "6097ef9c69210a5e713d3122d919acfb85be569be310c1bbf76b9df7752ead38",
+                    "source_head": "6eb8106b1641f95c3dcfe1148e8245c295eaaecf",
+                    "source_clean_at_build_start": true,
+                    "build_receipt": {
+                      "path": "runtime-paced-120-build-v5/result.json",
+                      "sha256": "52bd367aed5655387e4198f5f726f89c66c4660784264cc94ac2f9cd7589c635",
+                      "exit_code": 0,
+                      "elapsed_seconds": 32.75803795829415,
+                      "log_sha256": "56f9fcb7553e533604f13aaf9f40211b9490737b5ee4b3090cdcd8ca114a0c95",
+                      "command": [
+                        "python3",
+                        "scripts/build.py",
+                        "--target",
+                        "runtime-match-history-diagnostic",
+                        "--configuration",
+                        "Release"
+                      ]
+                    },
+                    "artifact_sha256": {
+                      "gameplay_menu_browser_match_history.source-state.json": "e009c3743f5ae2c92e21f04612b49b9713fe81e7d337b4b0bb6e4cc2dc5aa803",
+                      "gameplay_menu_browser_match_history.map": "4e132acf71d764483f0403f4888048275135814fd8492062823ffe949ce61218",
+                      "gameplay_menu_browser.wasm": "a1cf0fc57d2c4dcc9c05dd10a94ccd16c28a759d60350da3d9cdafc9b4df98e2",
+                      "gameplay_menu_browser.js": "5eb3efff9de314a248bf437790f1230a0f7fde032c38c0dbe4f3d1071f503231",
+                      "gameplay_menu_browser.data": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6",
+                      "gameplay_menu_browser_match_history_producers.tsv": "8d30bd71a9da5fa76db2c5976ae4e44379cfef872047301283cf683e5786e355",
+                      "CMakeCache.txt": "6caaf52231141746c72c1de3b418a29161f92d79612861204e2af1cde0d70e5f",
+                      "compile_commands.json": "8450c7c9bbd3adb168f819bda0bd53910ce9bb8ec37ee0ec763403714f1d9581",
+                      "build.ninja": "4565ba6ecef18f0271ccee88a243c912be9a083e48043db09b77efd1366e3d6c"
+                    }
+                  },
+                  "linked_configuration": {
+                    "path": "runtime-paced-120-catalog-v5/final-linked-configuration-v1.json",
+                    "sha256": "fab7b3741bc45a091d8394cf97fb9b0e667b10d662d32539490e62d494cd7989",
+                    "schema": "aggregate-cpu-final-linked-configuration-v1",
+                    "wasm_sha256": "a1cf0fc57d2c4dcc9c05dd10a94ccd16c28a759d60350da3d9cdafc9b4df98e2",
+                    "map_sha256": "4e132acf71d764483f0403f4888048275135814fd8492062823ffe949ce61218",
+                    "manifest_sha256": "e009c3743f5ae2c92e21f04612b49b9713fe81e7d337b4b0bb6e4cc2dc5aa803",
+                    "policy_sha256": "c9b0cbc2d89999cbb2a44810f54271ac294d47734b63c25d5274a5440af1a549"
+                  },
+                  "root_source_review": {
+                    "path": "runtime-paced-120-root-source-review-v5.json",
+                    "sha256": "8d6545f2a9aca5eb5b1c28dc5426edfe583589ad19685410e4bd20f2d4df1f97",
+                    "decision": "GO_FOCUSED_AND_BUILD",
+                    "source_head": "6eb8106b1641f95c3dcfe1148e8245c295eaaecf"
+                  },
+                  "observed": {
+                    "input_ticks": 120,
+                    "authoritative_PAD_rows_equal": 120,
+                    "equal_checksum_bytes": 64,
+                    "peer_checksum_exchange": "none; full native confirmed post-draw checksum compared locally",
+                    "scope": "120 actual PAD polls per page; 120 equal authoritative 44-byte PAD rows; final 64-byte native checksum compared locally (no peer checksum exchange). One near-start restore per page at PRE0/F1 with dirty=0, followed by 120 forward draws and one corrected draw. No restore after frame 28, no late class-piece restoration, no sustained 60 Hz or full-match claim.",
+                    "per_peer": {
+                      "alpha": {
+                        "polls": 120,
+                        "poll_serial_range": [
+                          "457",
+                          "576"
+                        ],
+                        "forward_draws": 120,
+                        "corrected_draws": 1,
+                        "restore_commands": 1,
+                        "correction": {
+                          "pre": 0,
+                          "frontier": 1,
+                          "dirty": 0,
+                          "confirmed_remote": [
+                            0,
+                            0,
+                            129,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                          ]
+                        },
+                        "later_clean_whole_END_rebases": [
+                          8,
+                          15,
+                          22,
+                          29,
+                          36,
+                          43,
+                          50,
+                          57,
+                          64,
+                          71,
+                          78,
+                          85,
+                          92,
+                          99,
+                          106,
+                          113
+                        ],
+                        "clock": {
+                          "elapsed_ms": 2017.6350002288818,
+                          "peak_debt_ticks": 5.81060001373291,
+                          "terminal_debt_ticks": 1.0581000137329053,
+                          "stalled": false
+                        },
+                        "presentations_total": 121,
+                        "checksum_sha256": "6ad9e0c7d907ee93a78eaf608ec0e95eeea47dfc3341552eb05a45790bcfe1dd"
+                      },
+                      "beta": {
+                        "polls": 120,
+                        "poll_serial_range": [
+                          "454",
+                          "573"
+                        ],
+                        "forward_draws": 120,
+                        "corrected_draws": 1,
+                        "restore_commands": 1,
+                        "correction": {
+                          "pre": 0,
+                          "frontier": 1,
+                          "dirty": 0,
+                          "confirmed_remote": [
+                            0,
+                            0,
+                            127,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0
+                          ]
+                        },
+                        "later_clean_whole_END_rebases": [
+                          8,
+                          15,
+                          22,
+                          29,
+                          36,
+                          43,
+                          50,
+                          57,
+                          64,
+                          71,
+                          78,
+                          85,
+                          92,
+                          99,
+                          106,
+                          113
+                        ],
+                        "clock": {
+                          "elapsed_ms": 2018.7750000953674,
+                          "peak_debt_ticks": 5.822900009155274,
+                          "terminal_debt_ticks": 1.1265000057220393,
+                          "stalled": false
+                        },
+                        "presentations_total": 121,
+                        "checksum_sha256": "6ad9e0c7d907ee93a78eaf608ec0e95eeea47dfc3341552eb05a45790bcfe1dd"
+                      }
+                    },
+                    "scope_limits": [
+                      "One successful restore per page at PRE0/F1 with dirty=0; no restore after frame 28.",
+                      "Later whole-END rebases at 8, 15, \u2026, 113 are clean; they do not exercise late piece restoration.",
+                      "Functional 120-input trace only; no sustained 60 Hz, full-match, complete-profile or public-relay rollback claim."
+                    ]
+                  },
+                  "source_specific_macro_fix": {
+                    "compile_definition": "MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC=1 for gameplay_source_memory_runtime.cpp only, in the existing private target block",
+                    "review": {
+                      "path": "runtime-coupled-piece-build-wiring-v1/independent-source-review.json",
+                      "sha256": "18e4d55a6eea4eafd6a3a40a8514c4bda8b7e1372db488efd6a594fc0a7e5406"
+                    },
+                    "build_controls_sha256": "78f162ac6bb0f0468efa4f67738832cac6d0a0f58a9feced59847a24798a53b0"
+                  },
+                  "coupled_piece_restore": {
+                    "production_patch_sha256": "bce6e47f6b907cb256016fede486b060b8f50b65d4aaf5a80c514f443dc8117e",
+                    "production_freeze": {
+                      "path": "runtime-coupled-piece-restore-candidate-v2/production-freeze.json",
+                      "sha256": "04c66855ebdd8adec3d435efaa9cbf39da4e9e7a886b90d07fe7095dc90eb748"
+                    },
+                    "independent_production_review": {
+                      "path": "runtime-coupled-piece-restore-candidate-v2/independent-production-review.json",
+                      "sha256": "c208a48664b8029bd245a4176447bf67339048bdea7a5202e0f8c6ea0ae4ca23"
+                    },
+                    "focused_sdk_coordinator_result": {
+                      "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime368-focused-v1/coupled-integrated-sdk.log",
+                      "sha256": "e5bf93c35a8a0b072330ab1c5b6abe430fd0e91727650827b4ee431664f5ab59",
+                      "tests": 8,
+                      "result": "PASS"
+                    },
+                    "test_only_patch": {
+                      "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-coupled-piece-restore-candidate-v2/tests-only.patch",
+                      "sha256": "5b8c26d595d02bf7b6d0e8f9321dbf5ccf8268b21218e1a1b269a6dae447e212"
+                    },
+                    "initial_fixture_failure": {
+                      "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-coupled-piece-restore-candidate-v2/focused-controls/first-failure.json",
+                      "sha256": "37f8e5aeaf3a63c25db2872a025b2ed109e43b3302567a491f75967bac690e08",
+                      "classification": "fixture-only: duplicate destruction after positive assertion and byte mutation in reuse negative; corrected fixtures passed; original binary/log retained and source caveat documented"
+                    },
+                    "actual_late_piece_restore_in_browser": "NOT_COVERED"
+                  }
+                }
+              },
+              "coupled_restore_repair": {
+                "scope": "Arena-coupled shadow prepare/restore can restore changed class-piece sidecar rows only when the exact physical PRE plan is bound; legacy shadow-only route and allocation/fighter guards remain fail-closed.",
+                "production_base_head": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                "production_patch_sha256": "bce6e47f6b907cb256016fede486b060b8f50b65d4aaf5a80c514f443dc8117e",
+                "focused_tests": "PASS; actual SDK coupled fixture covers exact PRE equality, legacy unpaired refusal, wrong plan, physical-before-shadow commit, byte fence, piece-generation fence and stale owner. This is native fixture evidence only; v5 did not exercise late piece restoration in-browser.",
+                "fixture_caveat": "First fixture run printed its positive restore success then failed in duplicate teardown; reuse control also changed SDK-owned bytes. Both were corrected as fixture defects. Retained failure/source-reconstruction note is pinned in the attempt record; no production failure was established by that first run."
+              },
+              "integration_validation": {
+                "initial_full_regression": {
+                  "source_head": "6eb8106b1641f95c3dcfe1148e8245c295eaaecf",
+                  "result_path": "runtime368-integration-validation-v1/full-regression-result.json",
+                  "result_sha256": "4a75ec043e4f6e47b0a59a760bccb1577fe3a37e4298e988186bc2b6d6b2de08",
+                  "log_path": "runtime368-integration-validation-v1/full-regression.log",
+                  "log_sha256": "82e6c3afc179fb8001596af62ef8c69251272a1ff2027b0bb442e92c08966345",
+                  "exit_code": 1,
+                  "tests": 3109,
+                  "failures": 5,
+                  "skips": 242,
+                  "failure_classes": [
+                    "Four retained opaque C11 header-alias/extractor failures in Stadium controls.",
+                    "One retained opaque Node child failure in test_actual_cpu_runner_and_existing_census_node_contracts."
+                  ],
+                  "status": "FAIL; all five failures retained."
+                },
+                "node_reproduction": {
+                  "source_root": "6eb8106b1641f95c3dcfe1148e8245c295eaaecf",
+                  "isolated_endpoint": {
+                    "path": "runtime368-node-reduced-v1/isolated-tap.log",
+                    "sha256": "e37c5b7d8d90df95ba51a3afdeb0e29772ac7dc4935f60bfb30e9300b5b8ef32",
+                    "passed": 15,
+                    "failed": 0,
+                    "status": "PASS; cause not reproduced."
+                  },
+                  "combined_nine_file": {
+                    "path": "runtime368-node-reduced-v1/combined-tap.log",
+                    "sha256": "0ce6ec5555a4ac7216e21150b9dcd482499e81e3305fc0220eba65b527a5ff31",
+                    "passed": 136,
+                    "skipped": 1,
+                    "failed": 0,
+                    "status": "PASS; cause not reproduced."
+                  }
+                },
+                "header_alias_fix": {
+                  "source_head": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
+                  "change": "Minimal C11 header-alias compatibility fix; no implementation or ABI changes.",
+                  "independent_review": {
+                    "path": "runtime368-header-hygiene-v1/independent-review.json",
+                    "sha256": "17f8c2c4fa3839eed0d72667090139f54eb53fd77fda176f37b85ff80e1147c7"
+                  },
+                  "focused_controls": [
+                    {
+                      "pattern": "test_stadium_generator_owner.py",
+                      "status": "PASS",
+                      "log_sha256": "ac13e52c0098e8fa9ca9306a556eea0ab2d61e709a3ed4745e20bdd59945d046"
+                    },
+                    {
+                      "pattern": "test_stadium_map2_writable_region.py",
+                      "status": "PASS",
+                      "log_sha256": "4c663f5b819ae090b69d6dd5417fecc6edca9e80cd553ba4302ff18cacbea2ef"
+                    },
+                    {
+                      "pattern": "test_stadium_pre_ready_cancel.py",
+                      "status": "PASS",
+                      "log_sha256": "e1654bfad2ae58184881e221cbae3c7777ccf4f34230b036fc9fe6f28f88ca6b"
+                    },
+                    {
+                      "pattern": "test_source_memory_snapshot.py",
+                      "status": "PASS",
+                      "log_sha256": "081a90d34d26d5245563294a726961765ed63572b2c9bbfd471c22731427c3b4"
+                    }
+                  ]
+                },
+                "current_validation": {
+                  "source_head": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
+                  "composed_source_review": {
+                    "path": "runtime368-integration-source-review-v1.json",
+                    "sha256": "4332d117e290b5fe225ce9d1eee643543e9d3dcaaa22e19e855f564833a4f1c6",
+                    "verdict": "GO source integration"
+                  },
+                  "full_regression": {
+                    "status": "PASS",
+                    "tests": 3109,
+                    "skips": 242,
+                    "failures": 0,
+                    "elapsed_seconds": 737.4958287500776,
+                    "result_path": "runtime368-integration-validation-v2/full-regression-result.json",
+                    "result_sha256": "fda11f40a8df1b6b55cb70cc75e1f3e8f72aa317eda109d7440e26f6a14821a8",
+                    "log_path": "runtime368-integration-validation-v2/full-regression.log",
+                    "log_sha256": "29e1c06ec784474ef728b5e1ce8152851295f4dfdf6b1578d1341b6acdc3e20e",
+                    "source_unchanged": true
+                  },
+                  "ordinary_release_build": {
+                    "status": "PASS",
+                    "elapsed_seconds": 49.874061916954815,
+                    "result_path": "runtime368-integration-validation-v2/ordinary-release-result.json",
+                    "result_sha256": "5f70cf1f9ebeebee32783af4ba4b3d6b3c86b5180132a112ff9a1d72ac5533f8",
+                    "log_sha256": "a05188c54eccf3dd506927712f94e98b335d00efba9871a8e1d1b0f30f0bed3b",
+                    "source_unchanged": true
+                  },
+                  "private_diagnostic_release_build": {
+                    "status": "PASS",
+                    "elapsed_seconds": 61.52854091580957,
+                    "result_path": "runtime368-integration-validation-v2/private-release-result.json",
+                    "result_sha256": "74c6ef8dedfe1de90341828e8b6350be1c8a2581f7bd5028551ad9f9de38f0c6",
+                    "log_sha256": "c2b69249030a8245797636c6db14cd954fb738f8a791d370ff70a81b569a45d0",
+                    "source_unchanged": true
+                  },
+                  "publication_head_ci": "PENDING_ROOT_RESULT"
+                }
+              },
+              "next_smallest_gate": {
+                "objective": "Issue #369: one actual page-owned late-input correction with nonzero dirty index after the speculative suffix crosses the observed TEXP_CNST class-piece retirement boundary. Keep issue #368 open until this browser criterion is demonstrated.",
+                "pass_criteria": [
+                  "A real keyboard event changes one retained native poll; release the identical retained packet without mutation or a second poll.",
+                  "The native history receipt confirms restoration after observed piece retirement with nonzero dirty index and within the existing seven-step bound.",
+                  "All 120 authoritative 44-byte PAD rows agree; the complete terminal 64-byte native checksum agrees locally.",
+                  "Native owner/status checks, corrected presentation order, and checked session/socket/browser cleanup pass. Report direct browser late-piece restoration separately from the native reuse fixture."
+                ],
+                "exclusions": [
+                  "Do not repeat the default 120-input capture absent a changed hypothesis.",
+                  "Do not enlarge history caps, restore counts, or deadlines.",
+                  "The late-correction result alone does not close full-match or online acceptance.",
+                  "Do not claim whole raw CPU/DRAW endpoint publication; the current browser route does not expose it."
+                ]
+              },
+              "retained_attempt_context": {
+                "v1_v3": "All three failed browser attempts remain retained. v3 observed TEXP_CNST class-piece retirement before restore was refused at shadow prepare; it is retirement evidence, not successful browser restoration or reuse.",
+                "reuse_evidence": "Class-piece reuse is demonstrated only in the focused actual-SDK native fixture; no browser attempt has yet demonstrated late retirement/reuse followed by a successful restore."
+              },
+              "v3_observed_retirement": {
+                "producer": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                "result": "FAILED_AT_SHADOW_PREPARE_AFTER_OBSERVED_TEXP_CNST_RETIREMENT",
+                "summary": {
+                  "path": "runtime-peer-paced-120-v3/result-summary.json",
+                  "sha256": "e8985d6045323591f7ce3c294e150f73cacc00b6efe602d7ce6ca97fc902b568"
+                },
+                "raw": {
+                  "path": "runtime-peer-paced-120-v3/browser/result.json",
+                  "sha256": "73f6ba9dcdb4ca5f1f323fe3d7dfbfc14bc28e33c7e5c9b79576d00f5c603d76"
+                },
+                "independent_result_review": {
+                  "path": "runtime-peer-paced-120-v3/independent-result-review.json",
+                  "sha256": "59410e12e3feb181f531068adc8dfb66b6d2d3329d4012ef34f639b35b2f613c"
+                },
+                "observed": "Piece index 37917 was a retired 24-requested/32-physical-byte TEXP_CNST sidecar (MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST); saved PRE geometry/tag/generation/site remained while the live row was zeroed. Both pages refused at shadow prepare. No successful late restore or browser reuse was observed."
+              }
             }
           }
         }

@@ -2199,10 +2199,62 @@ Independent combined source and raw-result review passes. Publication-head CI
 and the merge outcome are tracked on #366. `continuous_366.paced_loop_v2` pins
 sources, builds, reports, failed attempts and reviews. Combat/KO, sustained
 60 Hz, full-match, complete-profile and public-relay rollback remain incomplete.
-Next is a small actual-SDK Wasm benchmark of exact arena-admission cost and a
-review of completion-driven GPU waiting before a longer paced run. Preserve
-the same comparisons, ownership checks and absolute deadlines; do not extend
-a near-guard run without a changed cost hypothesis.
+The exact-arena microbenchmark did not justify replacing the checked `memcmp`
+path; the sampled 64-bit comparison was slower. The completion-driven wait and
+source-specific shadow diagnostic binding support the bounded paced-history
+work for [issue #368](https://github.com/ericvanlare/melee-web/issues/368).
+Browser attempts v1–v3 remain retained. Attempt v3 observed retirement of the
+`TEXP_CNST` class-piece sidecar during the speculative branch, then stopped at
+shadow prepare before restore. It did not observe a successful restore or piece
+reuse in the browser; reuse is currently covered only by the focused native
+fixture.
+
+Attempt v4 (`00dcf16c`) was the first browser attempt with the arena-coupled
+piece restore repair, not the first overall. It failed before any input because
+the actual `gameplay_source_memory_runtime.cpp` compile omitted
+`MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC`, selecting the bind API's unavailable
+`INVALID_STATE` branch. The browser surfaced only the refusal; the numeric
+status is inferred from the pinned compile command and source. The scoped CMake
+correction defines the macro for that translation unit in the existing private
+profile block, without changing the ordinary build.
+
+The corrected browser producer `6eb8106b` completes 120 actual PAD polls per
+page. All 120 authoritative 44-byte PAD rows match across peers, and the final
+64-byte native checksum matches locally; no checksum is exchanged on the wire.
+Each page performs one near-start wrong-prediction restore at PRE0/F1 with dirty
+index 0, then 120 forward draws and one corrected draw. Later whole-END rebases
+at 8, 15, …, 113 are clean and do not exercise the restore path. The clock does
+not stall; each 120-input trace takes about 2.018 seconds. This does not establish
+sustained 60 Hz. No restore occurs after frame 28, so v5 does not demonstrate
+late class-piece retirement restoration in the browser.
+
+The arena-coupled class-piece repair passes its focused actual-SDK fixture and
+coordinator controls, including legacy unpaired refusal and physical-before-
+shadow commit ordering. The first fixture attempt passed the positive restore
+assertions but failed in duplicate teardown; a reuse negative also changed the
+arena bytes. Both were fixture defects, were corrected, and remain retained.
+The fixture demonstrates reuse handling, but it is not browser evidence.
+
+The first full regression on producer head `6eb8106b` failed 5 of 3,109 tests
+with 242 skips. Four failures were opaque C11 header-alias/extractor controls in
+Stadium tests; the fifth was an opaque Node child failure. All failures remain
+retained. The Node endpoint test passed in isolation (15/15) and the exact
+nine-file combined TAP invocation passed (136 passed, 1 skipped); neither
+reproduced a cause. A minimal header-alias fix is committed at validation source
+`3d9c8d99`; the four affected focused modules pass. Full regression v2 on that
+An independent review approves composed source `3d9c8d99`. Full regression v2
+passes (3,109 tests, 242 skips), and both the ordinary Release and private
+history diagnostic Release builds pass. Their receipts are pinned below;
+publication-head CI remains pending.
+
+The next execution gate is issue #369: one actual late-input correction with a
+nonzero dirty index after the speculative branch crosses the observed
+class-piece retirement boundary. Retain the 120 actual PAD rows, terminal
+64-byte checksum, native owner/status checks, corrected presentation order and
+cleanup evidence. The current route does not publish whole raw CPU/DRAW
+endpoints, so do not claim those comparisons. The default 120-input capture will
+not be repeated. Keep history bounds, restore counts and deadlines unchanged.
+Issue #368 remains open until the late browser correction is demonstrated.
 
 ## Stage decision dependencies, issue #333
 
