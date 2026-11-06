@@ -15,6 +15,14 @@ int slippi_fighter_projection_retiring(void*);
 int slippi_fighter_projection_require(void*);
 int slippi_fighter_projection_draw_begin(void);
 int slippi_fighter_projection_draw_end(void);
+/* These hooks return -1 outside an armed draw, 1 when the operation was
+ * projected/authorized, and 0 after a sticky refusal. */
+int slippi_fighter_projection_shadow_members(void*, void*, int);
+int slippi_fighter_projection_shadow_active(void*, int);
+int slippi_fighter_projection_shadow_texture_operation(void*, void*, int);
+int slippi_fighter_projection_mobj_preflight(void*, void*);
+int slippi_fighter_projection_mobj_compile(void);
+int slippi_fighter_projection_mobj_toon_link(void*, void*);
 const char* slippi_fighter_projection_failure_reason(void);
 #ifdef __cplusplus
 }

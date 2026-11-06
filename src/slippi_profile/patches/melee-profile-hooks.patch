@@ -3172,3 +3172,209 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
 +#endif
  
  void Camera_80030A60(melee_source_bool arg0)
+
+diff --git a/src/sysdolphin/baselib/shadow.c b/src/sysdolphin/baselib/shadow.c
+--- a/src/sysdolphin/baselib/shadow.c
++++ b/src/sysdolphin/baselib/shadow.c
+@@ -1,4 +1,7 @@
+ #include "shadow.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include <math.h>
+ #include <string.h>
+@@ -281,6 +284,10 @@
+ {
+     HSD_ImageDesc* idesc;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    int projection = slippi_fighter_projection_shadow_active(shadow, active);
++    if (projection == 0) return;
++#endif
+     HSD_ASSERT(580, shadow);
+ 
+     if ((shadow->active && active) || (!shadow->active && !active)) {
+@@ -306,6 +313,11 @@
+ {
+     HSD_SList* list;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    int projection = slippi_fighter_projection_shadow_members(shadow, jobj, 1);
++    if (projection >= 0) return;
++#endif
++
+     if (!shadow || !jobj) {
+         return;
+     }
+@@ -321,6 +333,12 @@
+ 
+ void HSD_ShadowDeleteObject(HSD_Shadow* shadow, HSD_JObj* jobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    int projection = slippi_fighter_projection_shadow_members(
++        shadow, jobj, jobj == NULL ? 0 : 2);
++    if (projection >= 0) return;
++#endif
++
+     if (!shadow) {
+         return;
+     }
+diff --git a/src/sysdolphin/baselib/mobj.c b/src/sysdolphin/baselib/mobj.c
+--- a/src/sysdolphin/baselib/mobj.c
++++ b/src/sysdolphin/baselib/mobj.c
+@@ -1,4 +1,7 @@
+ #include "mobj.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include <string.h>
+ 
+@@ -339,6 +342,9 @@
+     HSD_TObj *tobj, **tail;
+     HSD_TExp* texp;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (slippi_fighter_projection_mobj_compile() == 0) return;
++#endif
+     tail = NULL;
+     if (mobj != NULL) {
+         if (mobj->tevdesc != NULL) {
+@@ -390,6 +396,19 @@
+ void HSD_MObjSetup(HSD_MObj* mobj, u32 rendermode)
+ {
+     HSD_TObj *tobj, **tail;
++
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        HSD_TObj* projected_head=mobj->tobj;
++        HSD_TObj* toon=(mobj->rendermode & RENDER_TOON) && tobj_toon != NULL &&
++                       tobj_toon->imagedesc != NULL ? tobj_toon : NULL;
++        if (slippi_fighter_projection_mobj_preflight(mobj->tobj,toon) == 0) return;
++        if (!projected_head && (mobj->rendermode & RENDER_SHADOW) && tobj_shadows)
++            projected_head=tobj_shadows;
++        if (toon && slippi_fighter_projection_mobj_toon_link(toon,projected_head)==0)
++            return;
++    }
++#endif
+ 
+     HSD_StateInitTev();
+     rendermode = mobj->rendermode;
+@@ -506,6 +525,11 @@
+ {
+     HSD_TObj* cur;
+     HSD_ASSERT(990, tobj);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    int projection = slippi_fighter_projection_shadow_texture_operation(
++        &tobj_shadows, tobj, 1);
++    if (projection == 0) return;
++#endif
+     for (cur = tobj_shadows; cur != NULL; cur = cur->next) {
+         if (cur == tobj) {
+             return;
+@@ -524,6 +548,11 @@
+ 
+ void HSD_MObjDeleteShadowTexture(HSD_TObj* tobj)
+ {
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    int projection = slippi_fighter_projection_shadow_texture_operation(
++        &tobj_shadows, tobj, 0);
++    if (projection == 0) return;
++#endif
+     if (tobj != NULL) {
+         HSD_TObj** cur = &tobj_shadows;
+         while (*cur != NULL) {
+diff --git a/src/melee/ft/ftmaterial.c b/src/melee/ft/ftmaterial.c
+--- a/src/melee/ft/ftmaterial.c
++++ b/src/melee/ft/ftmaterial.c
+@@ -1,4 +1,7 @@
+ #include "ftmaterial.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include "fighter.h"
+ #include "forward.h"
+@@ -80,6 +83,19 @@
+             mobj = ft_804D6588;
+         }
+     }
++
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        HSD_TObj* projected_head=mobj->tobj;
++        HSD_TObj* toon=(mobj->rendermode & RENDER_TOON) && tobj_toon != NULL &&
++                       tobj_toon->imagedesc != NULL ? tobj_toon : NULL;
++        if (slippi_fighter_projection_mobj_preflight(mobj->tobj,toon) == 0) return;
++        if (!projected_head && (mobj->rendermode & RENDER_SHADOW) && tobj_shadows)
++            projected_head=tobj_shadows;
++        if (toon && slippi_fighter_projection_mobj_toon_link(toon,projected_head)==0)
++            return;
++    }
++#endif
+ 
+     HSD_StateInitTev();
+ 
+diff --git a/src/melee/gr/grmaterial.c b/src/melee/gr/grmaterial.c
+--- a/src/melee/gr/grmaterial.c
++++ b/src/melee/gr/grmaterial.c
+@@ -1,4 +1,7 @@
+ #include "grmaterial.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include <melee/lb/forward.h>
+ #include <sysdolphin/baselib/forward.h>
+@@ -403,6 +406,19 @@
+     HSD_TObj** cur_tobj;
+     u32 mobj_rendermode;
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        HSD_TObj* projected_head=mobj->tobj;
++        HSD_TObj* toon=(mobj->rendermode & RENDER_TOON) && tobj_toon != NULL &&
++                       tobj_toon->imagedesc != NULL ? tobj_toon : NULL;
++        if (slippi_fighter_projection_mobj_preflight(mobj->tobj,toon) == 0) return;
++        if (!projected_head && (mobj->rendermode & RENDER_SHADOW) && tobj_shadows)
++            projected_head=tobj_shadows;
++        if (toon && slippi_fighter_projection_mobj_toon_link(toon,projected_head)==0)
++            return;
++    }
++#endif
++
+     HSD_StateInitTev();
+     mobj_rendermode = mobj->rendermode;
+     HSD_SetMaterialColor(mobj->mat->ambient, mobj->mat->diffuse,
+diff --git a/src/melee/it/itmaterial.c b/src/melee/it/itmaterial.c
+--- a/src/melee/it/itmaterial.c
++++ b/src/melee/it/itmaterial.c
+@@ -1,4 +1,7 @@
+ #include "itmaterial.h"
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ 
+ #include "forward.h"
+ #include "inlines.h"
+@@ -70,6 +73,19 @@
+     HSD_PEDesc* setup_render_arg;
+     HSD_TObj** tobj1_ptr;
+     u32 rendermode;
++
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    {
++        HSD_TObj* projected_head=mobj->tobj;
++        HSD_TObj* toon=(mobj->rendermode & RENDER_TOON) && tobj_toon != NULL &&
++                       tobj_toon->imagedesc != NULL ? tobj_toon : NULL;
++        if (slippi_fighter_projection_mobj_preflight(mobj->tobj,toon) == 0) return;
++        if (!projected_head && (mobj->rendermode & RENDER_SHADOW) && tobj_shadows)
++            projected_head=tobj_shadows;
++        if (toon && slippi_fighter_projection_mobj_toon_link(toon,projected_head)==0)
++            return;
++    }
++#endif
+ 
+     HSD_StateInitTev();
+     rendermode = mobj->rendermode;
