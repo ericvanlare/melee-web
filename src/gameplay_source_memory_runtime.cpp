@@ -1768,6 +1768,93 @@ melee_web_source_memory_history_current_allocation_read(
     return MELEE_WEB_SOURCE_MEMORY_READ_OK;
 }
 
+extern "C" void melee_web_source_memory_history_describe_pre_change(
+    const MeleeWebSourceMemoryHistory* pre, char* out, size_t out_bytes)
+{
+    if (!out || !out_bytes) return;
+    out[0] = '\0';
+    if (!pre || history_owner_admit(pre->snapshot) != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK ||
+        !history_observer_admit())
+        return;
+    auto live = allocations.begin();
+    for (size_t i = 0; i < pre->snapshot.allocations.size(); ++i) {
+        const auto& saved = pre->snapshot.allocations[i];
+        live = std::find_if(live, allocations.end(), [&](const HostAllocation& row) {
+            return row.generation == saved.generation;
+        });
+        if (live != allocations.end() && history_allocation_equal(saved, *live)) {
+            ++live;
+            continue;
+        }
+        const bool missing = live == allocations.end();
+        const auto actual = missing ? std::find_if(allocations.begin(), allocations.end(),
+            [&](const HostAllocation& row) { return row.host == saved.host; }) : live;
+        const HostAllocation empty{};
+        const auto& row = actual == allocations.end() ? empty : *actual;
+        int used = std::snprintf(out, out_bytes,
+            "alloc[%zu] %s pre=%p/%x/%llu/%u live=%p/%x/%llu/%u", i,
+            missing ? "missing-generation" : "changed-identity",
+            reinterpret_cast<void*>(saved.host), saved.source.value(),
+            static_cast<unsigned long long>(saved.generation), saved.requested,
+            reinterpret_cast<void*>(row.host), row.source.value(),
+            static_cast<unsigned long long>(row.generation), row.requested);
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        const auto leaf_name = [](const char* path) {
+            if (!path) return "-";
+            const char* name = path;
+            // Origin registration admits only a NUL-terminated source name
+            // shorter than 232 bytes.
+            for (size_t i = 0; i < 232 && path[i]; ++i)
+                if (path[i] == '/') name = path + i + 1;
+            return name;
+        };
+        if (used >= 0 && static_cast<size_t>(used) < out_bytes)
+            std::snprintf(out + used, out_bytes - static_cast<size_t>(used),
+                " pool=%u:%p/%u:%p origin=%.26s:%u:%u/%.26s:%u:%u",
+                saved.pool.state, reinterpret_cast<void*>(saved.pool.descriptor),
+                row.pool.state, reinterpret_cast<void*>(row.pool.descriptor),
+                leaf_name(saved.origin.file), saved.origin.line, saved.origin.kind,
+                leaf_name(row.origin.file), row.origin.line, row.origin.kind);
+#else
+        (void)used;
+#endif
+        return;
+    }
+    const auto& saved_leases = pre->snapshot.fighters;
+    for (size_t i = 0; i < std::max(saved_leases.size(), fighters.size()); ++i) {
+        const FighterLease empty{};
+        const auto& saved = i < saved_leases.size() ? saved_leases[i] : empty;
+        const auto& row = i < fighters.size() ? fighters[i] : empty;
+        if (i >= saved_leases.size() ? !row.live :
+            (i < fighters.size() && history_lease_equal(saved, row)))
+            continue;
+        std::snprintf(out, out_bytes, "lease[%zu] pre=%p/%x/%llu/%u live=%p/%x/%llu/%u", i,
+            reinterpret_cast<void*>(saved.host), saved.source,
+            static_cast<unsigned long long>(saved.allocation_generation), unsigned(saved.live),
+            reinterpret_cast<void*>(row.host), row.source,
+            static_cast<unsigned long long>(row.allocation_generation), unsigned(row.live));
+        return;
+    }
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (pre->piece_instance != piece_owner.instance || pre->pieces.size() != piece_owner.count ||
+        pre->piece_revision > piece_owner.serial || pre->piece_watermark > piece_owner.next_generation) {
+        std::snprintf(out, out_bytes, "piece-owner-fence");
+        return;
+    }
+    for (size_t i = 0; i < pre->pieces.size(); ++i) {
+        const auto& saved = pre->pieces[i];
+        const auto& row = piece_owner.cells[i];
+        if (!(saved.geometry & piece_live) || history_piece_equal(saved, row)) continue;
+        std::snprintf(out, out_bytes,
+            "piece[%zu] src=%x pre=%x/%x/%u/%x live=%x/%x/%u/%x", i,
+            static_cast<unsigned>(piece_owner.begin + i * 32u),
+            saved.geometry, saved.tag, saved.generation, saved.origin_site,
+            row.geometry, row.tag, row.generation, row.origin_site);
+        return;
+    }
+#endif
+}
+
 extern "C" MeleeWebSourceMemoryHistoryPrepareResult
 melee_web_source_memory_history_prepare(const MeleeWebSourceMemoryHistory* pre)
 {

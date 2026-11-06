@@ -117,8 +117,15 @@ void melee_web_gameplay_heap_history_commit_prevalidated(MeleeWebGameplayHeapHis
 void melee_web_gameplay_heap_history_prepared_destroy(MeleeWebGameplayHeapHistoryPrepared*){}
 MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare(
     const MeleeWebSourceMemoryHistory*)
-{ assert(!writes);return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
-                         reinterpret_cast<MeleeWebSourceMemoryHistoryPrepared*>(1)}; }
+{
+    assert(!writes);
+    if(arena_refusal==6)return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED,nullptr};
+    return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
+            reinterpret_cast<MeleeWebSourceMemoryHistoryPrepared*>(1)};
+}
+void melee_web_source_memory_history_describe_pre_change(
+    const MeleeWebSourceMemoryHistory*,char* out,size_t bytes)
+{ assert(!writes);std::snprintf(out,bytes,"modeled first mismatch"); }
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(
     const MeleeWebSourceMemoryHistoryPrepared*)
 {
@@ -134,7 +141,9 @@ void melee_web_source_memory_history_prepared_destroy(MeleeWebSourceMemoryHistor
 static void arena_coordinator()
 {
     using R=GameplayCpuCommitResult;
-    const R expected[]{R::Ok,R::Payload,R::Audio,R::Particle,R::Payload,R::Payload};
+    const R expected[]{R::Ok,R::Payload,R::Audio,R::Particle,R::Payload,R::Payload,R::Payload};
+    const char* detail[]{"","leaf=sdk-prepare status=1","","","leaf=sdk-admit status=1",
+        "leaf=shadow-admit status=6","leaf=shadow-prepare status=5 modeled first mismatch"};
     for(arena_refusal=0;arena_refusal<sizeof(expected)/sizeof(*expected);++arena_refusal){
         writes=order=fail_admission=0;
         fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
@@ -149,7 +158,9 @@ static void arena_coordinator()
         o.arena=reinterpret_cast<const MeleeWebGameplayHeapHistorySnapshot*>(1);
         o.shadow=reinterpret_cast<MeleeWebSourceMemoryHistory*>(1);
         o.arena_base=physical_arena;o.arena_bytes=sizeof(physical_arena);
-        assert(gameplay_cpu_commit_history_pre(o)==expected[arena_refusal]);
+        char refusal[96]{};
+        assert(gameplay_cpu_commit_history_pre(o,refusal,sizeof(refusal))==expected[arena_refusal]);
+        assert(std::strcmp(refusal,detail[arena_refusal])==0);
         if(arena_refusal)
             assert(writes==0&&static_value==9&&fighter_fields==9&&private_slots==9);
         else

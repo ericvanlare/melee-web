@@ -11,6 +11,7 @@
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
 #include "slippi_profile/particle_presentation.h"
+#include <cstddef>
 #include <cstdint>
 namespace melee_web {
 /* Fixed named domains, not a callback registry. All handles are capsule-owned;
@@ -55,5 +56,5 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwn
  * after every source owner has committed. */
 bool gameplay_cpu_history_audio_disjoint(const GameplayCpuCommitOwners&) noexcept;
 GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
-    const GameplayCpuCommitOwners&) noexcept;
+    const GameplayCpuCommitOwners&, char* refusal=nullptr, std::size_t refusal_bytes=0) noexcept;
 }

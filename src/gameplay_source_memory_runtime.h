@@ -129,6 +129,10 @@ MeleeWebSourceMemoryHistoryCaptureResult melee_web_source_memory_history_capture
  * a restore. This does not establish PRE survival or authority to commit. */
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_current_admit(
     const MeleeWebSourceMemoryHistory* pre);
+/* Failure-only observation for a PRE_CHANGED result. It does not admit or
+ * mutate any owner. Call synchronously before other source activity. */
+void melee_web_source_memory_history_describe_pre_change(
+    const MeleeWebSourceMemoryHistory* pre, char* out, size_t out_bytes);
 MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare(
     const MeleeWebSourceMemoryHistory* pre);
 MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(

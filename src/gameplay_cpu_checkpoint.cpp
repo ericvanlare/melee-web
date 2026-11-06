@@ -442,7 +442,7 @@ bool GameplayCpuCheckpoint::close_history_endpoint(
 }
 
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
-    const GameplayMatchSession& session) noexcept {
+    const GameplayMatchSession& session,char* refusal,std::size_t refusal_bytes) noexcept {
     if(!history_mode_||phase_!=Phase::HistorySealed||!history_endpoint_archived_||
        history_endpoint_closed_||
        !same_owner(session)||session.source_frames()!=history_end_frame_||
@@ -453,7 +453,7 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
     commit_.action_history=history_actions_.get();
     commit_.history_incarnation=history_incarnation_;
     commit_.history_end_frame=history_end_frame_;
-    const auto result=gameplay_cpu_commit_history_pre(commit_);
+    const auto result=gameplay_cpu_commit_history_pre(commit_,refusal,refusal_bytes);
     if(result!=GameplayCpuCommitResult::Ok){phase_=Phase::Failed;disarm();return result;}
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
     if(!slippi_lobj_current_set_view_reset_after_restore(commit_.lobj_anchor)){
