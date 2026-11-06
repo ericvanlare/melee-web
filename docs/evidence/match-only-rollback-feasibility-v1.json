@@ -12931,8 +12931,91 @@
                 "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-build-v4/result.json",
                 "sha256": "c866b336aeeaa76f4a1ac5149914e3a85be3b3ad4a6449f7c23156576f56e173"
               },
-              "scope": "All executable changes match7eda50d7; subsequent edits are existing receipt documentation only. Exact publication-head CI pending."
+              "scope": "Executable producer remains7eda50d7; publication head changes only receipt docs; exact-head CI and reviewed tree equality pass.",
+              "publication_head": "74e53237058eea96edbc1329821d1426a95a3a93",
+              "merged_commit": "e8a6a842a0411ca00460bc904c606997523cb38c",
+              "integration_receipt": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-continuation-integration-receipt-v1.json",
+                "sha256": "abca1ca22f7b06efed35d005920f01cfefae6060495f8647782003d1800a4d14"
+              },
+              "ci_run": 42190974199,
+              "checks": {
+                "success": 13,
+                "expected_skip": 2
+              },
+              "reviewed_merged_tree_equal": true
             }
+          },
+          "continuous_366": {
+            "issue": 366,
+            "status": "TWO_ARENA_EPISODES_COMPLETE",
+            "native_and_harness_producer": "08960dc3067e07fd7947f381f943eacc5ff2c869",
+            "base": "e8a6a842a0411ca00460bc904c606997523cb38c",
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-rebase-root-source-review-v1.json",
+              "sha256": "edfb47bfcb4c659a470526d352bd0a684e56de491ae6599346692681cec44256"
+            },
+            "focused_integration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-rebase-integrated-focused-v1.json",
+              "sha256": "1cc66a63d3b7a1e24864b490baff038f545c07f927f17e56dc76c9cddc6298a1"
+            },
+            "private_release": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-build-v1/result.json",
+              "sha256": "a1433799fc49683cd017b7285142601964170ed7583eac0bab4ad904e51636b3"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-producer-v1/archive.json",
+              "sha256": "8e9927cb32c5de904a7e6fecc9b4c8bc13b4a9f30acca7c83b5f71869d010733"
+            },
+            "linked_configuration": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-two-arena-catalog-v1/final-linked-configuration-v1.json",
+              "sha256": "b73d95923b670812526233f87d3bb9cd7df8d1dee6354db62b4533d84a067df8"
+            },
+            "capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-root-review-v1.json",
+              "sha256": "b69dbfd705101ddccb796cf6e6d266e3549ad50d698af63318912f7ad3ffa81f"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/result-summary.json",
+              "sha256": "e62bbea96b1cca4ce89297b7c98cc8461b093d26ecddcc9a2d32b1bf230fa03c"
+            },
+            "browser_report": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/browser/result.json",
+              "sha256": "36ab1a97b8bf26d3e1b2b6193bc0edf2af78e26f488bc7174037f96a0592e49e"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/owner.json",
+              "sha256": "173bc4ba7003098a9d06808dbb74c8669fca4e0cb7311aa67cc2ffda46fefb10"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-two-arena-v1/independent-result-review.json",
+              "sha256": "41354f5f2300003743f2092c9335100e17823d4e35c9fd498bba8bd98f7ee30d"
+            },
+            "observed": {
+              "source_ticks": 8,
+              "corrections": 4,
+              "confirmed_rebases": 1,
+              "raw_domains_per_restore": 9,
+              "particle_relations_per_restore": 12,
+              "arena_bytes_per_restore": 33554432,
+              "same_match_and_connection": true,
+              "actual_polls_per_peer": 8,
+              "authoritative_pad_equal": {
+                "rows": 8,
+                "bytes_per_row": 44
+              },
+              "confirmed_checksum_equal": {
+                "endpoints": 2,
+                "bytes_each": 64
+              },
+              "static_rows_equal_across_rebase_per_page": 3797,
+              "native_cleanup": true,
+              "owned_browser_pids_absent": 20,
+              "renderer_preparation_observations": 7,
+              "renderer_cache_flushes": 0
+            },
+            "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
+            "next": "Present each forward source frame through existing native scheduling boundary; retain no-draw correction and exact comparisons. Measure actual cadence before performance claims."
           }
         }
       }

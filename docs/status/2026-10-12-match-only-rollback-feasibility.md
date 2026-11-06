@@ -1987,7 +1987,7 @@ deadlines are unchanged. [PR #363](https://github.com/ericvanlare/melee-web/pull
 merged as `f817f857` after all 15 checks on `331e3f64` completed with 13 successes
 and two expected skips. The merged and reviewed trees match.
 
-The next milestone, [#364](https://github.com/ericvanlare/melee-web/issues/364),
+Milestone [#364](https://github.com/ericvanlare/melee-web/issues/364),
 now passes two adjacent actual corrections in the same ordinary-runtime match
 and browser-owned relay sockets. Native and harness producer `21e508a0` uses
 confirmed retirement and an exact END-to-fresh-PRE rebase. P1 uses a new actual
@@ -2060,7 +2060,27 @@ rollback. Repeated arena rebase, paced forward presentation, public enablement,
 complete profile behavior and acceptance remain open. The structured receipt's
 `continuation_364` owns source, raw result, catalog, review and cleanup identities.
 The full 3,102-test regression passes with 242 skips, and ordinary/private Release
-builds pass at `7eda50d7`. Exact publication-head CI remains pending integration.
+builds pass at `7eda50d7`. [PR #365](https://github.com/ericvanlare/melee-web/pull/365)
+merged as `e8a6a842` after all 15 exact-head checks on `74e53237` completed
+with 13 successes and two expected skips. Reviewed and merged trees match.
+
+The first [#366](https://github.com/ericvanlare/melee-web/issues/366) experiment,
+producer `08960dc3`, passes two adjacent four-tick arena episodes in one live
+match, page-owned input timeline and connection. Four actual late-input corrections
+restore the current PRE exactly; every authoritative PAD row and both confirmed
+64-byte endpoint checksums match the on-time peer. Confirmed END4 → fresh PRE4
+preserves the Owner tuple, all 3,797 static rows and each page's audio phase.
+Actual poll and request identities advance across rebase; the effect authority
+retires and re-arms separately. Independent raw replay confirms all four nine-domain,
+12-particle comparisons and the declared rebase checks. Both native owners cleanly
+close and all 20 owned browser processes are absent. The seven observed renderer
+preparations perform no cache flush.
+
+This remains an eight-tick batch proof with presentation at sealed endpoints.
+Paced per-forward presentation and continuous/full-match play are unmeasured.
+Focused controls and the affected private Release build pass; full milestone
+integration remains pending. The structured receipt's `continuous_366` owns exact
+source, capture, review and cleanup identities; no successful recapture is planned.
 
 ## Stage decision dependencies, issue #333
 
