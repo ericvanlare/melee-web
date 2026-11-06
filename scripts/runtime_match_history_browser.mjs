@@ -250,7 +250,7 @@ function assertMenuSourceHealth(state,label){
 function cssStartReady(state){
   const ids=state.css?.ids;
   return state.phase===1&&state.running===1&&state.css?.observed===true&&
-    ids?.length===14&&ids[5]===0&&ids[7]===0&&ids[8]===1;
+    ids?.length===14&&ids[5]===0&&ids[7]===0&&ids[8]!==0;
 }
 
 function sssInputReady(state){
