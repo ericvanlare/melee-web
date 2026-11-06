@@ -8,7 +8,7 @@ export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,pr
   pollTicket:12,forwardTicket:13,seal:14,replayTicket:15,finishReplay:16,
   continue:17,beginEpisode:18,recordingPresent:19,finishPrefix:20,
   closePrefix:21,retirePrefix:22,rebaseConfirmedPrefix:23,
-  adoptNextPrefixTicket:24});
+  adoptNextPrefixTicket:24,sealPresentedFrontier:25});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11,FRAME_BYTES=44,TICKET_BYTES=88,INPUT_ROW_BYTES=176;
 const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
@@ -149,8 +149,8 @@ export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false,arenaMo
   metadata.pollSerial=data.getBigUint64(96,true).toString();
   metadata.preAudioPhase=data.getUint32(104,true);metadata.currentAudioPhase=data.getUint32(108,true);
   Object.assign(result,{metadata,...fields(data,['inputReady','gpuPending','endpointActive','rendererErrors'],112)});
-  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?26:episodeMode?21:20,
-    commandLimit=arenaMode?24:episodeMode?18:11;
+  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?28:episodeMode?21:20,
+    commandLimit=arenaMode?25:episodeMode?18:11;
   if(result.schema!==1||result.bytes!==STATUS_BYTES||result.reserved!==0||result.ownerState>2||
     result.pendingCommand>commandLimit||result.lastCompletedCommand>commandLimit||result.completeSequence>result.requestSequence||
     result.inputReady>1||result.gpuPending>1||result.endpointActive>1||
@@ -158,6 +158,23 @@ export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false,arenaMo
     metadata.incarnation>(episodeMode?3:1)||metadata.forwardSteps>stepLimit||metadata.replaySteps>stepLimit||
     (!episodeMode&&metadata.phase===21))
     throw Error('Runtime history status schema or bounded-owner violation');
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryPacing(bytes){
+  if(!(bytes instanceof Uint8Array)||bytes.byteLength!==64)throw Error('Native pacing receipt extent');
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const result=fields(data,['schema','bytes','phase','currentFrame','steps','pendingSteps','stalled','stallReason']);
+  for(const [index,key] of ['elapsedMs','pendingTicks','triggeringValue','threshold'].entries())
+    result[key]=data.getFloat64(32+index*8,true);
+  if(result.schema!==1||result.bytes!==64||result.phase>28||result.steps>1||
+      result.pendingSteps>8||result.stalled>1||result.stallReason>3||
+      (result.stalled?(result.steps!==0||result.stallReason===0):result.stallReason!==0)||
+      !Number.isFinite(result.elapsedMs)||result.elapsedMs<0||
+      !Number.isFinite(result.pendingTicks)||result.pendingTicks<0||
+      (result.stallReason!==2&&!Number.isFinite(result.triggeringValue))||
+      !Number.isFinite(result.threshold))
+    throw Error('Native pacing receipt schema or clock invariant refused');
   return result;
 }
 
@@ -273,7 +290,8 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   let inlineMode=false,nativeCallPending=false;
   let identityText=null;
   let adoptedPrefixTicket=null,unclaimedPrefixTicket=false,confirmedPrefixActive=false;
-  const journal=[];
+  const journal=[],pacingJournal=[];
+  let pacingStarted=false;
   const read=(pointer,size)=>{
     if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>0xffffffff)throw Error('Native history pointer');
     const start=pointer>>>0,heap=module.HEAPU8;
@@ -512,6 +530,37 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     return Object.freeze({
     status,
     journal:()=>structuredClone(journal),
+    pacingJournal:()=>structuredClone(pacingJournal),
+    pacingStart(){
+      active();
+      if(pacingStarted||!arenaMode||!inlineMode||!captured)
+        throw Error('Pacing requires a once-only prepared inline arena owner');
+      const start=module[PREFIX+'pacing_start'];
+      if(typeof start!=='function'||start()!==1)
+        throw latch(Error(`Native pacing start refused: ${errorText()}`));
+      pacingStarted=true;
+    },
+    pacingSample(budget){
+      active();
+      if(!pacingStarted||![0,1].includes(budget))throw Error('Pacing requires a started owner and zero/one budget');
+      const sample=module[PREFIX+'pacing_sample'],size=module[PREFIX+'pacing_sample_bytes'];
+      if(typeof sample!=='function'||typeof size!=='function'||size()!==64)
+        throw latch(Error('Native pacing exports or receipt extent unavailable'));
+      const pointer=sample(budget);
+      if(!pointer)throw latch(Error(`Native pacing sample refused: ${errorText()}`));
+      // Preserve the clock's first failure before status() can turn it into a
+      // generic native owner error. The clock itself never auto-resumes.
+      const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
+      pacingJournal.push({budget,...receipt});
+      if(receipt.stalled){
+        const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
+        error.pacingSample=receipt;throw latch(error);
+      }
+      const after=check(status());
+      if(after.metadata.phase!==receipt.phase||after.metadata.currentFrame!==receipt.currentFrame)
+        throw latch(Error('Pacing sample changed its source owner'));
+      return receipt;
+    },
     takeOver({sourceFrame,localPort,remotePort}){
       active();u32(sourceFrame,'Source frame');
       if(![0,1].includes(localPort)||![0,1].includes(remotePort)||localPort===remotePort)
@@ -786,18 +835,44 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(request?.arenaHistoryEndpoint)throw Error('Arena history was not enabled before capture');
       return collectCpuEndpointInPage(request,{runtime:'match-history',module});
     },
+    admitEndpoint({view,provenance}){
+      active();
+      if(!arenaMode||!inlineMode||!captured||![1,2,3].includes(view)||![1,2,3].includes(provenance))
+        throw Error('Native endpoint admission requires an inline arena owner and explicit view/provenance');
+      const before=check(status()),started=performance.now();
+      if(before.pendingCommand||before.endpointActive||before.gpuPending||
+          before.completeSequence!==before.requestSequence)
+        throw Error('Native endpoint admission requires an idle owner');
+      try{
+        if(module[PREFIX+'cpu_endpoint_begin'](view,provenance)!==0||
+            module[PREFIX+'cpu_endpoint_end']()!==0)
+          throw Error(`Native endpoint admission refused: ${errorText()}`);
+        const after=check(status());
+        if(after.requestSequence!==before.requestSequence||after.completeSequence!==before.completeSequence||
+            after.expectedFrame!==before.expectedFrame||after.metadata.currentFrame!==before.metadata.currentFrame||
+            after.localPort!==before.localPort||after.remotePort!==before.remotePort||
+            after.ownerState!==1||after.endpointActive||after.gpuPending)
+          throw Error('Native endpoint admission changed its source owner');
+        return {scope:'native-typed-admission-only',rawRowsPublished:false,view,provenance,
+          elapsedMs:performance.now()-started,before,after};
+      }catch(error){throw latch(error);}
+    },
     motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
     motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
     pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},
-    checksum(){
+    checksum({postDraw=false}={}){
       active();
+      if(typeof postDraw!=='boolean')throw Error('Checksum endpoint kind must be explicit');
       const data=module[PREFIX+'checksum_data'],extent=module[PREFIX+'checksum_bytes'];
       if(typeof data!=='function'||typeof extent!=='function')
         throw Error('Private runtime history checksum exports are unavailable');
       try{
         const before=check(status()),history=before.metadata;
-        const corrected=history.phase===13; // CorrectedCpuCopied
+        const corrected=history.phase===13||(postDraw&&arenaMode&&history.phase===16);
         const confirmedPrefix=arenaMode&&history.phase===24; // PrefixCpuCopied
+        const presented=postDraw&&arenaMode&&
+          ((history.phase===28&&history.endpointMask===(1<<8))||
+           (history.phase===16&&(history.endpointMask&96)===96));
         const span=history.currentFrame-history.preFrame;
         const episodeStepsOkay=episodeMode&&span>0&&span<=7&&history.forwardSteps===span&&
           (corrected?history.replaySteps===span:history.replaySteps===0);
@@ -830,15 +905,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           history.replaySteps===(corrected?1:0);
         if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
           before.inputReady!==1||before.completeSequence!==before.requestSequence||
-          (history.phase!==6&&!corrected&&!confirmedPrefix)||history.preFrame!==before.expectedFrame||
+          (postDraw?!presented:(history.phase!==6&&!corrected&&!confirmedPrefix))||history.preFrame!==before.expectedFrame||
           history.preFrame===UINT32_MAX||history.currentFrame<=history.preFrame||
           history.currentFrame!==history.sealedEnd||history.pollSerial==='0'||
           (!episodeStepsOkay&&!prefixStepsOkay&&!legacyStepsOkay))
-          throw Error('Runtime history checksum requires a copied, idle CPU endpoint');
+          throw Error(postDraw?'Runtime history checksum requires an admitted idle presented frontier':
+            'Runtime history checksum requires a copied, idle CPU endpoint');
         const size=extent();
         if(size!==64)throw Error('Runtime history checksum ABI must be exactly 64 bytes');
         const pointer=data();
-        if(!pointer)throw Error('Native runtime history checksum refused its copied CPU endpoint');
+        if(!pointer)throw Error('Native runtime history checksum refused its admitted endpoint');
         const bytes=read(pointer,size); // Copy borrowed data before another native call.
         const record=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
         const expectedTick=episodeMode?history.currentFrame-1:history.preFrame;
@@ -890,7 +966,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const framePayload=name==='forwardTicket'||name==='replayTicket';
       const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay',
         'continue','beginEpisode','recordingPresent','finishPrefix','closePrefix','retirePrefix',
-        'rebaseConfirmedPrefix','adoptNextPrefixTicket']);
+        'rebaseConfirmedPrefix','adoptNextPrefixTicket','sealPresentedFrontier']);
       const prefixCommands=new Set(['finishPrefix','closePrefix','retirePrefix',
         'rebaseConfirmedPrefix','adoptNextPrefixTicket']);
       const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
@@ -908,7 +984,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         planBytes=argument.plan.slice();
       }else if(argument!==undefined)
         throw Error('Only confirmed frame and episode ticket commands take arguments');
-      if(name==='recordingPresent'&&!arenaMode)
+      if((name==='recordingPresent'||name==='sealPresentedFrontier')&&!arenaMode)
         throw Error('Recording presentation requires explicit arena history mode');
       if(prefixCommands.has(name)&&!arenaMode)
         throw Error('Confirmed-prefix commands require explicit arena history mode');
@@ -959,6 +1035,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         if(name==='recordingPresent'&&(!captured||before.metadata.phase!==21||
             before.metadata.currentFrame<=before.metadata.preFrame||before.gpuPending||before.endpointActive))
           throw Error('Recording presentation requires a completed forward boundary');
+        if(name==='sealPresentedFrontier'&&(!captured||before.metadata.phase!==21||
+            before.lastCompletedCommand!==5||before.metadata.currentFrame<=before.metadata.preFrame||
+            before.gpuPending||before.endpointActive))
+          throw Error('Presented frontier seal requires the completed idle of its actual recording draw');
         const next=before.requestSequence+1;
         const dispatchGeneric=async()=>{
           if(inlineMode)await requireInlineRequest('request',command);
@@ -1115,6 +1195,12 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           case 'seal':
             valid=now.phase===5&&now.currentFrame===prior.currentFrame&&
               now.sealedEnd===now.currentFrame&&now.forwardSteps>0;break;
+          case 'sealPresentedFrontier':
+            valid=now.phase===27&&now.currentFrame===prior.currentFrame&&
+              now.sealedEnd===now.currentFrame&&now.forwardSteps===prior.forwardSteps&&
+              now.incarnation===prior.incarnation&&now.restoreCount===prior.restoreCount&&
+              now.replaySteps===prior.replaySteps&&now.pollSerial===prior.pollSerial&&
+              now.currentAudioPhase===prior.currentAudioPhase&&!after.gpuPending;break;
           case 'replayTicket':
             valid=now.phase===11&&now.currentFrame===prior.currentFrame+1&&
               now.replaySteps===prior.replaySteps+1&&now.replaySteps<=7&&

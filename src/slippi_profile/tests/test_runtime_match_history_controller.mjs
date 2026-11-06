@@ -1116,6 +1116,66 @@ function inlineFixture(options){
   return {...f,owner,inlineEnableCalls:()=>enableCalls};
 }
 
+test('native endpoint admission revalidates without publishing raw rows and latches refusal',async()=>{
+  for(const failure of [null,'begin','end']){
+    const f=inlineFixture(),{owner,module}=f;
+    owner.enableArenaHistory();
+    module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+    owner.enableInlineDispatch();
+    await owner.command('capture');f.put(56,1);
+    const calls=[];
+    module[prefix+'cpu_endpoint_begin']=(view,provenance)=>{
+      calls.push(['begin',view,provenance]);
+      if(failure==='begin')return 1;
+      f.put(120,1);return 0;
+    };
+    module[prefix+'cpu_endpoint_end']=()=>{
+      calls.push(['end']);
+      if(failure==='end')return 1;
+      f.put(120,0);f.put(56,2);f.put(84,1);return 0;
+    };
+    module[prefix+'cpu_endpoint_record']=()=>{throw Error('Native-only admission must not claim raw row publication');};
+    if(failure){
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
+      assert.deepEqual(calls,failure==='begin'?[['begin',1,1]]:[['begin',1,1],['end']]);
+    }else{
+      f.put(116,1);
+      assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/idle owner/);
+      assert.deepEqual(calls,[]);f.put(116,0);
+      const receipt=owner.admitEndpoint({view:1,provenance:1});
+      assert.equal(receipt.scope,'native-typed-admission-only');
+      assert.equal(receipt.rawRowsPublished,false);
+      assert.deepEqual([receipt.before.metadata.phase,receipt.after.metadata.phase],[1,2]);
+      assert.deepEqual(calls,[['begin',1,1],['end']]);
+    }
+  }
+});
+
+test('paced controller retains the native clock stall before generic owner failure',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();await owner.command('capture');f.put(56,4);
+  const pointer=24576,bytes=new Uint8Array(64),data=new DataView(bytes.buffer);
+  [1,64,4,0,0,0,1,1].forEach((value,index)=>data.setUint32(index*4,value,true));
+  data.setFloat64(32,150,true);data.setFloat64(40,0,true);
+  data.setFloat64(48,9,true);data.setFloat64(56,8,true);module.HEAPU8.set(bytes,pointer);
+  let samples=0;
+  module[prefix+'pacing_start']=()=>1;
+  module[prefix+'pacing_sample_bytes']=()=>64;
+  module[prefix+'pacing_sample']=()=>{samples++;f.put(12,9);return pointer;};
+  owner.pacingStart();
+  assert.throws(()=>owner.pacingSample(0),error=>{
+    assert.match(error.message,/clock stalled/);
+    assert.equal(error.pacingSample.triggeringValue,9);
+    assert.equal(error.pacingSample.threshold,8);return true;
+  });
+  assert.equal(owner.pacingJournal()[0].stalled,1);
+  assert.throws(()=>owner.pacingSample(1),/clock stalled/);
+  assert.equal(samples,1,'failed pacing must not silently restart the native clock');
+});
+
 test('inline forward retains the plan and forbids native reentry while Asyncify is suspended',async()=>{
   const f=inlineFixture(),{owner,module}=f;
   assert.throws(()=>owner.enableInlineDispatch(),/explicit arena history/);

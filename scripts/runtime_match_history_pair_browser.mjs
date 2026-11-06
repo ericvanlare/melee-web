@@ -37,20 +37,21 @@ const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 const repeatPrefix=values.phase==='repeated-confirmed-prefix';
+const paced=values.phase==='paced-eight-inputs';
 const confirmedPrefix=values.phase==='confirmed-prefix'||repeatPrefix;
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix'].includes(values.phase),'--arena-history requires an arena episode');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix'].includes(values.phase),
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
-if(confirmedPrefix)assert(inlineDispatch&&presentForward&&values['arena-history'],'Confirmed prefix requires arena, per-forward presentation and inline dispatch');
+if(confirmedPrefix||paced)assert(inlineDispatch&&presentForward&&values['arena-history'],'Confirmed prefix/pacing requires arena, per-forward presentation and inline dispatch');
 const profileHistory=values['profile-history'];
 if(profileHistory)assert(inlineDispatch,'--profile-history requires --inline-dispatch');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
@@ -161,6 +162,13 @@ const diagnosticModuleBodies=new Map([
   [diagnosticBindings[6].url,timelineBytes],
 ]);
 const diagnosticImportResolutions=[];
+if(paced){
+  const file='src/slippi_profile/tests/runtime_paced_history_probe.mjs';
+  const bytes=await fs.readFile(path.join(ROOT,file));
+  const url=new URL('/__melee_diag__/'+file,baseUrl).href;
+  diagnosticBindings.push({url,checkout_path:file,sha256:sha256(bytes)});
+  diagnosticModuleBodies.set(url,bytes);
+}
 for(const binding of diagnosticBindings){
   const source=diagnosticModuleBodies.get(binding.url).toString('utf8');
   const specifiers=[...source.matchAll(/\b(?:from\s*|import\s*)['"]([^'"]+)['"]/g)]
@@ -173,7 +181,7 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
+const report={schema:paced?'melee-web-runtime-paced-eight-inputs-v1':repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
     (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
       values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
@@ -1449,6 +1457,80 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     retired:windowProof.final_history_retirement};
 }
 
+async function runPacedEightInputs(alpha,beta){
+  const items=[alpha,beta];
+  const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
+    beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
+  assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
+    'Both scripted first local inputs must differ from the actual held-prefix prediction');
+  const proof=report.peer_correction={claim:'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
+    scope:'native typed admission; no full raw endpoint publication during paced work',
+    checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
+    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[]};
+  await startCorrectionPeers(alpha,beta,proof,8,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+  const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
+  await joinOwned('paced-owner-prepare',items.map(async item=>{
+    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role})=>{
+      const {installRuntimePacedHistoryProbe}=await import(moduleUrl);
+      installRuntimePacedHistoryProbe({role});
+      return globalThis.__meleeRuntimePacedHistory.prepare();
+    },{moduleUrl,role:item.role});
+  }));
+  for(const item of items){
+    await item.page.locator('#canvas').focus();
+    assert.equal(await item.page.evaluate(()=>document.activeElement?.id),'canvas');
+    item.keyToRelease=item.role==='alpha'?'KeyD':'ArrowLeft';
+    await item.page.keyboard.down(item.keyToRelease);
+  }
+  let operationFailure=null;
+  const releaseErrors=[];
+  try{
+    await joinOwned('paced-eight-inputs',items.map(async item=>{
+      proof.pages[item.role].paced=await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run());
+    }));
+  }catch(error){operationFailure=error;
+  }finally{
+    for(const item of items)if(item.keyToRelease){
+      try{await item.page.keyboard.up(item.keyToRelease);item.keyToRelease=null;}
+      catch(error){releaseErrors.push({role:item.role,key:item.keyToRelease,error:String(error)});}
+    }
+    proof.keyboard_release_errors=releaseErrors;
+  }
+  if(operationFailure)throw operationFailure;
+  const [a,b]=items.map(item=>proof.pages[item.role].paced);
+  for(const item of items){
+    const run=proof.pages[item.role].paced;
+    assert.equal(run.result,'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
+    assert.equal(run.polls.length,8);
+    assert.deepEqual(run.polls.map(row=>row.sourceFrame),[0,1,2,3,4,5,6,7]);
+    assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,8);
+    for(const row of run.polls){
+      assert.deepEqual(Buffer.from(row.raw).subarray(row.localPort*11,(row.localPort+1)*11),
+        item.role==='alpha'?P1_RIGHT:P2_LEFT);
+    }
+    assert(run.clock.length>8&&run.clock.every(row=>!row.stalled));
+    assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),8);
+    assert.equal(run.finalOwner.metadata.currentFrame,8);
+    assert.equal(run.finalOwner.metadata.phase,18);
+    assert.equal(run.admissions.every(row=>row.scope==='native-typed-admission-only'&&row.rawRowsPublished===false),true);
+    assert.equal(run.presentations.filter(row=>row.kind==='forward').length,8);
+    assert.equal(run.presentations.length,8+run.corrections.length);
+    assert(run.presentations.every((row,index)=>index===0||
+      row.receipt.sourceFrameAfter>=run.presentations[index-1].receipt.sourceFrameAfter));
+    assert.equal(item.pageErrors.length,0);
+  }
+  assert.equal(releaseErrors.length,0,`Owned keyboard release failed: ${JSON.stringify(releaseErrors)}`);
+  assert(a.corrections.some(row=>row.dirty!==null)||b.corrections.some(row=>row.dirty!==null),
+    'Paced run must actually correct a wrong prediction');
+  proof.comparisons.end8=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
+  assert.equal(a.finalChecksum.bytes.length,64);assert.equal(b.finalChecksum.bytes.length,64);
+  assert(proof.comparisons.end8.equal,'Paced confirmed post-draw checksums differ');
+  proof.comparisons.authoritative_pad=a.authoritativeInputs.map((row,index)=>({tick:row.tick,
+    ...byteDifference(Buffer.from(row.bytes),Buffer.from(b.authoritativeInputs[index].bytes))}));
+  assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
+  proof.status='paced-eight-inputs-complete';report.result='PACED_EIGHT_INPUTS_COMPLETE';
+}
+
 async function runConfirmedPrefixTransfer(alpha,beta){
   const items=[alpha,beta],preFrame={alpha:0,beta:0},armed={},selectedEnd={};
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
@@ -1983,7 +2065,8 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  if(confirmedPrefix)await runConfirmedPrefixTransfer(alpha,beta);
+  if(paced)await runPacedEightInputs(alpha,beta);
+  else if(confirmedPrefix)await runConfirmedPrefixTransfer(alpha,beta);
   else if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
   else if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
   else{

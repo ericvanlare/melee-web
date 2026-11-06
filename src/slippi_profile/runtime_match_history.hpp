@@ -64,6 +64,7 @@ enum class RuntimeMatchHistoryPhase : std::uint32_t {
     Closed=17, Retired=18, Failed=19, MatchClosed=20,
     EpisodeRecording=21, EpisodePresentPending=22,
     PrefixSealed=23, PrefixCpuCopied=24, PrefixClosed=25, PrefixRetired=26,
+    PresentedSealed=27, PresentedComplete=28,
 };
 
 enum class RuntimeMatchHistoryFailure : std::uint32_t {
@@ -219,6 +220,8 @@ public:
     bool submit_present() noexcept;
     bool submit_recording_present() noexcept;
     bool admit_present_completion() noexcept;
+    /* Opt in to a post-draw frontier after the current recording present idles. */
+    bool seal_presented_frontier() noexcept;
     std::uint32_t recording_present_count() const noexcept { return recording_present_count_; }
 
     /* Copy the entire strict 9-domain endpoint and particle sidecar batch
@@ -273,11 +276,11 @@ private:
     enum EndpointBit : std::uint32_t {
         CapturedPre=1u<<0, ArmedPre=1u<<1, PredictedCpu=1u<<2,
         PredictedDraw=1u<<3, RestoredPre=1u<<4, CorrectedCpu=1u<<5,
-        CorrectedDraw=1u<<6, PrefixCpu=1u<<7,
+        CorrectedDraw=1u<<6, PrefixCpu=1u<<7, PresentedFrontier=1u<<8,
     };
     enum class EndpointRole : std::uint32_t {
         None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
-        RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu,
+        RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier,
     };
 
     RuntimeMatchHistory(GameplayMatchSession&, RuntimeMatchHistoryBoundaryCheck,

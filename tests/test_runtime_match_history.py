@@ -493,7 +493,7 @@ int main() {
     def test_native_recording_present_uses_actual_callback_once_per_source_frame(self):
         source_text = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
         begin = source_text.index('bool RuntimeMatchHistory::submit_present() noexcept')
-        end = source_text.index('\nbool RuntimeMatchHistory::endpoint_role_allowed(', begin)
+        end = source_text.index('\nbool RuntimeMatchHistory::seal_presented_frontier()', begin)
         methods = source_text[begin:end]
         methods = methods.replace('RuntimeMatchHistory::', 'NativeHistoryFixture::')
         fixture = r'''#include <array>
@@ -591,6 +591,201 @@ int main() {
             (self.work / f'{name}.log').write_text(output)
             self.assertEqual(result.returncode, 0, output)
 
+    def test_presented_frontier_is_a_distinct_post_draw_endpoint(self):
+        source_text = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+
+        def method(start, end):
+            begin = source_text.index(start)
+            return source_text[begin:source_text.index(end, begin)].replace(
+                'RuntimeMatchHistory::', 'NativeHistoryFixture::')
+
+        methods = '\n'.join([
+            method('bool RuntimeMatchHistory::seal_presented_frontier() noexcept',
+                   '\nbool RuntimeMatchHistory::endpoint_role_allowed('),
+            method('bool RuntimeMatchHistory::endpoint_role_allowed(',
+                   '\nbool RuntimeMatchHistory::begin_endpoint_batch('),
+            method('bool RuntimeMatchHistory::begin_endpoint_batch(',
+                   '\nGameplayCpuEndpointRecord RuntimeMatchHistory::endpoint_record('),
+            method('bool RuntimeMatchHistory::end_endpoint_batch() noexcept',
+                   '\nbool RuntimeMatchHistory::close_selected_endpoint() noexcept'),
+            method('bool RuntimeMatchHistory::close_selected_endpoint() noexcept',
+                   '\nbool RuntimeMatchHistory::retire_confirmed() noexcept'),
+            method('bool RuntimeMatchHistory::begin_continuation() noexcept',
+                   '\nbool RuntimeMatchHistory::forward_from_poll('),
+            method('bool RuntimeMatchHistory::restore_pre() noexcept',
+                   '\nbool RuntimeMatchHistory::correct_from_retained('),
+        ])
+        seal_body = source_text[source_text.index(
+            'bool RuntimeMatchHistory::seal_presented_frontier() noexcept'):
+            source_text.index('\nbool RuntimeMatchHistory::endpoint_role_allowed(',
+                              source_text.index('bool RuntimeMatchHistory::seal_presented_frontier() noexcept'))]
+        self.assertNotIn('present_(', seal_body)
+        self.assertNotIn('session_.tick', seal_body)
+        self.assertNotIn('audio_step_', seal_body)
+
+        fixture = r'''#include <array>
+#include <cassert>
+#include <cstdint>
+#include <memory>
+enum class RuntimeMatchHistoryPhase { Captured, CapturedPreCopied, ArmedPrePending, Armed,
+  PredictedSealed, PredictedCpuCopied, PredictedDrawPending, PredictedDrawIdle,
+  PredictedComplete, RestoredPrePending, Restored, CorrectedSealed, CorrectedCpuCopied,
+  CorrectedDrawPending, CorrectedDrawIdle, CorrectedComplete, Closed, Retired, Failed,
+  MatchClosed, EpisodeRecording, EpisodePresentPending, PrefixSealed, PrefixCpuCopied,
+  PrefixClosed, PrefixRetired, PresentedSealed, PresentedComplete };
+enum class RuntimeMatchHistoryFailure { None, Boundary, Phase, Owner, Seal, Endpoint, Restore, Close, Present };
+enum class RuntimeMatchHistoryGatePoint { Arm, PresentComplete, EndpointBegin, EndpointComplete,
+  RestoreBefore, RestoreAfter, Close };
+enum class View { Pre, CpuEnd, DrawEnd };
+enum class Provenance { SharedPre, Reference, Corrected };
+enum class GameplayCpuCommitResult { Ok, Refused };
+struct Session { std::uint32_t frame{}; std::uint32_t source_frames() const { return frame; } };
+struct Row { std::uint32_t ticket_id{}, source_frame{}, incarnation{}, state{}; std::uint64_t poll_serial{}; };
+struct Ticket { std::uint32_t ticket_id{}, source_frame{}, incarnation{}; std::uint64_t poll_serial{}; };
+struct MockCheckpoint {
+  bool seal_ok=true, close_ok=true, archive_ok=true, restore_ok=true, begin_ok=true;
+  unsigned seal_calls{}, close_calls{}, archive_calls{}, restore_calls{}, begin_calls{};
+  std::uint32_t seal_frame{}, restore_frame=100;
+  bool seal_history_incarnation(Session& s,const char**) { ++seal_calls; seal_frame=s.frame; return seal_ok; }
+  bool close_history_endpoint(Session&) { ++close_calls; return close_ok; }
+  bool archive_history_endpoint(Session&) { ++archive_calls; return archive_ok; }
+  GameplayCpuCommitResult restore_history_pre(Session& s) {
+    ++restore_calls; if(!restore_ok)return GameplayCpuCommitResult::Refused;
+    s.frame=restore_frame; return GameplayCpuCommitResult::Ok;
+  }
+  bool begin_history_incarnation(Session&) { ++begin_calls; return begin_ok; }
+};
+struct GameplayCpuEndpointReader {
+  bool active_{}; bool revalidate_ok=true; bool begin_ok=true;
+  bool active() const { return active_; }
+  bool begin_history(Session&,MockCheckpoint&,View,Provenance) {
+    if(!begin_ok){return false;}
+    active_=true;
+    return true;
+  }
+  bool revalidate() const { return revalidate_ok; }
+};
+struct NativeHistoryFixture {
+  using View=::View; using Provenance=::Provenance;
+  enum EndpointBit : std::uint32_t { CapturedPre=1u<<0, ArmedPre=1u<<1,
+    PredictedCpu=1u<<2, PredictedDraw=1u<<3, RestoredPre=1u<<4,
+    CorrectedCpu=1u<<5, CorrectedDraw=1u<<6, PrefixCpu=1u<<7,
+    PresentedFrontier=1u<<8 };
+  enum class EndpointRole { None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
+    RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier };
+  Session session_{}; std::unique_ptr<MockCheckpoint> checkpoint_=std::make_unique<MockCheckpoint>();
+  GameplayCpuEndpointReader reader_{};
+  RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
+  RuntimeMatchHistoryFailure failure_=RuntimeMatchHistoryFailure::None;
+  EndpointRole endpoint_role_=EndpointRole::None;
+  std::array<Row,7> episode_rows_{}; Ticket latest_ticket_{};
+  std::uint32_t pre_frame_{},sealed_end_{},incarnation_{},restore_count_{},endpoint_mask_{};
+  std::uint32_t forward_steps_{},replay_steps_{},last_present_source_frame_{},ticket_count_{};
+  std::uint32_t last_ticket_id_{},recording_present_count_{},local_port_{},remote_port_{};
+  std::uint32_t segment_start_frame_{},replay_target_end_{};
+  std::uint64_t poll_serial_{}; unsigned audio_phase_{},pre_audio_phase_{};
+  bool episode_mode_=true,arena_mode_=true,current_ticket_pending_{},latest_ticket_valid_=true;
+  bool last_present_source_frame_valid_{},endpoint_read_failure_{},gate_ok=true;
+  bool source_step_possible_{};
+  bool live_owner(std::uint32_t f) const { return session_.source_frames()==f; }
+  bool gate(RuntimeMatchHistoryGatePoint,std::uint32_t f) { return gate_ok&&live_owner(f); }
+  bool fail(RuntimeMatchHistoryFailure f,const char* = nullptr) { failure_=f; phase_=RuntimeMatchHistoryPhase::Failed; return false; }
+  bool checkpoint_failure(RuntimeMatchHistoryFailure f,const char*) { return fail(f); }
+  bool seal_presented_frontier() noexcept;
+  bool endpoint_role_allowed(View,Provenance,EndpointRole&) const noexcept;
+  bool begin_endpoint_batch(View,Provenance) noexcept;
+  bool end_endpoint_batch() noexcept;
+  bool close_selected_endpoint() noexcept;
+  bool begin_continuation() noexcept;
+  bool restore_pre() noexcept;
+};
+'''
+        fixture += methods + r'''
+static NativeHistoryFixture episode_fixture() {
+  NativeHistoryFixture h{};
+  h.pre_frame_=100; h.session_.frame=101; h.forward_steps_=h.ticket_count_=1;
+  h.incarnation_=1; h.last_ticket_id_=77; h.poll_serial_=9001;
+  h.last_present_source_frame_=101; h.last_present_source_frame_valid_=true;
+  h.latest_ticket_={77,100,1,9001}; h.episode_rows_[0]={77,100,1,1,9001};
+  return h;
+}
+static void seal_and_copy(NativeHistoryFixture& h) {
+  assert(h.seal_presented_frontier());
+  assert(h.phase_==RuntimeMatchHistoryPhase::PresentedSealed);
+  assert(h.checkpoint_->seal_calls==1 && h.checkpoint_->seal_frame==101);
+  assert(h.endpoint_mask_==0);
+  assert(h.begin_endpoint_batch(View::DrawEnd,Provenance::Reference));
+  assert(h.endpoint_role_==NativeHistoryFixture::EndpointRole::PresentedFrontier);
+  assert(h.end_endpoint_batch());
+  assert(h.phase_==RuntimeMatchHistoryPhase::PresentedComplete);
+  assert(h.endpoint_mask_==NativeHistoryFixture::PresentedFrontier);
+  assert((h.endpoint_mask_&(NativeHistoryFixture::PredictedCpu|NativeHistoryFixture::PredictedDraw))==0);
+}
+int main() {
+  auto valid=episode_fixture();
+  NativeHistoryFixture::EndpointRole role{};
+  assert(valid.seal_presented_frontier());
+  assert(!valid.endpoint_role_allowed(View::CpuEnd,Provenance::Reference,role));
+  assert(!valid.endpoint_role_allowed(View::DrawEnd,Provenance::Corrected,role));
+  assert(valid.endpoint_role_allowed(View::DrawEnd,Provenance::Reference,role));
+  assert(role==NativeHistoryFixture::EndpointRole::PresentedFrontier);
+  assert(valid.begin_endpoint_batch(View::DrawEnd,Provenance::Reference));
+  valid.reader_.revalidate_ok=false;
+  assert(!valid.end_endpoint_batch());
+  assert(valid.endpoint_mask_==0); // drift does not mint a receipt
+
+  auto stale=episode_fixture(); stale.last_present_source_frame_=100;
+  assert(!stale.seal_presented_frontier() && stale.checkpoint_->seal_calls==0);
+  auto wrong_row=episode_fixture(); wrong_row.episode_rows_[0].state=2;
+  assert(!wrong_row.seal_presented_frontier() && wrong_row.checkpoint_->seal_calls==0);
+  auto pending=episode_fixture(); pending.current_ticket_pending_=true;
+  assert(!pending.seal_presented_frontier() && pending.checkpoint_->seal_calls==0);
+  auto active_reader=episode_fixture(); active_reader.reader_.active_=true;
+  assert(!active_reader.seal_presented_frontier() && active_reader.checkpoint_->seal_calls==0);
+  auto wrong_mode=episode_fixture(); wrong_mode.arena_mode_=false;
+  assert(!wrong_mode.seal_presented_frontier() && wrong_mode.checkpoint_->seal_calls==0);
+  auto not_idle=episode_fixture(); not_idle.gate_ok=false;
+  assert(!not_idle.seal_presented_frontier() && not_idle.checkpoint_->seal_calls==0);
+
+  auto closed=episode_fixture(); seal_and_copy(closed);
+  assert(closed.close_selected_endpoint());
+  assert(closed.phase_==RuntimeMatchHistoryPhase::Closed && closed.checkpoint_->close_calls==1);
+  assert(!closed.begin_continuation()); // confirmed frontier closes toward retire/rebase only
+  assert(closed.checkpoint_->begin_calls==0);
+
+  auto restored=episode_fixture(); seal_and_copy(restored);
+  assert(restored.restore_pre());
+  assert(restored.checkpoint_->archive_calls==1 && restored.checkpoint_->restore_calls==1);
+  assert(restored.session_.frame==100 && restored.phase_==RuntimeMatchHistoryPhase::RestoredPrePending);
+  assert(restored.endpoint_mask_==0); // corrected incarnation gets a fresh endpoint receipt
+  assert(!restored.restore_pre());
+
+  auto bad_mask=episode_fixture(); seal_and_copy(bad_mask);
+  bad_mask.endpoint_mask_|=NativeHistoryFixture::PredictedCpu;
+  assert(!bad_mask.close_selected_endpoint() && bad_mask.checkpoint_->close_calls==0);
+  auto legacy=episode_fixture();
+  legacy.phase_=RuntimeMatchHistoryPhase::PredictedComplete;
+  legacy.sealed_end_=101;
+  legacy.endpoint_mask_=NativeHistoryFixture::PredictedCpu|NativeHistoryFixture::PredictedDraw;
+  assert(legacy.close_selected_endpoint());
+  assert(legacy.phase_==RuntimeMatchHistoryPhase::Closed && legacy.checkpoint_->close_calls==1);
+}
+'''
+        source = self.work / 'presented-frontier-native.cpp'
+        binary = self.work / 'presented-frontier-native'
+        source.write_text(fixture)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [
+            ('compile', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                         str(source), '-o', str(binary)]),
+            ('presented-frontier-control', [str(binary)]),
+        ]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
     def test_extracted_native_start_with_controlled_owners(self):
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
         history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
@@ -620,7 +815,7 @@ int main() {
             section('void match_history_before_close() noexcept {',
                     'void match_history_after_match_close()'),
             section('int melee_web_native_menu_match_history_start_enable()',
-                    'int melee_web_native_menu_match_history_take_over('),
+                    'int melee_web_native_menu_match_history_pacing_start('),
         ]))
         source = self.work / 'start.cpp'
         binary = self.work / 'start'

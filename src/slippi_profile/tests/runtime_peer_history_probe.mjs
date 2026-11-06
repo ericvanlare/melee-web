@@ -309,6 +309,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
           const receipt = await peer.waitForRemoteSample({tick: value?.tick ?? 0, timeoutMs: 5000});
           return {receipt, snapshot: peer.snapshot()};
         }
+        case 'peerRemoteSnapshot': return peer.remoteSnapshot(value?.tick??0);
         case 'peerClose': {
           const snapshot = await peer.close();
           return {snapshot, closed: peer.closed};

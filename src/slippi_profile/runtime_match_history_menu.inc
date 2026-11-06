@@ -12,6 +12,24 @@ struct MatchHistoryStatus {
  melee_web::RuntimeMatchHistoryMetadata history{};
  uint32_t input_ready{},gpu_pending{},endpoint_active{},renderer_errors{};
 };
+/* Copied immediately through the private pacing endpoint. Offsets are fixed:
+ * schema/bytes 0/4, phase/frame/steps/pending/stall/reason 8..28,
+ * elapsed/debt/trigger/threshold 32/40/48/56. */
+struct MatchHistoryPacingSample {
+ uint32_t schema=1,bytes=64,phase{},current_frame{},steps{},pending_steps{},stalled{},stall_reason{};
+ double elapsed_ms{},pending_ticks{},triggering_value{},threshold{};
+};
+static_assert(sizeof(MatchHistoryPacingSample)==64);
+static_assert(offsetof(MatchHistoryPacingSample,phase)==8);
+static_assert(offsetof(MatchHistoryPacingSample,current_frame)==12);
+static_assert(offsetof(MatchHistoryPacingSample,steps)==16);
+static_assert(offsetof(MatchHistoryPacingSample,pending_steps)==20);
+static_assert(offsetof(MatchHistoryPacingSample,stalled)==24);
+static_assert(offsetof(MatchHistoryPacingSample,stall_reason)==28);
+static_assert(offsetof(MatchHistoryPacingSample,elapsed_ms)==32);
+static_assert(offsetof(MatchHistoryPacingSample,pending_ticks)==40);
+static_assert(offsetof(MatchHistoryPacingSample,triggering_value)==48);
+static_assert(offsetof(MatchHistoryPacingSample,threshold)==56);
 struct MatchHistoryInput {
  uint32_t schema=1,bytes=168,input_ready{},corrected_ready{};
  uint64_t poll_serial{};
@@ -95,6 +113,8 @@ struct MatchHistoryControl {
  std::array<char,2048> renderer_preparation{};
  std::array<char,512> presentation_json{};
  std::array<char,1024> prefix_handoff_json{};
+ MatchHistoryPacingSample pacing{};
+ bool pacing_started{},pacing_failed{};
  uint32_t requested_rebase_end{};
  uint32_t requested_ticket_id{};
  std::array<uint8_t,44> requested_plan{};
@@ -951,6 +971,7 @@ EM_BOOL history_dispatch(double,void*) {
     close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
     okay=!match&&!world&&!host&&!results&&!prize&&!c.capsule;
     if(okay){c.prefix_handoff.clear();c.prefix_handoff_json={};
+     c.pacing_started=false;
      c.status.owner_state=2;c.status.endpoint_active=0;}
    }
   }else if(!c.status.first_failure&&match&&match.get()==c.match_owner){
@@ -1041,6 +1062,12 @@ EM_BOOL history_dispatch(double,void*) {
    case 23:okay=history_rebase_confirmed_prefix(c,c.requested_rebase_end);break;
    case 24:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
       c.capsule->adopt_next_prefix_ticket();break;
+   case 25:okay=c.episode_enabled&&c.arena_enabled&&c.capsule&&
+      c.presentation_command==19&&c.presentation_serial&&c.submitted_frame&&
+      c.presentation_request_sequence<=UINT32_MAX-2u&&
+      c.presentation_request_sequence+2u==c.status.request_seq&&
+      c.status.last_completed_command==5&&c.status.complete_seq+1u==c.status.request_seq&&
+      c.capsule->seal_presented_frontier();break;
    default:break;
    }
   }
@@ -1057,14 +1084,14 @@ EM_BOOL history_dispatch(double,void*) {
 }
 int history_request(unsigned command,uint32_t end_frame,bool explicit_episode_payload=false) {
  auto& c=match_history;
- const bool episode_command=command>=12&&command<=24;
+ const bool episode_command=command>=12&&command<=25;
  const bool legacy_execution=command==2||command==3||command==7;
  const bool unsupported_rebase=command==11&&c.episode_enabled!=c.arena_enabled;
  const bool frame_payload_command=command==13||command==15;
  if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
-    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>24||
+    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>25||
     (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||unsupported_rebase||
-    (command>=20&&command<=24&&!c.arena_enabled)||
+    (command>=20&&command<=25&&!c.arena_enabled)||
     (frame_payload_command!=explicit_episode_payload)||
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  c.requested_rebase_end=end_frame;
@@ -1203,6 +1230,128 @@ const void* melee_web_native_menu_match_history_start_publication_data(){
  return &start.publication;
 }
 unsigned melee_web_native_menu_match_history_start_publication_bytes(){return sizeof(MatchHistoryPublication);}
+int melee_web_native_menu_match_history_pacing_start(){
+ auto& c=match_history;
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(c.pacing_started||c.pacing_failed||!match_history_terminal||c.status.owner_state!=1||
+    c.status.first_failure||c.status.pending_command||c.status.complete_seq!=c.status.request_seq||
+    c.dispatching||match_history_in_tick||!history_start_export_idle()||!c.identity_ready||
+    !c.episode_enabled||!c.arena_enabled||!c.capsule||!match||match.get()!=c.match_owner||
+    c.capsule->phase()!=Phase::Armed||c.capsule->current_frame()!=c.capsule->pre_frame()||
+    c.capsule->forward_steps()!=0||c.capsule->poll_serial()!=0||c.capsule->restore_count()!=0||
+    c.capsule->endpoint_active()||c.status.last_completed_command!=18||
+    c.status.request_seq==UINT32_MAX||
+    !c.capsule->can_admit_poll_ticket(c.status.request_seq+1u,c.status.local_port,c.status.remote_port)||
+    history_boundary(*match,Gate::ForwardBefore,c.capsule->current_frame(),nullptr)!=Result::Admitted)
+  return history_refuse("Pacing start requires the exact idle armed PRE after initial preparation");
+ // Take-over stopped the ordinary menu loop. Start this owner clock only now,
+ // after PRE, identity, arena mode and episode arming have all been admitted.
+ // Seed from the native clock so the first later sample measures elapsed time
+ // from pacing start rather than dropping an initial frame as the clock anchor.
+ menu_clock.reset();
+ const auto seeded=menu_clock.tick_with_budget(emscripten_get_now(),true,0u);
+ c.pacing={};
+ c.pacing.phase=static_cast<uint32_t>(c.capsule->phase());
+ c.pacing.current_frame=c.capsule->current_frame();
+ c.pacing.stalled=seeded.stalled?1u:0u;
+ c.pacing.stall_reason=static_cast<uint32_t>(seeded.reason);
+ c.pacing.elapsed_ms=seeded.interval_ms;
+ c.pacing.pending_ticks=menu_clock.pending_ticks();
+ c.pacing.triggering_value=seeded.triggering_value;
+ c.pacing.threshold=seeded.threshold;
+ if(seeded.stalled){
+  c.pacing_failed=true;
+  history_refuse("Native pacing clock could not seed a finite start time");
+  return 0;
+ }
+ c.pacing_started=true;
+ return 1;
+}
+const MatchHistoryPacingSample* melee_web_native_menu_match_history_pacing_sample(unsigned max_steps){
+ auto& c=match_history;
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(!c.pacing_started)return nullptr;
+ if(c.pacing_failed)return &c.pacing;
+ if(max_steps>1u){history_refuse("Pacing budget must be exactly zero or one");return nullptr;}
+ // A dispatched export can yield while the renderer's Asyncify continuation is
+ // active. Do not read the match or clock until the ordinary runtime is idle.
+ if(!history_runtime_idle()){
+  history_refuse("Pacing sample requires the idle native runtime");
+  return nullptr;
+ }
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||!match||
+    match.get()!=c.match_owner||c.dispatching||match_history_in_tick)
+  {history_refuse("Pacing sample lost its terminal match owner");return nullptr;}
+
+ const auto phase=c.capsule?c.capsule->phase():Phase::Failed;
+ const auto current=match->source_frames();
+ const bool recording=c.capsule&&c.episode_enabled&&c.arena_enabled&&
+     (phase==Phase::Armed||phase==Phase::EpisodeRecording);
+ const bool known_serialized_wait=c.status.pending_command!=0;
+ const bool known_endpoint_wait=c.capsule&&c.capsule->endpoint_active();
+ const bool known_present_wait=phase==Phase::EpisodePresentPending;
+ const bool known_unclaimed_ticket=c.status.last_completed_command==12||
+     c.status.last_completed_command==24;
+ const bool known_forward_present_wait=recording&&phase==Phase::EpisodeRecording&&
+     c.status.last_completed_command==13;
+ const bool known_prefix_suffix_wait=recording&&c.prefix_handoff.active()&&
+     c.prefix_handoff.rebase_request_sequence()&&
+     c.prefix_handoff.suffix_cursor()<c.prefix_handoff.suffix_count();
+ const bool known_wait=known_serialized_wait||known_endpoint_wait||known_present_wait||
+     known_unclaimed_ticket||known_forward_present_wait||known_prefix_suffix_wait||!recording;
+
+ unsigned effective_budget=0;
+ if(max_steps==1u&&!known_wait){
+  if(!recording||c.capsule->endpoint_active()||c.status.request_seq==UINT32_MAX||
+     (phase==Phase::Armed&&c.status.last_completed_command!=18)||
+     (phase==Phase::EpisodeRecording&&c.status.last_completed_command!=5&&
+      c.status.last_completed_command!=17)){
+   history_refuse("Pacing due step is outside the presented native recording boundary");
+   return nullptr;
+  }
+  if(!history_runtime_idle()||!history_gpu_idle()||
+     !c.capsule->can_admit_poll_ticket(c.status.request_seq+1u,
+          c.status.local_port,c.status.remote_port)||
+     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+   history_refuse("Pacing due step failed native input, owner, or renderer admission");
+   return nullptr;
+  }
+  effective_budget=1u;
+ }else if(!known_wait&&recording){
+  // Budget zero is an intentional network/host wait, but it must not disguise
+  // an owner or renderer failure at an otherwise live recording boundary.
+  if(!history_runtime_idle()||!history_gpu_idle()||
+     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+   history_refuse("Pacing wait detected a native owner or renderer failure");
+   return nullptr;
+  }
+ }
+
+ const auto elapsed=menu_clock.tick_with_budget(emscripten_get_now(),true,effective_budget);
+ c.pacing={};
+ c.pacing.phase=c.capsule?static_cast<uint32_t>(phase):0u;
+ c.pacing.current_frame=current;
+ c.pacing.steps=elapsed.steps;
+ c.pacing.pending_steps=elapsed.pending_steps;
+ c.pacing.stalled=elapsed.stalled?1u:0u;
+ c.pacing.stall_reason=static_cast<uint32_t>(elapsed.reason);
+ c.pacing.elapsed_ms=elapsed.interval_ms;
+ c.pacing.pending_ticks=menu_clock.pending_ticks();
+ c.pacing.triggering_value=elapsed.triggering_value;
+ c.pacing.threshold=elapsed.threshold;
+ if(elapsed.stalled){
+  c.pacing_failed=true;
+  history_refuse("Native pacing clock stalled; terminal due-step admission is disabled");
+ }
+ return &c.pacing;
+}
+unsigned melee_web_native_menu_match_history_pacing_sample_bytes(){
+ return sizeof(MatchHistoryPacingSample);
+}
 int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,unsigned remote) {
  auto& c=match_history;
  try {
@@ -1536,14 +1685,20 @@ const void* melee_web_native_menu_match_history_checksum_data(){
     c.capsule->first_failure()!=melee_web::RuntimeMatchHistoryFailure::None)
   return nullptr;
  const auto phase=c.capsule->phase();
- const bool corrected=phase==Phase::CorrectedCpuCopied;
+ const bool corrected=phase==Phase::CorrectedCpuCopied||
+     (phase==Phase::CorrectedComplete&&c.episode_enabled&&c.arena_enabled);
  const bool prefix=phase==Phase::PrefixCpuCopied;
- if(phase!=Phase::PredictedCpuCopied&&!corrected&&!prefix)return nullptr;
+ const bool presented=c.episode_enabled&&c.arena_enabled&&
+     ((phase==Phase::PresentedComplete&&c.capsule->endpoint_mask()==(1u<<8))||
+      (phase==Phase::CorrectedComplete&&(c.capsule->endpoint_mask()&96u)==96u));
+ if(phase==Phase::CorrectedComplete&&!presented)return nullptr;
+ if(phase!=Phase::PredictedCpuCopied&&!corrected&&!prefix&&!presented)return nullptr;
  const auto pre=c.capsule->pre_frame();
  if(pre!=c.status.expected_frame||pre==UINT32_MAX)return nullptr;
  const auto frame=c.capsule->current_frame();
  if(frame<=pre||c.capsule->sealed_end()!=frame||!c.capsule->poll_serial()||
     history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)return nullptr;
+ if(presented&&history_boundary(*match,Gate::PresentComplete,frame,nullptr)!=Result::Admitted)return nullptr;
  const auto span=frame-pre;
  if(prefix){
   const auto old_selected_end=c.capsule->prefix_selected_end();

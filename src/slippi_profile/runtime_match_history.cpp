@@ -647,7 +647,8 @@ std::uint32_t RuntimeMatchHistory::prefix_suffix_remaining() const noexcept
 bool RuntimeMatchHistory::begin_continuation() noexcept
 {
     if(!episode_mode_||phase_!=RuntimeMatchHistoryPhase::Closed||!checkpoint_||
-       current_ticket_pending_||incarnation_>=3u||sealed_end_<=pre_frame_||
+       (endpoint_mask_&PresentedFrontier)||current_ticket_pending_||
+       incarnation_>=3u||sealed_end_<=pre_frame_||
        !live_owner(sealed_end_)||!gate(RuntimeMatchHistoryGatePoint::Arm,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Phase,"Episode continuation admission refused");
     if(!checkpoint_->begin_history_incarnation(session_))
@@ -709,10 +710,14 @@ bool RuntimeMatchHistory::forward_from_poll(
 
 bool RuntimeMatchHistory::restore_pre() noexcept
 {
-    constexpr std::uint32_t required=PredictedCpu|PredictedDraw;
-    if(phase_!=RuntimeMatchHistoryPhase::PredictedComplete||!checkpoint_||
+    const bool presented_frontier=phase_==RuntimeMatchHistoryPhase::PresentedComplete;
+    constexpr std::uint32_t predicted_required=PredictedCpu|PredictedDraw;
+    const std::uint32_t required=presented_frontier?PresentedFrontier:predicted_required;
+    if((phase_!=RuntimeMatchHistoryPhase::PredictedComplete&&!presented_frontier)||!checkpoint_||
        (episode_mode_?restore_count_>=2u:restore_count_!=0u)||
        (endpoint_mask_&required)!=required||!live_owner(sealed_end_)||
+       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||
+       (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
        !gate(RuntimeMatchHistoryGatePoint::RestoreBefore,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Phase);
     if(!checkpoint_->archive_history_endpoint(session_)||
@@ -841,6 +846,40 @@ bool RuntimeMatchHistory::admit_present_completion() noexcept
     return true;
 }
 
+bool RuntimeMatchHistory::seal_presented_frontier() noexcept
+{
+    const auto current=session_.source_frames();
+    if(!episode_mode_||!arena_mode_||phase_!=RuntimeMatchHistoryPhase::EpisodeRecording||
+       !checkpoint_||reader_.active()||endpoint_role_!=EndpointRole::None||
+       current_ticket_pending_||!ticket_count_||ticket_count_!=forward_steps_||
+       ticket_count_>episode_rows_.size()||current<=pre_frame_||
+       current-pre_frame_!=forward_steps_||!live_owner(current)||
+       !last_present_source_frame_valid_||last_present_source_frame_!=current)
+        return fail(RuntimeMatchHistoryFailure::Phase,
+                    "Presented frontier requires an idle recording present at the current frame");
+
+    const auto& latest=episode_rows_[ticket_count_-1u];
+    if(latest.state!=1u||latest.source_frame+1u!=current||
+       latest.ticket_id!=last_ticket_id_||latest.poll_serial!=poll_serial_||
+       latest.incarnation!=incarnation_||!latest_ticket_valid_||
+       latest_ticket_.ticket_id!=latest.ticket_id||
+       latest_ticket_.source_frame!=latest.source_frame||
+       latest_ticket_.incarnation!=latest.incarnation||
+       latest_ticket_.poll_serial!=latest.poll_serial)
+        return fail(RuntimeMatchHistoryFailure::Present,
+                    "Presented frontier does not bind the latest committed recording ticket");
+
+    if(!gate(RuntimeMatchHistoryGatePoint::PresentComplete,current))
+        return fail(RuntimeMatchHistoryFailure::Boundary,
+                    "Presented frontier lost the admitted current renderer submission");
+    const char* refusal=nullptr;
+    if(!checkpoint_->seal_history_incarnation(session_,&refusal))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Seal,refusal);
+    sealed_end_=current;replay_target_end_=current;endpoint_mask_=0;
+    phase_=RuntimeMatchHistoryPhase::PresentedSealed;
+    return true;
+}
+
 bool RuntimeMatchHistory::endpoint_role_allowed(
     View view,Provenance provenance,EndpointRole& role) const noexcept
 {
@@ -868,6 +907,10 @@ bool RuntimeMatchHistory::endpoint_role_allowed(
     if(view==View::CpuEnd&&provenance==Provenance::Corrected&&
        phase_==RuntimeMatchHistoryPhase::PrefixSealed){
         role=EndpointRole::PrefixCpu;return true;
+    }
+    if(view==View::DrawEnd&&provenance==Provenance::Reference&&
+       phase_==RuntimeMatchHistoryPhase::PresentedSealed){
+        role=EndpointRole::PresentedFrontier;return true;
     }
     if(view==View::DrawEnd&&provenance==Provenance::Corrected&&
        phase_==RuntimeMatchHistoryPhase::CorrectedDrawIdle){
@@ -966,6 +1009,8 @@ bool RuntimeMatchHistory::end_endpoint_batch() noexcept
         endpoint_mask_|=CorrectedDraw;phase_=RuntimeMatchHistoryPhase::CorrectedComplete;break;
     case EndpointRole::PrefixCpu:
         endpoint_mask_|=PrefixCpu;phase_=RuntimeMatchHistoryPhase::PrefixCpuCopied;break;
+    case EndpointRole::PresentedFrontier:
+        endpoint_mask_|=PresentedFrontier;phase_=RuntimeMatchHistoryPhase::PresentedComplete;break;
     case EndpointRole::None:return fail(RuntimeMatchHistoryFailure::Endpoint);
     }
     return true;
@@ -975,10 +1020,14 @@ bool RuntimeMatchHistory::close_selected_endpoint() noexcept
 {
     const bool corrected=phase_==RuntimeMatchHistoryPhase::CorrectedComplete;
     const bool reference=phase_==RuntimeMatchHistoryPhase::PredictedComplete;
-    const std::uint32_t required=corrected?(CorrectedCpu|CorrectedDraw):(PredictedCpu|PredictedDraw);
-    if((!corrected&&!reference)||!checkpoint_||
-       (endpoint_mask_&required)!=required||reader_.active()||
+    const bool presented_frontier=phase_==RuntimeMatchHistoryPhase::PresentedComplete;
+    const std::uint32_t required=presented_frontier?PresentedFrontier:
+        (corrected?(CorrectedCpu|CorrectedDraw):(PredictedCpu|PredictedDraw));
+    if((!corrected&&!reference&&!presented_frontier)||!checkpoint_||
+       (endpoint_mask_&required)!=required||
+       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||reader_.active()||
        !live_owner(sealed_end_)||
+       (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
        !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_)||
        !checkpoint_->close_history_endpoint(session_))
         return fail(RuntimeMatchHistoryFailure::Close);
