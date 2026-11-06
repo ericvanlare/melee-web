@@ -2173,14 +2173,36 @@ rebase with handoff clearance, and cleanup of all 18 owned browser processes
 pass. `continuous_366.repeated_prefix_v1` pins the sources, controls, build,
 reports and independent review; retained earlier drafts are unchanged.
 
-The affected private Release build and nine focused runtime/timeline controls
-pass. Full milestone integration regression and CI are still pending. These
-remain serialized local functional witnesses. Paced play, combat/KO, full-match
-and public-relay rollback remain incomplete. Next is a page-owned loop using
-the existing clock and timing guard, with an explicit already-presented frontier
-restore path. Native endpoint admission must be labeled separately from full
-raw observation; the new loop must not draw a speculative frontier twice or
-invent a CPU-before-draw receipt.
+A page-owned paced eight-input run now passes at native/harness `a9e79a18`.
+It uses the existing 60 Hz clock and unchanged timing guard, with each actual
+poll and forward step separately granted. Both peers receive actual inputs;
+beta corrects a non-vacuous wrong prediction without drawing replay ticks.
+Clean confirmed-prefix transfers retain original suffix inputs. Independent raw
+review confirms all eight 44-byte authoritative PAD rows, the full 64-byte
+post-draw endpoint checksum, 9/10 source presentations, actual multi-step
+callback catch-up and owned cleanup. The checksum is compared locally after
+capture; this run does not exchange checksum messages. Endpoint admission is
+native typed validation, with no full raw endpoint publication during pacing.
+The earlier serialized strict restoration comparisons remain separate evidence.
+
+This is bounded functional pacing, not a real-time pass. Eight inputs take
+230.840 ms on alpha and 273.915 ms on beta, versus nominal 133.333 ms. They end
+with 5.8426 and 8.4280 ticks of debt. The first paced attempt at `7b6b26cf`
+stopped on the existing clock guard and remains retained. The reviewed repair
+adds an exact whole-arena equality fast path before the unchanged first-mismatch
+walker, bounded within-callback catch-up, and clean refresh at the existing
+seven-row capacity. No timing guard, history cap or deadline is enlarged.
+
+Thirteen focused controls, the full 3,108-test regression (242 skips), and both
+ordinary and private Release builds pass at executable source `a9e79a18`.
+Independent combined source and raw-result review passes. Publication-head CI
+and the merge outcome are tracked on #366. `continuous_366.paced_loop_v2` pins
+sources, builds, reports, failed attempts and reviews. Combat/KO, sustained
+60 Hz, full-match, complete-profile and public-relay rollback remain incomplete.
+Next is a small actual-SDK Wasm benchmark of exact arena-admission cost and a
+review of completion-driven GPU waiting before a longer paced run. Preserve
+the same comparisons, ownership checks and absolute deadlines; do not extend
+a near-guard run without a changed cost hypothesis.
 
 ## Stage decision dependencies, issue #333
 

@@ -13015,7 +13015,7 @@
               "renderer_cache_flushes": 0
             },
             "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
-            "next": "Use existing 60Hz clock and distinct already-presented frontier admission for bounded page-owned paced loop. Keep raw publication separate from native endpoint admission; preserve all source/timing/history guards.",
+            "next": "Complete exact-head publication checks, then reduce remaining actual arena-admission and GPU-completion-wait costs before a longer paced rollback run; preserve all guards and exact comparisons.",
             "per_forward_present_v1": {
               "state": "TWO_ARENA_EPISODES_COMPLETE",
               "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
@@ -13598,6 +13598,249 @@
               "independent_review": {
                 "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/independent-result-review.json",
                 "sha256": "8487608d81eda395e712a1570e885ff75ba15a9592b1333ac09ef3f3af5414a0"
+              }
+            },
+            "paced_loop_v2": {
+              "status": "PACED_EIGHT_INPUTS_COMPLETE",
+              "native_and_harness_producer": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+              "observed": {
+                "pages": {
+                  "alpha": {
+                    "elapsed_ms": 230.8400001525879,
+                    "native_clock_elapsed_ms": 230.71000003814697,
+                    "terminal_native_pending_ticks": 5.842600002288818,
+                    "maximum_pending_ticks": 5.943500022888183,
+                    "callback_grants": [
+                      0,
+                      0,
+                      3,
+                      5
+                    ],
+                    "actual_polls": 8,
+                    "presentations": 9,
+                    "corrections": [
+                      [
+                        "confirmed-prefix",
+                        0,
+                        7,
+                        4,
+                        null
+                      ]
+                    ],
+                    "PRE_admissions_ms": [
+                      9.419999599456787,
+                      8.255000114440918,
+                      7.730000019073486,
+                      7.180000305175781,
+                      7.484999656677246
+                    ]
+                  },
+                  "beta": {
+                    "elapsed_ms": 273.914999961853,
+                    "native_clock_elapsed_ms": 273.7999997138977,
+                    "terminal_native_pending_ticks": 8.427999982833862,
+                    "maximum_pending_ticks": 8.427999982833862,
+                    "callback_grants": [
+                      0,
+                      0,
+                      1,
+                      7,
+                      0
+                    ],
+                    "actual_polls": 8,
+                    "presentations": 10,
+                    "corrections": [
+                      [
+                        "fully-confirmed-correction",
+                        0,
+                        1,
+                        1,
+                        0
+                      ],
+                      [
+                        "confirmed-prefix",
+                        1,
+                        8,
+                        7,
+                        null
+                      ]
+                    ],
+                    "PRE_admissions_ms": [
+                      10.144999980926514,
+                      8.130000114440918,
+                      7.184999942779541,
+                      7.425000190734863,
+                      6.974999904632568,
+                      7.695000171661377,
+                      7.255000114440918,
+                      7.569999694824219
+                    ]
+                  }
+                },
+                "postdraw_checksum_bytes": 64,
+                "all_postdraw_checksums_equal": true,
+                "checksum_exchange": "none; compared locally after capture",
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    8
+                  ]
+                },
+                "cleanup": {
+                  "owned_pids_absent": 18,
+                  "relay_disposed": true,
+                  "capture_and_server_groups_absent": true
+                },
+                "clock": "existing 60Hz FixedTickClock with unchanged debt guard; no reset or auto-Resume",
+                "callback_bound": "eight individually granted forwards and at most one reconciliation",
+                "history_bounds": "unchanged seven rows, three incarnations, two restores"
+              },
+              "scope": [
+                "Native typed admission without raw endpoint publication. Eight inputs and actual catch-up bursts; terminal debt remains and run durations exceed nominal 133.33ms. No steady 60Hz, broader rollback coverage or full-match claim.",
+                "No combat/KO, full-match, complete-profile, public-relay rollback or human/two-machine acceptance claim.",
+                "Local full regression and ordinary/private Release builds pass. Publication-head CI and merge outcome are tracked on issue #366; no broader acceptance follows."
+              ],
+              "focused_controls": {
+                "tests": 13,
+                "passed": true,
+                "elapsed_s": 11.928,
+                "actual_wasm_sdk_equality_and_first_mismatch_controls": true
+              },
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-combined-candidate-v1/independent-source-review.json",
+                "sha256": "ace695b3ea0fd5024a5dbea477d74b2437975db0e1eaf8c32e2f34f2bfb7c6e8"
+              },
+              "root_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-root-source-review-v2.json",
+                "sha256": "83aaa5c5332dba5533472a1bd710579ae2f7badcd8a3a6a966cfa42a8f4ff8eb"
+              },
+              "fast_compare_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-sdk-arena-observe-fast-equal-candidate-v1/independent-review.json",
+                "sha256": "a7578ee9cd757da284cbdf87477be7bbf133bcef8f8b3618568924eeae14297d"
+              },
+              "catchup_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-catchup-candidate-v1/independent-source-review.json",
+                "sha256": "8dc6a4f357056e2f62e527a2d0f4e9e6c46385fdc001d6926293132be8cc8210"
+              },
+              "focused_controls_log": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-fast-compare-controls-v1.log",
+                "sha256": "e8f2b91d53e42645e85d5e20b7688017725d59ad1becc4891a4346ac7f5b4fbc"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-build-v2/result.json",
+                "sha256": "7cf06bbaa1807824244d803b4a3304f153b409c466394c4eaea0b22117ba5f7a"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-producer-v2/archive.json",
+                "sha256": "2c1c04ea37d7551ad1457544910465bf0f4d95b7ce79f04a349106a36ef257f8"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-catalog-v2/final-linked-configuration-v1.json",
+                "sha256": "ccc886e6726237c8c60f249c32c0596b366f27e6829c13f0abbd2cf570d6d400"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-root-review-v2.json",
+                "sha256": "6806dd12d713e8b747bbdff65d31a1484d19c7609ffb8800bf2f4def2cecc674"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/result-summary.json",
+                "sha256": "2122e2d0b054acc30d9e53b085bf49a2de0a25b6962e7257ddfc2dc607e2e496"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/browser/result.json",
+                "sha256": "b2333dd0ba4e54a6d43bd03ad0fc742ce7288953ee04a0fda4e8a0f5dec1663c"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/owner.json",
+                "sha256": "86504e31dcfad2dd54c4fa938666fe54a56273c5850aef5c9128cef856850d1d"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v2/independent-result-review.json",
+                "sha256": "b8fe327117bc64b435e9a442105cbf01a1959d4cffaba79a8b437d43a42d882a"
+              },
+              "integration_source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-source-review-v1.json",
+                "sha256": "6e46f37610a9a4113c927e99a35d14032652e4a3b4baa6e7ff7d54db8a718547"
+              },
+              "retained_first_failure": {
+                "native_and_harness_producer": "7b6b26cf3429a7e0a6edf57716f6736fe5a997d5",
+                "result": "Existing clock-debt guard stopped both peers after real correction work.",
+                "repair": "Exact whole-arena memcmp equality fast path before unchanged first-mismatch walker; bounded catch-up grants; clean anchor refresh at existing seven-row capacity.",
+                "summary": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/result-summary.json",
+                  "sha256": "25295e4932ea54059d80faa86c56c15c436f74fe277ecc92e3232416376bf4c7"
+                },
+                "browser_report": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/browser/result.json",
+                  "sha256": "d45d924f589c94aaa53489643aa8edf2cac96ac25011fa11dbafb0fc3a6d2940"
+                },
+                "owner": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/owner.json",
+                  "sha256": "d7273ebfdd8517dc81b068162594fa6b77569a84d6f087d95d6af5d250af408d"
+                },
+                "independent_analysis": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-paced-loop-v1/independent-failure-analysis.json",
+                  "sha256": "71fe3b1e4c4258abd995d681220a6b20244c738749339ea781d99e36963cf7fa"
+                },
+                "producer_archive": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-producer-v1/archive.json",
+                  "sha256": "e3ca9767d64fdb78bcd559bd3b070d27231131539c0a7387ec866e3b4c44488a"
+                },
+                "linked_configuration": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-loop-catalog-v1/final-linked-configuration-v1.json",
+                  "sha256": "36f14db3fc78f527faa831401c6e283dfb7b10ae574d5341df7294094ec9c74d"
+                }
+              },
+              "retained_fixture_failure": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paced-integrated-controls-v1.log",
+                "sha256": "d0a4d82e4a375aba47ca69c1479f6b54abf3a264a311a4a421573e07e07412e6"
+              },
+              "integration_validation": {
+                "source": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+                "full_regression": {
+                  "tests": 3108,
+                  "skips": 242,
+                  "elapsed_s": 747.129,
+                  "result": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-validation-v1/full-regression-result.json",
+                    "sha256": "3f744392829b6276136e2be8beaa050239814e7da0efdcdc590a056896edafc4"
+                  }
+                },
+                "ordinary_release": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-validation-v1/ordinary-release-result.json",
+                  "sha256": "51cd15b9ed67d30d0143436f15b53bbee93ccadb729f63363b79301cddce88a6"
+                },
+                "private_release_source": "a9e79a18ef4e40590845fade580595f2fa3b91ea",
+                "source_review": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-integration-source-review-v1.json",
+                  "sha256": "6e46f37610a9a4113c927e99a35d14032652e4a3b4baa6e7ff7d54db8a718547"
+                },
+                "pre_validation_docs_review": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime366-docs-review-v1.json",
+                  "sha256": "59e6282b50392fb178926b394b224cf536beb25f3514d0cef588345c0d290c1c"
+                }
               }
             }
           }
