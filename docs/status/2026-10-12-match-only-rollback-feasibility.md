@@ -2009,13 +2009,29 @@ processes are absent. The first host source draft's phase, scope, test-merge and
 continuity defects were repaired before capture and remain retained. The actual
 native translation units, affected private Release build and focused controls pass.
 
-These are two individually confirmed one-tick corrections. Multi-tick speculative
-continuation, sustained/full-match rollback, public enablement, complete profile
-behavior and acceptance remain open. The next experiment keeps one original PRE
-for four ticks, corrects a late input, and advances again while a newer input is
-still unconfirmed. The existing structured receipt's `continuation_364` owns the
-source, raw result, catalog, review and cleanup identities. Full regression and
-exact-head CI remain pending the complete #364 milestone.
+These are two individually confirmed one-tick corrections. The subsequent
+four-tick attempt at native and harness `f8d0db8c` passes its first strict
+Armed/Restored PRE comparison across all nine domains and 12 particle relations,
+corrects to END3, then actually advances tick 3 while remote input remains
+confirmed only through tick 1. It refuses the next END4 seal. Independent review
+confirms that completed prefix and the absence of a second restore or final
+four-PAD/64-byte peer comparison. Diagnostic producer `5778935b` preserves the
+guards and their order and identifies the exact leaf: payload snapshot topology
+changed in the source main heap. Both failed captures, source reviews and
+producer identities are retained; owned browser, relay and server cleanup passes.
+
+The current payload-only snapshot deliberately requires unchanged allocation
+topology. The next reduced experiment uses the original SDK allocator to test
+restoring its stable owned arena and source-address mirror together across
+allocation/free/reuse. It must preserve real host/observer identities and prove
+external borrower safety before integration. The legacy payload guard and strict
+comparator remain unchanged; exact restored source state and advancing observer
+fences require distinct, explicit evidence. The exact END4 allocation or free
+is not yet attributed. Multi-tick speculative continuation, sustained/full-match
+rollback, public enablement, complete profile behavior and acceptance remain open.
+The structured receipt's `continuation_364` owns the source, raw result, catalog,
+review and cleanup identities. Full regression and exact-head CI remain pending
+the complete #364 milestone.
 
 ## Stage decision dependencies, issue #333
 
