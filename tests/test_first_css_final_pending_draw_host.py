@@ -78,6 +78,8 @@ PRELUDE = r"""
 #include <stdio.h>
 #include <string.h>
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
+/* These modeled draw leaves assert the opt-in particle scope lifecycle. */
+#define MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE 1
 #define TARGET_PC 1
 #define MELEE_WEB_SAVE_PROFILE_CARD_BYTES 8
 #define MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED 3
@@ -147,6 +149,8 @@ static void* HSD_GObj_804D781C,*HSD_GObj_804D7838,*HSD_GObj_804D7830;
 static void* HSD_GObj_804D7814,*HSD_GObj_804D7818;
 static int gobj_draws, clock_presents, configured_result=3, configured_request=19;
 static int clock_present_ok=1;
+static int particle_scope_open,particle_begin_ok=1,particle_end_ok=1;
+static unsigned particle_begin_calls,particle_end_calls;
 enum { MELEE_WEB_HOST_SCENE_CSS=1, MELEE_WEB_HOST_SCENE_TITLE=3,
        MELEE_WEB_HOST_SCENE_MAIN=4, MELEE_WEB_HOST_SCENE_SSS=2 };
 
@@ -181,11 +185,27 @@ static void HSD_StateInvalidate(unsigned);
 static void HSD_GObj_80390FC0(void);
 static void HSD_Init_803755A8(void);
 static int melee_web_menu_clock_present(void);
+static int slippi_particle_source_draw_begin(uint64_t,uint64_t,char*,size_t);
+static int slippi_particle_source_draw_end(char*,size_t);
 """
 
 
 STUBS_AND_TESTS = r"""
 static GameplayStats melee_web_gameplay_stats(void) { return stats; }
+static int slippi_particle_source_draw_begin(uint64_t world,uint64_t interval,
+                                             char* error,size_t size)
+{
+  ++particle_begin_calls; assert(!particle_scope_open);
+  assert(world==stats.generation&&interval==0);
+  if(!particle_begin_ok){if(error&&size)snprintf(error,size,"particle draw begin refused");return 0;}
+  particle_scope_open=1;return 1;
+}
+static int slippi_particle_source_draw_end(char* error,size_t size)
+{
+  ++particle_end_calls;assert(particle_scope_open);particle_scope_open=0;
+  if(!particle_end_ok){if(error&&size)snprintf(error,size,"particle draw end refused");return 0;}
+  return 1;
+}
 static int melee_web_audio_is_active(MeleeWebAudio* a) { return a != NULL && a->active; }
 static int melee_web_audio_bank_transport_active(void) { return 1; }
 static int melee_web_save_profile_owner_live(MeleeWebSaveProfileOwner* p,char* e,size_t n)
@@ -206,10 +226,10 @@ static int melee_web_menu_tick(MeleeWebMenuSession* s,char* e,size_t n)
 static GXRenderModeObj* HSD_VIGetRenderMode(void) { return &render_mode; }
 static void GXInvalidateVtxCache(void) { }
 static void GXInvalidateTexAll(void) { }
-static void HSD_StartRender(int x) { (void)x; }
+static void HSD_StartRender(int x) { (void)x;assert(particle_scope_open); }
 static void HSD_StateInvalidate(unsigned x) { (void)x; }
-static void HSD_GObj_80390FC0(void) { ++gobj_draws; }
-static void HSD_Init_803755A8(void) { }
+static void HSD_GObj_80390FC0(void) { assert(particle_scope_open);++gobj_draws; }
+static void HSD_Init_803755A8(void) { assert(particle_scope_open); }
 static int melee_web_menu_clock_present(void) { ++clock_presents; return clock_present_ok; }
 
 static void setup(MeleeWebMenuHost* h,MeleeWebMenuSession* s,
@@ -229,6 +249,9 @@ static void setup(MeleeWebMenuHost* h,MeleeWebMenuSession* s,
   HSD_GObj_804D781C=HSD_GObj_804D7838=HSD_GObj_804D7830=NULL;
   HSD_GObj_804D7814=HSD_GObj_804D7818=NULL;
   gobj_draws=clock_presents=0; clock_present_ok=1;
+  particle_scope_open=0;particle_begin_ok=particle_end_ok=1;
+  particle_begin_calls=particle_end_calls=0;
+  sss_capture_ok=1;
   configured_result=3; configured_request=19;
 }
 static void make_raw(PADStatus raw[4])
@@ -252,6 +275,7 @@ static void test_one_use_success_and_normal_pending_noop(void)
   assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==1);
   assert(h.final_pending_css_draw_state==2&&gobj_draws==1&&clock_presents==1);
+  assert(particle_begin_calls==1&&particle_end_calls==1&&!particle_scope_open);
   assert(h.final_pending_css_draw_returned==1);
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==1&&clock_presents==1);
@@ -356,6 +380,39 @@ static void test_failed_clock_consumes_authorization(void)
   clock_present_ok=1;
   assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
   assert(gobj_draws==1&&clock_presents==1);
+  assert(particle_begin_calls==1&&particle_end_calls==1&&!particle_scope_open);
+}
+
+static void test_particle_scope_failure_cleanup(void)
+{
+  MeleeWebMenuHost h; MeleeWebMenuSession s; MeleeWebAudio a;
+  MeleeWebSaveProfileOwner p; PADStatus raw[4]; char error[160]={0};
+  setup(&h,&s,&a,&p); make_raw(raw); assert(produce_transition(&h,raw)==3);
+  assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
+  particle_begin_ok=0;
+  assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
+  assert(strstr(error,"particle draw begin refused"));
+  assert(particle_begin_calls==1&&particle_end_calls==0&&!particle_scope_open);
+  assert(!h.drawing&&gobj_draws==0&&clock_presents==0);
+
+  setup(&h,&s,&a,&p); make_raw(raw); assert(produce_transition(&h,raw)==3);
+  assert(melee_web_menu_host_arm_final_pending_css_draw(&h,148,1574,raw,error,sizeof(error))==1);
+  particle_end_ok=0;
+  assert(melee_web_menu_host_draw_final_pending_css(&h,error,sizeof(error))==0);
+  assert(strstr(error,"particle draw end refused"));
+  assert(particle_begin_calls==1&&particle_end_calls==1&&!particle_scope_open);
+  assert(!h.drawing&&gobj_draws==1&&clock_presents==0);
+}
+
+static void test_particle_scope_balances_draw_enter_refusal(void)
+{
+  MeleeWebMenuHost h; MeleeWebMenuSession s; MeleeWebAudio a;
+  MeleeWebSaveProfileOwner p; char error[160]={0};
+  setup(&h,&s,&a,&p); h.first_sss_sequence_operation=1; sss_capture_ok=0;
+  assert(!host_draw_render(&h,error,sizeof(error)));
+  assert(strstr(error,"DRAW_ENTER fixture comparator failure"));
+  assert(particle_begin_calls==1&&particle_end_calls==1&&!particle_scope_open);
+  assert(!h.drawing&&gobj_draws==0);
 }
 
 static void test_active_source_callback_refuses_arm_and_draw(void)
@@ -441,6 +498,8 @@ int main(void)
   test_live_owner_changes_and_later_tick_invalidate();
   test_preexit_pending_scalar_is_observed_and_bound();
   test_failed_clock_consumes_authorization();
+  test_particle_scope_failure_cleanup();
+  test_particle_scope_balances_draw_enter_refusal();
   test_active_source_callback_refuses_arm_and_draw();
   puts("actual-source final pending CSS host controls passed");
   return 0;
@@ -540,6 +599,35 @@ int main(void){
 
 
 class FinalPendingCssDrawHostTests(OwnedWorkspaceTests):
+    def test_default_off_particle_scope_header_compiles_as_noop(self) -> None:
+        source = r'''#undef MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include "slippi_profile/particle_source_schedule.h"
+int main(void) {
+  if (!slippi_particle_source_world_begin(1) ||
+      !slippi_particle_source_draw_begin(1, 0, 0, 0) ||
+      !slippi_particle_source_camera_begin(0, 0, 0) ||
+      !slippi_particle_source_camera_end(0, 0, 0) ||
+      !slippi_particle_source_draw_end(0, 0) ||
+      !slippi_particle_source_world_end(1)) return 1;
+  return 0;
+}
+'''
+        cc = shlex.split(os.environ.get("CC", "cc"))
+        work = self.new_workspace(ROOT, "particle-source-disabled-")
+        c_path = work / "disabled.c"
+        binary = work / "disabled"
+        c_path.write_text(source, encoding="utf-8")
+        compile_result = subprocess.run(
+            cc + ["-std=c11", "-Wall", "-Wextra", "-Werror",
+                  "-I" + str(ROOT / "src"), str(c_path), "-o", str(binary)],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            check=False)
+        self.assertEqual(compile_result.returncode, 0, compile_result.stdout)
+        run_result = subprocess.run([str(binary)], text=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, check=False)
+        self.assertEqual(run_result.returncode, 0, run_result.stdout)
+
     def test_actual_host_ownership_and_draw_functions(self) -> None:
         source = HOST_SOURCE.read_text(encoding="utf-8")
         functions = [
@@ -580,8 +668,20 @@ typedef struct MeleeWebMenuHost MeleeWebMenuHost;""")
         prelude += r"""
 static void sss_sequence_fail(MeleeWebMenuHost* h,int prefix,const char* text)
 { (void)h;(void)prefix;(void)text;assert(0); }
+static int sss_capture_ok=1;
 static int sss_sequence_capture(MeleeWebMenuHost* h,int prefix,int phase,void* sample)
-{ (void)h;(void)prefix;(void)phase;(void)sample;assert(0);return 0; }
+{
+  (void)h;(void)prefix;(void)phase;
+  if(!sss_capture_ok){
+    MeleeWebMenuSssSequenceObservation* observation=prefix
+        ? &h->first_sss_prefix : &h->first_sss_draw;
+    (void)sample;
+    snprintf(observation->error,sizeof(observation->error),
+             "DRAW_ENTER fixture comparator failure");
+    return 0;
+  }
+  return 1;
+}
 """
         c_source = prelude + "\n".join(functions) + STUBS_AND_TESTS
         cc = shlex.split(os.environ.get("CC", "cc"))

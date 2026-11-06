@@ -11514,7 +11514,7 @@
           "next": "Ordinary-runtime private rollback integration using its existing match session and browser-local input/relay owner; first close the linked API and owner adapter gap. Sustained confirmed-anchor advancement, correction across refill, combat/KO breadth, full-match play and complete-profile admission remain open."
         },
         "retained_history_integration_v1": {
-          "status": "LOCAL_VALIDATION_PASS_PUBLICATION_PENDING",
+          "status": "MERGED_EXACT_HEAD_CI",
           "validation_source": "a0fec4bd2adb9c7d10b3a13b8ddd572f676833f5",
           "regression": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v2/result.json",
@@ -11548,7 +11548,7 @@
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-regression-repair-root-v1/focused-profile-result.json",
             "sha256": "c551ee9be81bc5d735248d2cc8314c84142849a7b1878d4eec77be5111176af6"
           },
-          "publication_head_ci": "Initial92d8044 run41107947034 unit-0 cancelled at existing15-minute cap; no assertion failure before cancellation. Current head pending after reviewed three-shard rebalance.",
+          "publication_head_ci": "Exact-head CI completed; premerge and merged receipts are pinned below.",
           "failed_full_regression": {
             "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-full-regression-v1/result.json",
             "sha256": "12fd24eb2c3f11a2e9f50f06d7851da61467797f176a92f08c8b0aa22532aa39"
@@ -11574,6 +11574,820 @@
               "sha256": "b4330086cd5bcd9f45554e5f9bf462c046f7e5bc10a99e14ce1ad22114ee3361"
             },
             "scope": "Same full test inventory, existing15-minute deadline and compiler-job settings; three slow complete modules gain their own unit shard."
+          },
+          "merge": {
+            "pull_request": 361,
+            "reviewed_head": "f654b6cd7016a353d536732da11587faf9ded3a5",
+            "merge_commit": "fb2b22043ba0362508df63fac9a1568ce3519a9a",
+            "reviewed_tree": "38f581f5748bb09c5b2c4bed77a6fbecf34c8b46",
+            "merged_tree": "38f581f5748bb09c5b2c4bed77a6fbecf34c8b46",
+            "trees_equal": true,
+            "premerge_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/premerge-f654.json",
+              "sha256": "f6e145cd32930cb3df2e152dc4fe3275759075f7448807c8369de203de3fa9c1"
+            },
+            "merged_receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/retained-history-integration-v1/merged-f654.json",
+              "sha256": "ae0ba1e77066b542fb7d2026ce487d93d7859b311ad8f16b7d7ae5c93b5f36bc"
+            }
+          }
+        },
+        "retained_page_peer_collision": {
+          "audit": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-history-page-peer-v1/collision-audit.json",
+            "sha256": "78bb160f5d1595b3188397bfc0b755c612efaf11a4942fbd3ee79c46d4f08025"
+          },
+          "overwritten_receipt_sha256": "c49eb124eb82e3436819a704ec246c5ce757b4c9675fb53b090f546bbe642702",
+          "recovery": "No byte-identical copy found; the exact prior receipt bytes cannot be restored and no reconstruction was attempted."
+        },
+        "runtime_match_start_v1": {
+          "issue": 362,
+          "status": "ONE_ACTUAL_ORDINARY_RUNTIME_PEER_CORRECTION_FUNCTIONAL_PASS",
+          "scope": "Private original-menu startup and live-match takeover, followed by one wrong-prediction correction using actual browser-owned sockets to the pinned local Worker. Native source input, restore, no-draw corrected tick and presentation are exercised. Not sustained rollback, Internet, full-match or acceptance evidence.",
+          "native_release_build": {
+            "source_head": "0f72ae25e73e21c875b89ff5167f205a0f23b3ec",
+            "result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-build-v1/result.json",
+              "sha256": "84987b38278bf64ec5fe13cacb78ee3d7e80a1103df306a072c5efe69d570f59"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/archive.json",
+              "sha256": "329e1b52891eb8800074efa43ce6f051d71c3725518d87f25e0cfb6dfbc637cd"
+            },
+            "artifacts": {
+              "source_state": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser_match_history.source-state.json",
+                "sha256": "9d65534a12f51bdf89450c1bbc6bfe657f428e8f28c461d545cf50cf5c2b308b"
+              },
+              "map": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser_match_history.map",
+                "sha256": "7e4042e0dece9ae5e9b0713ffdab8d099852e09f14bd495ce1fac7e4f0fc9472"
+              },
+              "wasm": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.wasm",
+                "sha256": "d0101cb822cd903695c63d043d5f2d0a7844669b8e7b709b5564baabd8efeffd"
+              },
+              "javascript": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.js",
+                "sha256": "13c0a26d397900728f438db3686b89bd6a2dca8a5302fb6108b41883738af776"
+              },
+              "data": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v1/gameplay_menu_browser.data",
+                "sha256": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              }
+            }
+          },
+          "native_source_controls": {
+            "focused_checkpoint": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/checkpoint.json",
+              "sha256": "754f6268a5d1bce8c91478b640027c1dd2e7e2a4b0e07d1760a2e5eb66e0988f"
+            },
+            "private_translation_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/private-tu.log",
+              "sha256": "ebb4e38073d5e6901ff226e14a8cdcbd34c81f19d475e7618f237fd763d58983"
+            },
+            "default_off_translation_unit_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/default-off-tu.log",
+              "sha256": "23ba51c18cdccd6bedeacf0f34b2b7c6cf2d7829a7e6f50908d7dc877d440ad0"
+            },
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-native-agreed-start-root-review-v1.json",
+              "sha256": "8c9bf6cb31ed12c89abdce544508138f40df227ce62edd1c1c8844c94eecede8"
+            },
+            "control_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v5/root-review.json",
+              "sha256": "a0ae1f9feeb425f852ee2f4ae2835760a35c9f6c498c8c4d42640fc25609ba5c"
+            }
+          },
+          "host_adapter_controls": {
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-start-host-v1/receipt.json",
+              "sha256": "d72b59bf64ab17dde7272d3132745694bcf78d40067fc9d408f2f706829e5ba8"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-start-host-review-v1.json",
+              "sha256": "cd1704fa71dc0e361b3fb0569bdb36de37ac8437603ee50a938d09eba72a4596"
+            }
+          },
+          "harness_review": {
+            "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-harness-review-v1.json",
+            "sha256": "bfe1dc78152bfe9b2f594d96741a45b949c7e8a3751b0f4f004862087f73b37a"
+          },
+          "css_readiness_defect": {
+            "status": "V5 harness comparison repaired to preserve source's nonzero readiness predicate",
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/browser/result.json",
+              "sha256": "752fc1266697c722838c15a5e89c7f839e383a80066016f0bc577d05f30e4b18"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/first-failure-summary.json",
+              "sha256": "5d297424d6301ee5e5f3553882bbd72737faced9c708cf0caad44f1fd28c1c24"
+            },
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v5/css-ready-source-review.json",
+              "sha256": "2fc6bf62d500cc143c6e8cd33faedc250c75f5c8d10bbdddd9945552cfbe5701"
+            }
+          },
+          "v6_initial_publication_failure": {
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/browser/result.json",
+              "sha256": "f99f03bb0d309f9283c45f33a06de19e2e87451bb6c10037efb264577e07c1b3"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/first-failure-summary.json",
+              "sha256": "d8de66c270ff310779244b0aca0d3dd9f451ab7d8fe1de072fb0307a1b152118"
+            },
+            "native_close_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v6/browser/native-log-after-cleanup.txt",
+              "sha256": "da8410c39ce62138374b49ce838c23b75b0861d442ffed3ee64ff0e3ff200805"
+            }
+          },
+          "v7_current_attempt": {
+            "native_and_harness_head": "08cffe8b77688c27463a8fdb459035f1ed7e60fb",
+            "attempt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser/result.json",
+              "sha256": "bc1ca768f5bb128e4c92cb5f8d128fce14d8f9caba27fbdce5e55f4546679978"
+            },
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/first-failure-summary.json",
+              "sha256": "c108937fb2902f92c6be16fa0ef4a7678951f3b6491020f20c6ff18797dbfb01"
+            },
+            "native_close_and_cache_log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser/native-log-after-cleanup.txt",
+              "sha256": "89f4e1598b0c400c1ac907fdd3b16c0e6217f2f9ad3f253ddef0418941137db4"
+            },
+            "owner_cleanup": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/owner.json",
+              "sha256": "31610fb70a707e08690a1e0782828fe72dc2fb6d84e81660d5193509849c4556"
+            },
+            "process_inventory": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v7/browser-processes.jsonl",
+              "sha256": "749f71cab15dbd8fd93ef187c1fec61935aba039757c75d82a5ce1ee82f039c6"
+            },
+            "current_observation": "V7 reaches original CSS/SSS and source-bound frame-zero construction. The initial publication fails on renderer quiescence descriptor schema/extent. Native close/cache flush and browser/server owner cleanup pass; no takeover or rollback command runs."
+          },
+          "followup": "V9-V11 first failures and the V12 startup/admission/cleanup pass remain pinned above. Same-input restore and paired held-static diagnostics are recorded below; the latter reached matching startup identity but retained static differences, so a bounded first-mismatch ownership review precedes any further comparison.",
+          "v8_attempt": {
+            "attempt": "v8",
+            "producer": "ac080bbeacec6746890875197a0c7aef3a43223a",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v8/first-failure-summary.json",
+              "sha256": "3be8a6738e1de6b4037dbb8b9e3609373b541852b42449d8ef23d7e4578269d7"
+            },
+            "browser": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v8/browser/result.json",
+              "sha256": "9171a4c529f7c557475cf09f558003aba71e45d999db63d7207bfbbc1354218e"
+            },
+            "build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-build-v3/result.json",
+              "sha256": "67b2e7c9bff1633735f4723cecdc3d4ad6de63c0df7a5c46b3dcc09e63b38560"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v3/archive.json",
+              "sha256": "64b871c3a3a15a94fc1cfac1765e168046822cac6d89e8160e1981d80c165ea2"
+            },
+            "review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v6/root-review.json",
+              "sha256": "35781413fa2aed44794fc27b6757b75f34c6df630afe438563d375a77b681fef"
+            },
+            "observed": "Source HPS startup loading refuses initial publication before cache flush is exercised. Native close/cache drain and all recorded owned process cleanup pass.",
+            "next": "Service the existing bounded constructor SSM/HPS resident transport before initial publication; full source, renderer and ownership checks remain required."
+          },
+          "v9_source_include_provenance": {
+            "artifact": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-source-include-provenance-v1.json",
+              "sha256": "d3a4bed13a15d9a3adcefb38b8001ca98d5bed8615c75f1078888c5521fc62e6"
+            },
+            "producer_identity": "runtime-agreed-start-build-v4 from source head 6917455263ac18d82f12f3605787e3329ae0883b plus the exact one-line gameplay_audio_stream.h include delta",
+            "source_note": "The pinned provenance reports that the included state header already includes gameplay_audio_stream.h and the direct include is redundant; it adds no arithmetic or capture finding."
+          },
+          "v10_presentation_clock_failure": {
+            "runtime_and_harness_head": "b0f8606cd0ae8afe74f8cd43d1c03056fc0dfe02",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v10/first-failure-summary.json",
+              "sha256": "1819761b531a519e51ce89c4ba5f0b0af6ae788cb4217cfd5e1a49b26b6b1ea7"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v10/browser/result.json",
+              "sha256": "3b31f592102ef65560fe771224931fd2b0e597af9a145bac8b44ce126f2382a9"
+            },
+            "first_failure": "Original match presentation clock lost ownership",
+            "scope": "Ordinary original-keyboard start admission only; no capture, network or rollback command."
+          },
+          "v11_raf_handle_failure": {
+            "runtime_and_harness_head": "47e690a613357c818819f59e45b532bcb5e5037e",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v11/first-failure-summary.json",
+              "sha256": "66aa3ed44b446e7f9c6d79d192ff949fcd03967325f466803417310e2897ff5a"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v11/browser/result.json",
+              "sha256": "364c5348011923160746f6d6edbdd298e3f8a30023d547dad4cadd20445fab59"
+            },
+            "observed": "The ordinary GO prefix contains 124 actual source tick/draw pairs, and held frame-zero takeover and identity checks pass. Terminal cleanup refuses because native code treats Emscripten\u2019s opaque animation-frame handle as EMSCRIPTEN_RESULT.",
+            "repair_control": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-raf-fix-v1/receipt.json",
+              "sha256": "41e3c34cc30dfb02755f8455c03be5f97a3e4ddedd39f7cb4313fa1aa3ee73a2"
+            }
+          },
+          "latest_attempt": {
+            "attempt": "v12",
+            "runtime_and_harness_head": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/result-summary.json",
+              "sha256": "5ba8056e2488237fd0eafd0abd476b67aa647c9896029925517a15040d46f1d0"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/browser/result.json",
+              "sha256": "84ccf0a194be93b08a057f5408d7a359a96067246cfc097e7f3fad4162539b51"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/owner.json",
+              "sha256": "13d0b69cc6eb407d71f0887995f40b31b4f222a3418616f95a06afd462f9d14a"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/archive.json",
+              "sha256": "0077c1a4feb9f3243e031ec02836f354d980979547bb632e62031dae45acb2e8"
+            },
+            "producer_artifacts": {
+              "source_state": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history.source-state.json",
+                "sha256": "4c5a5f2151517413120a3384c5ba1a7e80244305d3a0297d65ecd311d8eca035"
+              },
+              "linker_map": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history.map",
+                "sha256": "722f09495cbb7d5a6c7aa33f2f85b41302990543ef16718f6769907aaa7a091a"
+              },
+              "wasm": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.wasm",
+                "sha256": "d020efaf211ac6c01bccbd13c7aab6fa2947d2b1b9290f0bd6d32ac9d85b2d86"
+              },
+              "javascript": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.js",
+                "sha256": "baf7a22e28d00a4cb7dedbcff10c5ffa7c68b9a4f3f4dce78f8ddd6cfe1e6dab"
+              },
+              "data": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.data",
+                "sha256": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              },
+              "producer_manifest": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history_producers.tsv",
+                "sha256": "8d30bd71a9da5fa76db2c5976ae4e44379cfef872047301283cf683e5786e355"
+              }
+            },
+            "observed": "PASS. Actual ordinary Entry/Ready/Go source prefix reaches held gameplay frame zero with 124 source ticks and 124 source draws. Same-turn admission confirms source frame zero, no pending GPU work, and no first-failure/renderer error; native source/runtime quiescence guards admit takeover (the optional host Asyncify property is not exported and is recorded null); source-serialized identity binds runtime, disc, save and frame; terminal command retires match and renderer. Initial and final resident-transfer drain counts are 1 and 0. Capture-owner cleanup passes, including browser/server process absence.",
+            "source_fixes": "The clean producer archive pins the actual first-use, bounded constructor SSM/HPS transport and renderer-cache servicing, plus the RAF opaque-handle repair.",
+            "scope": "Startup, held takeover, source identity and terminal native/owner cleanup component evidence only. No history capture, input correction, replay, peer session or rollback command.",
+            "raf_handle_repair": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-raf-fix-v1/receipt.json",
+              "sha256": "41e3c34cc30dfb02755f8455c03be5f97a3e4ddedd39f7cb4313fa1aa3ee73a2"
+            },
+            "next": "The read-only ownership/peer-proof review is pinned under paired_held_statics_v2.source_ownership_review. It establishes a live pointer-value difference but not pointee contents. Its proposed next is one asymmetric peer proof using typed local restore and the existing semantic checksum; no peer capture has run and no menu-only exclusion is established."
+          },
+          "v9_audio_guard_correction": {
+            "source_checkpoint": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v8/checkpoint.json",
+              "sha256": "aaea3dbf58a335e06698cff32d6e3e559d6a4d79bca0f8d3d39e9641e4205548"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v8/root-review.json",
+              "sha256": "9cd7a944dbb12fab163b63caee66b4b5c9f522d789e729e8e1a477b6803943d7"
+            },
+            "finding": "Require active SSM only when it has pending work. Keep the exact match audio object and exact pending HPS owner mandatory; a mismatched or absent busy-bank owner still refuses."
+          },
+          "v9_initial_audio_guard_refusal": {
+            "artifact_provenance": "runtime-agreed-start-build-v4 from source head 6917455263ac18d82f12f3605787e3329ae0883b plus the redundant exact one-line include delta pinned in v9_source_include_provenance",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v9/first-failure-summary.json",
+              "sha256": "f5b9599fa11885ea338be43957642debfb1595e3a51bf7a13efd2173610cb954"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v9/browser/result.json",
+              "sha256": "148c3dbcebc2065a62c9ddbc9092967082c556fa4f34c2965c5456142085d9cd"
+            },
+            "first_failure": "Agreed initial audio transfer lost its exact audio owner",
+            "scope": "Ordinary original-keyboard start admission only; no capture, network or rollback command.",
+            "interpretation": "The first-failure text reports an exact-audio-owner refusal. Later source review found this guard was too strict: the match constructor may use a legitimate resident bank with its owned HPS stream while SSM is inactive and has no pending work.",
+            "runtime_base_head": "6917455263ac18d82f12f3605787e3329ae0883b",
+            "harness_head": "6917455263ac18d82f12f3605787e3329ae0883b"
+          },
+          "same_input_restore_v1": {
+            "result": "FAILED_BEFORE_FORWARD_ON_CROSS_PHASE_PRE_COMPARISON",
+            "native_producer": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "harness_producer": "59c9b7cabc8bbdae53876f81f0980a21de62ee1d",
+            "probe": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-restore-v1/browser/same-input-restore.json",
+              "sha256": "f8d0da21d91a277bdb56149336c0f9fcd5f583ff4d9581a0aff110245b537a54",
+              "bytes": 13779567
+            },
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-restore-v1/result-summary.json",
+              "sha256": "a63de5ad073e6fb96aaed9f93829177e81b0206730d540387e8a66e25cac5e54"
+            },
+            "first_failure": "CPU endpoint Effects.EffectToken[0].metadata[Token] differs (0 vs 1); the forward command did not run.",
+            "phase_pair": "capturePre versus armedPre",
+            "raw_phase_difference_reducer": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-restore-v1/capture-vs-armed-raw-differences.json",
+              "sha256": "0679069c8a308d3f8cf830fb8966e4e59970f23539213f2165da42a34e16095d",
+              "difference_count": 1,
+              "difference": "Effects.EffectToken[0] Token 0 versus 1",
+              "particle_equal": true,
+              "scope": "Read-only raw reducer; no normalization, pass or native mutation."
+            },
+            "phase_semantics": "Capture PRE is HistoryReady with token zero. begin allocates the history incarnation and token; armed PRE has token one. These are distinct lifecycle phases. V2 compares matching phases and retains both raw endpoints."
+          },
+          "same_input_restore_v2": {
+            "result": "PASS_ONE_SAME_INPUT_RESTORE_CONTROL",
+            "decision": "VERIFIED_BROWSER_EXERCISED_ONE_SAME_INPUT_RESTORE_CONTROL",
+            "native_producer": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "harness_producer": "c379ac1da375de6d965417093a84d57b7237af21",
+            "probe": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-control-v2/browser/same-input-restore.json",
+              "sha256": "1a6ece8bcf147cfb97d4cf8335d36776c207c2d95041d23f368afc4a6f899b80",
+              "bytes": 48141515
+            },
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-control-v2/result-summary.json",
+              "sha256": "f080eb97791a9c63fef68682d85b8652fdbe2768adb9a7cde8f456b9a0664f31"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-control-v2/browser/result.json",
+              "sha256": "750a73530f415a9b9bee1694b97ffc28e1b681680d501841dbdda47dea9b53e4"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-control-v2/owner.json",
+              "sha256": "f5b628945d437be61752699d68c230b9556d9022b604f802b3301d4906adc067"
+            },
+            "independent_result_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-same-input-control-v2/independent-result-review.json",
+              "sha256": "b794887985ea209cd6ae8d9c2fabd564ae4022effadfdf9227a8988a2a525dd8"
+            },
+            "comparisons": {
+              "restored_pre": {
+                "equal": true,
+                "source_frame": 0,
+                "strict_domains": 9,
+                "particle_cells_live_captured_incarnation_relations": [
+                  12,
+                  12,
+                  12
+                ]
+              },
+              "cpu": {
+                "equal": true,
+                "source_frame": 1,
+                "strict_domains": 9,
+                "particle_cells_live_captured_incarnation_relations": [
+                  12,
+                  12,
+                  12
+                ]
+              },
+              "draw": {
+                "equal": true,
+                "source_frame": 1,
+                "strict_domains": 9,
+                "particle_cells_live_captured_incarnation_relations": [
+                  12,
+                  12,
+                  12
+                ]
+              },
+              "pcm": {
+                "equal": true,
+                "bytes": 4272,
+                "semantics": "exact raw bytes",
+                "sha256": "89c3cc6a1752b0b59c10c456ef811278336046eba8ab63f7376b1a3e8177e93b"
+              },
+              "motor": {
+                "equal": true,
+                "event_count": 0,
+                "first_frame": 0,
+                "span": 1,
+                "published": false,
+                "mode": "capture-only",
+                "event_hash": "14695981039346656037"
+              }
+            },
+            "input": {
+              "action": "literal P1 KeyD/right keyboard input from caller-supplied callbacks",
+              "held_prefix_poll": "489",
+              "forward_and_replay_poll": "490",
+              "p1_raw_pad_hex": "00007f0000000000000000",
+              "remote_p2_source": "last literal P2 sample from the actual held prefix",
+              "raw_p2_matched_forward_and_corrected": true,
+              "correction_used_new_poll": false
+            },
+            "native_present_sequence": [
+              {
+                "after": "forward draw",
+                "commands": [
+                  "present",
+                  "idle"
+                ],
+                "completed": true
+              },
+              {
+                "after": "corrected draw",
+                "commands": [
+                  "present",
+                  "idle"
+                ],
+                "completed": true
+              }
+            ],
+            "motor_commit_receipt": {
+              "schema": 1,
+              "bytes": 64,
+              "status": 1,
+              "selected_lane": 3,
+              "published": 0,
+              "event_count": 0,
+              "first_frame": 0,
+              "span": 1,
+              "token": "1",
+              "world": "3",
+              "context_epoch": "1",
+              "event_hash": "14695981039346656037"
+            },
+            "cleanup": {
+              "owner_cleanup_passed": true,
+              "native_owner": "retired",
+              "browser_context_and_browser": "closed",
+              "server_and_capture_groups_absent": true,
+              "attributed_processes_absent": 9
+            },
+            "unobserved": [
+              "legacy 1280-byte observation lane",
+              "legacy 32-byte RNG profile lane",
+              "legacy 40-byte transfer lane",
+              "runtime draw-diagnostics lane"
+            ],
+            "limits": [
+              "One same-instance same-input restore control only.",
+              "Not a wrong-prediction, browser-relay, peer-session, full-match, or accepted rollback result.",
+              "No missing legacy lane was synthesized.",
+              "Source integration remains unmerged."
+            ]
+          },
+          "paired_held_statics_v1": {
+            "result": "FAILED_BEFORE_STATIC_COMPARISON_ON_LOADED_IDENTITY",
+            "native_producer": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "harness_producer": "6a7b46f7acfe38083f14ee046cc3feed7da561d8",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v1/result-summary.json",
+              "sha256": "7cf2d118239632a437b3c777dd8532dd7ffc6bacc7b6008c6f52ba455cf5ac59"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v1/browser/result.json",
+              "sha256": "1cda187a388a27d8758e8603f7041b16de622fef08f892bd74f1655d6b0d61d3"
+            },
+            "loaded_identity_mismatch": {
+              "field": "save_profile_sha256",
+              "alpha": "6d43a2dba007686acb888f617d75863660b4352925541db769ba6106aab4de5c",
+              "beta": "ea6af0301884cbad6535b870a9770c47ea5c52d54bf47a0eafeeec4282297fd0",
+              "card_bytes": 61892,
+              "other_reported_runtime_asset_and_profile_identity_fields_equal": true
+            },
+            "source_only_diagnosis": "Timestamp variation is a possible explanation for the hash mismatch. The raw V1 card bytes were not retained, so no byte/offset difference or cause is proven.",
+            "owner_cleanup_passed": true,
+            "source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-save-identity-review-v1.json",
+              "sha256": "02eed882f9014390be9f806924249467911be8dc83eef17bd64d6c2937096ef4",
+              "scope": "Read-only source diagnosis; no build, browser, test or capture rerun.",
+              "likely_cause": "gm_8017297C writes lbTime_GetTimeInSeconds() into the 0x42 first-run achievement timestamp words, encoded at card-relative offset 0x318; no evidence points to RNG.",
+              "raw_byte_limit": "V1 retained whole-card hashes, not raw card bytes; no exact differing offset is proven."
+            }
+          },
+          "paired_held_statics_v2": {
+            "result": "BASELINE_DIAGNOSTIC_COMPLETE_STATIC_ROWS_DIFFER",
+            "native_producer": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "harness_producer": "39d67d46e444229a9f1c8df9699a265575599ccf",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/result-summary.json",
+              "sha256": "0003874cb464571dbffd0768c426926a0ebe96538e5690b4f15517b6e6380dfe"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/browser/result.json",
+              "sha256": "b3d374b976f2186f7f2de4f8bdd4805b1220d57548ed2b87d7869ca832d92a18"
+            },
+            "shared_source_card": {
+              "bytes": 61892,
+              "sha256": "41da6be01673c09aa23910874e0bb8a4d4eea912c7f650feca2243e9ea7a3d8b",
+              "alpha_raw_card": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/browser/alpha-source-card.bin",
+                "sha256": "41da6be01673c09aa23910874e0bb8a4d4eea912c7f650feca2243e9ea7a3d8b",
+                "bytes": 61892
+              },
+              "beta_raw_card": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/browser/beta-source-card.bin",
+                "sha256": "41da6be01673c09aa23910874e0bb8a4d4eea912c7f650feca2243e9ea7a3d8b",
+                "bytes": 61892
+              },
+              "source_hashes_equal": true
+            },
+            "startup_prefix_comparison": {
+              "equal": true,
+              "alpha_source_ticks_draws_final_ready_tick": [
+                124,
+                124,
+                124
+              ],
+              "beta_source_ticks_draws_final_ready_tick": [
+                124,
+                124,
+                124
+              ],
+              "live_identity_equal": true,
+              "intentionally_page_local": [
+                "rows[].poll_serial",
+                "rows[].draw_submission"
+              ],
+              "raw_rows_retained_in_browser_result": true,
+              "actual_pad_hex_equal": true
+            },
+            "static_comparison": {
+              "equal": false,
+              "rows_compared": 3797,
+              "rows_with_differences": 188,
+              "different_bytes": 7029,
+              "raw_mismatches_retained_in_browser_result": true,
+              "alpha_raw_static_rows": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/browser/alpha-static-rows.json",
+                "sha256": "a7d8135199e30b65c59aca39bb76a174cfb997906ad185ae4f3f972d5df42e74",
+                "rows": 3797,
+                "row_payload_bytes": 682277,
+                "json_file_bytes": 2832669
+              },
+              "beta_raw_static_rows": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/browser/beta-static-rows.json",
+                "sha256": "83d6df6b2f75e9eba120cfe8ea2dce963b6a76aadf4e58f5b0b3806942aa85ac",
+                "rows": 3797,
+                "row_payload_bytes": 682277,
+                "json_file_bytes": 2832668
+              },
+              "first_mismatch": {
+                "wire_index": 74,
+                "source": "src/melee/ef/efasync.c",
+                "input_section": ".data.efAsync_DatEntries",
+                "first_byte_offset": 8,
+                "different_byte_count": 8,
+                "alpha_byte": 80,
+                "beta_byte": 56
+              }
+            },
+            "commands": {
+              "capture_called": false,
+              "begin_called": false,
+              "forward_called": false
+            },
+            "cleanup": {
+              "owner_cleanup_passed": true,
+              "attributed_processes_absent": 20,
+              "server_and_capture_groups_absent": true
+            },
+            "limits": [
+              "Held-frame-zero paired static diagnostic only; no rollback or full-match claim.",
+              "The static comparison is unequal; no pass is claimed.",
+              "The source review identifies pointer-value divergence but does not compare pointee contents or establish a broad menu-only exclusion.",
+              "At this earlier boundary the asymmetric peer proof was proposed only; subsequent peer-correction V2 is recorded separately below."
+            ],
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/owner.json",
+              "sha256": "b87695fe836c440d46aa31d4c9313232f9e41f13fd5c42f374e07474843e3968"
+            },
+            "source_ownership_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-proof-architecture-v1.json",
+              "sha256": "4e9c0a0d5d0a34d4056c2654b753a3a7c6f72f6479ac1b5dab84c891d9fb1204",
+              "decision": "REUSE_TYPED_LOCAL_RESTORE_AND_EXISTING_SEMANTIC_CHECKSUM_FOR_ONE_PEER_CONTROL",
+              "first_difference_field": "EF_DAT_Entry[0].data (Wasm32 pointer at struct offset 0x8)",
+              "alpha_pointer": "0x010bb750",
+              "beta_pointer": "0x034f2938",
+              "finding": "Address divergence is established; pointee contents are not compared.",
+              "proposed_scope": "One asymmetric peer proof using actual authoritative inputs, one local restore, existing semantic checksum and strict local endpoints; no preroll source frame.",
+              "runtime_peer_capture_completed": false
+            }
+          },
+          "peer_correction_v1": {
+            "result": "FAILED_BEFORE_HISTORY_OR_RELAY_ON_HARNESS_BRIDGE_INSTALL_ORDER",
+            "native_producer": "17c48b102faec1aeb999bd87d2ca3af86562cc6e",
+            "harness_producer": "f6e34d7a",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v1/result-summary.json",
+              "sha256": "4b3a0beb1e0bb05a007c85163f7919cb515f26b54fd44c9eef23ea134eda1ca5"
+            },
+            "fix": "Move initial peer status reads after page bridge installation. No native or comparator change.",
+            "cleanup_passed": true
+          },
+          "peer_correction_v2": {
+            "result": "BROWSER_EXERCISED_ONE_WRONG_PREDICTION_CORRECTED_AGAINST_ON_TIME_PEER",
+            "native_producer": "17c48b102faec1aeb999bd87d2ca3af86562cc6e",
+            "harness_producer": "76b2dff311badb30affd08d03afcadcd34397028",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/result-summary.json",
+              "sha256": "9b2bd216707881463eb0cc39361abd724d29896cf8f4e677971f007209fb9dbe"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/browser/result.json",
+              "sha256": "99ff3af3856ae0f57f9165794a5a16a57e33b65c1135ffa0059bea6f9ae205a7"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/owner.json",
+              "sha256": "1807a0dace1f4526ed4c381e5caf853a4145e07168d00145ee28bdf61b9f94a0"
+            },
+            "independent_result_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/independent-result-review.json",
+              "sha256": "86e15aa9b296ef11aac5b74c5854bf808f60b0b3306f92148f8d33a51194b8ca"
+            },
+            "native_build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-build-v1/result.json",
+              "sha256": "ab591aa5d36e8eb61a9ea3f743468b2ed8a6745ca1d024808b18b382bffc9a6b"
+            },
+            "native_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-producer-v1/archive.json",
+              "sha256": "df536191ec6e22fc3821fe7ec5e19fa1c69fe53b330e744366acbfc77b71520c"
+            },
+            "linked_catalog": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-catalog-v1/final-linked-configuration-v1.json",
+              "sha256": "f516a23806ec4eecd7bf3bfc19d87fc832e53c4760e12c448c9e8c88c09d800a"
+            },
+            "harness_repair": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-harness-repair-v1/freeze.json",
+              "sha256": "18e6bffc4e465114ccd97359c9402f662582fafcc301d91eda5073455109be20"
+            },
+            "first_capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-root-review-v1.json",
+              "sha256": "624e00cbe867f6cf238ee74bdd502d309c63f4ea9cc0a34f96cf1057e41769e5"
+            },
+            "second_capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-root-review-v2.json",
+              "sha256": "5ae9f56eb002a787dbc54e5f7068130c81fe2c1e1bf2b8c0327b9d886ce3696d"
+            },
+            "input": {
+              "alpha": "actual P1 KeyD at poll 490",
+              "beta": "actual P2 ArrowLeft at poll 441",
+              "prediction": "last actual held-prefix P2 sample",
+              "correction": "received beta contribution; original alpha local poll retained, no repoll",
+              "authoritative_pad_bytes_equal": 44
+            },
+            "comparisons": {
+              "local_armed_restored_pre": {
+                "strict_domains": 9,
+                "particle_live_captured_incarnation_relations": [
+                  12,
+                  12,
+                  12
+                ],
+                "equal": true
+              },
+              "prediction_changes_scene_state": true,
+              "predicted_scene_state": "4ab89f73db1f779f",
+              "on_time_scene_state": "9312981f00f2debe",
+              "corrected_vs_on_time_native_checksum_bytes": 64,
+              "corrected_vs_on_time_native_checksum_equal": true
+            },
+            "transport": "Real browser-owned WebSockets through the existing pinned local RoomRelay Worker. Two protocol-only neutral pre-roll rows and one input row; no pre-roll source ticks. Checksums copied and compared by harness, not exchanged over this diagnostic peer protocol.",
+            "cleanup": {
+              "both_native_owner_state": 2,
+              "both_native_last_command": 10,
+              "browser_pids_absent": 17,
+              "relay_server_capture_pids_absent": 3,
+              "sockets_drained_and_closed": true,
+              "owned_relay_disposable_scratch_removed": true
+            },
+            "limits": [
+              "Exactly one input tick and one correction; no sustained history, full match, combat breadth or playable rollback claim.",
+              "Local relay transport only; no Internet or two-machine result.",
+              "Peer comparison is the unchanged finite native gameplay-checksum projection, not all memory. Full strict endpoint comparison applies locally to restore.",
+              "Alpha PRE audio phase 20 and beta 40; no cross-peer PCM/audio equality claimed.",
+              "Legacy observation, RNG-profile, transfer and runtime draw-diagnostic lanes remain unobserved.",
+              "Integration validation is tracked by issue #362; native capture and later source-integration identities remain separate."
+            ]
+          },
+          "integration_regression_v1": {
+            "result": "FAILED",
+            "source_head": "76b2dff311badb30affd08d03afcadcd34397028",
+            "tests": 3073,
+            "failures": 7,
+            "errors": 3,
+            "skips": 247,
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v1/result.json",
+              "sha256": "00ae47bea06a92d6e1397ecd92f6f17dc0a8dc74fce8554ce3d7419de79ca47b"
+            },
+            "log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v1/regression.log",
+              "sha256": "1b163e7e6d671566af163c9fd1b06b8288f288b7a6278135df899ac7431c88fa"
+            },
+            "scope": "Retained integration failure: stale source/extraction expectations and missing local default build/explicit TObj graph. Repair and rerun required; no passing full-suite claim."
+          },
+          "integration_repairs_v2": {
+            "source_head": "4597f008936203d4e70cb041862f8364012c96e4",
+            "validation": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-validation-v2/result.json",
+              "sha256": "fa0a3fff205aa35ce6147e068fccd3fa1b9274095d40fc20cd658e9625c5d4db"
+            },
+            "ordinary_release": "PASS",
+            "private_release": "PASS",
+            "full_local_regression": {
+              "tests": 3096,
+              "failures": 3,
+              "errors": 0,
+              "skips": 242,
+              "scope": "Only three shared profile-fixture failures remained. Their modeled draw leaves require profile enabled, but the fixture had not explicitly enabled it after production hooks became opt-in. Failed artifacts retained."
+            },
+            "remote_admission_repair": {
+              "freeze": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/freeze.json",
+                "sha256": "f38fcbb30b4a5891ab02539c2c4dabf9fb57371ed80f87321986ef77bb84108d"
+              },
+              "causal_control": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/result.json",
+                "sha256": "56e43fc98b1c1565887316df914e8d9f0ed5a05cbda0bf97b53989b476dc056c"
+              },
+              "root_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/root-review.json",
+                "sha256": "2912f9a6c9379e865d2dd8a6834bfe317fee855e00fcb41f29228c9f53015180"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-root-repair-review-v2.json",
+                "sha256": "d7fc8e616754b2ce68d87afbf51dffcca101cb7fe9767cb6b138536fcf6bbe0c"
+              },
+              "scope": "New remote PAD is staged outside pump/input-ACK maps and packet ACK sequence advances only after successful observer admission. Original control fails; repaired accepted/refused controls pass."
+            },
+            "profile_fixture_repair": {
+              "review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-particle-profile-fixture-review-v1/review.json",
+                "sha256": "09da99c819e24857dce529abf22825b57c81ed777dd871ef50a8fdff53d42583"
+              },
+              "focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-profile-fixture-focused-v1/result.json",
+                "sha256": "0384b3b693229d3d4ffdb34a5cc68073736726715676539705f807a74f58726f"
+              },
+              "scope": "Explicitly enable the particle profile in the shared modeled draw fixture; assertions and default-off header test retained. All affected CSS/SSS fixture modules pass. No production source change."
+            },
+            "setup_and_source_fixture_repairs": {
+              "setup_v1": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-setup-repair-v1/result.json",
+                "sha256": "859c4937c4f83e686a3f5476ec517d2a7eb5001d71b9397b290e73dd4c1aee10"
+              },
+              "setup_v2": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-setup-repair-v2/result.json",
+                "sha256": "fe8759ddf617ba81266d204ff1ed192d1a8a9a77cbcc8c02195f78ad382920a0"
+              },
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-fixture-root-review-v1.json",
+                "sha256": "9754bdc363b9f5a9a94b104c93a5cdedeff6c511588d10751f0cac5b3196edc0"
+              },
+              "focused_v1": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-integration-focused-v1/result.json",
+                "sha256": "a81676937686d67e816527a5c8042369edcd60e42b17c67cf90f264f4b870d47"
+              },
+              "focused_v2": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-integration-focused-v2/result.json",
+                "sha256": "d57f74a9a8803b989958ae8017ff78ddc729f7ee15ef721b50662b0364715dfe"
+              }
+            },
+            "integration_gate": "Complete final full regression and exact-head CI before merging; tracking issue #362 owns integration state."
+          },
+          "integration_validation_v3": {
+            "source_head": "b4025d3b2228898adba33c699fc3166319036d55",
+            "result": "PASS_FULL_LOCAL_REGRESSION",
+            "tests": 3096,
+            "skips": 242,
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v3/result.json",
+              "sha256": "55936a6211150bc8dec6de06ace3198234e643c200b4e3688d323c0ad8ccb333"
+            },
+            "log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v3/regression.log",
+              "sha256": "22c8cfc34d178035aed83d18f644683f47235a113d5ad39495262a1b2d42773f"
+            },
+            "independent_source_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-final-preci-review-v1.json",
+              "sha256": "2f774e4834e545600d1c7a2d3202ebbd8ae9966ec13071cf4a8f1d021d373e31"
+            },
+            "ci_first_attempt": {
+              "run": 42169861811,
+              "failed_job": 127734958510,
+              "log": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-failure-v1/unit0-complete.log",
+                "sha256": "e816a78327af053e58bf7628f9f678920a59fb7c13dc86912367df9669876c10"
+              },
+              "failure": "Historical TObj component lacked its canonical v7 compile graph in a clean unit shard. All six native shards passed; no product runtime failure is claimed."
+            },
+            "ci_setup_repair": {
+              "freeze": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-v7-setup-repair-v1/freeze.json",
+                "sha256": "4a49767c3695828284f1702c0b3825ab4a88ab84154ef5cd57cd7764cf9c77e1"
+              },
+              "review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime363-ci-v7-setup-repair-v1/root-review.json",
+                "sha256": "e84ea6f11797a7d665e21bd5a67734c55ad08208136c695ef23ceb9cf720aabe"
+              },
+              "scope": "Configure-only canonical v7 source graph before its owning unit shard, using an explicitly empty assets directory; no asset-bearing build, inventory/test assertion removal or deadline increase. Fifteen focused CI controls and unchanged actual TObj component pass."
+            },
+            "integration": "PR #363; complete all exact-head checks before merge."
           }
         }
       }

@@ -32,8 +32,14 @@ class SlippiSynctestBuildContractTests(unittest.TestCase):
     def test_profile_wiring_is_explicitly_opt_in_and_separate(self):
         cmake = (ROOT / "CMakeLists.txt").read_text()
         fighter_cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text()
-        self.assertIn('option(MELEE_WEB_SLIPPI_SYNCTEST', cmake)
-        self.assertIn('if(MELEE_WEB_SLIPPI_SYNCTEST)', cmake)
+        for option in ('MELEE_WEB_SLIPPI_SYNCTEST', 'MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC'):
+            self.assertRegex(cmake, rf'option\({option}\s+"[^"]+" OFF\)')
+        self.assertIn(
+            'set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED OFF)\n'
+            'if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)\n'
+            '  set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED ON)\n'
+            'endif()', cmake)
+        self.assertIn('if(MELEE_WEB_SLIPPI_SYNCTEST)', fighter_cmake)
         self.assertIn('add_custom_target(gameplay_slippi_synctest DEPENDS', fighter_cmake)
         self.assertIn('MELEE_WEB_SLIPPI_PROFILE=1', cmake)
         self.assertIn('gameplay-source-slippi-profile',

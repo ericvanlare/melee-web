@@ -62,7 +62,7 @@ target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPL
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
   MELEE_WEB_MENU_MARIO_FD)
-if(MELEE_WEB_SLIPPI_SYNCTEST)
+if(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED)
   target_sources(fighter_source_runtime PRIVATE
     src/slippi_profile/deadupfall_fix.c
     src/slippi_profile/draw_diagnostics.c
@@ -887,7 +887,7 @@ target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora
 target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
 set(gameplay_menu_browser_runtime_methods "FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString")
-if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+if(MELEE_WEB_MATCH_DRAW_DISCARD_DIAGNOSTIC OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC OR MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
   string(PREPEND gameplay_menu_browser_runtime_methods "ccall,")
 endif()
 set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_file_transfer,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_source_file_external_set,_melee_web_native_source_files_external_clear,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_set_save_profile,_melee_web_native_menu_snapshot_save_profile,_melee_web_native_menu_snapshot_unlocked_baseline,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_results_pad_schedule,_melee_web_native_menu_results_pause_schedule,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_native_menu_results_entry_packet,_melee_web_native_menu_results_pad_trace,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_native_menu_source_observe,_melee_web_css_observe_port,_melee_web_native_menu_net_begin,_melee_web_native_menu_net_begin_lockstep,_melee_web_net_push,_melee_web_net_push_indexed,_melee_web_net_enable_local_input_capture,_melee_web_net_confirm_start,_melee_web_net_terminate,_melee_web_net_cursor,_melee_web_net_pushed,_melee_web_net_checksum_drain,_melee_web_net_status,_melee_web_net_arena_fill")
@@ -912,6 +912,16 @@ if(MELEE_WEB_PIPELINE_PROVENANCE)
   string(APPEND gameplay_menu_browser_exports
     ",_melee_web_provenance_set_case,_melee_web_provenance_drain,_melee_web_provenance_finish,_melee_web_provenance_status")
 endif()
+if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  target_sources(gameplay_menu_browser PRIVATE src/slippi_profile/runtime_match_history.cpp)
+  target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC=1)
+  string(APPEND gameplay_menu_browser_exports
+    ",_melee_web_sss_observe_input_gate,_melee_web_native_menu_match_history_start_enable,_melee_web_native_menu_match_history_start_state,_melee_web_native_menu_match_history_start_offer_json,_melee_web_native_menu_match_history_start_agreement_json,_melee_web_native_menu_match_history_start_commit,_melee_web_native_menu_match_history_start_live_identity_json,_melee_web_native_menu_match_history_start_prefix_json,_melee_web_native_menu_match_history_start_publication_data,_melee_web_native_menu_match_history_start_publication_bytes,_melee_web_native_menu_match_history_take_over,_melee_web_native_menu_match_history_configure,_melee_web_native_menu_match_history_remote_pad,_melee_web_native_menu_match_history_request,_melee_web_native_menu_match_history_status,_melee_web_native_menu_match_history_status_bytes,_melee_web_native_menu_match_history_input,_melee_web_native_menu_match_history_input_bytes,_melee_web_native_menu_match_history_error,_melee_web_native_menu_match_history_identity_json,_melee_web_native_menu_match_history_cpu_endpoint_begin,_melee_web_native_menu_match_history_cpu_endpoint_record,_melee_web_native_menu_match_history_cpu_endpoint_data,_melee_web_native_menu_match_history_cpu_endpoint_bytes,_melee_web_native_menu_match_history_cpu_endpoint_end,_melee_web_native_menu_match_history_cpu_particle_endpoint_header,_melee_web_native_menu_match_history_cpu_particle_endpoint_header_data,_melee_web_native_menu_match_history_cpu_particle_endpoint_header_bytes,_melee_web_native_menu_match_history_cpu_particle_endpoint_row,_melee_web_native_menu_match_history_cpu_particle_endpoint_row_data,_melee_web_native_menu_match_history_cpu_particle_endpoint_row_bytes,_melee_web_native_menu_match_history_motor_data,_melee_web_native_menu_match_history_motor_bytes,_melee_web_native_menu_match_history_motor_commit_data,_melee_web_native_menu_match_history_motor_commit_bytes,_melee_web_native_menu_match_history_pcm_data,_melee_web_native_menu_match_history_pcm_bytes,_melee_web_native_menu_match_history_checksum_data,_melee_web_native_menu_match_history_checksum_bytes")
+  set(_match_history_link_map
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history.map")
+  target_link_options(gameplay_menu_browser PRIVATE
+    "-Wl,--Map=${_match_history_link_map}")
+endif()
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
@@ -925,6 +935,59 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
 else()
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
+endif()
+if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(_history_source_producer_targets
+    gameplay_runtime hsd_native_runtime fighter_source_runtime)
+  set(_history_source_producers
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history_producers.tsv")
+  string(ASCII 9 _history_source_tab)
+  file(WRITE "${_history_source_producers}" "")
+  foreach(_history_source_target IN LISTS _history_source_producer_targets)
+    get_target_property(_history_source_paths "${_history_source_target}" SOURCES)
+    if(NOT _history_source_paths)
+      message(FATAL_ERROR
+        "Match-history source producer target has no sources: ${_history_source_target}")
+    endif()
+    foreach(_history_source IN LISTS _history_source_paths)
+      if(_history_source MATCHES "\\$<")
+        message(FATAL_ERROR
+          "Match-history source producer has a generated-expression source: ${_history_source_target}:${_history_source}")
+      endif()
+      if(IS_ABSOLUTE "${_history_source}")
+        set(_history_source_absolute "${_history_source}")
+      else()
+        get_filename_component(_history_source_absolute "${_history_source}" ABSOLUTE
+          BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+      endif()
+      if(_history_source_absolute MATCHES "[\t\n]")
+        message(FATAL_ERROR
+          "Match-history source path cannot be represented: ${_history_source_absolute}")
+      endif()
+      file(APPEND "${_history_source_producers}"
+        "${_history_source_target}${_history_source_tab}${_history_source_absolute}\n")
+    endforeach()
+  endforeach()
+  set(_match_history_manifest
+    "${CMAKE_CURRENT_BINARY_DIR}/gameplay_menu_browser_match_history.source-state.json")
+  add_custom_target(gameplay_menu_browser_match_history_source_manifest
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      --target gameplay_menu_browser
+      --link-map "${_match_history_link_map}"
+      --wasm "$<TARGET_FILE_DIR:gameplay_menu_browser>/gameplay_menu_browser.wasm"
+      --compile-commands "${CMAKE_BINARY_DIR}/compile_commands.json"
+      --producer-sources "${_history_source_producers}"
+      --source-root "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/.."
+      --repository-root "${CMAKE_CURRENT_SOURCE_DIR}"
+      --cmake-cache "${CMAKE_BINARY_DIR}/CMakeCache.txt"
+      --build-graph "${CMAKE_BINARY_DIR}/build.ninja"
+      --emscripten-version-file "${CMAKE_CURRENT_SOURCE_DIR}/.deps/emsdk/upstream/emscripten/emscripten-version.txt"
+      --build-type "${CMAKE_BUILD_TYPE}"
+      --output "${_match_history_manifest}"
+    DEPENDS gameplay_menu_browser "${CMAKE_CURRENT_SOURCE_DIR}/scripts/source_state_manifest.py"
+      "${_history_source_producers}"
+    VERBATIM)
 endif()
 configure_file(web/native-menu.html native-menu.html @ONLY)
 

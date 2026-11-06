@@ -1840,25 +1840,154 @@ nested Git patch-isolation defect and strict unused-parameter warnings. The
 repair preserves every existing assertion; all six failed controls pass. The
 first focused launcher missed the repository import path, and that failed
 invocation is retained separately from the corrected two-control pass. The
-browser producer stays `fc26c423`; integration source `a0fec4bd` changes fixtures
-and explicit unused-parameter casts. Its rebuilt Wasm differs (including the
-SDL revision string); it is not represented as the captured binary.
-Final-present raw lanes are independently replayable; the saved command68 GPU
-return object is null, so its original online validation cannot be replayed
-from that field. The full regression passes 3,082 tests with 238 skips, and
-both Release builds pass at `a0fec4bd`. Initial publication CI exhausted the
-existing 15-minute unit-0 budget while assertions were passing. A reviewed
-three-shard rebalance preserves the full test inventory, compiler settings and
-deadline; its focused controls pass. New-head CI and merge remain pending in
-`retained_history_integration_v1`.
+browser producer remains `fc26c423`; integration source `a0fec4bd` changes fixtures
+and explicit unused-parameter casts. Its rebuilt Wasm differs and is not
+represented as the captured binary. Final-present raw lanes are independently
+replayable; the saved command68 GPU return object is null, so its original
+online validation cannot be replayed from that field. The full regression
+passes 3,082 tests with 238 skips, and both Release builds pass at `a0fec4bd`.
+
+PR #361 merged as fb2b22043ba0362508df63fac9a1568ce3519a9a from exact reviewed
+head f654b6cd7016a353d536732da11587faf9ded3a5. The reviewed and merged trees
+are both 38f581f5748bb09c5b2c4bed77a6fbecf34c8b46; all 15 exact-head CI checks
+completed with 13 successes and two expected skips (run 41112558293). The
+premerge and merge receipts are pinned in `retained_history_integration_v1`.
+The earlier page-peer collision audit records an overwritten receipt with SHA-256
+c49eb124eb82e3436819a704ec246c5ce757b4c9675fb53b090f546bbe642702. No
+byte-identical recovery was found, so its prior bytes were not reconstructed.
 
 This remains a four-tick component with Node-held local Worker sockets and
-authored PAD input. The next step is the ordinary runtime's existing match
-session, browser-local input and relay owner; the private diagnostic target does
-not link the ordinary input API. Sustained rolling history, correction across
-refill, combat/KO breadth, combined frame budget, full-match play and public
-profile admission remain open.
+authored PAD input. Sustained rolling history, correction across refill,
+combat/KO breadth, combined frame budget, full-match play and public profile
+admission remain open.
 
+### Ordinary-runtime agreed match start, issue #362
+
+A private ordinary-runtime keyboard route now reaches original CSS and SSS,
+passes the native source-offer, negotiated-seed agreement and exact commit, and
+constructs the selected original match at source frame zero. V5 is retained as
+a harness readiness defect: source CSS readiness was 74, but the harness
+required exactly 1. Read-only review repaired the comparison to nonzero while
+retaining the raw value. V6 passed CSS/SSS, agreement/commit and frame-zero
+construction, then refused the initial source publication before a draw.
+V7 narrows the first refusal to the renderer quiescence descriptor schema or
+extent; no takeover, terminal capture, rollback command or match tick ran.
+V7 also records successful native close/cache flush and owner cleanup, with
+browser and server process cleanup verified. A source review attributes the
+descriptor refusal to pending pipeline-cache writes during the ordinary source
+hold. The private stopped-boundary flush repair passes focused controls and
+a Release build. V8 (`ac080bbe`) reaches an earlier strict source boundary:
+the original HPS stream is still loading, so initial publication refuses before
+the new flush runs. Native close/cache drain and owned-process cleanup pass.
+
+V9 refuses frame-zero publication with “Agreed initial audio transfer lost its
+exact audio owner.” Follow-up source review shows that message was a false guard:
+the constructor may use a resident bank with its owned HPS stream while SSM has
+no pending work. The repair requires active SSM only for pending work, while
+retaining exact match-audio and pending-HPS ownership checks. The V9 binary was
+built by `runtime-agreed-start-build-v4` from source head `69174552` plus the
+separately pinned, redundant one-line `gameplay_audio_stream.h` include delta;
+the artifact identity includes that delta, and provenance review finds no new
+arithmetic or capture result. V10 next refuses because the original match
+presentation clock loses ownership. V11 reaches the actual ordinary
+Entry/Ready/Go boundary with 124 source tick/draw pairs, remains at gameplay
+frame zero, and passes held
+takeover and identity checks, then refuses terminal cleanup because the native
+request path treats Emscripten's opaque animation-frame handle as a result code.
+
+V12 (`33cdb16a`) passes the ordinary source GO prefix, held frame-zero takeover,
+source-serialized identity and terminal cleanup. The prefix records 124 actual
+source ticks and draws; no fixed GO tick count is assumed. Native cleanup retires
+the match and renderer owners, and the capture owner verifies browser, server
+and process cleanup. Its producer archive pins the ordinary first-use, SSM/HPS
+transfer and renderer-cache servicing changes together with the animation-frame
+handle repair. This is a scoped startup/admission/cleanup component pass only:
+no history capture, input correction, replay, peer session or rollback command
+ran. The V9–V12 receipts and producer identities are pinned in
+`runtime_match_start_v1`.
+
+Same-instance restore V1 failed before its forward command because its harness
+compared capture PRE against armed PRE. A raw reducer retained exactly one
+cross-phase difference: `Effects.EffectToken[0]` changes from 0 to 1 when
+`begin` allocates the armed incarnation. The V2 probe compares endpoints within
+their matching phases and passes one same-input restore control. It retains
+strict equal PRE, CPU and DRAW endpoints across nine domains and 12 particles,
+plus exact 4,272-byte PCM equality. One literal P1 KeyD poll at serial 490 was
+reused after restore; P2 came from the held prefix. The original present/idle
+commands remain around both source draw boundaries, the motor commit receipt
+completed with zero events, and native/browser-owner cleanup passed. Native
+producer `33cdb16a8593d7ec1499da13dcb825d26b955b02`, harness producer
+`c379ac1da375de6d965417093a84d57b7237af21`, probe SHA-256
+`1a6ece8bcf147cfb97d4cf8335d36776c207c2d95041d23f368afc4a6f899b80`, and
+independent review are pinned in `runtime_match_start_v1`. This is one
+same-input control, not a wrong-prediction, browser-relay or full-match result;
+the legacy observation, RNG-profile, transfer and draw-diagnostics lanes remain
+unobserved.
+
+The separate paired held-static V1 stopped at loaded identity because its two
+source card hashes differed. Source-only inspection suggests timestamp
+variation may explain the mismatch, but the V1 card bytes were not retained, so
+no offset-level difference is proven. Read-only source review traces the likely
+cause to first-run timestamp writes from `lbTime_GetTimeInSeconds()` into the
+card-relative table at `0x318`; it finds no evidence of an RNG cause. Paired
+held-static V2 retained both 61,892-byte card snapshots with identical hashes
+and matched live identity, actual PAD prefixes and 124-tick/124-draw startup
+prefixes. Its held static comparison is still diagnostic and unequal: 188 of
+3,797 rows differ across 7,029 bytes; the first mismatch is wire row 74 in
+`.data.efAsync_DatEntries` at byte offset 8. Source review identifies this value
+as `EF_DAT_Entry[0].data`, a live Wasm pointer; the retained bytes prove address
+divergence, not the pointee contents. All rows and both source cards are
+retained. No capture, begin or forward command ran, and owner cleanup passed.
+This does not establish a menu-only exclusion or resolve pointer/local-state
+ownership. A bounded architecture review proposes one asymmetric peer proof
+using the existing typed restore and semantic checksum; this earlier baseline
+did not run a peer correction.
+The V2 producer is native
+`33cdb16a8593d7ec1499da13dcb825d26b955b02` and harness
+`39d67d46e444229a9f1c8df9699a265575599ccf`.
+
+The subsequent peer correction V2 passes one actual wrong-prediction control in
+two ordinary-runtime browsers. Alpha polls P1 KeyD once and predicts P2 from its
+actual held prefix from beta; beta receives alpha's real input through
+browser-owned WebSockets to the pinned local Worker before polling P2 ArrowLeft. The prediction
+changes the native scene-state checksum. Alpha restores its strict local Armed
+PRE across all nine domains and 12 particle relations, replays the retained local
+input plus beta's received input without source draw, then presents the result.
+Its authoritative 44-byte PAD record and all 64 native gameplay-checksum bytes
+match beta's on-time result. Independent raw replay verifies the comparison and
+peer receipts. Both native owners retire; all 17 owned Chrome processes and the
+relay, server and capture processes are absent. This is local functional evidence
+for one correction, not sustained rollback or a full match. The checksum is the
+existing finite gameplay projection; independently allocated memory is not
+claimed byte-identical. The harness copies and compares checksums locally; this
+diagnostic peer protocol exchanges input, not checksum receipts.
+
+Native producer `17c48b102faec1aeb999bd87d2ca3af86562cc6e` and harness
+`76b2dff311badb30affd08d03afcadcd34397028` remain distinct. The failed V1 stopped
+before history or relay work because it read the page bridge before installing
+it; the ordering-only repair and both attempts are retained. Alpha and beta PRE
+audio phases differ, so this peer control makes no cross-peer PCM claim. These
+results do not establish Internet play, physical-input acceptance, performance,
+combat breadth or a complete profile. The existing unobserved lanes remain open.
+
+Independent integration review found a remote-input admission race: a concurrent
+local input could let the frame pump consume a received remote row before its
+observer accepted it. The repair keeps new remote input and packet acknowledgments
+staged until admission. Controlled tests fail on the earlier core and pass on the
+repair for both acceptance and refusal. Ordinary and private Release builds pass
+on `4597f008`; retained regression failures and their build-setup/source-fixture
+repairs are recorded in `runtime_match_start_v1`. The final fixture repair explicitly
+enables the profile that its modeled draw leaves require, preserving assertions
+and the separate default-off control. The full local regression then passed on
+`b4025d3b`: 3,096 tests with 242 skips. The first CI attempt exposed a missing
+historical TObj compiler graph in its clean unit shard; the CI-only repair configures
+that graph with an explicitly empty source-only asset directory. The unchanged
+TObj component and all 15 focused CI controls pass; assertions, test ownership and
+deadlines are unchanged. Integration and exact-head checks are tracked by
+[PR #363](https://github.com/ericvanlare/melee-web/pull/363) and
+[#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
+boundary is confirmed retirement and rebase into adjacent correction windows in
+the same live match.
 
 ## Stage decision dependencies, issue #333
 

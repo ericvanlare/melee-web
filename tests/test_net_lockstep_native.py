@@ -55,7 +55,8 @@ def _harness(include_clock_composition: bool = False) -> str:
         "local_capture_failure_name", "record_local_capture_failure",
         "melee_web_net_capture_local_input", "ring_used",
         "capture_start_identity", "record_arena", "melee_web_net_before_step",
-        "melee_web_net_after_step", "decode_frame", "melee_web_net_push",
+        "melee_web_net_after_step", "melee_web_net_decode_pad",
+        "melee_web_net_validate_pad", "decode_frame", "melee_web_net_push",
         "melee_web_net_push_indexed", "melee_web_net_confirm_start",
         "melee_web_net_terminate", "melee_web_net_status",
     )
@@ -163,6 +164,44 @@ static NetSession net = {{.arena_fill=-1}};
 {functions}
 {clock_helpers}
 int main(void) {{
+  /* The early per-port validator is the actual full-frame predicate and has
+   * no network/session effects, including while no session exists. */
+  uint8_t pad_bytes[11]={{0x1f,0x7f,0x80,0x7f,0xff,0x01,255,254,253,252,0}};
+  uint8_t pad_frame[44];PADStatus pad_out,pads_out[4],unchanged;
+  NetSession initial_net=net;
+  if(!melee_web_net_decode_pad(pad_bytes,11,&pad_out)||
+     !melee_web_net_validate_pad(pad_bytes,11)||pad_out.button!=0x1f7f||
+     pad_out.stickX!=-128||pad_out.stickY!=127||pad_out.substickX!=-1||
+     pad_out.substickY!=1||pad_out.triggerLeft!=255||pad_out.triggerRight!=254||
+     pad_out.analogA!=253||pad_out.analogB!=252||pad_out.err)return 76;
+  for(unsigned port=0;port<4;++port)memcpy(pad_frame+11*port,pad_bytes,11);
+  if(!decode_frame(pad_frame,pads_out))return 77;
+  for(unsigned port=0;port<4;++port)
+    if(memcmp(&pad_out,&pads_out[port],sizeof(pad_out)))return 78;
+  memset(&unchanged,0xa5,sizeof(unchanged));pad_out=unchanged;
+  for(unsigned size=0;size<=12;++size){{
+    if(size==11)continue;
+    if(melee_web_net_decode_pad(pad_bytes,size,&pad_out)||
+       memcmp(&pad_out,&unchanged,sizeof(pad_out)))return 79;
+  }}
+  if(melee_web_net_decode_pad(NULL,11,&pad_out)||
+     melee_web_net_decode_pad(pad_bytes,11,NULL))return 80;
+  for(unsigned invalid=0;invalid<3;++invalid){{
+    uint8_t bad[11]={{0}};
+    if(invalid==0)bad[0]=0x80;
+    if(invalid==1)bad[10]=0xfe;
+    if(invalid==2){{bad[10]=0xff;bad[2]=1;}}
+    if(melee_web_net_validate_pad(bad,11)||
+       melee_web_net_decode_pad(bad,11,&pad_out)||
+       memcmp(&pad_out,&unchanged,sizeof(pad_out)))return 81;
+    for(unsigned port=0;port<4;++port){{
+      memset(pad_frame,0,sizeof(pad_frame));memcpy(pad_frame+11*port,bad,11);
+      if(decode_frame(pad_frame,pads_out))return 82;
+    }}
+  }}
+  memset(pad_bytes,0,sizeof(pad_bytes));pad_bytes[10]=0xff;
+  if(!melee_web_net_decode_pad(pad_bytes,11,&pad_out)||
+     pad_out.err!=PAD_ERR_NO_CONTROLLER||memcmp(&net,&initial_net,sizeof(net)))return 83;
   uint8_t frame[MELEE_WEB_NET_FRAME_BYTES]={{0}};
   char* status;
   if(!melee_web_net_begin_lockstep(7,32,NULL,0))return 1;

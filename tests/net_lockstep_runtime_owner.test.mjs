@@ -11,6 +11,7 @@ import {standardPad} from './controller-fixtures.mjs';
 import {LockstepPeer, parseNetChecksum, lockstepConstants, LOCKSTEP_MAX_SOURCE_TICKS} from '../scripts/net_lockstep_core.mjs';
 import {createRoomRelayTransport, createRoomTransport, createRuntimeLockstepSession} from '../scripts/net_lockstep_runtime_owner.mjs';
 import {createRoomRelayPeerEndpoint} from '../scripts/net_lockstep_websocket_relay.mjs';
+import {MatchInputTimeline} from '../scripts/net_rollback_input_timeline.mjs';
 import {buildRuntimeCssSssGamepadSamples, RUNTIME_CSS_SSS_INPUT_TICKS,
   RUNTIME_CSS_SSS_SOURCE_TICKS} from '../scripts/net_lockstep_browser_modes.mjs';
 
@@ -1205,7 +1206,8 @@ test('runtime CSS-to-SSS witness binds all 518 selected PAD rows to 520 native i
 // Synthetic native records; actual runtime owner, live capture, peer and paired protocol core.
 const evidenceRecord = tick => { const row = new Uint8Array(64); new DataView(row.buffer).setUint32(0, tick, true); return Array.from(row); };
 async function budgetIdle() { for (let i = 0; i < 12; ++i) await turn(); }
-function evidenceBudgetFixture({sourceTicks, checksumEvidenceRecords = undefined} = {}) {
+function evidenceBudgetFixture({sourceTicks, checksumEvidenceRecords = undefined,
+  onRemoteContributionBatch = null} = {}) {
   // Reuse the pump fixture's queued endpoint delivery and canonical native records.
   const queue = [], records = [], producedRecords = [], remoteRecords = [], disposals = [];
   let callbacks, cursor = 0, session, drainMutation = null, flushOperation = null, pushGate = null;
@@ -1258,6 +1260,7 @@ function evidenceBudgetFixture({sourceTicks, checksumEvidenceRecords = undefined
     async close() { endpoint.closed = true; }};
   session = createRuntimeLockstepSession({Module: {}, role: 'alpha', sourceTicks, inputTicks: sourceTicks - 2,
     url: 'ws://127.0.0.1:8787', roomId: 'r'.repeat(32), timeoutMs: 5000, checksumEvidenceRecords,
+    onRemoteContributionBatch,
     createAdapter: () => adapter,
     createTransport(options) {
       return {createEndpoint(value) { callbacks = value; return endpoint; },
@@ -1313,6 +1316,46 @@ async function feedEvidenceInputs(run, sourceTicks, splitDefault = false) {
     if (run.session.snapshot().peer.failure) break;
   }
 }
+
+test('runtime owner delivers a real accepted remote row to a late rollback timeline before native frame completion', async () => {
+  const batches = [];
+  const timeline = new MatchInputTimeline({localPort: 0, remotePort: 1,
+    initialRemotePad: new Uint8Array(11)});
+  const run = evidenceBudgetFixture({sourceTicks: 8, onRemoteContributionBatch: batch => {
+    batches.push(batch);
+    for (const row of batch.inputs) timeline.acceptRemote(row.tick, row.pad);
+  }});
+  try {
+    await run.start();
+    for (let tick = 0; tick < 3; ++tick) {
+      timeline.recordLocal(tick, new Uint8Array(11));
+      timeline.commitForward(timeline.planForward());
+    }
+    assert.equal(timeline.status().dirty_from, null);
+    const remotePad = Uint8Array.of(0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    await run.remote.addLocalInput(0, remotePad);
+    await run.flush();
+
+    assert.equal(batches.length, 1, 'the runtime owner propagated the peer callback');
+    assert.deepEqual(batches[0].inputs, [{tick: 0, pad: Array.from(remotePad)}]);
+    assert.deepEqual(run.producedRecords.map(row => new DataView(Uint8Array.from(row).buffer).getUint32(0, true)),
+      [0, 1], 'the receiver native queue has only the existing neutral prefix; source frame 2 lacks local PAD');
+    assert.deepEqual(run.remoteRecords.map(row => new DataView(Uint8Array.from(row).buffer).getUint32(0, true)),
+      [0, 1], 'the sender also has only the neutral prefix without the counterpart');
+    assert.equal(timeline.status().dirty_from, 0, 'the actual packet row dirties the predicted suffix');
+    assert.deepEqual(timeline.planReplay().frames.map(row => row.tick), [0, 1, 2]);
+
+    const localCallback = globalThis.__meleeWebNetLocalInputCapture;
+    assert.equal(typeof localCallback, 'function', 'the source-owned already-polled local callback is present');
+    assert.equal(localCallback(0, 0, 1, new Uint8Array(11)), true);
+    await waitForEvidence(run, () => run.producedRecords.length === 3, 'completed source frame after both literal inputs');
+    assert.deepEqual(run.producedRecords.map(row => new DataView(Uint8Array.from(row).buffer).getUint32(0, true)),
+      [0, 1, 2], 'native receives the complete frame only after the actual local sample arrives');
+  } finally {
+    await cleanupEvidence(run);
+    delete globalThis.__meleeWebNetLocalInputCapture;
+  }
+});
 
 test('actual runtime owner preserves the default 513th-record refusal and first cause through fatal close', async t => {
   for (const delayed of [false, true]) await t.test(delayed ? 'deferred final native push' : 'ordinary async delivery', async () => {

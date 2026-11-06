@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
+import {MatchInputTimeline} from '../scripts/net_rollback_input_timeline.mjs';
 
 // The expected wire/hash/frame values were captured from pre-portable producer
 // da1f3eaf9836f757380cfdfc7e9d2cafa97eeab1 (protocol module SHA-256
@@ -418,4 +419,184 @@ test('foreign and malformed PAD/checksum state payloads fail closed', async () =
   const malformedChecksum = {...badIdentity, role: 'beta', delayed_checksums: [{tick: 0, record: 'AA=='}]};
   await assert.rejects(badChecksum.receive(JSON.stringify(malformedChecksum)), /invalid delayed checksum record/);
   assert.equal(badChecksum.terminal.kind, 'protocol');
+});
+
+test('accepted remote PAD batches reach the timeline before a full native frame is available', async () => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+  const wire = {alpha: [], beta: []}, pushed = {alpha: [], beta: []}, batches = [];
+  const agreement = {protocol: 'match-scoped-test-v1', match: 'same'};
+  const makePeer = role => new core.LockstepPeer({role, sourceTicks: 8, inputTicks: 6,
+    pushFrame: async (firstTick, bytes) => {
+      for (let offset = 0; offset < bytes.length; offset += core.NET_FRAME_BYTES)
+        pushed[role].push(firstTick + offset / core.NET_FRAME_BYTES);
+    },
+    onRemoteContributionBatch: role === 'alpha' ? async batch => {
+      batches.push(batch);
+      assert.equal(wire.alpha.length, 1, 'observer runs before the inbound state ACK is sent');
+    } : undefined,
+  });
+  const peers = {alpha: makePeer('alpha'), beta: makePeer('beta')};
+  for (const role of ['alpha', 'beta']) peers[role].attach(async text => wire[role].push(text));
+  await Promise.all([peers.alpha.start(agreement), peers.beta.start(agreement)]);
+  await Promise.all([peers.alpha.receive(wire.beta[0]), peers.beta.receive(wire.alpha[0])]);
+  assert.deepEqual(pushed.alpha, [0, 1], 'readiness pushes only the existing neutral prefix');
+
+  const timeline = new MatchInputTimeline({localPort: 0, remotePort: 1, initialRemotePad: sample(0)});
+  for (let tick = 0; tick < 3; ++tick) {
+    timeline.recordLocal(tick, sample(tick + 20));
+    timeline.commitForward(timeline.planForward());
+  }
+  assert.equal(timeline.status().dirty_from, null);
+
+  const remotePad = sample(7);
+  await peers.beta.addLocalInput(0, remotePad);
+  await peers.alpha.receive(wire.beta.at(-1));
+  assert.equal(batches.length, 1);
+  assert.deepEqual({
+    protocolVersion: batches[0].protocolVersion,
+    agreementHash: batches[0].agreementHash,
+    senderRole: batches[0].senderRole,
+    remotePort: batches[0].remotePort,
+    packetSequence: batches[0].packetSequence,
+  }, {
+    protocolVersion: core.LOCKSTEP_VERSION,
+    agreementHash: peers.alpha.agreementHash,
+    senderRole: 'beta', remotePort: 1, packetSequence: 0,
+  });
+  assert.deepEqual(batches[0].inputs, [{tick: 0, pad: Array.from(remotePad)}]);
+  assert.equal(Object.isFrozen(batches[0]), true);
+  assert.equal(Object.isFrozen(batches[0].inputs), true);
+  assert.equal(Object.isFrozen(batches[0].inputs[0].pad), true);
+  assert.deepEqual(pushed.alpha, [0, 1], 'remote PAD is observed while the native frame still lacks local PAD');
+  const accepted = timeline.acceptRemote(batches[0].inputs[0].tick, batches[0].inputs[0].pad);
+  assert.equal(accepted.earliest_changed_tick, 0);
+  assert.equal(timeline.status().dirty_from, 0, 'late literal PAD dirties the predicted suffix');
+  assert.deepEqual(timeline.planReplay().frames.map(row => row.tick), [0, 1, 2]);
+
+  await peers.alpha.addLocalInput(0, sample(31));
+  assert.ok(pushed.alpha.includes(2), 'the unchanged native path pushes only after both literal inputs exist');
+});
+
+test('pending remote contribution admission blocks the frame pump and outbound acknowledgements', async t => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+
+  for (const outcome of ['accepted', 'refused']) await t.test(outcome, async () => {
+    const wire = {alpha: [], beta: []}, pushed = {alpha: [], beta: []};
+    const observerEntered = deferred(), observerRelease = deferred();
+    const terminalEntered = deferred(), terminalRelease = deferred();
+    const refusal = Error('remote timeline refused contribution batch');
+    const agreement = {protocol: 'match-scoped-test-v1', match: 'admission-race'};
+    const makePeer = role => new core.LockstepPeer({role, sourceTicks: 4, inputTicks: 2,
+      pushFrame: async (firstTick, bytes) => {
+        for (let offset = 0; offset < bytes.length; offset += core.NET_FRAME_BYTES)
+          pushed[role].push(firstTick + offset / core.NET_FRAME_BYTES);
+      },
+      onRemoteContributionBatch: role === 'alpha' ? async () => {
+        observerEntered.resolve();
+        await observerRelease.promise;
+        if (outcome === 'refused') throw refusal;
+      } : undefined,
+      onTerminal: role === 'alpha' && outcome === 'refused' ? async () => {
+        terminalEntered.resolve();
+        await terminalRelease.promise;
+      } : undefined,
+    });
+    const peers = {alpha: makePeer('alpha'), beta: makePeer('beta')};
+    for (const role of ['alpha', 'beta']) peers[role].attach(async text => wire[role].push(text));
+    await Promise.all([peers.alpha.start(agreement), peers.beta.start(agreement)]);
+    await Promise.all([peers.alpha.receive(wire.beta[0]), peers.beta.receive(wire.alpha[0])]);
+    assert.deepEqual(pushed.alpha, [0, 1]);
+
+    await peers.beta.addLocalInput(0, sample(7));
+    const remoteState = wire.beta.at(-1);
+    const receivePromise = peers.alpha.receive(remoteState);
+    await observerEntered.promise;
+
+    // This outgoing publication can race the asynchronous page observer. It
+    // must not let the pump consume the staged remote row or acknowledge it.
+    await peers.alpha.addLocalInput(0, sample(31));
+    assert.deepEqual(pushed.alpha, [0, 1], 'no source tick consumes an unadmitted remote PAD row');
+    assert.equal(peers.alpha.remote.has(0), false, 'the received row remains staged');
+    const concurrentState = wire.alpha.map(text => JSON.parse(text)).find(packet =>
+      packet.type === 'state' && packet.unacknowledged.some(row => row.tick === 0));
+    assert.equal(concurrentState.ack_sequence, null, 'pending packet sequence is not acknowledged');
+    assert.equal(concurrentState.ack_input, null, 'pending remote input is not acknowledged');
+
+    observerRelease.resolve();
+    if (outcome === 'accepted') {
+      await receivePromise;
+      assert.deepEqual(pushed.alpha, [0, 1, 2]);
+      assert.deepEqual(peers.alpha.remote.get(0), sample(7));
+      const ack = wire.alpha.map(text => JSON.parse(text)).find(packet =>
+        packet.type === 'state' && packet.ack_sequence === 0);
+      assert.ok(ack, 'accepted packet receives its sequence acknowledgement');
+      assert.equal(ack.ack_input, 0, 'accepted PAD row becomes acknowledgeable');
+      return;
+    }
+
+    await terminalEntered.promise;
+    assert.equal(peers.alpha.terminal.kind, 'protocol');
+    assert.deepEqual(pushed.alpha, [0, 1], 'refusal cannot release the frame pump');
+    assert.equal(peers.alpha.remote.has(0), false, 'refused row is never committed');
+    assert.equal(wire.alpha.map(text => JSON.parse(text)).some(packet =>
+      packet.type === 'state' && packet.ack_sequence === 0), false, 'refused packet is never acknowledged');
+    terminalRelease.resolve();
+    await assert.rejects(receivePromise, error => error === refusal);
+    assert.equal(peers.alpha.terminal.kind, 'protocol');
+  });
+});
+
+test('remote observer publishes neither a valid prefix of a malformed packet nor a checksum mismatch', async t => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+  const agreement = {protocol: 'match-scoped-test-v1', match: 'same'};
+  const hello = {type: 'hello', version: core.LOCKSTEP_VERSION, role: 'beta',
+    local_port: 1, remote_port: 0, agreement};
+  const state = (overrides = {}) => ({type: 'state', version: core.LOCKSTEP_VERSION,
+    role: 'beta', sequence: 0, ack_sequence: null, ack_input: null, ack_checksum: null,
+    unacknowledged: [{tick: 0, pad: Buffer.from(sample(7)).toString('base64')}],
+    delayed_checksums: [], ...overrides});
+  const make = async onRemoteContributionBatch => {
+    const outbound = [];
+    const peer = new core.LockstepPeer({role: 'alpha', sourceTicks: 4, inputTicks: 2,
+      pushFrame: async () => {}, onRemoteContributionBatch});
+    peer.attach(async text => outbound.push(JSON.parse(text)));
+    await peer.start(agreement);
+    await peer.receive(JSON.stringify(hello));
+    outbound.length = 0;
+    return {peer, outbound};
+  };
+
+  await t.test('malformed checksum tail', async () => {
+    const observed = [];
+    const run = await make(batch => observed.push(batch));
+    await assert.rejects(run.peer.receive(JSON.stringify(state({delayed_checksums: [
+      {tick: 0, record: 'AA=='},
+    ]}))), /invalid delayed checksum record/);
+    assert.equal(observed.length, 0);
+    assert.equal(run.outbound.some(packet => packet.type === 'state'), false, 'no inbound ACK escaped');
+    assert.equal(run.peer.terminal.kind, 'protocol');
+  });
+
+  await t.test('ready checksum mismatch', async () => {
+    const observed = [];
+    const run = await make(batch => observed.push(batch));
+    const local = new Uint8Array(64);
+    new DataView(local.buffer).setUint32(0, 0, true);
+    await run.peer.addChecksum(local);
+    const remote = new Uint8Array(local); remote[24] = 1;
+    await run.peer.receive(JSON.stringify(state({delayed_checksums: [
+      {tick: 0, record: Buffer.from(remote).toString('base64')},
+    ]})));
+    assert.equal(observed.length, 0, 'checksum mismatch prevents observation of the packet PAD row');
+    assert.equal(run.outbound.some(packet => packet.type === 'state'), false, 'no inbound ACK escaped');
+    assert.equal(run.peer.terminal.kind, 'desync');
+  });
+
+  await t.test('observer refusal terminalizes before ACK or frame pump', async () => {
+    const refusal = Error('remote timeline refused contribution batch');
+    const run = await make(() => { throw refusal; });
+    await assert.rejects(run.peer.receive(JSON.stringify(state())), error => error === refusal);
+    assert.equal(run.outbound.some(packet => packet.type === 'state'), false, 'no inbound ACK escaped');
+    assert.equal(run.peer.terminal.kind, 'protocol');
+  });
 });

@@ -408,28 +408,44 @@ void melee_web_net_after_step(void)
     net.step_pending = 0;
 }
 
+int melee_web_net_decode_pad(const uint8_t* p, unsigned bytes, PADStatus* out)
+{
+    if (!p || !out || bytes != MELEE_WEB_NET_PAD_BYTES) return 0;
+    PADStatus pad;
+    memset(&pad, 0, sizeof(pad));
+    pad.button = (u16) (p[0] << 8 | p[1]);
+    pad.stickX = (s8) p[2];
+    pad.stickY = (s8) p[3];
+    pad.substickX = (s8) p[4];
+    pad.substickY = (s8) p[5];
+    pad.triggerLeft = p[6];
+    pad.triggerRight = p[7];
+    pad.analogA = p[8];
+    pad.analogB = p[9];
+    pad.err = (s8) p[10];
+    if (pad.button & ~0x1f7fu) return 0;
+    if (pad.err != PAD_ERR_NONE && pad.err != PAD_ERR_NO_CONTROLLER) return 0;
+    if (pad.err != PAD_ERR_NONE) {
+        for (unsigned i = 0; i < 10; ++i)
+            if (p[i]) return 0;
+    }
+    memcpy(out, &pad, sizeof(pad));
+    return 1;
+}
+
+/* Early rollback contributions use exactly the full-frame PAD predicate,
+ * without creating a network session or publishing a partial native frame. */
+EMSCRIPTEN_KEEPALIVE int melee_web_net_validate_pad(const uint8_t* p, unsigned bytes)
+{
+    PADStatus pad;
+    return melee_web_net_decode_pad(p, bytes, &pad);
+}
+
 static int decode_frame(const uint8_t* p, PADStatus out[4])
 {
-    for (unsigned port = 0; port < 4; ++port, p += 11) {
-        PADStatus* pad = &out[port];
-        memset(pad, 0, sizeof(*pad));
-        pad->button = (u16) (p[0] << 8 | p[1]);
-        pad->stickX = (s8) p[2];
-        pad->stickY = (s8) p[3];
-        pad->substickX = (s8) p[4];
-        pad->substickY = (s8) p[5];
-        pad->triggerLeft = p[6];
-        pad->triggerRight = p[7];
-        pad->analogA = p[8];
-        pad->analogB = p[9];
-        pad->err = (s8) p[10];
-        if (pad->button & ~0x1f7fu) return 0;
-        if (pad->err != PAD_ERR_NONE && pad->err != PAD_ERR_NO_CONTROLLER) return 0;
-        if (pad->err != PAD_ERR_NONE) {
-            for (unsigned i = 0; i < 10; ++i)
-                if (p[i]) return 0;
-        }
-    }
+    for (unsigned port = 0; port < 4; ++port, p += MELEE_WEB_NET_PAD_BYTES)
+        if (!melee_web_net_decode_pad(p, MELEE_WEB_NET_PAD_BYTES, &out[port]))
+            return 0;
     return 1;
 }
 

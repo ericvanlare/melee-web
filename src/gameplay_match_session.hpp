@@ -100,6 +100,9 @@ public:
                          uint8_t input[MELEE_WEB_PAD_STATE_BYTES]) const;
     int fighter_kind(unsigned index) const;
     const StartMeleeData& start_data() const;
+    // Read-only view of the exact menu selection retained by this live,
+    // fully constructed source match. No caller-owned copy is admitted.
+    const MeleeWebMenuMatchSelection& start_selection() const;
     // Copied menu selection only; safe during deferred construction and never
     // traverses live fighters or serializes player/save data.
     const StartMeleeData* diagnostic_start_data() const noexcept;

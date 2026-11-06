@@ -13,7 +13,8 @@ function deferred() {
 }
 function harness({role = 'alpha', terminalFailure = false, confirmFailure = false, sourceTicks = 8,
   readyGate = null, inputCapture = null, dispose = null, endpointCloseGate = null,
-  endpointCloseStarted = null, endpointCloseFailure = null, cleanupOrder = []} = {}) {
+  endpointCloseStarted = null, endpointCloseFailure = null, cleanupOrder = [],
+  onRemoteContributionBatch = null} = {}) {
   const sent = [], nativeRecords = [], frames = [], terminals = [], pending = new Set(), captureConfigs = [];
   let callbacks, confirmations = 0, pushFailure = false;
   const endpoint = {ready: Promise.resolve(), closed: false, errors: [], transport: {type: 'room-websocket'},
@@ -31,7 +32,7 @@ function harness({role = 'alpha', terminalFailure = false, confirmFailure = fals
   const remotePort = role === 'alpha' ? 1 : 0;
   const remoteRole = role === 'alpha' ? 'beta' : 'alpha';
   const controller = createBrowserNativePeer({role, sourceTicks, inputTicks: sourceTicks - 2,
-    inputCapture,
+    inputCapture, onRemoteContributionBatch,
     relayUrl: 'ws://example.test', roomId: 'a'.repeat(32), agreement: {build: 'same'}, native: {
       async pushIndexed(tick, bytes) { if (pushFailure) return false; frames.push({tick, bytes: Array.from(bytes)}); return true; },
       configureLocalInputCapture(port, ticks) { captureConfigs.push({port, ticks}); return port === localPort && ticks === sourceTicks - 2; },
@@ -78,6 +79,52 @@ test('page controller confirms start and gives native records to peer before exp
   await run.controller.close();
   assert.equal(run.endpoint.closed, true);
   assert.equal(run.terminals.length, 0);
+});
+
+test('browser peer close joins an accepted remote contribution callback before retiring its owner', async () => {
+  const entered = deferred(), release = deferred();
+  let settled = 0;
+  const run = harness({onRemoteContributionBatch: async batch => {
+    entered.resolve(batch);
+    await release.promise;
+    ++settled;
+  }});
+  try {
+    await run.ready();
+    const remoteWire = [];
+    const remote = new LockstepPeer({role: 'beta', sourceTicks: 8, inputTicks: 6,
+      pushFrame: async () => {}});
+    remote.attach(async text => remoteWire.push(text));
+    await remote.start({build: 'same'});
+    const localHello = run.sent.find(packet => packet.type === 'hello');
+    assert.ok(localHello);
+    await remote.receive(JSON.stringify(localHello));
+    await remote.addLocalInput(0, new Uint8Array(11));
+
+    const state = remoteWire.find(packet => JSON.parse(packet).type === 'state');
+    assert.ok(state, 'the remote peer sent a protocol state packet over the real core path');
+    const delivery = run.deliver(state);
+    const batch = await entered.promise;
+    assert.deepEqual(batch.inputs.map(row => row.tick), [0]);
+    assert.equal(batch.senderRole, 'beta');
+    let closed = false;
+    const closing = run.controller.close().then(() => { closed = true; });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(closed, false, 'close waits for the already accepted observer callback');
+    assert.equal(run.cleanupOrder.includes('native-dispose'), false,
+      'the callback settles before native ownership is disposed');
+    release.resolve();
+    await delivery;
+    await closing;
+    assert.equal(settled, 1);
+    assert.equal(run.endpoint.closed, true);
+    const deliveredAfterClose = await run.deliver(state);
+    assert.equal(deliveredAfterClose, undefined);
+    assert.equal(settled, 1, 'the closed peer no longer invokes the retired observer');
+  } finally {
+    release.resolve();
+    try { await run.controller.close(); } catch {}
+  }
 });
 
 test('opt-in page capture copies native bytes, records source ticks and releases only its retained sample', async () => {

@@ -23,6 +23,24 @@ from typing import Any
 
 SCHEMA = "melee-web-source-state-manifest-v1"
 TARGET = "gameplay_slippi_synctest_browser"
+MATCH_HISTORY_TARGET = "gameplay_menu_browser"
+SOURCE_PRODUCER_TARGETS = frozenset({
+    "gameplay_runtime", "hsd_native_runtime", "fighter_source_runtime",
+})
+TARGET_PROFILES = {
+    TARGET: {
+        "name": "slippi-synctest",
+        "producer_targets": SOURCE_PRODUCER_TARGETS,
+        "source_profile": None,
+        "release_only": False,
+    },
+    MATCH_HISTORY_TARGET: {
+        "name": "runtime-match-history-diagnostic",
+        "producer_targets": SOURCE_PRODUCER_TARGETS,
+        "source_profile": "slippi-render-dependencies-overlay",
+        "release_only": True,
+    },
+}
 MAP_HEADER = "Addr Off Size Out In Symbol"
 MUTABLE_SECTION_CLASSES = (
     "data", "bss", "sdata", "sbss", "tdata", "tbss", "common", "scommon", "noinit",
@@ -132,7 +150,10 @@ def _validate_non_overlapping(rows: list[dict[str, Any]]) -> None:
         previous = row
 
 
-def _read_producer_sources(path: Path) -> dict[str, set[Path]]:
+def _read_producer_sources(
+    path: Path,
+    expected_targets: frozenset[str] = SOURCE_PRODUCER_TARGETS,
+) -> dict[str, set[Path]]:
     producers: dict[str, set[Path]] = defaultdict(set)
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -147,7 +168,7 @@ def _read_producer_sources(path: Path) -> dict[str, set[Path]]:
         producers[target].add(Path(source).resolve())
     if not producers:
         raise ManifestError("CMake producer source list is empty")
-    expected = {"gameplay_runtime", "hsd_native_runtime", "fighter_source_runtime"}
+    expected = set(expected_targets)
     unexpected = set(producers) - expected
     if unexpected:
         raise ManifestError(f"unexpected producer targets: {sorted(unexpected)}")
@@ -328,9 +349,115 @@ def _producer_source_hashes(
     return hashes
 
 
+def _read_cmake_cache_values(path: Path) -> dict[str, tuple[str, str]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise ManifestError(f"cannot read CMake cache {path}: {error}") from error
+    values: dict[str, tuple[str, str]] = {}
+    for line in lines:
+        if not line or line.startswith("#") or "=" not in line or ":" not in line.split("=", 1)[0]:
+            continue
+        key, value = line.split("=", 1)
+        name, value_type = key.split(":", 1)
+        values[name] = (value_type, value)
+    return values
+
+
+def _validate_match_history_cmake_profile(path: Path) -> None:
+    required = {
+        "MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC": "ON",
+        "MELEE_WEB_SLIPPI_SYNCTEST": "OFF",
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK": "ON",
+        "MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE": "ON",
+        "MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE": "ON",
+        "MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE": "ON",
+        "MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY": "ON",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "ON",
+        "MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY": "OFF",
+    }
+    cache = _read_cmake_cache_values(path)
+    if cache.get("CMAKE_BUILD_TYPE") != ("STRING", "Release"):
+        raise ManifestError("match-history CMake cache is not a Release build")
+    for name, expected in required.items():
+        if cache.get(name) != ("BOOL", expected):
+            raise ManifestError(
+                f"match-history CMake profile option mismatch: {name} must be {expected}"
+            )
+
+
+def _validate_profile_source_overlay(
+    source_root: Path,
+    repository_root: Path,
+    generated_patch_path: Path,
+    locked_melee_commit: str,
+) -> dict[str, str]:
+    expected_root = "build/gameplay-source-slippi-profile"
+    if _display_path(source_root, repository_root) != expected_root:
+        raise ManifestError(
+            "match-history manifest requires the dedicated Slippi profile source tree"
+        )
+    # The profile builder composes over the boolean-transformed gameplay patch,
+    # not the raw reviewed patch. Authenticate that existing builder identity
+    # first; this validator must never rebuild or modify the generated tree.
+    base_patch_path = source_root / ".git/melee-web-composed.patch"
+    base_manifest_path = source_root / ".git/melee-web-composed.json"
+    try:
+        base_manifest = json.loads(base_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"cannot read gameplay base composition identity: {error}") from error
+    if not isinstance(base_manifest, dict):
+        raise ManifestError("gameplay base composition identity is not an object")
+    expected_base_key = {
+        "head": locked_melee_commit,
+        "reviewed": sha256(repository_root / "patches/melee-gameplay.patch"),
+        "transform": sha256(repository_root / "scripts/gameplay_bool.py"),
+    }
+    if base_manifest.get("key") != expected_base_key:
+        raise ManifestError("gameplay base composition uses different source/patch/transform inputs")
+    base_patch_hash = sha256(base_patch_path)
+    if base_manifest.get("patch_sha256") != base_patch_hash:
+        raise ManifestError("gameplay base composition manifest does not match its patch")
+    composed_patch_path = source_root / ".git/melee-web-slippi-profile-composed.patch"
+    composition_path = source_root / ".git/melee-web-slippi-profile-composed.json"
+    try:
+        composition = json.loads(composition_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ManifestError(f"cannot read Slippi profile composition identity: {error}") from error
+    if not isinstance(composition, dict):
+        raise ManifestError("Slippi profile composition identity is not an object")
+    expected_key = {
+        "base_patch_sha256": base_patch_hash,
+        "profile_patch_sha256": sha256(
+            repository_root / "src/slippi_profile/patches/melee-profile-hooks.patch"
+        ),
+    }
+    composed_hash = sha256(composed_patch_path)
+    if composition.get("key") != expected_key:
+        raise ManifestError("Slippi profile source composition uses different patch inputs")
+    if composition.get("patch_sha256") != composed_hash:
+        raise ManifestError("Slippi profile composition manifest does not match its patch")
+    if sha256(generated_patch_path) != composed_hash:
+        raise ManifestError("generated source tree does not use the composed Slippi profile patch")
+    return {
+        "base_composed_patch_sha256": base_patch_hash,
+        "base_composition_manifest_sha256": sha256(base_manifest_path),
+        "composed_patch_sha256": composed_hash,
+        "composition_manifest_sha256": sha256(composition_path),
+    }
+
+
 def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
-    if args.target != TARGET:
-        raise ManifestError(f"manifest is private to {TARGET}")
+    target_profile = TARGET_PROFILES.get(args.target)
+    if target_profile is None:
+        raise ManifestError(
+            "manifest is private to explicitly admitted targets; unsupported target: "
+            + str(args.target)
+        )
+    if target_profile["release_only"] and args.build_type != "Release":
+        raise ManifestError("match-history source manifest requires a Release build")
     map_path = Path(args.link_map).resolve()
     wasm_path = Path(args.wasm).resolve()
     compile_commands_path = Path(args.compile_commands).resolve()
@@ -338,6 +465,8 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
     source_root = Path(args.source_root).resolve()
     repository_root = Path(args.repository_root).resolve()
     cmake_cache_path = Path(args.cmake_cache).resolve()
+    if target_profile["release_only"]:
+        _validate_match_history_cmake_profile(cmake_cache_path)
     build_graph_value = args.build_graph or str(Path(args.compile_commands).resolve().parent / "build.ninja")
     build_graph_path = Path(build_graph_value).resolve()
     version_path = Path(args.emscripten_version_file).resolve()
@@ -357,8 +486,16 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
     if not generated_patch_path.is_file():
         raise ManifestError(f"generated source checkout has no applied-patch identity: {generated_patch_path}")
 
+    profile_overlay = None
+    if target_profile["source_profile"] is not None:
+        profile_overlay = _validate_profile_source_overlay(
+            source_root, repository_root, generated_patch_path, locked_melee_commit
+        )
+
     rows = _parse_map(map_path)
-    producers = _read_producer_sources(producer_sources_path)
+    producers = _read_producer_sources(
+        producer_sources_path, target_profile["producer_targets"]
+    )
     compile_outputs = _read_compile_commands(compile_commands_path)
     classified = _classify_rows(rows, producers, compile_outputs, source_root, repository_root)
     included = [row for row in classified if row["decision"] == "source-c-static-candidate"]
@@ -384,9 +521,18 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
         ),
         "generated-composed-patch": sha256(generated_patch_path),
     }
+    if profile_overlay is not None:
+        source_patches["base-composed-patch"] = profile_overlay["base_composed_patch_sha256"]
+        source_patches["base-composition-manifest"] = profile_overlay[
+            "base_composition_manifest_sha256"
+        ]
+        source_patches["profile-composed-patch"] = profile_overlay["composed_patch_sha256"]
+        source_patches["profile-composition-manifest"] = profile_overlay[
+            "composition_manifest_sha256"
+        ]
     identity_inputs = {
         "schema": SCHEMA,
-        "target": TARGET,
+        "target": args.target,
         "cmake_build_type": args.build_type,
         "emscripten_version": emscripten_version,
         "source_root": _display_path(source_root, repository_root),
@@ -406,10 +552,13 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
         },
         **artifact_hashes,
     }
+    if profile_overlay is not None:
+        identity_inputs["execution_profile"] = target_profile["name"]
+        identity_inputs["source_profile"] = target_profile["source_profile"]
     canonical_identity = json.dumps(identity_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return {
         "schema": SCHEMA,
-        "target": TARGET,
+        "target": args.target,
         "complete_game_state": False,
         "scope": "retained mutable input-section bytes from generated source C translation units only",
         "address_model": "wasm32 linear-memory VMA from pinned wasm-ld map; post-link VMA checked by optimized sentinel fixture",

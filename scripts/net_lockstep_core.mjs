@@ -115,6 +115,7 @@ function mismatchChannel(a, b) {
  * send(string) callback; it never assembles PAD frames or edits checksums. */
 export class LockstepPeer {
   constructor({role, sourceTicks, inputTicks, pushFrame, onTerminal = () => {}, onReady = () => {},
+    onRemoteContributionBatch = () => {},
     isClosedSendCancellation = () => false, isClosedDisconnect = () => false,
     onSendCancellation = () => {}}) {
     if (!(role in opposite)) throw Error('Lockstep role must be alpha or beta');
@@ -130,11 +131,12 @@ export class LockstepPeer {
     this.onTerminal = onTerminal;
     this.onReady = onReady;
     if (typeof isClosedSendCancellation !== 'function' || typeof isClosedDisconnect !== 'function' ||
-        typeof onSendCancellation !== 'function')
-      throw Error('Lockstep closed-send cancellation hooks must be functions');
+        typeof onSendCancellation !== 'function' || typeof onRemoteContributionBatch !== 'function')
+      throw Error('Lockstep lifecycle and contribution hooks must be functions');
     this.isClosedSendCancellation = isClosedSendCancellation;
     this.isClosedDisconnect = isClosedDisconnect;
     this.onSendCancellation = onSendCancellation;
+    this.onRemoteContributionBatch = onRemoteContributionBatch;
     this.sendRaw = null;
     this.localHello = null;
     this.startAttempted = false;
@@ -158,6 +160,10 @@ export class LockstepPeer {
     this.nextChecksumCompare = 0;
     this.nextSequence = 0;
     this.expectedSequence = 0;
+    // `expectedSequence` tracks ordered packets being processed. A packet is
+    // advertised as acknowledged only after its remote contribution observer
+    // has accepted every newly received PAD row.
+    this.admittedSequence = -1;
     this.lastAccepted = new Map();
     this.pendingSequence = new Map();
     this.nextSourceFrame = 0;
@@ -388,7 +394,7 @@ export class LockstepPeer {
     const packet = {
       type: 'state', version: LOCKSTEP_VERSION, role: this.role,
       sequence: this.nextSequence++,
-      ack_sequence: this.expectedSequence ? this.expectedSequence - 1 : null,
+      ack_sequence: this.admittedSequence >= 0 ? this.admittedSequence : null,
       ack_input: this.remoteContiguousInput >= 0 ? this.remoteContiguousInput : null,
       ack_checksum: this.remoteContiguousChecksum >= 0 ? this.remoteContiguousChecksum : null,
       unacknowledged, delayed_checksums: checksums,
@@ -437,7 +443,28 @@ export class LockstepPeer {
       this.lastAccepted.set(this.expectedSequence, next.rawHash);
       while (this.lastAccepted.size > LOCKSTEP_WINDOW) this.lastAccepted.delete(this.lastAccepted.keys().next().value);
       ++this.expectedSequence;
-      changed = (await this.#applyState(next.packet)) || changed;
+      const applied = await this.#applyState(next.packet);
+      changed = applied.changed || changed;
+      if (this.terminal) return;
+      if (applied.remoteInputs.length) {
+        const inputs = Object.freeze(applied.remoteInputs.map(({tick, pad}) => Object.freeze({
+          tick, pad: Object.freeze(Array.from(pad)),
+        })));
+        await this.onRemoteContributionBatch(Object.freeze({
+          protocolVersion: LOCKSTEP_VERSION,
+          agreementHash: this.agreementHash,
+          senderRole: this.remoteRole,
+          remotePort: this.remotePort,
+          packetSequence: next.packet.sequence,
+          inputs,
+        }));
+        // #applyState stages new remote rows rather than exposing them in the
+        // pump/ACK maps. Commit only after the page observer has accepted them.
+        if (this.terminal) return;
+        for (const {tick, pad} of applied.remoteInputs) this.remote.set(tick, pad);
+        while (this.remote.has(this.remoteContiguousInput + 1)) ++this.remoteContiguousInput;
+      }
+      this.admittedSequence = next.packet.sequence;
     }
     await this.#pumpFrames();
     if (changed) return this.#sendState({context: 'inbound_state_ack'});
@@ -445,6 +472,7 @@ export class LockstepPeer {
 
   async #applyState(packet) {
     let changed = false;
+    const remoteInputs = [];
     const ackSequence = packet.ack_sequence;
     if (ackSequence !== null) {
       integer(ackSequence, 0xffffffff, 'sequence acknowledgement');
@@ -480,10 +508,9 @@ export class LockstepPeer {
       const old = this.remote.get(tick);
       if (old && !equalBytes(old, sample)) throw Error(`conflicting remote PAD contribution at tick ${tick}`);
       if (old) ++this.inputDuplicates;
-      else { this.remote.set(tick, sample); changed = true; }
+      else { remoteInputs.push({tick, pad: sample}); changed = true; }
       if (tick > this.remoteContiguousInput + 1) ++this.outOfOrderInputs;
     }
-    while (this.remote.has(this.remoteContiguousInput + 1)) ++this.remoteContiguousInput;
 
     const seenChecksums = new Set();
     for (const entry of packet.delayed_checksums) {
@@ -504,7 +531,7 @@ export class LockstepPeer {
     }
     while (this.remoteChecksums.has(this.remoteContiguousChecksum + 1)) ++this.remoteContiguousChecksum;
     await this.#compareReadyChecksums();
-    return changed;
+    return {changed, remoteInputs};
   }
 
   async #compareReadyChecksums() {

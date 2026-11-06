@@ -294,6 +294,19 @@ def run_group(group, jobs):
     try:
         phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py",
                                            "--configure-only"))
+        if group == UNIT_GROUPS[unit_shard("profile_tobj_writer_tests")]:
+            # The extracted TObj producer needs the actual v7 compiler recipes.
+            # Configure its source graph without retail assets or linked output.
+            assets = directory / "slippi-v7-source-only-assets"
+            assets.mkdir(exist_ok=True)
+            if assets.is_symlink() or any(assets.iterdir()):
+                raise RuntimeError("CI source-only Slippi asset directory must be empty")
+            phase("configure-slippi-v7", lambda: command(
+                sys.executable, ROOT / "scripts/build.py", "--configure-only",
+                "--trace-target", "gameplay_slippi_synctest", "--configuration", "Release",
+                "--slippi-logical-frame-clock", "--slippi-lobj-presentation-cache",
+                "--stage-arena-owner-diagnostic", "--aurora-staging-shadow-diagnostic",
+                "--slippi-synctest-assets", assets))
         if targets:
             phase("build", lambda: command(ROOT / ".venv/bin/cmake", "--build", ROOT / "build/browser",
                                             "--target", *targets, "-j", jobs))
