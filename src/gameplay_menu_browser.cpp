@@ -4,6 +4,7 @@
 #include "slippi_profile/runtime_match_history.hpp"
 #include "slippi_profile/runtime_match_identity.hpp"
 #include "gameplay_audio_bank_transport.h"
+#include "gameplay_audio_stream.h"
 #include "gameplay_source_memory_runtime.h"
 #include <dolphin/dvd.h>
 #include <emscripten/html5.h>
