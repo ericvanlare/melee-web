@@ -3,6 +3,7 @@
 
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -20,6 +21,25 @@ GameplayCpuEndpointRecord incomplete_record() noexcept
     result.status=static_cast<std::uint32_t>(GameplayCpuEndpointStatus::Incomplete);
     result.schema=1;
     return result;
+}
+
+void encode_pad_row(const PADStatus& pad,std::uint8_t* out) noexcept
+{
+    out[0]=static_cast<std::uint8_t>(pad.button>>8);
+    out[1]=static_cast<std::uint8_t>(pad.button);
+    out[2]=static_cast<std::uint8_t>(pad.stickX);
+    out[3]=static_cast<std::uint8_t>(pad.stickY);
+    out[4]=static_cast<std::uint8_t>(pad.substickX);
+    out[5]=static_cast<std::uint8_t>(pad.substickY);
+    out[6]=pad.triggerLeft;out[7]=pad.triggerRight;
+    out[8]=pad.analogA;out[9]=pad.analogB;out[10]=static_cast<std::uint8_t>(pad.err);
+}
+
+void encode_pad_frame(const PADStatus pads[PAD_MAX_CONTROLLERS],
+                      std::array<std::uint8_t,44>& out) noexcept
+{
+    for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port)
+        encode_pad_row(pads[port],out.data()+port*MELEE_WEB_NET_PAD_BYTES);
 }
 
 void capture_refusal(CpuCaptureDiagnostic& out,
@@ -57,7 +77,7 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
     GameplayMatchSession& session,std::unique_ptr<GameplayCpuStatics> statics,
     CpuCaptureDiagnostic& diagnostic,RuntimeMatchHistoryBoundaryCheck boundary,
     RuntimeMatchHistoryPresentSubmit present,RuntimeMatchHistoryAudioStep audio_step,
-    unsigned& audio_phase,void* callback_context) noexcept
+    unsigned& audio_phase,void* callback_context,bool episode_mode) noexcept
 {
     diagnostic={};
     if(!statics||!boundary||!present||!audio_step||audio_phase>=60){
@@ -88,6 +108,8 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
     result->owners_=owners;
     result->pre_frame_=owners.frame;
     result->sealed_end_=0;
+    result->segment_start_frame_=owners.frame;
+    result->episode_mode_=episode_mode;
     result->checkpoint_=GameplayCpuCheckpoint::capture_history(
         session,std::move(statics),diagnostic);
     if(!result->checkpoint_){
@@ -159,7 +181,7 @@ bool RuntimeMatchHistory::checkpoint_failure(RuntimeMatchHistoryFailure failure,
 
 bool RuntimeMatchHistory::begin() noexcept
 {
-    if(phase_!=RuntimeMatchHistoryPhase::CapturedPreCopied||!checkpoint_||
+    if(episode_mode_||phase_!=RuntimeMatchHistoryPhase::CapturedPreCopied||!checkpoint_||
        !live_owner(pre_frame_)||!gate(RuntimeMatchHistoryGatePoint::Arm,pre_frame_))
         return fail(RuntimeMatchHistoryFailure::Phase);
     if(!checkpoint_->begin_history_incarnation(session_))
@@ -170,12 +192,226 @@ bool RuntimeMatchHistory::begin() noexcept
     return true;
 }
 
+bool RuntimeMatchHistory::begin_episode() noexcept
+{
+    if(!episode_mode_||phase_!=RuntimeMatchHistoryPhase::CapturedPreCopied||!checkpoint_||
+       !live_owner(pre_frame_)||!gate(RuntimeMatchHistoryGatePoint::Arm,pre_frame_))
+        return fail(RuntimeMatchHistoryFailure::Phase);
+    if(!checkpoint_->begin_history_incarnation(session_))
+        return fail(RuntimeMatchHistoryFailure::Owner);
+    incarnation_=1;
+    segment_start_frame_=pre_frame_;
+    source_step_possible_=true;
+    phase_=RuntimeMatchHistoryPhase::ArmedPrePending;
+    return true;
+}
+
+bool RuntimeMatchHistory::can_admit_poll_ticket(
+    std::uint32_t ticket_id,unsigned local_port,unsigned remote_port) const noexcept
+{
+    const auto current=session_.source_frames();
+    const bool phase_ok=phase_==RuntimeMatchHistoryPhase::Armed||
+        phase_==RuntimeMatchHistoryPhase::EpisodeRecording;
+    return episode_mode_&&phase_ok&&checkpoint_&&ticket_id&&ticket_id>last_ticket_id_&&
+        local_port<PAD_MAX_CONTROLLERS&&remote_port<PAD_MAX_CONTROLLERS&&
+        local_port!=remote_port&&current>=pre_frame_&&
+        current-pre_frame_==ticket_count_&&ticket_count_<episode_rows_.size()&&
+        !current_ticket_pending_&&live_owner(current)&&
+        (!ticket_count_||(episode_rows_[0].local_port==local_port&&
+          episode_rows_[0].remote_port==remote_port));
+}
+
+bool RuntimeMatchHistory::admit_poll_ticket(
+    std::uint32_t ticket_id,const PADStatus raw[PAD_MAX_CONTROLLERS],
+    std::uint64_t poll_serial,unsigned local_port,unsigned remote_port) noexcept
+{
+    const auto current=session_.source_frames();
+    if(!raw||!poll_serial||poll_serial<=poll_serial_||
+       !can_admit_poll_ticket(ticket_id,local_port,remote_port)||
+       !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode poll ticket admission refused");
+
+    auto& row=episode_rows_[ticket_count_];
+    row={};
+    row.ticket_id=ticket_id;row.source_frame=current;row.incarnation=incarnation_;
+    row.local_port=local_port;row.remote_port=remote_port;row.poll_serial=poll_serial;
+    encode_pad_frame(raw,row.raw_pad);
+    latest_ticket_={};
+    latest_ticket_.ticket_id=ticket_id;latest_ticket_.source_frame=current;
+    latest_ticket_.incarnation=incarnation_;latest_ticket_.local_port=local_port;
+    latest_ticket_.remote_port=remote_port;latest_ticket_.poll_serial=poll_serial;
+    latest_ticket_.raw_pad=row.raw_pad;
+    ++ticket_count_;last_ticket_id_=ticket_id;poll_serial_=poll_serial;
+    latest_ticket_valid_=true;current_ticket_pending_=true;
+    return true;
+}
+
+bool RuntimeMatchHistory::forward_ticket(
+    std::uint32_t ticket_id,const std::uint8_t* planned_frame,
+    unsigned planned_frame_bytes) noexcept
+{
+    const auto current=session_.source_frames();
+    if(!episode_mode_||!checkpoint_||!planned_frame||planned_frame_bytes!=44||
+       !current_ticket_pending_||!latest_ticket_valid_||ticket_id!=latest_ticket_.ticket_id||
+       ticket_id!=last_ticket_id_||latest_ticket_.source_frame!=current||
+       latest_ticket_.incarnation!=incarnation_||
+       (phase_!=RuntimeMatchHistoryPhase::Armed&&phase_!=RuntimeMatchHistoryPhase::EpisodeRecording)||
+       current<pre_frame_||current-pre_frame_>=7u||
+       forward_steps_>=7u||!live_owner(current)||
+       !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode forward ticket is stale or out of order");
+    if(!checkpoint_->interval_boundary(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Owner,"Episode forward interval admission refused");
+
+    const auto ordinal=current-pre_frame_;
+    if(ordinal>=episode_rows_.size())
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode forward ordinal exceeds retained ticket storage");
+    auto& row=episode_rows_[ordinal];
+    if(row.state!=0||row.ticket_id!=ticket_id||row.source_frame!=current||
+       row.incarnation!=incarnation_||row.poll_serial!=latest_ticket_.poll_serial||
+       row.local_port!=latest_ticket_.local_port||row.remote_port!=latest_ticket_.remote_port)
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode forward ticket identity changed");
+
+    std::array<PADStatus,PAD_MAX_CONTROLLERS> actual{},applied{};
+    for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port){
+        if(!melee_web_net_decode_pad(row.raw_pad.data()+port*MELEE_WEB_NET_PAD_BYTES,
+              MELEE_WEB_NET_PAD_BYTES,&actual[port]))
+            return fail(RuntimeMatchHistoryFailure::Input,"Episode retained actual PAD row refused");
+    }
+    applied=actual;
+    if(!melee_web_net_decode_pad(planned_frame+row.remote_port*MELEE_WEB_NET_PAD_BYTES,
+          MELEE_WEB_NET_PAD_BYTES,&applied[row.remote_port]))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode planned remote PAD refused");
+    std::array<std::uint8_t,44> expected{};
+    encode_pad_frame(applied.data(),expected);
+    if(!std::equal(expected.begin(),expected.end(),planned_frame))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode plan changed actual local or unused PAD bytes");
+
+    std::memcpy(retained_raw_.data(),actual.data(),sizeof(actual));
+    std::memcpy(retained_forward_.data(),applied.data(),sizeof(applied));
+    std::memcpy(row.forward_pad.data(),planned_frame,44);
+    row.selected_pad=row.forward_pad;row.state=1;
+    local_port_=row.local_port;remote_port_=row.remote_port;has_input_=true;
+    current_ticket_pending_=false;
+    try{
+        session_.tick(retained_forward_.data());
+        if(!audio_step_(session_,callback_context_))
+            return fail(RuntimeMatchHistoryFailure::SourceTick,"Ordinary audio render refused after episode forward tick");
+    }catch(const std::exception& error){
+        return fail(RuntimeMatchHistoryFailure::SourceTick,error.what());
+    }catch(...){return fail(RuntimeMatchHistoryFailure::SourceTick);}
+    const std::uint32_t actual_frame=session_.source_frames();
+    if(actual_frame==current+1u)++forward_steps_;
+    if(actual_frame!=current+1u||actual_frame-pre_frame_>7u||!live_owner(actual_frame)||
+       !gate(RuntimeMatchHistoryGatePoint::ForwardAfter,actual_frame))
+        return fail(RuntimeMatchHistoryFailure::SourceTick,"Episode forward source frame boundary refused");
+    phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
+    return true;
+}
+
+bool RuntimeMatchHistory::seal_incarnation() noexcept
+{
+    const auto actual=session_.source_frames();
+    if(!episode_mode_||phase_!=RuntimeMatchHistoryPhase::EpisodeRecording||!checkpoint_||
+       current_ticket_pending_||actual<=segment_start_frame_||actual<=pre_frame_||
+       actual-pre_frame_>7u||forward_steps_!=actual-pre_frame_||
+       !live_owner(actual)||!gate(RuntimeMatchHistoryGatePoint::ForwardAfter,actual))
+        return fail(RuntimeMatchHistoryFailure::Seal,"Episode incarnation seal boundary refused");
+    if(!checkpoint_->seal_history_incarnation(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Seal,"Episode native incarnation seal refused");
+    sealed_end_=actual;replay_target_end_=actual;endpoint_mask_=0;
+    phase_=RuntimeMatchHistoryPhase::PredictedSealed;
+    return true;
+}
+
+bool RuntimeMatchHistory::replay_ticket(
+    std::uint32_t ticket_id,const std::uint8_t* planned_frame,
+    unsigned planned_frame_bytes) noexcept
+{
+    const auto current=session_.source_frames();
+    if(!episode_mode_||!checkpoint_||!planned_frame||planned_frame_bytes!=44||
+       phase_!=RuntimeMatchHistoryPhase::Restored||
+       current<pre_frame_||current>=replay_target_end_||current-pre_frame_>=episode_rows_.size()||
+       replay_steps_>=7u||!live_owner(current)||
+       !gate(RuntimeMatchHistoryGatePoint::CorrectBefore,current))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode replay step admission refused");
+    if(!checkpoint_->interval_boundary(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Owner,"Episode replay interval admission refused");
+    auto& row=episode_rows_[current-pre_frame_];
+    if((row.state!=1&&row.state!=2)||row.ticket_id!=ticket_id||row.source_frame!=current||
+       row.poll_serial==0||row.local_port!=local_port_||row.remote_port!=remote_port_||
+       row.incarnation==0||row.incarnation>incarnation_)
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode replay did not bind the retained source ticket");
+
+    std::array<PADStatus,PAD_MAX_CONTROLLERS> actual{},applied{};
+    for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port){
+        if(!melee_web_net_decode_pad(row.raw_pad.data()+port*MELEE_WEB_NET_PAD_BYTES,
+              MELEE_WEB_NET_PAD_BYTES,&actual[port]))
+            return fail(RuntimeMatchHistoryFailure::Input,"Episode replay retained actual PAD row refused");
+    }
+    applied=actual;
+    if(!melee_web_net_decode_pad(planned_frame+row.remote_port*MELEE_WEB_NET_PAD_BYTES,
+          MELEE_WEB_NET_PAD_BYTES,&applied[row.remote_port]))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode replay planned remote PAD refused");
+    std::array<std::uint8_t,44> expected{};
+    encode_pad_frame(applied.data(),expected);
+    if(!std::equal(expected.begin(),expected.end(),planned_frame))
+        return fail(RuntimeMatchHistoryFailure::Input,"Episode replay plan changed retained local or unused PAD bytes");
+
+    std::memcpy(retained_raw_.data(),actual.data(),sizeof(actual));
+    std::memcpy(retained_corrected_.data(),applied.data(),sizeof(applied));
+    std::memcpy(row.selected_pad.data(),planned_frame,44);row.state=2;
+    has_input_=true;
+    try{
+        session_.tick(retained_corrected_.data());
+        if(!audio_step_(session_,callback_context_))
+            return fail(RuntimeMatchHistoryFailure::Correction,"Ordinary audio render refused after episode replay tick");
+    }catch(const std::exception& error){
+        return fail(RuntimeMatchHistoryFailure::Correction,error.what());
+    }catch(...){return fail(RuntimeMatchHistoryFailure::Correction);}
+    const std::uint32_t actual_frame=session_.source_frames();
+    if(actual_frame==current+1u)++replay_steps_;
+    if(actual_frame!=current+1u||!live_owner(actual_frame)||
+       !gate(RuntimeMatchHistoryGatePoint::CorrectAfter,actual_frame))
+        return fail(RuntimeMatchHistoryFailure::Correction,"Episode replay source frame boundary refused");
+    return true;
+}
+
+bool RuntimeMatchHistory::finish_replay() noexcept
+{
+    if(!episode_mode_||phase_!=RuntimeMatchHistoryPhase::Restored||!checkpoint_||
+       current_ticket_pending_||replay_target_end_<=pre_frame_||
+       session_.source_frames()!=replay_target_end_||
+       replay_steps_!=replay_target_end_-pre_frame_||
+       !live_owner(replay_target_end_)||!gate(RuntimeMatchHistoryGatePoint::CorrectAfter,replay_target_end_))
+        return fail(RuntimeMatchHistoryFailure::Correction,"Episode replay did not reach the exact sealed END");
+    if(!checkpoint_->finish_history_replay(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Correction,"Episode replay finish refused");
+    sealed_end_=replay_target_end_;endpoint_mask_=0;
+    phase_=RuntimeMatchHistoryPhase::CorrectedSealed;
+    return true;
+}
+
+bool RuntimeMatchHistory::begin_continuation() noexcept
+{
+    if(!episode_mode_||phase_!=RuntimeMatchHistoryPhase::Closed||!checkpoint_||
+       current_ticket_pending_||incarnation_>=3u||sealed_end_<=pre_frame_||
+       !live_owner(sealed_end_)||!gate(RuntimeMatchHistoryGatePoint::Arm,sealed_end_))
+        return fail(RuntimeMatchHistoryFailure::Phase,"Episode continuation admission refused");
+    if(!checkpoint_->begin_history_incarnation(session_))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Owner,"Episode continuation incarnation refused");
+    ++incarnation_;segment_start_frame_=sealed_end_;sealed_end_=0;replay_target_end_=0;
+    replay_steps_=0;endpoint_mask_=0;endpoint_role_=EndpointRole::None;
+    phase_=RuntimeMatchHistoryPhase::EpisodeRecording;source_step_possible_=true;
+    return true;
+}
+
 bool RuntimeMatchHistory::forward_from_poll(
     const PADStatus raw[PAD_MAX_CONTROLLERS],std::uint64_t poll_serial,
     unsigned local_port,unsigned remote_port,const std::uint8_t* predicted_remote,
     unsigned predicted_remote_bytes) noexcept
 {
-    if(phase_!=RuntimeMatchHistoryPhase::Armed||!checkpoint_||!raw||
+    if(episode_mode_||phase_!=RuntimeMatchHistoryPhase::Armed||!checkpoint_||!raw||
        poll_serial==0||local_port>=PAD_MAX_CONTROLLERS||
        remote_port>=PAD_MAX_CONTROLLERS||local_port==remote_port||
        !predicted_remote||predicted_remote_bytes!=MELEE_WEB_NET_PAD_BYTES||
@@ -223,6 +459,7 @@ bool RuntimeMatchHistory::restore_pre() noexcept
 {
     constexpr std::uint32_t required=PredictedCpu|PredictedDraw;
     if(phase_!=RuntimeMatchHistoryPhase::PredictedComplete||!checkpoint_||
+       (episode_mode_?restore_count_>=2u:restore_count_!=0u)||
        (endpoint_mask_&required)!=required||!live_owner(sealed_end_)||
        !gate(RuntimeMatchHistoryGatePoint::RestoreBefore,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Phase);
@@ -231,7 +468,9 @@ bool RuntimeMatchHistory::restore_pre() noexcept
         return checkpoint_failure(RuntimeMatchHistoryFailure::Restore,"Native typed history restore refused");
     audio_phase_=pre_audio_phase_;
     ++restore_count_;
-    if(restore_count_!=1u||session_.source_frames()!=pre_frame_||
+    replay_target_end_=sealed_end_;replay_steps_=0;
+    if(episode_mode_)endpoint_mask_=0;
+    if((episode_mode_?restore_count_>2u:restore_count_!=1u)||session_.source_frames()!=pre_frame_||
        !live_owner(pre_frame_)||
        !gate(RuntimeMatchHistoryGatePoint::RestoreAfter,pre_frame_))
         return fail(RuntimeMatchHistoryFailure::Restore);
@@ -242,7 +481,7 @@ bool RuntimeMatchHistory::restore_pre() noexcept
 bool RuntimeMatchHistory::correct_from_retained(
     const std::uint8_t* late_remote,unsigned late_remote_bytes) noexcept
 {
-    if(phase_!=RuntimeMatchHistoryPhase::Restored||!checkpoint_||!has_input_||
+    if(episode_mode_||phase_!=RuntimeMatchHistoryPhase::Restored||!checkpoint_||!has_input_||
        !late_remote||late_remote_bytes!=MELEE_WEB_NET_PAD_BYTES||
        session_.source_frames()!=pre_frame_||!live_owner(pre_frame_)||
        !gate(RuntimeMatchHistoryGatePoint::CorrectBefore,pre_frame_))
@@ -467,7 +706,7 @@ bool RuntimeMatchHistory::retire_confirmed() noexcept
 
 bool RuntimeMatchHistory::can_rebase_confirmed(std::uint32_t end_frame) const noexcept
 {
-    return phase_==RuntimeMatchHistoryPhase::Retired&&!checkpoint_&&!reader_.active()&&
+    return !episode_mode_&&phase_==RuntimeMatchHistoryPhase::Retired&&!checkpoint_&&!reader_.active()&&
         failure_==RuntimeMatchHistoryFailure::None&&forward_steps_==1&&
         end_frame==sealed_end_&&live_owner(end_frame);
 }
@@ -510,6 +749,19 @@ const PADStatus* RuntimeMatchHistory::retained_input(unsigned kind) const noexce
     if(kind==1)return retained_forward_.data();
     if(kind==2&&replay_steps_==1)return retained_corrected_.data();
     return nullptr;
+}
+
+const RuntimeMatchHistoryPollTicket* RuntimeMatchHistory::latest_ticket() const noexcept
+{
+    return episode_mode_&&latest_ticket_valid_?&latest_ticket_:nullptr;
+}
+
+const RuntimeMatchHistoryInputReceipt* RuntimeMatchHistory::episode_input_row(
+    std::uint32_t ordinal) const noexcept
+{
+    if(!episode_mode_||ordinal>=ticket_count_||ordinal>=episode_rows_.size()||
+       !episode_rows_[ordinal].ticket_id)return nullptr;
+    return &episode_rows_[ordinal];
 }
 
 std::uint32_t RuntimeMatchHistory::current_frame() const noexcept

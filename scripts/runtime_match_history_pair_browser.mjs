@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* Two independently owned headless pages share the original ordinary route.
  * The held-statics phase retains exact configured rows before capture; the
- * peer-correction phase performs one asymmetric actual-input correction. */
+ * peer-correction phase runs one or two adjacent corrections. The four-tick
+ * episode extends the same fixed-PRE capsule before confirmation. */
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createReadStream} from 'node:fs';
@@ -32,14 +33,14 @@ const {values}=parseArgs({options:Object.fromEntries(optionNames.map(name=>[name
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction'].includes(values.phase),
-  'Supported bounded phases are held-statics and peer-correction');
-if(values.phase==='held-statics')assert.equal(values.windows,'1','Held-statics supports one baseline window');
+assert(['held-statics','peer-correction','four-tick-correction'].includes(values.phase),
+  'Unsupported bounded runtime history phase');
+if(values.phase!=='peer-correction')assert.equal(values.windows,'1','--windows applies only to peer-correction');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
 assert(['127.0.0.1','localhost','[::1]'].includes(baseUrl.hostname),'The runtime server must be local');
-if(values.phase==='peer-correction')
+if(values.phase!=='held-statics')
   assert(['http://127.0.0.1:8787','http://localhost:8787'].includes(baseUrl.origin),
     'Peer correction needs a loopback runtime origin allowed by the pinned Worker on port 8787');
 const discPath=path.resolve(values.disc),out=path.resolve(values.out);
@@ -111,12 +112,13 @@ const peerProbePath=path.join(ROOT,'src/slippi_profile/tests/runtime_peer_histor
 const peerModulePath=path.join(ROOT,'src/slippi_profile/runtime_match_history_peer.mjs');
 const lockstepCorePath=path.join(ROOT,'scripts/net_lockstep_core.mjs');
 const websocketRelayPath=path.join(ROOT,'scripts/net_lockstep_websocket_relay.mjs');
+const timelinePath=path.join(ROOT,'scripts/net_rollback_input_timeline.mjs');
 const profilePath=path.join(ROOT,'src/slippi_profile/profile.h');
 const [controllerBytes,endpointBytes,peerProbeBytes,peerModuleBytes,lockstepCoreBytes,
-  websocketRelayBytes,profileSource]=await Promise.all([
+  websocketRelayBytes,timelineBytes,profileSource]=await Promise.all([
   fs.readFile(controllerPath),fs.readFile(endpointPath),fs.readFile(peerProbePath),
   fs.readFile(peerModulePath),fs.readFile(lockstepCorePath),fs.readFile(websocketRelayPath),
-  fs.readFile(profilePath,'utf8'),
+  fs.readFile(timelinePath),fs.readFile(profilePath,'utf8'),
 ]);
 assert(profileSource.includes(`"${PROFILE}"`),'Source profile header no longer pins V20');
 const diagnosticBindings=[
@@ -132,11 +134,14 @@ const diagnosticBindings=[
     checkout_path:path.relative(ROOT,lockstepCorePath),sha256:sha256(lockstepCoreBytes)},
   {url:new URL('/__melee_diag__/scripts/net_lockstep_websocket_relay.mjs',baseUrl).href,
     checkout_path:path.relative(ROOT,websocketRelayPath),sha256:sha256(websocketRelayBytes)},
+  {url:new URL('/__melee_diag__/scripts/net_rollback_input_timeline.mjs',baseUrl).href,
+    checkout_path:path.relative(ROOT,timelinePath),sha256:sha256(timelineBytes)},
 ];
 const diagnosticModuleBodies=new Map([
   [diagnosticBindings[0].url,controllerBytes],[diagnosticBindings[1].url,endpointBytes],
   [diagnosticBindings[2].url,peerProbeBytes],[diagnosticBindings[3].url,peerModuleBytes],
   [diagnosticBindings[4].url,lockstepCoreBytes],[diagnosticBindings[5].url,websocketRelayBytes],
+  [diagnosticBindings[6].url,timelineBytes],
 ]);
 const diagnosticImportResolutions=[];
 for(const binding of diagnosticBindings){
@@ -151,11 +156,13 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:values.phase==='held-statics'?
+const report={schema:values.phase==='four-tick-correction'?
+    'melee-web-runtime-four-tick-peer-correction-v1':values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:values.phase==='held-statics'?
+  scope:values.phase==='four-tick-correction'?
+    'four actual source ticks in one fixed-PRE capsule, two typed corrections, and continuation before a newer remote PAD is confirmed; batch functional evidence with presentation only at sealed ENDs':values.phase==='held-statics'?
     'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim':
     (values.windows==='2'?
       'two independently owned headless browser pages; one continuous browser-owned page peer pair and live native match; two adjacent actual one-input windows joined by checked same-match rebase at exact retired END; each window has beta on-time actual P2 and alpha typed restore/replay/correction; strict full Armed vs Restored PRE and all-64-byte CPU checksum agreement within each window; exact selected owner/statics/audio/frame continuity across rebase; no full cross-view END/PRE endpoint equality claim':
@@ -782,14 +789,14 @@ function byteDifference(left,right){
   }
   return {equal:count===0,bytes_left:left.length,bytes_right:right.length,different_byte_count:count,first_mismatch:first};
 }
-async function installPeerHistoryBridge(item,relayUrl,roomId){
+async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad){
   const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
-  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks})=>{
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad})=>{
     const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
-    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks});
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad});
   },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
       new URL('/__melee_diag__/',baseUrl)).href,
-    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks:Number(values.windows)});
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad});
 }
 async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionSource,priorPollSerials,
   previousDrawEndpoints,windowReport,previousRetirement}){
@@ -1018,6 +1025,238 @@ async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionS
     receivedBetaPad:actualP2,drawEndpoints:[alphaDraw,betaDraw]};
 }
 
+async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads){
+  for(const item of [alpha,beta])
+    report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
+  const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
+    diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));}});
+  const roomId=createRoomId(),relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
+  peerReport.relay={base:roomRelay.base,port:roomRelay.port,relay_url:relayUrl,room_id:roomId,
+    owner_process:roomRelay.ownerProcess,runtime_identity:roomRelay.runtimeIdentity,hashes:roomRelay.hashes,
+    transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for the diagnostic'};
+  await joinOwned('peer-bridge-install',[
+    installPeerHistoryBridge(alpha,relayUrl,roomId,inputTicks,initialRemotePads?.alpha).then(value=>{alpha.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta).then(value=>{beta.peerInstalled=true;return value;}),
+  ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
+  for(const item of [alpha,beta]){
+    const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
+      restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
+    assert.equal(initial.localPort,item.role==='alpha'?0:1);
+    assert.equal(initial.remotePort,1-initial.localPort);
+    assert.equal(initial.inputReady,0);
+  }
+  const [alphaPeer,betaPeer]=await joinOwned('peer-start',[
+    peerOperation(alpha,'peerStart'),peerOperation(beta,'peerStart')]);
+  peerReport.pages.alpha.peer_start=alphaPeer;peerReport.pages.beta.peer_start=betaPeer;
+  assert(alphaPeer.ready&&betaPeer.ready&&alphaPeer.agreement_hash);
+  assert.equal(alphaPeer.agreement_hash,betaPeer.agreement_hash);
+  assert.equal(alphaPeer.input_ticks_protocol_only,inputTicks);
+  assert.equal(alphaPeer.source_ticks_protocol_only,inputTicks+2);
+  for(const item of [alpha,beta]){
+    assert.equal(item.websockets.length,1,`${item.role} must own exactly one actual peer WebSocket`);
+    assert.equal(item.websockets[0],`${relayUrl}/v1/rooms/${roomId}/socket`,
+      `${item.role} WebSocket is not the selected local relay room`);
+  }
+  peerReport.pages.alpha.websocket=alpha.websockets[0];peerReport.pages.beta.websocket=beta.websockets[0];
+
+}
+
+async function runFourTickEpisode(alpha,beta){
+  const items=[alpha,beta];
+  const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
+    beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
+  const proof=report.peer_correction={claim:'four actual source ticks, two corrections and forward continuation while a newer input is unconfirmed',
+    checksum_exchange:'none; exact finite native CPU_END checksum bytes are compared locally',
+    pages:{alpha:{port:0},beta:{port:1}},events:[],segments:{},comparisons:{},checks:[]};
+  await startCorrectionPeers(alpha,beta,proof,4,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+  const pollSerials={alpha:prefix.alpha.pollSerial,beta:prefix.beta.pollSerial};
+  const tickets={alpha:[],beta:[]};
+  const selected={alpha:[],beta:[]};
+  const log=async(item,operation,value)=>{
+    const event={role:item.role,operation,value};
+    proof.events.push(event);
+    try{return event.result=await peerOperation(item,operation,value);}
+    catch(error){event.error=String(error);throw error;}
+  };
+  const opts=(phase,sourceFrame,counters={})=>({window:'episode',phase,sourceFrame,...counters});
+  const endpoint=(item,label,view,provenance,sourceFrame,phase)=>
+    retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,phase});
+  const pre=(item,label,phase)=>endpoint(item,label,CPU_ENDPOINT_VIEW.pre,CPU_ENDPOINT_PROVENANCE.sharedPre,0,phase);
+  const command=(item,name,phase,frame,counters)=>historyCommand(item,name,opts(phase,frame,counters));
+
+  await joinOwned('episode-enable',items.map(item=>log(item,'episodeEnable')));
+  await joinOwned('episode-capture',items.map(item=>command(item,'capture',1,0)));
+  const captured=await joinOwned('episode-capture-pre',items.map(item=>pre(item,'episode-capture-pre',2)));
+  for(const e of captured)assert.equal(effectToken(e),'0');
+  await joinOwned('episode-begin',items.map(item=>command(item,'beginEpisode',3,0)));
+  const armed=await joinOwned('episode-armed-pre',items.map(item=>pre(item,'episode-armed-pre',4)));
+  for(const e of armed)assert(BigInt(effectToken(e))>0n);
+
+  const poll=async(item,tick,key,expectedPad)=>{
+    const page=item.page;
+    await page.locator('#canvas').focus();
+    assert.equal(await page.evaluate(()=>document.activeElement?.id),'canvas');
+    let error=null;
+    try{
+      item.keyToRelease=key;
+      await page.keyboard.down(key);
+      const {ticket,status}=await log(item,'episodePoll',{tick});
+      requireHistoryStatus(status,`${item.role} poll ${tick}`,opts(tick===0?4:21,tick,{gpuIdle:true}));
+      assert.equal(ticket.ticketId,status.completeSequence);
+      assert.equal(ticket.raw.length,44);
+      assert.deepEqual(Buffer.from(ticket.raw).subarray(ticket.localPort*11,(ticket.localPort+1)*11),expectedPad);
+      assert(BigInt(ticket.pollSerial)>BigInt(pollSerials[item.role]),`${item.role} actual poll serial did not advance`);
+      pollSerials[item.role]=ticket.pollSerial;
+      tickets[item.role][tick]=ticket;
+    }catch(cause){error=cause;throw cause;}
+    finally{
+      try{await page.keyboard.up(key);item.keyToRelease=null;}
+      catch(release){
+        (report.pages[item.role].action_release_errors??=[]).push({key,error:String(release)});
+        if(!error)throw release;
+      }
+    }
+  };
+  const publish=async(item,tick)=>{
+    const ticket=tickets[item.role][tick];
+    const receipt=await log(item,'episodePublish',{tick,ticketId:ticket.ticketId});
+    assert.equal(receipt.protocol_input_tick,tick);
+    assert.equal(receipt.poll_serial,ticket.pollSerial);
+    assert.deepEqual(receipt.pad,ticket.raw.slice(ticket.localPort*11,(ticket.localPort+1)*11));
+  };
+  const admit=(item,tick)=>log(item,'episodeAdmit',{tick});
+  const forward=async(item,tick,actual)=>{
+    const ticket=tickets[item.role][tick];
+    const result=await log(item,'episodeForward',{tick,ticketId:ticket.ticketId,actual});
+    requireHistoryStatus(result.status,`${item.role} forward ${tick}`,opts(21,tick+1,{forwardSteps:tick+1,gpuIdle:true}));
+    assert.equal(result.row.pollSerial,ticket.pollSerial);
+    assert.equal(result.row.ticketId,ticket.ticketId);
+    assert.deepEqual(result.row.raw,ticket.raw);
+    assert.equal(result.timeline.simulated_through,tick);
+    selected[item.role][tick]=result.row.selected;
+    return result;
+  };
+  const boundary=async(item,label,frame,corrected)=>{
+    const prov=corrected?CPU_ENDPOINT_PROVENANCE.corrected:CPU_ENDPOINT_PROVENANCE.reference;
+    if(!corrected)await command(item,'seal',5,frame,{forwardSteps:frame});
+    await endpoint(item,`${label}-cpu`,CPU_ENDPOINT_VIEW.cpuEnd,prov,frame,corrected?13:6);
+    const checksum=await retainChecksum(item,`${label}-cpu`,{tick:frame-1,sourceFrame:frame});
+    await command(item,'present',corrected?14:7,frame);
+    await command(item,'idle',corrected?15:8,frame,{gpuIdle:true});
+    await endpoint(item,`${label}-draw`,CPU_ENDPOINT_VIEW.drawEnd,prov,frame,corrected?16:9);
+    return checksum;
+  };
+  const correct=async(frame,dirty,speculative,restoreCount)=>{
+    await command(alpha,'restore',10,0,{restoreCount,forwardSteps:frame,replaySteps:0});
+    const restored=await pre(alpha,`episode-restored-${frame}`,11);
+    const strict=compareCpuReferenceParticleEndpoints(armed[0],restored);
+    proof.comparisons[`restored_pre_${frame}`]=strict;
+    assert(strict.equal);
+    const result=await log(alpha,'episodeReplay',{dirty,through:frame-1,speculative});
+    requireHistoryStatus(result.status,`corrected END ${frame}`,
+      opts(12,frame,{restoreCount,forwardSteps:frame,replaySteps:frame,gpuIdle:true}));
+    assert.equal(result.rows.length,frame);
+    for(const [tick,receipt] of result.rows.entries()){
+      assert.equal(receipt.row.ticketId,tickets.alpha[tick].ticketId);
+      assert.equal(receipt.row.pollSerial,tickets.alpha[tick].pollSerial);
+      assert.deepEqual(receipt.row.raw,tickets.alpha[tick].raw);
+      assert.equal(receipt.unchangedPrefix,tick<dirty);
+      selected.alpha[tick]=receipt.row.selected;
+    }
+    assert.equal(result.timeline.dirty_from,null);
+    return result.timeline;
+  };
+  const comparePads=ticks=>{
+    const rows=ticks.map(tick=>({tick,...byteDifference(
+      Buffer.from(selected.alpha[tick]),Buffer.from(selected.beta[tick]))}));
+    assert(rows.every(row=>row.equal),`Corrected applied PAD differs: ${JSON.stringify(rows.find(row=>!row.equal))}`);
+    return rows;
+  };
+  const continueAt=async(item,end)=>{
+    await command(item,'close',17,end);
+    const continued=await command(item,'continue',21,end,{forwardSteps:end,gpuIdle:true});
+    assert.equal(continued.metadata.incarnation,2);
+    assert.equal(continued.metadata.sealedEnd,0);
+    return continued;
+  };
+
+  // Both peers' real tick-0 contributions are admitted before source execution.
+  await poll(alpha,0,'KeyD',P1_RIGHT);await publish(alpha,0);
+  await poll(beta,0,'ArrowRight',P2_RIGHT);await publish(beta,0);
+  await admit(alpha,0);await admit(beta,0);
+  await forward(alpha,0,true);await forward(beta,0,true);
+  for(const tick of [1,2]){
+    await poll(alpha,tick,'KeyD',P1_RIGHT);await publish(alpha,tick);
+    await forward(alpha,tick,false);
+  }
+  const predicted3=await boundary(alpha,'episode-end3-predicted',3,false);
+  await admit(beta,1);await poll(beta,1,'ArrowLeft',P2_LEFT);await publish(beta,1);
+  await forward(beta,1,true);
+  const firstLate=await admit(alpha,1);
+  assert.equal(firstLate.timeline.dirty_from,1);
+  assert.equal(firstLate.timeline.remote_contiguous_through,1);
+  const firstCorrected=await correct(3,1,1,1);
+  assert.equal(firstCorrected.confirmed_through,1);
+  assert.equal(firstCorrected.simulated_through,2);
+  const corrected3=await boundary(alpha,'episode-end3-corrected',3,true);
+  proof.comparisons.end3={predicted_scene_state:predicted3.parsed.scene_state,
+    corrected_scene_state:corrected3.parsed.scene_state,confirmed_pad_prefix:comparePads([0,1]),
+    still_unconfirmed:[2]};
+  assert.notEqual(predicted3.parsed.scene_state,corrected3.parsed.scene_state,
+    'First late input must change native scene state while tick 2 remains speculative');
+
+  proof.segments.alpha_continuation=await continueAt(alpha,3);
+  await poll(alpha,3,'KeyD',P1_RIGHT);await publish(alpha,3);
+  const advanced=await forward(alpha,3,false);
+  assert.equal(advanced.timeline.remote_contiguous_through,1);
+  assert.equal(advanced.timeline.confirmed_through,1);
+  assert.equal(advanced.timeline.simulated_through,3);
+  proof.segments.forward_before_remote2={native_frame:advanced.status.metadata.currentFrame,timeline:advanced.timeline};
+  const predicted4=await boundary(alpha,'episode-end4-predicted',4,false);
+
+  // Beta runs its reference on time at every source step. Its real tick 2
+  // and tick 3 samples are first published after alpha reaches source frame 4.
+  await admit(beta,2);await poll(beta,2,'ArrowRight',P2_RIGHT);await publish(beta,2);
+  await forward(beta,2,true);
+  await boundary(beta,'episode-end3-reference',3,false);
+  proof.segments.beta_continuation=await continueAt(beta,3);
+  await admit(beta,3);await poll(beta,3,'ArrowRight',P2_RIGHT);await publish(beta,3);
+  await forward(beta,3,true);
+  const reference4=await boundary(beta,'episode-end4-reference',4,false);
+  await admit(alpha,2);
+  const finalLate=await admit(alpha,3);
+  assert.equal(finalLate.timeline.dirty_from,2);
+  assert.equal(finalLate.timeline.remote_contiguous_through,3);
+  const finalCorrected=await correct(4,2,0,2);
+  assert.equal(finalCorrected.confirmed_through,3);
+  const corrected4=await boundary(alpha,'episode-end4-corrected',4,true);
+  const checksum=checksumDifference(corrected4,reference4);
+  proof.comparisons.end4={prediction:checksumDifference(predicted4,reference4),corrected:checksum,
+    predicted_scene_state:predicted4.parsed.scene_state,on_time_scene_state:reference4.parsed.scene_state,
+    pad:comparePads([0,1,2,3])};
+  assert.notEqual(predicted4.parsed.scene_state,reference4.parsed.scene_state,
+    'Second late input must change the native scene-state checksum');
+  assert(checksum.equal,`Corrected END4 differs from the on-time peer in ${checksum.first_mismatch_channel}`);
+
+  for(const item of items){
+    const timeline=await log(item,'episodeTimeline');
+    assert.deepEqual([timeline.confirmed_through,timeline.simulated_through,timeline.dirty_from,
+      timeline.plan_outstanding],[3,3,null,false]);
+  }
+  await joinOwned('episode-close',items.map(item=>command(item,'close',17,4)));
+  const retired=await joinOwned('episode-retire',items.map(item=>command(item,'retire',18,4,
+    {forwardSteps:4,restoreCount:item===alpha?2:0,replaySteps:item===alpha?4:0,gpuIdle:true})));
+  proof.final_history_retirement={alpha:retired[0],beta:retired[1]};
+  for(const item of items){
+    assert.deepEqual(item.websockets,[proof.pages[item.role].websocket]);
+    assert.deepEqual(item.pageErrors,[]);
+    assert.deepEqual(item.externalRequests,[]);
+  }
+  proof.status='four-tick-episode-complete';
+  report.result='FOUR_TICK_EPISODE_COMPLETE';
+  addCheck('one fixed PRE, two actual corrections, and source advancement before full confirmation');
+}
+
 async function runPeerCorrection(alpha,beta){
   const alphaHeld=report.pages.alpha.route.agreed_start.held;
   const betaHeld=report.pages.beta.route.agreed_start.held;
@@ -1033,38 +1272,7 @@ async function runPeerCorrection(alpha,beta){
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],windows:[],
     endpoint_comparison_scope:'all raw nine-domain and particle endpoints are retained per page; strict full endpoint equality is asserted only between Armed and Restored PRE within each window; cross-window comparison uses exact Owner fields, static rows, frame and audio continuity without cross-view endpoint equality',
   };
-  for(const item of [alpha,beta])
-    report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
-  const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
-    diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));}});
-  const roomId=createRoomId(),relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
-  peerReport.relay={base:roomRelay.base,port:roomRelay.port,relay_url:relayUrl,room_id:roomId,
-    owner_process:roomRelay.ownerProcess,runtime_identity:roomRelay.runtimeIdentity,hashes:roomRelay.hashes,
-    transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for both windows'};
-  await joinOwned('peer-bridge-install',[
-    installPeerHistoryBridge(alpha,relayUrl,roomId).then(value=>{alpha.peerInstalled=true;return value;}),
-    installPeerHistoryBridge(beta,relayUrl,roomId).then(value=>{beta.peerInstalled=true;return value;}),
-  ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
-  for(const item of [alpha,beta]){
-    const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
-      restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
-    assert.equal(initial.localPort,item.role==='alpha'?0:1);
-    assert.equal(initial.remotePort,1-initial.localPort);
-    assert.equal(initial.inputReady,0);
-  }
-  const [alphaPeer,betaPeer]=await joinOwned('peer-start',[
-    peerOperation(alpha,'peerStart'),peerOperation(beta,'peerStart')]);
-  peerReport.pages.alpha.peer_start=alphaPeer;peerReport.pages.beta.peer_start=betaPeer;
-  assert(alphaPeer.ready&&betaPeer.ready&&alphaPeer.agreement_hash);
-  assert.equal(alphaPeer.agreement_hash,betaPeer.agreement_hash);
-  assert.equal(alphaPeer.input_ticks_protocol_only,Number(values.windows));
-  assert.equal(alphaPeer.source_ticks_protocol_only,Number(values.windows)+2);
-  for(const item of [alpha,beta]){
-    assert.equal(item.websockets.length,1,`${item.role} must own exactly one actual peer WebSocket`);
-    assert.equal(item.websockets[0],`${relayUrl}/v1/rooms/${roomId}/socket`,
-      `${item.role} WebSocket is not the selected local relay room`);
-  }
-  peerReport.pages.alpha.websocket=alpha.websockets[0];peerReport.pages.beta.websocket=beta.websockets[0];
+  await startCorrectionPeers(alpha,beta,peerReport,Number(values.windows));
 
   let previousResult=null,previousRetirement=null;
   const count=Number(values.windows);
@@ -1298,7 +1506,8 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
+  if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
+  else if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);
   else{
     const staticReadRows=joined.map(({identity})=>({address:identity.address,size:identity.size,identity}));
     const [alphaRows,betaRows]=await joinOwned('held-static-read',[

@@ -38,10 +38,14 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
         request = '\n'.join([
             section('int history_request(', '} // namespace'),
             section('int melee_web_native_menu_match_history_request(',
-                    'const char* melee_web_native_menu_match_history_rebase_identity_json('),
+                    'int melee_web_native_menu_match_history_episode_enable('),
         ])
         self.assertIn('(void)emscripten_request_animation_frame(history_dispatch,nullptr);', request)
         self.assertNotIn('EMSCRIPTEN_RESULT_SUCCESS', request)
+        poll_case = section('case 12:{', 'case 13:match_history_pcm_frames=0;')
+        self.assertLess(poll_case.index('can_admit_poll_ticket'), poll_case.index('melee_web_input_poll()'))
+        self.assertIn('history_request(13,0,true)', history)
+        self.assertIn('history_request(15,0,true)', history)
 
         fixture = r'''#include <array>
 #include <cassert>
@@ -59,6 +63,7 @@ struct Capsule { bool endpoint_active() const { return false; } };
 struct MatchHistoryControl {
   MatchHistoryStatus status{};
   bool dispatching=false;
+  bool episode_enabled=false;
   uint32_t requested_rebase_end=0;
   Capsule* capsule=nullptr;
   std::array<char,512> error{};
@@ -135,6 +140,16 @@ int main() {
   assert(match_history.status.first_failure==1 && match_history.error.data()==first_error);
   assert(match_history.status.request_seq==0 && match_history.status.pending_command==0);
   assert(request_calls==0);
+  for (const unsigned command : {13u,15u}) {
+    reset(37);
+    match_history.episode_enabled=true;
+    assert(melee_web_native_menu_match_history_request(command)==0);
+    const std::string missing_plan_error=match_history.error.data();
+    assert(match_history.status.first_failure==1 && request_calls==0);
+    assert(melee_web_native_menu_match_history_request(12)==0);
+    assert(match_history.error.data()==missing_plan_error);
+    assert(match_history.status.request_seq==0 && match_history.status.pending_command==0);
+  }
 }
 '''
         source_text = fixture.replace('@REFUSAL@', refusal).replace('@REQUEST@', request)

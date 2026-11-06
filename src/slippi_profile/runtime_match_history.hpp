@@ -58,6 +58,7 @@ enum class RuntimeMatchHistoryPhase : std::uint32_t {
     Restored=11, CorrectedSealed=12, CorrectedCpuCopied=13,
     CorrectedDrawPending=14, CorrectedDrawIdle=15, CorrectedComplete=16,
     Closed=17, Retired=18, Failed=19, MatchClosed=20,
+    EpisodeRecording=21,
 };
 
 enum class RuntimeMatchHistoryFailure : std::uint32_t {
@@ -84,10 +85,33 @@ struct RuntimeMatchHistoryMetadata {
 };
 static_assert(sizeof(RuntimeMatchHistoryMetadata)==64);
 
-/* One PRE, one actual forward source tick, at most one restored-PRE correction,
- * and one source tick of actual elapsed time. This first runtime adapter is
- * intentionally narrower than the underlying three-incarnation/two-restore
- * capsule. A failed or incomplete history remains owned until match teardown. */
+/* Private optional episode receipts. The legacy 168-byte input ABI is kept
+ * separate; these fixed records bind actual polls and applied rows to one
+ * captured owner without allocating after PRE. */
+struct RuntimeMatchHistoryPollTicket {
+    std::uint32_t schema=1, bytes=88;
+    std::uint32_t ticket_id{}, source_frame{}, incarnation{}, local_port{}, remote_port{}, reserved0{};
+    std::uint64_t poll_serial{};
+    std::array<std::uint8_t,44> raw_pad{};
+    std::uint32_t reserved1{};
+};
+static_assert(sizeof(RuntimeMatchHistoryPollTicket)==88);
+
+struct RuntimeMatchHistoryInputReceipt {
+    std::uint32_t schema=1, bytes=176;
+    std::uint32_t ticket_id{}, source_frame{}, incarnation{}, local_port{}, remote_port{}, state{};
+    std::uint64_t poll_serial{};
+    std::array<std::uint8_t,44> raw_pad{};
+    std::array<std::uint8_t,44> forward_pad{};
+    std::array<std::uint8_t,44> selected_pad{};
+    std::uint32_t reserved{};
+};
+static_assert(sizeof(RuntimeMatchHistoryInputReceipt)==176);
+
+/* Legacy mode remains one actual forward source tick and one restored-PRE
+ * correction. The explicitly enabled private episode mode uses the fixed
+ * seven-row receipts above across at most three source incarnations and two
+ * restores. Failed or incomplete history remains owned until match teardown. */
 class RuntimeMatchHistory final {
 public:
     using View=GameplayCpuEndpointView;
@@ -99,7 +123,8 @@ public:
         GameplayMatchSession&, std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&, RuntimeMatchHistoryBoundaryCheck,
         RuntimeMatchHistoryPresentSubmit, RuntimeMatchHistoryAudioStep,
-        unsigned& audio_phase, void* callback_context) noexcept;
+        unsigned& audio_phase, void* callback_context,
+        bool episode_mode=false) noexcept;
     ~RuntimeMatchHistory();
     RuntimeMatchHistory(const RuntimeMatchHistory&)=delete;
     RuntimeMatchHistory& operator=(const RuntimeMatchHistory&)=delete;
@@ -109,6 +134,22 @@ public:
      * serial. The remote prediction is decoded from the canonical 11-byte PAD
      * format here; correction later uses the retained row and never polls. */
     bool begin() noexcept;
+    bool begin_episode() noexcept;
+    bool can_admit_poll_ticket(std::uint32_t ticket_id,
+                               unsigned local_port, unsigned remote_port) const noexcept;
+    bool admit_poll_ticket(std::uint32_t ticket_id,
+                           const PADStatus raw[PAD_MAX_CONTROLLERS],
+                           std::uint64_t poll_serial,
+                           unsigned local_port, unsigned remote_port) noexcept;
+    bool forward_ticket(std::uint32_t ticket_id,
+                       const std::uint8_t* planned_frame,
+                       unsigned planned_frame_bytes) noexcept;
+    bool seal_incarnation() noexcept;
+    bool replay_ticket(std::uint32_t ticket_id,
+                       const std::uint8_t* planned_frame,
+                       unsigned planned_frame_bytes) noexcept;
+    bool finish_replay() noexcept;
+    bool begin_continuation() noexcept;
     bool forward_from_poll(const PADStatus raw[PAD_MAX_CONTROLLERS],
                            std::uint64_t poll_serial,
                            unsigned local_port, unsigned remote_port,
@@ -160,6 +201,9 @@ public:
     std::uint32_t restore_count() const noexcept { return restore_count_; }
     std::uint32_t endpoint_mask() const noexcept { return endpoint_mask_; }
     std::uint64_t poll_serial() const noexcept { return poll_serial_; }
+    bool episode_mode() const noexcept { return episode_mode_; }
+    const RuntimeMatchHistoryPollTicket* latest_ticket() const noexcept;
+    const RuntimeMatchHistoryInputReceipt* episode_input_row(std::uint32_t ordinal) const noexcept;
     /* Copy this value before restore/retire reuses the selected motor tape. */
     const MeleeWebCpuMotorEvidence* motor_evidence() const noexcept;
 
@@ -206,6 +250,10 @@ private:
     std::uint64_t poll_serial_{};
     mutable bool endpoint_read_failure_{};
     bool has_input_{},source_step_possible_{};
+    bool episode_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
+    std::uint32_t segment_start_frame_{},replay_target_end_{},ticket_count_{},last_ticket_id_{};
+    RuntimeMatchHistoryPollTicket latest_ticket_{};
+    std::array<RuntimeMatchHistoryInputReceipt,7> episode_rows_{};
 };
 
 } // namespace melee_web

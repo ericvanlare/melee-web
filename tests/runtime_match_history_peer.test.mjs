@@ -572,3 +572,33 @@ function deferredForTest() {
   const promise = new Promise(resolvePromise => { resolve = resolvePromise; });
   return {promise, resolve};
 }
+
+test('four-tick peer keeps later actual input unpublished across speculative continuation', async () => {
+  const bus = createEndpointBus();
+  const alpha = makePeer(bus, 'alpha', {inputTicks: 4});
+  const beta = makePeer(bus, 'beta', {inputTicks: 4});
+  const publish = (peer, port, tick) => peer.publishLocal({port, tick,
+    pollSerial: String(100 + tick), pad: validPad(10 + port + tick)});
+  try {
+    const [started] = await Promise.all([alpha.start(), beta.start()]);
+    assert.equal(started.scope, 'melee-web-runtime-four-tick-history-peer-v1');
+    assert.deepEqual(started.protocol_only_frames.map(row => row.protocol_source_tick), [0, 1]);
+    for (const tick of [0, 1, 2, 3]) await publish(alpha, 0, tick);
+    for (const tick of [0, 1]) await publish(beta, 1, tick);
+    await alpha.waitForRemoteSample({tick: 1});
+    assert.equal(alpha.remoteSnapshot(2), null);
+    assert.deepEqual(alpha.snapshot().remote_contributions.map(row => row.protocol_input_tick), [0, 1]);
+    for (const tick of [2, 3]) await publish(beta, 1, tick);
+    const received = await alpha.waitForRemoteSample({tick: 3});
+    assert.deepEqual(received.pad, [...validPad(14)]);
+    await beta.waitForRemoteSample({tick: 3});
+    for (const peer of [alpha, beta]) {
+      const rows = peer.snapshot().protocol_only_frames;
+      assert.deepEqual(rows.map(row => row.protocol_input_tick), [null, null, 0, 1, 2, 3]);
+      assert(rows.every(row => row.match_source_frame === null && row.not_for_gameplay));
+    }
+    await assert.rejects(publish(beta, 1, 4), /contiguous index order/);
+  } finally {
+    await Promise.allSettled([alpha.close(), beta.close()]);
+  }
+});

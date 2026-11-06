@@ -19,8 +19,12 @@ struct MatchHistoryInput {
  uint8_t raw[44]{},forward[44]{},corrected[44]{};
  uint32_t reserved{};
 };
+using MatchHistoryPollTicket=melee_web::RuntimeMatchHistoryPollTicket;
+using MatchHistoryEpisodeInputRow=melee_web::RuntimeMatchHistoryInputReceipt;
 static_assert(sizeof(MatchHistoryStatus)==128);
 static_assert(sizeof(MatchHistoryInput)==168);
+static_assert(sizeof(MatchHistoryPollTicket)==88);
+static_assert(sizeof(MatchHistoryEpisodeInputRow)==176);
 static_assert(sizeof(MeleeWebNetChecksumRecord)==64);
 enum MatchHistoryStartState : uint32_t {
  MatchHistoryStartDisabled=0,
@@ -86,8 +90,10 @@ struct MatchHistoryControl {
  uint64_t asset_owner{};
  uint64_t submitted_frame{};
  uint32_t requested_rebase_end{};
+ uint32_t requested_ticket_id{};
+ std::array<uint8_t,44> requested_plan{};
  std::array<uint8_t,11> remote{};
- bool remote_ready{},dispatching{},identity_ready{};
+ bool remote_ready{},dispatching{},identity_ready{},episode_enabled{};
  std::string identity;
  std::array<std::string,4> identity_host;
  melee_web::GameplayCpuEndpointRecord record{};
@@ -739,6 +745,7 @@ void history_encode_pad(uint8_t* to,const PADStatus& p) noexcept {
 }
 void history_copy_input() noexcept {
  auto& c=match_history;if(!c.capsule)return;
+ if(c.capsule->episode_mode()){c.input={};return;}
  c.input.poll_serial=c.capsule->poll_serial();c.input.local_port=c.status.local_port;c.input.remote_port=c.status.remote_port;
  c.input.input_ready=c.capsule->retained_input(0)!=nullptr;
  c.input.corrected_ready=c.capsule->retained_input(2)!=nullptr;
@@ -759,7 +766,7 @@ std::unique_ptr<melee_web::GameplayCpuStatics> history_configure_statics(MatchHi
 bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  using Gate=melee_web::RuntimeMatchHistoryGatePoint;
  using Result=melee_web::RuntimeMatchHistoryGateResult;
- if(!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
+ if(c.episode_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
     c.capsule->pre_frame()!=c.status.expected_frame||
     end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||!c.capsule->can_rebase_confirmed(end)||
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
@@ -815,12 +822,12 @@ EM_BOOL history_dispatch(double,void*) {
     if(c.capsule||!c.statics||!c.identity_ready||match->source_frames()!=c.status.expected_frame){history_refuse("Capture requires a frame-bound identity and reviewed statics configuration");break;}
     melee_web::CpuCaptureDiagnostic diagnostic{};
     c.capsule=RuntimeMatchHistory::capture(*match,std::move(c.statics),diagnostic,
-      history_boundary,history_present,history_audio_step,audio_phase,nullptr);
+      history_boundary,history_present,history_audio_step,audio_phase,nullptr,c.episode_enabled);
     okay=bool(c.capsule);if(!okay)history_refuse(diagnostic.message.data());break;
    }
-   case 2:okay=c.capsule&&c.capsule->begin();break;
+   case 2:okay=c.capsule&&!c.episode_enabled&&c.capsule->begin();break;
    case 3:{
-    if(!c.capsule||!c.remote_ready||c.capsule->phase()!=melee_web::RuntimeMatchHistoryPhase::Armed){history_refuse("Forward requires armed PRE and decoded remote PAD");break;}
+    if(!c.capsule||c.episode_enabled||!c.remote_ready||c.capsule->phase()!=melee_web::RuntimeMatchHistoryPhase::Armed){history_refuse("Forward requires legacy armed PRE and decoded remote PAD");break;}
     if(history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::ForwardBefore,c.capsule->pre_frame(),nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)break;
     for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event)if(event->type==AURORA_EXIT)throw std::runtime_error("Aurora exit during terminal forward");
     const auto* before=melee_web_input_snapshot();const uint64_t previous=before?before->samples:0;
@@ -835,12 +842,41 @@ EM_BOOL history_dispatch(double,void*) {
    case 4:okay=c.capsule&&c.capsule->submit_present();break;
    case 5:okay=c.capsule&&c.capsule->admit_present_completion();break;
    case 6:okay=c.capsule&&c.capsule->restore_pre();break;
-   case 7:match_history_pcm_frames=0;okay=c.capsule&&c.remote_ready&&c.capsule->correct_from_retained(c.remote.data(),11);c.remote_ready=false;break;
+   case 7:match_history_pcm_frames=0;okay=c.capsule&&!c.episode_enabled&&c.remote_ready&&c.capsule->correct_from_retained(c.remote.data(),11);c.remote_ready=false;break;
    case 8:okay=c.capsule&&c.capsule->close_selected_endpoint();break;
    case 9:
     if(c.capsule){if(const auto* motor=c.capsule->motor_evidence())c.motor=*motor;okay=c.capsule->retire_confirmed();
      if(okay){if(const auto* receipt=melee_web_cpu_interval_motor_commit_receipt())c.motor_commit=*receipt;else okay=false;}}break;
    case 11:okay=history_rebase_confirmed(c,c.requested_rebase_end);break;
+   case 12:{
+    if(!c.episode_enabled||!c.capsule){history_refuse("Episode poll ticket requires explicit pre-capture mode");break;}
+    const auto poll_admitted=[&]{
+     return c.capsule->can_admit_poll_ticket(c.status.request_seq,c.status.local_port,c.status.remote_port)&&
+      history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::ForwardBefore,
+       c.capsule->current_frame(),nullptr)==melee_web::RuntimeMatchHistoryGateResult::Admitted;
+    };
+    if(!poll_admitted()){history_refuse("Episode poll ticket preflight refused before Aurora service");break;}
+    for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event)
+     if(event->type==AURORA_EXIT)throw std::runtime_error("Aurora exit during episode input poll");
+    if(!poll_admitted()){history_refuse("Episode poll ticket preflight refused before input sampling");break;}
+    const auto* before=melee_web_input_snapshot();const uint64_t previous=before?before->samples:0;
+    if(previous==UINT64_MAX)throw std::runtime_error("Input sample serial exhausted");
+    const auto* polled=melee_web_input_poll();
+    if(!polled||polled->samples!=previous+1||!polled->ready||!polled->focused||!polled->visible||!polled->active)
+     throw std::runtime_error("Actual ordinary episode input poll owner refused");
+    okay=c.capsule->admit_poll_ticket(c.status.request_seq,polled->raw,polled->samples,
+      c.status.local_port,c.status.remote_port);break;
+   }
+   case 13:match_history_pcm_frames=0;
+    okay=c.episode_enabled&&c.capsule&&c.capsule->forward_ticket(
+      c.requested_ticket_id,c.requested_plan.data(),c.requested_plan.size());break;
+   case 14:okay=c.episode_enabled&&c.capsule&&c.capsule->seal_incarnation();break;
+   case 15:match_history_pcm_frames=0;
+    okay=c.episode_enabled&&c.capsule&&c.capsule->replay_ticket(
+      c.requested_ticket_id,c.requested_plan.data(),c.requested_plan.size());break;
+   case 16:okay=c.episode_enabled&&c.capsule&&c.capsule->finish_replay();break;
+   case 17:okay=c.episode_enabled&&c.capsule&&c.capsule->begin_continuation();break;
+   case 18:okay=c.episode_enabled&&c.capsule&&c.capsule->begin_episode();break;
    default:break;
    }
   }
@@ -849,14 +885,20 @@ EM_BOOL history_dispatch(double,void*) {
  if(!okay)history_refuse("Terminal match history command refused");
  history_sync();history_copy_input();
  c.requested_rebase_end=0;
+ c.requested_ticket_id=0;c.requested_plan={};
  c.status.last_completed_command=command;c.status.complete_seq=c.status.request_seq;c.status.pending_command=0;
  c.dispatching=false;
  return EM_FALSE;
 }
-int history_request(unsigned command,uint32_t end_frame) {
+int history_request(unsigned command,uint32_t end_frame,bool explicit_episode_payload=false) {
  auto& c=match_history;
+ const bool episode_command=command>=12&&command<=18;
+ const bool legacy_execution=command==2||command==3||command==7||command==11;
+ const bool frame_payload_command=command==13||command==15;
  if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
-    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>11||
+    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>18||
+    (episode_command&&!c.episode_enabled)||(c.episode_enabled&&legacy_execution)||
+    (frame_payload_command!=explicit_episode_payload)||
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  c.requested_rebase_end=end_frame;
  ++c.status.request_seq;c.status.pending_command=command;
@@ -1025,7 +1067,7 @@ int melee_web_native_menu_match_history_configure(const melee_web::CpuStaticRow*
 }
 int melee_web_native_menu_match_history_remote_pad(const uint8_t* bytes,unsigned length) {
  auto& c=match_history;
- if(!match_history_terminal||c.status.first_failure||c.status.pending_command||c.dispatching||
+ if(c.episode_enabled||!match_history_terminal||c.status.first_failure||c.status.pending_command||c.dispatching||
     (c.capsule&&c.capsule->endpoint_active())||!bytes||length!=11||
     reinterpret_cast<uintptr_t>(bytes)+uint64_t(length)>emscripten_get_heap_size()||
     !melee_web_net_validate_pad(bytes,length))return history_refuse("Remote PAD admission refused");
@@ -1037,6 +1079,36 @@ int melee_web_native_menu_match_history_request(unsigned command) {
 }
 int melee_web_native_menu_match_history_request_rebase(uint32_t end_frame) {
  return history_request(11,end_frame);
+}
+int melee_web_native_menu_match_history_episode_enable() {
+ auto& c=match_history;
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||c.status.pending_command||
+    c.dispatching||c.capsule||c.episode_enabled||c.remote_ready||!c.identity_ready||!c.statics||!match||
+    match.get()!=c.match_owner||match->source_frames()!=c.status.expected_frame||
+    history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::CapturePre,
+      c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
+  return history_refuse("Episode mode must be explicitly enabled before PRE capture");
+ c.episode_enabled=true;return 1;
+}
+int melee_web_native_menu_match_history_request_episode_forward(
+ uint32_t ticket_id,const uint8_t* plan,unsigned length) {
+ auto& c=match_history;
+ const uintptr_t begin=reinterpret_cast<uintptr_t>(plan);
+ if(!c.episode_enabled||!ticket_id||!plan||length!=44||
+    begin+uint64_t(length)>emscripten_get_heap_size()||c.status.pending_command||c.dispatching||
+    c.status.first_failure)return history_refuse("Episode forward plan argument refused");
+ std::copy_n(plan,44,c.requested_plan.begin());c.requested_ticket_id=ticket_id;
+ return history_request(13,0,true);
+}
+int melee_web_native_menu_match_history_request_episode_replay(
+ uint32_t ticket_id,const uint8_t* plan,unsigned length) {
+ auto& c=match_history;
+ const uintptr_t begin=reinterpret_cast<uintptr_t>(plan);
+ if(!c.episode_enabled||!ticket_id||!plan||length!=44||
+    begin+uint64_t(length)>emscripten_get_heap_size()||c.status.pending_command||c.dispatching||
+    c.status.first_failure)return history_refuse("Episode replay plan argument refused");
+ std::copy_n(plan,44,c.requested_plan.begin());c.requested_ticket_id=ticket_id;
+ return history_request(15,0,true);
 }
 const char* melee_web_native_menu_match_history_rebase_identity_json(){
  const auto& c=match_history;
@@ -1061,6 +1133,26 @@ const MatchHistoryInput* melee_web_native_menu_match_history_input(){
  return &match_history.input;
 }
 unsigned melee_web_native_menu_match_history_input_bytes(){return sizeof(MatchHistoryInput);}
+unsigned melee_web_native_menu_match_history_ticket_bytes(){
+ return match_history.episode_enabled?sizeof(MatchHistoryPollTicket):0u;
+}
+const MatchHistoryPollTicket* melee_web_native_menu_match_history_ticket_data(){
+ auto& c=match_history;
+ if(!c.episode_enabled||!c.capsule||c.status.first_failure||c.status.pending_command||
+    c.status.complete_seq!=c.status.request_seq||c.status.last_completed_command!=12||
+    !history_start_export_idle())return nullptr;
+ const auto* ticket=c.capsule->latest_ticket();
+ return ticket&&ticket->ticket_id==c.status.request_seq?ticket:nullptr;
+}
+unsigned melee_web_native_menu_match_history_input_row_bytes(){
+ return match_history.episode_enabled?sizeof(MatchHistoryEpisodeInputRow):0u;
+}
+const MatchHistoryEpisodeInputRow* melee_web_native_menu_match_history_input_row_data(unsigned ordinal){
+ auto& c=match_history;
+ if(!c.episode_enabled||!c.capsule||c.status.first_failure||c.status.pending_command||
+    c.status.complete_seq!=c.status.request_seq||!history_start_export_idle())return nullptr;
+ return c.capsule->episode_input_row(ordinal);
+}
 const char* melee_web_native_menu_match_history_error(){return match_history.error.data();}
 const char* melee_web_native_menu_match_history_identity_json(const char* runtime,const char* assets,const char* save,const char* profile){
  auto& c=match_history;
@@ -1145,20 +1237,33 @@ const void* melee_web_native_menu_match_history_checksum_data(){
  if(phase!=Phase::PredictedCpuCopied&&!corrected)return nullptr;
  const auto pre=c.capsule->pre_frame();
  if(pre!=c.status.expected_frame||pre==UINT32_MAX)return nullptr;
- const auto frame=pre+1;
- if(c.capsule->sealed_end()!=frame||!c.capsule->poll_serial()||
-    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)
-  return nullptr;
- const auto* pads=c.capsule->retained_input(corrected?2:1);
- if(!pads)return nullptr;
- // The actual pre-frame is the match-local ordinal of this consumed input.
- // Scene three selects the existing match projection, independent of transport preroll.
+ const auto frame=c.capsule->current_frame();
+ if(frame<=pre||c.capsule->sealed_end()!=frame||!c.capsule->poll_serial()||
+    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)return nullptr;
+ std::array<PADStatus,PAD_MAX_CONTROLLERS> decoded{};
+ const PADStatus* pads=nullptr;uint32_t tick=pre;
+ if(c.capsule->episode_mode()){
+  const auto ordinal=frame-pre-1u;
+  if(frame-pre>7u||ordinal>=7u)return nullptr;
+  const auto* row=c.capsule->episode_input_row(ordinal);
+  if(!row||row->source_frame+1u!=frame||row->state==0||row->poll_serial==0)return nullptr;
+  const auto& bytes=row->state==2?row->selected_pad:row->forward_pad;
+  for(unsigned port=0;port<PAD_MAX_CONTROLLERS;++port)
+   if(!melee_web_net_decode_pad(bytes.data()+port*MELEE_WEB_NET_PAD_BYTES,
+        MELEE_WEB_NET_PAD_BYTES,&decoded[port]))return nullptr;
+  pads=decoded.data();tick=frame-1u;
+ }else{
+  if(frame!=pre+1u)return nullptr;
+  pads=c.capsule->retained_input(corrected?2:1);
+  if(!pads)return nullptr;
+ }
+ // The actual consumed match-local input ordinal selects this unchanged
+ // 64-byte projection; transport and episode metadata are not hashed.
  MeleeWebNetChecksumRecord observed{};
- melee_web_net_checksum_compute(pre,3,pads,nullptr,&observed);
- if(observed.tick!=pre||observed.frame!=frame||!(observed.flags&MELEE_WEB_NET_HASHED_FIGHTERS)||
+ melee_web_net_checksum_compute(tick,3,pads,nullptr,&observed);
+ if(observed.tick!=tick||observed.frame!=frame||!(observed.flags&MELEE_WEB_NET_HASHED_FIGHTERS)||
     c.capsule->phase()!=phase||
-    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)
-  return nullptr;
+    history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)return nullptr;
  c.checksum=observed;
  return &c.checksum;
 }

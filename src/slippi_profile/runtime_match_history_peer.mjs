@@ -11,6 +11,8 @@ export const RUNTIME_MATCH_HISTORY_PEER_PROFILE =
 export const RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS = 3;
 export const RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS = 1;
 export const RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS = 2;
+export const RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS = 4;
+const EPISODE_SCOPE = 'melee-web-runtime-four-tick-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS = 5000;
 const PAD_BYTES = 11;
 const FRAME_BYTES = 44;
@@ -135,13 +137,13 @@ function validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame)
  * provenance. */
 export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
   loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS} = {}) {
-  requireCondition(Number.isSafeInteger(inputTicks) && inputTicks >= 1 &&
-    inputTicks <= RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
-    'Runtime history peer supports one or two indexed input samples');
+  requireCondition([1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS, RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS].includes(inputTicks),
+    'Runtime history peer supports one, two, or four indexed input samples');
   validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame);
   return Object.freeze({
     protocol: 'melee-web-local-lockstep-a2-v1',
-    scope: inputTicks === 1 ? RUNTIME_MATCH_HISTORY_PEER_SCOPE : RUNTIME_MATCH_HISTORY_TWO_WINDOW_PEER_SCOPE,
+    scope: inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS ? EPISODE_SCOPE :
+      (inputTicks === 1 ? RUNTIME_MATCH_HISTORY_PEER_SCOPE : RUNTIME_MATCH_HISTORY_TWO_WINDOW_PEER_SCOPE),
     source_ticks: inputTicks + 2,
     input_ticks: inputTicks,
     source_frame: sourceFrame,
@@ -192,9 +194,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   requireCondition(typeof createEndpoint === 'function',
     'Runtime history peer requires the existing room relay endpoint factory');
 
-  requireCondition(Number.isSafeInteger(inputTicks) && inputTicks >= 1 &&
-    inputTicks <= RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
-    'Runtime history peer supports one or two indexed input samples');
+  requireCondition([1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS, RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS].includes(inputTicks),
+    'Runtime history peer supports one, two, or four indexed input samples');
   const sourceTicks = inputTicks + 2;
   const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame, inputTicks});
   const localPort = role === 'alpha' ? 0 : 1;
