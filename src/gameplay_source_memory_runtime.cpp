@@ -1,5 +1,6 @@
 #include "slippi_profile/fighter_projection.h"
 #include "gameplay_source_memory_runtime.h"
+#include "gameplay_heap.h"
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include "stadium_registration_observer.h"
 #endif

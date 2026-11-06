@@ -2,7 +2,6 @@
 #define MELEE_WEB_GAMEPLAY_SOURCE_MEMORY_RUNTIME_H
 
 #include "gameplay_class_piece_diagnostic.h"
-#include "gameplay_heap.h"
 #include "gameplay_lobj_writer_diagnostic.h"
 #include "gameplay_tobj_writer_diagnostic.h"
 #include "slippi_profile/slist_target_diagnostic.h"
@@ -91,6 +90,8 @@ void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snap
  * Commit is one-shot and retains displaced storage until prepared_destroy. */
 typedef struct MeleeWebSourceMemoryHistory MeleeWebSourceMemoryHistory;
 typedef struct MeleeWebSourceMemoryHistoryPrepared MeleeWebSourceMemoryHistoryPrepared;
+typedef struct MeleeWebGameplayHeapHistorySnapshot MeleeWebGameplayHeapHistorySnapshot;
+typedef struct MeleeWebGameplayHeapHistoryPrepared MeleeWebGameplayHeapHistoryPrepared;
 typedef enum MeleeWebSourceMemoryHistoryStatus {
     MELEE_WEB_SOURCE_MEMORY_HISTORY_OK = 0,
     MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT,
