@@ -54,7 +54,7 @@ assert.equal(actualWasmHash,values['runtime-wasm-sha256'],
   'Built ordinary runtime differs from the reviewed Wasm identity');
 
 const report={schema:'melee-web-runtime-match-history-admission-v1',
-  scope:'one headless ordinary-runtime page; original CSS/SSS keyboard route; native agreed start and held frame-zero terminal takeover only; no capture, network session, replay or rollback command',
+  scope:'one headless ordinary-runtime page; original CSS/SSS keyboard route; native agreed start, recorded ordinary-local Entry/Ready/Go input and draw prefix, then held gameplay-frame-zero terminal takeover; no capture, network session, replay or rollback command',
   result:'RUNNING',started_at:new Date().toISOString(),
   runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
   disc:{image_sha256:discImageHash,validated_identity:null},
@@ -478,25 +478,35 @@ async function agreeOriginalMatchStart(){
       const held=await page.evaluate(()=>{
         const controller=globalThis.__meleeRuntimeMatchHistory;
         const publication=controller.startPublication();
+        const liveIdentity=controller.startLiveIdentity();
+        const prefixJSON=controller.startPrefix();
+        const prefix=globalThis.__meleeValidateRuntimeMatchStartPrefix(prefixJSON,
+          {publication,liveIdentity});
         return {publication:{...publication,raw:Array.from(publication.raw)},
-          live_identity:controller.startLiveIdentity(),
+          live_identity:liveIdentity,prefix_json:prefixJSON,
+          prefix_summary:{source_ticks:prefix.source_ticks,source_draws:prefix.source_draws,
+            final_ready_tick:prefix.final_ready_tick,input_provenance:prefix.input_provenance,
+            initial_resident_transfer_drains:prefix.initial_resident_transfer_drains,
+            final_resident_transfer_drains:prefix.final_resident_transfer_drains},
           match:JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_match_observe())),
           running:Module._melee_web_native_menu_running()};
       });
       route.held=held;report.route.match=held.match;
       assert.equal(held.running,0,'Agreed match must remain held before terminal takeover');
-      assert.equal(held.match.frame,0,'Agreed match advanced before terminal takeover');
+      assert.equal(held.match.frame,0,'Gameplay counter advanced beyond the actual GO boundary');
+      assert.equal(held.match.ready,true,'Original HUD did not enable gameplay at the held boundary');
       break;
     }
     await page.waitForTimeout(25);
   }
-  // ready is the original post-intro HUD enable flag. The native held-state
-  // receipt proves construction/publication before any source tick; retain
-  // that HUD flag as telemetry rather than waiting through Entry/Ready/Go.
-  assert(route.held&&report.route.match?.frame===0,
+  // The original gameplay timer starts after Entry/Ready. The prefix retains
+  // every actual local input and source tick/draw pair leading to HUD enable.
+  // Holding there makes the next gameplay counter transition exactly 0 -> 1.
+  assert(route.held&&report.route.match?.frame===0&&report.route.match.ready===true,
     `Agreed original match did not publish frame zero: ${JSON.stringify({state,start:route.last_state})}`);
-  addCheck('native agreement constructs and publishes the supported match once at held frame zero',{
+  addCheck('ordinary source startup reaches the actual GO boundary at held gameplay frame zero',{
     frame:report.route.match.frame,stage:report.route.match.rules.stage,
+    prefix:route.held.prefix_summary,
     sourceCharacters:report.route.match.rules.player_source_characters,
     stocks:report.route.match.rules.player_stocks});
 }
@@ -564,7 +574,7 @@ async function admitTerminalTakeover(){
     if(asyncifyState!==null&&asyncifyState!==0)
       throw Error(`Asyncify is not idle at admission (state ${asyncifyState})`);
     const match=JSON.parse(module.UTF8ToString(module._melee_web_native_menu_match_observe()));
-    if(match.paused||match.ending||match.complete||match.rules?.stage!==32||
+    if(!match.ready||match.paused||match.ending||match.complete||match.rules?.stage!==32||
       match.rules?.match_kind!==1||match.rules?.is_stock!==1||match.rules?.is_vs!==1||
       match.rules?.is_teams!==0||JSON.stringify(match.rules?.player_stocks)!=='[4,4]'||
       JSON.stringify(match.rules?.player_source_characters)!=='[8,8]'||
@@ -654,8 +664,9 @@ try{
   await page.waitForFunction(()=>globalThis.Module&&typeof Module._melee_web_native_menu_match_history_take_over==='function'&&
     typeof Module._melee_web_native_menu_match_observe==='function',null,{timeout:90000});
   await page.evaluate(async url=>{
-    const {createRuntimeMatchHistoryController}=await import(url);
+    const {createRuntimeMatchHistoryController,validateRuntimeMatchStartPrefix}=await import(url);
     globalThis.__meleeRuntimeMatchHistory=createRuntimeMatchHistoryController(globalThis.Module);
+    globalThis.__meleeValidateRuntimeMatchStartPrefix=validateRuntimeMatchStartPrefix;
   },new URL('runtime_match_history_controller.mjs',diagBase).href);
   controllerInstalled=true;
   const preRouteOwners=await page.evaluate(()=>({lockstep:window.meleeNetRuntimeLockstepSnapshot?.()??null,

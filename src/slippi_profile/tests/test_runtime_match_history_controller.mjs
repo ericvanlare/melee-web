@@ -3,17 +3,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
-  decodeRuntimeMatchHistoryInput} from '../runtime_match_history_controller.mjs';
+  decodeRuntimeMatchHistoryInput,validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
 const HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
-const DEFAULT_PUBLICATION={schema:1,bytes:48,state:5,sourceFrame:0,sourceDraws:1,
+const DEFAULT_PUBLICATION={schema:2,bytes:48,state:5,sourceFrame:0,sourceDraws:3,
   padPolicy:1,firstUsePending:0,reserved:0,
-  priorSubmission:9007199254741001n,sourceSubmission:9007199254741002n};
+  priorSubmission:9007199254741001n,sourceSubmission:9007199254741004n};
 function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=0,
   failStart='',offerText=' { "source" : "native-offer" } ',
   agreementText=' { "source" : "native-agreement" } ',
   liveIdentityText=' { "source" : "native-live-identity" } ',
+  prefixText=' { "source" : "native-prefix" } ',
   publication=DEFAULT_PUBLICATION,publicationBytes=48,agreedStartExports=true}={}){
   const heap=new Uint8Array(65536),view=new DataView(heap.buffer),calls=[],allocations=[],frees=[],padCalls=[],startCalls=[];
   const put=(offset,value)=>view.setUint32(256+offset,value,true);
@@ -92,6 +93,11 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
     module[prefix+'start_publication_bytes']=()=>publicationBytes;
     module[prefix+'start_publication_data']=()=>nativeStartPhase===5?publicationPointer:0;
     module[prefix+'start_live_identity_json']=()=>nativeStartPhase===5?borrowedString(liveIdentityText):0;
+    module[prefix+'start_prefix_json']=()=>{
+      startCalls.push({name:'prefix',phase:nativeStartPhase});
+      if(failStart==='prefix'||nativeStartPhase!==5)return refuse('prefix',55);
+      return borrowedString(prefixText);
+    };
   }
   return {module,calls,put,view,allocations,frees,padCalls,startCalls,
     setStartPhase:value=>{nativeStartPhase=value;},writePublication};
@@ -99,6 +105,84 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
 
 const host=Object.freeze({runtime_sha256:'a'.repeat(64),asset_identity_sha256:'b'.repeat(64),
   save_profile_sha256:'c'.repeat(64),profile_identity:'slippi-profile-v1'});
+const startIdentity={match_id:'local-start-1',seed:0xfedcba98,stage_id:2,
+  players:[{port:0,character:0},{port:1,character:0}]};
+const prefixPad='0a'.repeat(44);
+const makePrefix=(overrides={})=>{
+  const prior=BigInt(DEFAULT_PUBLICATION.priorSubmission);
+  return {
+    schema:'melee-web-runtime-match-start-prefix-v1',
+    input_provenance:'ordinary-local-four-port-pad-v1',
+    source_ticks:3,source_draws:3,final_ready_tick:13,
+    initial_resident_transfer_drains:0,final_resident_transfer_drains:1,
+    rows:[0,1,2].map(index=>({poll_serial:'9007199254740993',tick_before:10+index,
+      tick_after:11+index,source_frame_before:0,source_frame_after:0,
+      hud_ready_before:false,hud_ready_after:index===2,pad_hex:prefixPad,
+      draw_submission:(prior+BigInt(index+1)).toString()})),
+    live_identity:startIdentity,
+    ...overrides,
+  };
+};
+const validPrefix=makePrefix();
+const liveIdentityText=' { "players" : [ { "character" : 0, "port" : 0 }, { "character" : 0, "port" : 1 } ], "stage_id" : 2, "seed" : 4275878552, "match_id" : "local-start-1" } ';
+
+test('start-prefix validator accepts exact ordinary local startup rows and lossless native receipt bindings',()=>{
+  const nativePrefix={...validPrefix,live_identity:{...startIdentity}};
+  const rawJSON=` \n${JSON.stringify(nativePrefix)} \n`;
+  const f=fixture({startPhase:5,liveIdentityText}),owner=createRuntimeMatchHistoryController(f.module);
+  const publication=owner.startPublication(),liveIdentity=owner.startLiveIdentity();
+  const parsed=validateRuntimeMatchStartPrefix(rawJSON,{publication,liveIdentity});
+  assert.equal(parsed.source_ticks,3);assert.equal(parsed.source_draws,3);
+  assert.equal(parsed.rows[0].poll_serial,'9007199254740993','poll serial remains lossless above Number safe integer range');
+  assert.equal(parsed.rows[1].poll_serial,parsed.rows[0].poll_serial,'ordinary PAD batching may reuse its poll serial');
+  assert.equal(parsed.rows.at(-1).draw_submission,publication.sourceSubmission);
+  assert.equal(parsed.live_identity.match_id,'local-start-1');
+  assert.equal(rawJSON.includes(' \n'),true,'caller retains exact native prefix JSON separately from parsed validation');
+});
+
+test('start-prefix validator refuses malformed provenance, bounds, tick/HUD rows, and receipt mismatches',()=>{
+  const f=fixture({startPhase:5,liveIdentityText}),owner=createRuntimeMatchHistoryController(f.module);
+  const publication=owner.startPublication(),liveIdentity=owner.startLiveIdentity();
+  const reject=(label,mutate,pattern)=>{
+    const value=structuredClone(validPrefix);mutate(value);
+    assert.throws(()=>validateRuntimeMatchStartPrefix(JSON.stringify(value),{publication,liveIdentity}),
+      pattern??/Runtime start prefix/,label);
+  };
+  reject('wrong schema',value=>{value.schema='other';},/schema or input provenance/);
+  reject('wrong provenance',value=>{value.input_provenance='relay';},/schema or input provenance/);
+  reject('tick and draw counts differ',value=>{value.source_draws=2;},/count, ready tick/);
+  reject('source prefix exceeds bounded ticks',value=>{value.source_ticks=1025;},/count, ready tick/);
+  reject('row count differs',value=>{value.rows.pop();},/count, ready tick/);
+  reject('final ready tick differs',value=>{value.final_ready_tick=12;},/final ready tick/);
+  reject('tick does not advance once',value=>{value.rows[1].tick_after++;},/contiguous single step/);
+  reject('ticks are not contiguous',value=>{value.rows[1].tick_before++;value.rows[1].tick_after++;},/contiguous single step/);
+  reject('source tick would wrap uint32',value=>{value.rows[0].tick_before=0xffffffff;value.rows[0].tick_after=0;},/contiguous single step/);
+  reject('source frame advances',value=>{value.rows[0].source_frame_after=1;},/frame-zero HUD-ready/);
+  reject('HUD ready arrives early',value=>{value.rows[0].hud_ready_after=true;},/frame-zero HUD-ready/);
+  reject('last HUD row does not transition to ready',value=>{value.rows.at(-1).hud_ready_after=false;},/frame-zero HUD-ready/);
+  reject('PAD byte extent is short',value=>{value.rows[0].pad_hex='00'.repeat(43);},/PAD extent/);
+  reject('PAD hex must be lowercase',value=>{value.rows[0].pad_hex='AA'.repeat(44);},/PAD extent/);
+  reject('poll serial must be positive',value=>{value.rows[0].poll_serial='0';},/poll serial is outside/);
+  reject('poll serial must be canonical decimal',value=>{value.rows[0].poll_serial='01';},/not canonical/);
+  reject('poll serial cannot move backwards',value=>{value.rows[1].poll_serial='9007199254740992';},/moved backwards/);
+  reject('draw submission must be canonical decimal',value=>{value.rows[0].draw_submission='09007199254740993';},/not canonical/);
+  reject('draw submission must be greater than prior receipt',value=>{value.rows[0].draw_submission=publication.priorSubmission;},/outside its publication interval/);
+  reject('draw submissions must increase',value=>{value.rows[1].draw_submission=value.rows[0].draw_submission;},/outside its publication interval/);
+  reject('draw submission cannot exceed publication',value=>{value.rows[2].draw_submission='9007199254741005';},/outside its publication interval/);
+  reject('resident transfer drain is boolean',value=>{value.initial_resident_transfer_drains=2;},/resident-transfer drain bounds/);
+  reject('live identity must match all held fields',value=>{value.live_identity.seed++;},/embedded live identity differs/);
+  const laterReceiptFixture=fixture({startPhase:5,liveIdentityText,
+    publication:{...DEFAULT_PUBLICATION,sourceSubmission:9007199254741005n}});
+  const laterReceipt=createRuntimeMatchHistoryController(laterReceiptFixture.module).startPublication();
+  assert.throws(()=>validateRuntimeMatchStartPrefix(JSON.stringify(validPrefix),
+    {publication:laterReceipt,liveIdentity}),/final ready tick or publication submission/,
+  'last source draw must be the publication final submission');
+  const wrongPublication={...publication,sourceSubmission:'9007199254741005'};
+  assert.throws(()=>validateRuntimeMatchStartPrefix(JSON.stringify(validPrefix),
+    {publication:wrongPublication,liveIdentity}),/differs from its fixed 48-byte receipt/);
+  assert.throws(()=>validateRuntimeMatchStartPrefix(JSON.stringify(validPrefix),
+    {publication,liveIdentity:'{}'}),/embedded live identity differs/);
+});
 
 test('controller joins exact native completion sequence and forbids concurrent commands',async()=>{
   const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
@@ -187,6 +271,7 @@ test('agreed-start exports stay optional until called on an older production mod
   const f=fixture({agreedStartExports:false}),owner=createRuntimeMatchHistoryController(f.module);
   assert.equal(owner.status().ownerState,0);
   assert.throws(()=>owner.startEnable(),/start_enable is unavailable/);
+  assert.throws(()=>owner.startPrefix(),/start_state is unavailable/);
   assert.deepEqual(f.allocations.map(row=>row.size),[11]);
   assert.deepEqual(f.frees,[]);
 });
@@ -216,14 +301,19 @@ test('agreed-start forwards host identities and seed while returning exact nativ
 
   f.setStartPhase(5);
   const receipt=owner.startPublication();
-  assert.equal(receipt.state,5);assert.equal(receipt.sourceFrame,0);assert.equal(receipt.sourceDraws,1);
+  assert.equal(receipt.state,5);assert.equal(receipt.sourceFrame,0);assert.equal(receipt.sourceDraws,3);
   assert.equal(receipt.priorSubmission,'9007199254741001');
-  assert.equal(receipt.sourceSubmission,'9007199254741002');
+  assert.equal(receipt.sourceSubmission,'9007199254741004');
   const frozenPublication=receipt.raw.slice();
+  const allocationCount=f.allocations.length,freeCount=f.frees.length;
+  const prefix=owner.startPrefix();
+  assert.equal(prefix,' { "source" : "native-prefix" } ','borrowed prefix is copied without parsing or normalization');
   const liveIdentity=owner.startLiveIdentity();
   assert.equal(liveIdentity,' { "source" : "native-live-identity" } ');
+  assert.equal(prefix,' { "source" : "native-prefix" } ','later native identity read cannot mutate the copied prefix');
   assert.deepEqual(receipt.raw,frozenPublication,'publication bytes are copied out of native storage');
-  assert.equal(f.allocations.map(row=>row.size).length,14,'read-only held-frame inspection allocates no host arguments');
+  assert.equal(f.allocations.length,allocationCount,'held-frame reads allocate no host arguments');
+  assert.equal(f.frees.length,freeCount,'held-frame reads perform no native frees');
 });
 
 test('wrong native phase and native first failure latch without retry or allocation leak',()=>{
@@ -253,6 +343,21 @@ test('held-frame publication rejects malformed fixed receipt and live identity r
   assert.throws(()=>wrongOwner.startLiveIdentity(),/requires held frame zero/);
   assert.equal(wrongPhase.startCalls.length,0,'live identity is never read from an unheld native phase');
   assert.deepEqual(wrongPhase.allocations.map(row=>row.size),[11]);
+});
+
+test('start-prefix read requires the held frame-zero native phase and latches native refusal',()=>{
+  const stale=fixture({startPhase:2}),staleOwner=createRuntimeMatchHistoryController(stale.module);
+  assert.throws(()=>staleOwner.startPrefix(),/requires held frame zero/);
+  assert.equal(stale.startCalls.length,0,'stale phase is rejected before asking native for its borrowed prefix');
+  assert.deepEqual(stale.allocations.map(row=>row.size),[11]);
+
+  const failed=fixture({startPhase:5,failStart:'prefix'}),failedOwner=createRuntimeMatchHistoryController(failed.module);
+  assert.throws(()=>failedOwner.startPrefix(),/Native agreed-start start_prefix_json refused: synthetic refusal/);
+  assert.throws(()=>failedOwner.startPrefix(),/start_prefix_json refused/);
+  assert.equal(failed.startCalls.filter(call=>call.name==='prefix'&&!call.refused).length,1,
+    'first native failure blocks another prefix read');
+  assert.deepEqual(failed.allocations.map(row=>row.size),[11],'prefix reads never allocate Wasm arguments');
+  assert.deepEqual(failed.frees,[]);
 });
 
 test('agreed-start argument paths refuse allocator churn after match-history capture',async()=>{

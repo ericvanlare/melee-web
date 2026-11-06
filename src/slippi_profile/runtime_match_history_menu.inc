@@ -31,14 +31,25 @@ enum MatchHistoryStartState : uint32_t {
  MatchHistoryStartPublishing=6,
 };
 struct MatchHistoryPublication {
- uint32_t schema=1,bytes=48,state{},source_frame{},source_draws{},pad_policy=1,first_use_pending{},reserved{};
+ uint32_t schema=2,bytes=48,state{},source_frame{},source_draws{},pad_policy=1,first_use_pending{},reserved{};
  uint64_t prior_submission{},source_submission{};
 };
 static_assert(sizeof(MatchHistoryPublication)==48);
+constexpr size_t kMatchHistoryStartPrefixLimit=1024; // Private probe storage limit, independent of GO timing.
+struct MatchHistoryStartTick {
+ uint64_t poll_serial{},draw_submission{};
+ uint32_t tick_before{},tick_after{},source_frame_before{},source_frame_after{};
+ bool hud_ready_before{},hud_ready_after{};
+ std::array<uint8_t,44> pad{};
+};
 struct MatchHistoryStart {
  uint32_t state{};
  MatchHistoryPublication publication{};
  double settle_started{};
+ bool prefix_final_drawn{};
+ unsigned initial_resident_transfer_drains{},final_resident_transfer_drains{};
+ std::vector<MatchHistoryStartTick> prefix;
+ std::string prefix_json;
  uint32_t local_menu_seed{};
  uint32_t negotiated_seed{};
  uint32_t reserved{};
@@ -98,6 +109,7 @@ const char* history_gpu_idle_failure() noexcept;
 const char* history_source_idle_failure(const GameplayMatchSession&) noexcept;
 bool history_gpu_idle() noexcept;
 bool history_source_idle(const GameplayMatchSession&) noexcept;
+void history_encode_pad(uint8_t*,const PADStatus&) noexcept;
 
 bool history_start_export_idle() noexcept {
  return !match_history_in_tick&&!match_history.dispatching&&
@@ -310,12 +322,38 @@ bool history_start_finish_renderer_persistence() {
  return true;
 }
 
+std::string history_start_serialize_prefix(const MatchHistoryStart& start) {
+ std::ostringstream out;
+ out.imbue(std::locale::classic());
+ out<<"{\"schema\":\"melee-web-runtime-match-start-prefix-v1\","
+    <<"\"input_provenance\":\"ordinary-local-four-port-pad-v1\","
+    <<"\"source_ticks\":"<<start.prefix.size()
+    <<",\"source_draws\":"<<start.publication.source_draws
+    <<",\"initial_resident_transfer_drains\":"<<start.initial_resident_transfer_drains
+    <<",\"final_resident_transfer_drains\":"<<start.final_resident_transfer_drains
+    <<",\"final_ready_tick\":"<<start.prefix.back().tick_after<<",\"rows\":[";
+ const char hex[]="0123456789abcdef";
+ for(const auto& row:start.prefix){
+  if(&row!=start.prefix.data())out<<',';
+  out<<"{\"poll_serial\":\""<<row.poll_serial<<"\",\"tick_before\":"<<row.tick_before
+     <<",\"tick_after\":"<<row.tick_after<<",\"source_frame_before\":"<<row.source_frame_before
+     <<",\"source_frame_after\":"<<row.source_frame_after
+     <<",\"hud_ready_before\":"<<(row.hud_ready_before?"true":"false")
+     <<",\"hud_ready_after\":"<<(row.hud_ready_after?"true":"false")<<",\"pad_hex\":\"";
+  for(const auto byte:row.pad)out<<hex[byte>>4]<<hex[byte&15];
+  out<<"\",\"draw_submission\":\""<<row.draw_submission<<"\"}";
+ }
+ out<<"],\"live_identity\":"<<start.live_identity_json<<'}';
+ return out.str();
+}
+
 bool history_start_enter_ready_hold_impl() {
  auto& start=match_history.start;
- if(start.state!=MatchHistoryStartPublishing||start.publication.source_draws!=1||
+ if(start.state!=MatchHistoryStartPublishing||!start.prefix_final_drawn||start.prefix.empty()||
+    start.publication.source_draws!=start.prefix.size()||first_use_draw_pending||
     !start.match_owner||
     match.get()!=start.match_owner||!match->construction_complete()||
-    match->source_frames()!=0||match->start_selection().random_seed!=start.negotiated_seed||
+    !match->ready()||match->source_frames()!=0||match->start_selection().random_seed!=start.negotiated_seed||
     history_start_payload(match->start_selection())!=
        history_start_payload(start.agreed_selection)||pending||faulted||
     preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
@@ -326,8 +364,8 @@ bool history_start_enter_ready_hold_impl() {
  try {
   start.live_identity_json=melee_web::slippi_profile::serialize_live_match_identity(
       *match,history_start_bound_host_agreement());
+  start.prefix_json=history_start_serialize_prefix(start);
  }catch(const std::exception& error){return history_refuse(error.what());}
- first_use_draw_pending=false; // Transfer the one proven original source publication.
  start.publication.state=MatchHistoryStartReadyHeld;
  start.publication.first_use_pending=0;
  start.state=MatchHistoryStartReadyHeld;
@@ -335,7 +373,7 @@ bool history_start_enter_ready_hold_impl() {
  return true;
 }
 
-bool history_start_complete_initial_transfers(const GameplayMatchSession& session) {
+bool history_start_complete_resident_transfers(const GameplayMatchSession& session,unsigned& drains) {
  // The original match constructor starts its resident music asynchronously.
  // Complete only its existing DevCom work, in the transport order used by
  // the audio renderer, before admitting the strict source-idle boundary.
@@ -353,8 +391,10 @@ bool history_start_complete_initial_transfers(const GameplayMatchSession& sessio
   return history_refuse("Agreed initial SSM transfer has no active bank transport");
  if(stream_pending&&!melee_web_audio_stream_owned(audio))
   return history_refuse("Agreed initial HPS transfer lost its exact stream owner");
+ const bool stream_owned=melee_web_audio_stream_owned(audio);
+ if(bank_pending||stream_owned)++drains;
  if(bank_pending)melee_web_audio_bank_transport_pump();
- if(melee_web_audio_stream_owned(audio)){
+ if(stream_owned){
   char error[256]{};
   if(!melee_web_audio_stream_pump_for(audio,error,sizeof(error)))
    return history_refuse(error[0]?error:"Agreed initial HPS transfer failed");
@@ -370,8 +410,8 @@ bool history_start_publication_begin() {
   return history_refuse("Agreed source publication has no pending first-use draw");
  if(!start.match_owner||match.get()!=start.match_owner||!match->construction_complete())
   return history_refuse("Agreed source publication lost its constructed match owner");
- if(match->source_frames()!=0)
-  return history_refuse("Agreed source publication requires source frame zero");
+ if(match->source_frames()!=0||match->ready())
+  return history_refuse("Agreed source publication requires the original pre-intro owner");
  if(pending||running||faulted||preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle)
   return history_refuse("Agreed source publication requires stopped, idle scene preparation");
  if(!history_runtime_idle())
@@ -380,12 +420,13 @@ bool history_start_publication_begin() {
   return history_refuse("Agreed source publication requires an unarmed CPU interval");
  if(history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
   return history_refuse("Agreed source publication selection differs from its agreement");
- if(!history_start_complete_initial_transfers(*match))return false;
+ if(!history_start_complete_resident_transfers(*match,start.initial_resident_transfer_drains))return false;
  if(const auto* error=history_source_idle_failure(*match))return history_refuse(error);
  if(!history_start_finish_renderer_persistence())return false;
  if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
  const auto* stats=aurora_get_stats();
  if(!stats)return history_refuse("Agreed source publication has no actual renderer stats");
+ start.prefix.reserve(kMatchHistoryStartPrefixLimit);
  start.publication.prior_submission=stats->lastEndFrameId;
  start.publication.source_frame=match->source_frames();
  start.publication.first_use_pending=first_use_draw_pending;
@@ -394,48 +435,75 @@ bool history_start_publication_begin() {
  return true;
 }
 
-bool history_start_publication_end() {
- auto& start=match_history.start;
- const auto* stats=aurora_get_stats();
- if(start.state!=MatchHistoryStartPublishing||start.publication.source_draws||
-    !start.match_owner||match.get()!=start.match_owner||match->source_frames()!=0||
-    !stats||stats->lastEndFrameId<=start.publication.prior_submission||
-    stats->lastBeginFrameId!=stats->lastEndFrameId||match_history_renderer_errors||
-    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle)
-  return history_refuse("Agreed original source publication return refused");
- start.publication.source_submission=stats->lastEndFrameId;
- start.publication.source_draws=1;
- if(!preparation.request_render_settle(false))
-  return history_refuse("Agreed source publication could not enter existing render-only settle");
- start.settle_started=emscripten_get_now();
- running=false;menu_clock.reset();audio_clock.reset();
- return true;
+bool history_start_prefix_running() noexcept {
+ const auto& start=match_history.start;
+ return start.state==MatchHistoryStartPublishing&&!start.prefix_final_drawn;
 }
 
-template<class Present>
-void history_start_publish_initial_source(const Present& present_source) {
- try {
-  if(!history_start_publication_begin())throw std::runtime_error(match_history.error.data());
-  check(present_source(),"Agreed initial source presentation did not draw");
-  if(!history_start_publication_end())throw std::runtime_error(match_history.error.data());
- }catch(const std::exception& error){
-  history_refuse(error.what());throw;
- }catch(...){
-  constexpr char error[]="Agreed initial source presentation threw an unknown exception";
-  history_refuse(error);throw std::runtime_error(error);
+void history_start_before_tick(const PADStatus* pad,uint64_t poll_serial) {
+ auto& start=match_history.start;
+ check(history_start_prefix_running()&&start.match_owner&&match.get()==start.match_owner&&
+       running&&!faulted&&!pending&&!match->paused()&&!match->ending()&&!match->complete()&&
+       start.publication.source_draws==start.prefix.size(),
+       "Agreed startup tick lost its live source/draw owner");
+ check(start.prefix.size()<kMatchHistoryStartPrefixLimit,"Agreed startup input prefix exceeded its 1024-tick cap");
+ MatchHistoryStartTick row{};
+ row.poll_serial=poll_serial;
+ row.tick_before=gm_801A4BA8();
+ row.source_frame_before=match->source_frames();
+ row.hud_ready_before=match->ready();
+ check(row.poll_serial&&row.tick_before!=UINT32_MAX&&!row.source_frame_before&&!row.hud_ready_before&&
+       (start.prefix.empty()||(row.poll_serial>=start.prefix.back().poll_serial&&
+                              row.tick_before==start.prefix.back().tick_after)),
+       "Agreed startup tick input or original traversal boundary refused");
+ for(unsigned port=0;port<4;++port)history_encode_pad(row.pad.data()+port*11,pad[port]);
+ start.prefix.push_back(row);
+}
+
+bool history_start_after_tick() {
+ auto& row=match_history.start.prefix.back();
+ row.tick_after=gm_801A4BA8();
+ row.source_frame_after=match->source_frames();
+ row.hud_ready_after=match->ready();
+ check(row.tick_after==row.tick_before+1u&&!row.source_frame_after&&
+       !match->paused()&&!match->ending()&&!match->complete(),
+       "Agreed startup source tick left its original intro/gameplay-frame-zero boundary");
+ return row.hud_ready_after;
+}
+
+void history_start_after_draw(bool drew_source) {
+ auto& start=match_history.start;
+ const auto* stats=aurora_get_stats();
+ check(drew_source&&start.match_owner&&match.get()==start.match_owner&&match->source_frames()==0&&
+       start.prefix.size()==size_t(start.publication.source_draws)+1&&stats&&
+       stats->lastEndFrameId>std::max(start.publication.prior_submission,start.publication.source_submission)&&
+       stats->lastBeginFrameId==stats->lastEndFrameId&&!match_history_renderer_errors,
+       "Agreed startup source draw did not complete its original tick and submission");
+ auto& row=start.prefix.back();
+ check(row.tick_after==gm_801A4BA8()&&row.hud_ready_after==match->ready(),
+       "Agreed startup source draw changed its tick or HUD boundary");
+ row.draw_submission=stats->lastEndFrameId;
+ start.publication.source_submission=row.draw_submission;
+ ++start.publication.source_draws;
+ if(row.hud_ready_after){
+  check(!first_use_draw_pending&&preparation.request_render_settle(false),
+        "Agreed HUD-ready startup draw could not enter renderer-only settle");
+  start.prefix_final_drawn=true;
+  start.settle_started=emscripten_get_now();
+  running=false;menu_clock.reset();audio_clock.reset();
  }
 }
 
 bool history_start_service_publication() {
  auto& start=match_history.start;
- if(start.state!=MatchHistoryStartPublishing)return false;
+ if(!start.prefix_final_drawn||start.state!=MatchHistoryStartPublishing)return false;
  try {
-  if(start.publication.source_draws!=1||!start.match_owner||match.get()!=start.match_owner||
-     match->source_frames()!=0||pending||running||faulted||melee_web_cpu_interval_active()||
+  if(start.publication.source_draws!=start.prefix.size()||!start.match_owner||match.get()!=start.match_owner||
+     !match->ready()||match->source_frames()!=0||pending||running||faulted||melee_web_cpu_interval_active()||
      emscripten_get_now()-start.settle_started>=10000)
    throw std::runtime_error("Agreed source publication settle lost its bounded owner");
-  // Reuse renderer-only scene preparation. No aurora_update, input poll,
-  // source tick/draw, audio render, callback or source-file pump occurs here.
+  // Reuse renderer-only scene preparation. No input, source tick/draw, PCM
+  // or RuntimeFiles pump. Finish only any already-queued resident audio I/O.
   if(preparation.warming()){
    const bool deferred=prepare_deferred_pipelines();
    const auto before=aurora_stats_snapshot();
@@ -458,10 +526,13 @@ bool history_start_service_publication() {
 #endif
    const bool complete=!submitted.pendingFramePackets&&!submitted.pendingStagingBuffers&&!submitted.workerBusy;
    if(complete&&pipelines_ready){
+    if(!history_start_complete_resident_transfers(*match,start.final_resident_transfer_drains))
+     throw std::runtime_error(match_history.error.data());
+    if(const auto* error=history_source_idle_failure(*match))throw std::runtime_error(error);
     if(!history_start_finish_renderer_persistence())
      throw std::runtime_error(match_history.error.data());
-    if(preparation.arm(true)&&!history_start_enter_ready_hold_impl())
-     throw std::runtime_error(match_history.error.data());
+    check(preparation.arm(true),"Agreed startup renderer settle lost its arming phase");
+    if(!history_start_enter_ready_hold_impl())throw std::runtime_error(match_history.error.data());
    }
   }else throw std::runtime_error("Agreed source publication left renderer-only preparation");
  }catch(const std::exception& error){history_refuse(error.what());faulted=true;running=false;}
@@ -839,6 +910,13 @@ const char* melee_web_native_menu_match_history_start_live_identity_json(){
   return nullptr;
  return start.live_identity_json.c_str();
 }
+const char* melee_web_native_menu_match_history_start_prefix_json(){
+ const auto& start=match_history.start;
+ if(!history_start_export_idle()||start.state!=MatchHistoryStartReadyHeld||
+    !start.match_owner||match.get()!=start.match_owner||match->source_frames()!=0||
+    start.prefix_json.empty())return nullptr;
+ return start.prefix_json.c_str();
+}
 const void* melee_web_native_menu_match_history_start_publication_data(){
  auto& start=match_history.start;
  if(!history_start_export_idle()||start.state!=MatchHistoryStartReadyHeld||
@@ -851,6 +929,8 @@ int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,
  try {
   const bool agreed_ready=c.start.state==MatchHistoryStartReadyHeld&&
       c.start.match_owner&&c.start.match_owner==match.get()&&frame==0;
+  if(c.start.state!=MatchHistoryStartDisabled&&!agreed_ready)
+   return history_refuse("Agreed startup requires a completed HUD-ready publication before takeover");
   if(match_history_terminal||match_history_in_tick||c.dispatching||c.status.first_failure||!match||local>=2||remote>=2||local==remote||frame==UINT32_MAX||
      (!running&&!agreed_ready)||pending||faulted||preparation.busy()||replay||menu_scene_rebuild_pending||
      first_use_draw_pending||

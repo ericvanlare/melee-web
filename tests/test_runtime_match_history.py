@@ -30,7 +30,10 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
     def test_extracted_native_start_with_controlled_owners(self):
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
         history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
-        self.assertIn('history_start_publish_initial_source(present_source);', browser)
+        self.assertNotIn('history_start_publish_initial_source', browser)
+        self.assertIn('history_start_before_tick(sample,input->samples);', browser)
+        self.assertIn('if(agreed_prefix_tick&&history_start_after_tick())break;', browser)
+        self.assertIn('if(history_start_prefix_running())history_start_after_draw(drew_source);', browser)
         self.assertIn('if(history_start_ordinary_callback())return;', browser)
         self.assertIn('history_start_finish_asset_match();', browser)
 
@@ -38,9 +41,10 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
             begin = history.index(start)
             return history[begin:history.index(end, begin)]
 
-        self.assertIn('first_use_draw_pending||', section(
-            'int melee_web_native_menu_match_history_take_over(',
-            'int melee_web_native_menu_match_history_configure('))
+        takeover = section('int melee_web_native_menu_match_history_take_over(',
+                           'int melee_web_native_menu_match_history_configure(')
+        self.assertIn('first_use_draw_pending||', takeover)
+        self.assertIn('c.start.state!=MatchHistoryStartDisabled&&!agreed_ready', takeover)
         fixture = (ROOT / 'tests/runtime_match_history_start_test.cpp.in').read_text()
         fixture = fixture.replace('@START_TYPES@', section(
             'enum MatchHistoryStartState', 'struct MatchHistoryControl'))
@@ -48,6 +52,7 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
             section('bool history_refuse(', 'void history_write_selection('),
             section('std::string_view history_start_string_argument(',
                     'const char* history_gpu_idle_failure() noexcept {'),
+            section('void history_encode_pad(uint8_t* to,', 'void history_copy_input()'),
             section('void match_history_before_close() noexcept {',
                     'void match_history_after_match_close()'),
             section('int melee_web_native_menu_match_history_start_enable()',

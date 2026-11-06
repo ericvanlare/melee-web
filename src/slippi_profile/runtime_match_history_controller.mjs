@@ -7,7 +7,16 @@ export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,pr
   idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11;
-const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5;
+const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
+const START_PREFIX_SCHEMA='melee-web-runtime-match-start-prefix-v1';
+const START_PREFIX_INPUT='ordinary-local-four-port-pad-v1';
+const UINT32_MAX=0xffffffff,UINT64_MAX=0xffffffffffffffffn;
+const PUBLICATION_FIELDS=['schema','bytes','state','sourceFrame','sourceDraws','padPolicy',
+  'firstUsePending','reserved','priorSubmission','sourceSubmission'];
+const START_PREFIX_FIELDS=['schema','input_provenance','source_ticks','source_draws',
+  'final_ready_tick','initial_resident_transfer_drains','final_resident_transfer_drains','rows','live_identity'];
+const START_PREFIX_ROW_FIELDS=['poll_serial','tick_before','tick_after','source_frame_before',
+  'source_frame_after','hud_ready_before','hud_ready_after','pad_hex','draw_submission'];
 const START_HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
 const statusNames=['schema','bytes','ownerState','firstFailure','pendingCommand','lastCompletedCommand',
   'requestSequence','completeSequence','expectedFrame','localPort','remotePort','reserved'];
@@ -22,6 +31,101 @@ const pad=value=>{
   if(!(value instanceof Uint8Array)||value.length!==11)throw Error('Remote PAD must be exactly 11 bytes');
   return value.slice();
 };
+const hasExactKeys=(value,names)=>value&&typeof value==='object'&&!Array.isArray(value)&&
+  Object.keys(value).length===names.length&&names.every(name=>Object.hasOwn(value,name));
+const canonicalU64=(value,label,{positive=false}={})=>{
+  if(typeof value!=='string'||!/^(0|[1-9][0-9]*)$/.test(value))
+    throw Error(`Runtime start prefix ${label} is not canonical uint64 decimal`);
+  const parsed=BigInt(value);
+  if(parsed>UINT64_MAX||(positive&&parsed===0n))
+    throw Error(`Runtime start prefix ${label} is outside uint64 bounds`);
+  return parsed;
+};
+const decodeStartPublicationBytes=bytes=>{
+  if(!(bytes instanceof Uint8Array)||bytes.length!==START_PUBLICATION_BYTES)
+    throw Error('Agreed-start publication receipt extent');
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const result={schema:data.getUint32(0,true),bytes:data.getUint32(4,true),
+    state:data.getUint32(8,true),sourceFrame:data.getUint32(12,true),
+    sourceDraws:data.getUint32(16,true),padPolicy:data.getUint32(20,true),
+    firstUsePending:data.getUint32(24,true),reserved:data.getUint32(28,true),
+    priorSubmission:data.getBigUint64(32,true).toString(),
+    sourceSubmission:data.getBigUint64(40,true).toString(),raw:bytes.slice()};
+  if(result.schema!==2||result.bytes!==START_PUBLICATION_BYTES||result.state!==START_HELD_STATE||
+    result.sourceFrame!==0||result.sourceDraws<1||result.sourceDraws>START_PREFIX_MAX||
+    result.padPolicy!==1||result.firstUsePending!==0||result.reserved!==0||
+    BigInt(result.sourceSubmission)<=BigInt(result.priorSubmission))
+    throw Error('Agreed-start publication receipt schema or held-frame owner violation');
+  return result;
+};
+const sameJsonValue=(left,right)=>{
+  if(Object.is(left,right))return true;
+  if(left===null||right===null||typeof left!=='object'||typeof right!=='object'||
+    Array.isArray(left)!==Array.isArray(right))return false;
+  if(Array.isArray(left))return left.length===right.length&&left.every((value,index)=>sameJsonValue(value,right[index]));
+  const leftKeys=Object.keys(left),rightKeys=Object.keys(right);
+  return leftKeys.length===rightKeys.length&&leftKeys.every(key=>Object.hasOwn(right,key)&&
+    sameJsonValue(left[key],right[key]));
+};
+
+// This prefix binds literal ordinary local four-port PAD rows to source ticks;
+// poll serials here are not relay receipts, and PAD bytes do not prove actions.
+export function validateRuntimeMatchStartPrefix(rawJSON,{publication,liveIdentity}={}){
+  if(typeof rawJSON!=='string'||!rawJSON)throw Error('Runtime start prefix JSON is required');
+  let parsed,identity;
+  try{parsed=JSON.parse(rawJSON);}catch{throw Error('Runtime start prefix JSON parse refused');}
+  try{
+    if(typeof liveIdentity!=='string'||!liveIdentity)throw Error('missing live identity');
+    identity=JSON.parse(liveIdentity);
+  }catch{throw Error('Runtime start prefix live identity JSON is invalid');}
+  if(!hasExactKeys(parsed,START_PREFIX_FIELDS)||parsed.schema!==START_PREFIX_SCHEMA||
+    parsed.input_provenance!==START_PREFIX_INPUT)
+    throw Error('Runtime start prefix schema or input provenance violation');
+  if(!Number.isInteger(parsed.source_ticks)||parsed.source_ticks<1||parsed.source_ticks>START_PREFIX_MAX||
+    parsed.source_draws!==parsed.source_ticks||!Array.isArray(parsed.rows)||
+    parsed.rows.length!==parsed.source_ticks||!Number.isInteger(parsed.final_ready_tick)||
+    parsed.final_ready_tick<0||parsed.final_ready_tick>UINT32_MAX||
+    ![0,1].includes(parsed.initial_resident_transfer_drains)||
+    ![0,1].includes(parsed.final_resident_transfer_drains))
+    throw Error('Runtime start prefix count, ready tick, or resident-transfer drain bounds violation');
+  if(!identity||typeof identity!=='object'||Array.isArray(identity)||
+    !sameJsonValue(parsed.live_identity,identity))
+    throw Error('Runtime start prefix embedded live identity differs from the held identity');
+  if(!publication||!hasExactKeys(publication,PUBLICATION_FIELDS.concat('raw')))
+    throw Error('Runtime start prefix publication receipt shape violation');
+  const receipt=decodeStartPublicationBytes(publication.raw);
+  if(PUBLICATION_FIELDS.some(name=>publication[name]!==receipt[name])||
+    receipt.sourceDraws!==parsed.source_draws)
+    throw Error('Runtime start prefix publication differs from its fixed 48-byte receipt');
+  const priorSubmission=canonicalU64(receipt.priorSubmission,'publication prior submission');
+  const finalSubmission=canonicalU64(receipt.sourceSubmission,'publication final submission',{positive:true});
+  let previousPoll=0n,previousTick=null,previousSubmission=priorSubmission;
+  for(let index=0;index<parsed.rows.length;index++){
+    const row=parsed.rows[index];
+    if(!hasExactKeys(row,START_PREFIX_ROW_FIELDS))
+      throw Error(`Runtime start prefix row ${index} schema violation`);
+    const poll=canonicalU64(row.poll_serial,`row ${index} poll serial`,{positive:true});
+    const submission=canonicalU64(row.draw_submission,`row ${index} draw submission`,{positive:true});
+    if(poll<previousPoll)
+      throw Error(`Runtime start prefix row ${index} poll serial moved backwards`);
+    if(!Number.isInteger(row.tick_before)||row.tick_before<0||row.tick_before>=UINT32_MAX||
+      !Number.isInteger(row.tick_after)||row.tick_after!==row.tick_before+1||
+      (previousTick!==null&&row.tick_before!==previousTick))
+      throw Error(`Runtime start prefix row ${index} source tick is not a contiguous single step`);
+    if(row.source_frame_before!==0||row.source_frame_after!==0||
+      typeof row.hud_ready_before!=='boolean'||row.hud_ready_before!==false||
+      typeof row.hud_ready_after!=='boolean'||row.hud_ready_after!==(index===parsed.rows.length-1))
+      throw Error(`Runtime start prefix row ${index} left the frame-zero HUD-ready boundary`);
+    if(typeof row.pad_hex!=='string'||!/^[0-9a-f]{88}$/.test(row.pad_hex))
+      throw Error(`Runtime start prefix row ${index} PAD extent or lowercase hex violation`);
+    if(submission<=previousSubmission||submission>finalSubmission)
+      throw Error(`Runtime start prefix row ${index} draw submission is outside its publication interval`);
+    previousPoll=poll;previousTick=row.tick_after;previousSubmission=submission;
+  }
+  if(parsed.final_ready_tick!==previousTick||previousSubmission!==finalSubmission)
+    throw Error('Runtime start prefix final ready tick or publication submission differs from its last row');
+  return parsed;
+}
 
 export function decodeRuntimeMatchHistoryStatus(bytes){
   if(!(bytes instanceof Uint8Array)||bytes.length!==STATUS_BYTES)throw Error('Runtime history status extent');
@@ -157,23 +261,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       throw latch(Error(`Native agreed-start ${name} returned an empty string`));
     return value;
   };
-  const decodeStartPublication=bytes=>{
-    if(!(bytes instanceof Uint8Array)||bytes.length!==START_PUBLICATION_BYTES)
-      throw Error('Agreed-start publication receipt extent');
-    const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-    const result={schema:data.getUint32(0,true),bytes:data.getUint32(4,true),
-      state:data.getUint32(8,true),sourceFrame:data.getUint32(12,true),
-      sourceDraws:data.getUint32(16,true),padPolicy:data.getUint32(20,true),
-      firstUsePending:data.getUint32(24,true),reserved:data.getUint32(28,true),
-      priorSubmission:data.getBigUint64(32,true).toString(),
-      sourceSubmission:data.getBigUint64(40,true).toString(),raw:bytes.slice()};
-    if(result.schema!==1||result.bytes!==START_PUBLICATION_BYTES||result.state!==START_HELD_STATE||
-      result.sourceFrame!==0||result.sourceDraws!==1||result.padPolicy!==1||
-      result.firstUsePending!==0||result.reserved!==0||
-      BigInt(result.sourceSubmission)<=BigInt(result.priorSubmission))
-      throw Error('Agreed-start publication receipt schema or held-frame owner violation');
-    return result;
-  };
+  const decodeStartPublication=decodeStartPublicationBytes;
   const requireSuccess=(name,...args)=>{
     if(module[PREFIX+name](...args)!==1)throw latch(Error(`Native history ${name} refused: ${errorText()}`));
   };
@@ -313,6 +401,13 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         throw latch(Error(`Agreed-start live identity requires held frame zero, observed state ${state}`));
       const pointer=startExport('start_live_identity_json')();
       return startTextResult('start_live_identity_json',pointer);
+    },
+    startPrefix(){
+      const state=readStartState();
+      if(state!==START_HELD_STATE)
+        throw latch(Error(`Agreed-start prefix requires held frame zero, observed state ${state}`));
+      const pointer=startExport('start_prefix_json')();
+      return startTextResult('start_prefix_json',pointer);
     },
     validatePad(value){
       active();const bytes=pad(value);const pointer=writePadArgument(bytes);

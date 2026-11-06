@@ -6705,6 +6705,11 @@ void tick(){
  bool actual_source_draw=false;
  bool first_css_draw_terminal=false;
  bool replay_completed_now=false;
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+ bool agreed_prefix_final_draw=false;
+#else
+ constexpr bool agreed_prefix_final_draw=false;
+#endif
  const bool replay_input_already_drawn=replay_completion.final_input_drawn;
  unsigned replay_steps=0;
  unsigned replay_draw_boundaries=0;
@@ -7108,6 +7113,9 @@ void tick(){
    // The source draw scope is closed before exporting this ordered chunk.
    drain_pipeline_provenance();
 #endif
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+   if(history_start_prefix_running())history_start_after_draw(drew_source);
+#endif
    return drew_source;
   };
   const bool audio_before_construction=transition_audio_continues&&
@@ -7175,6 +7183,10 @@ void tick(){
    const bool pipelines_ready=true;
 #endif
    if(preparation.arm(complete&&pipelines_ready)){
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+    if(history_start_ready_hold_pending()&&!history_start_publication_begin())
+     throw std::runtime_error(match_history.error.data());
+#endif
     const double ready_at=emscripten_get_now();
     preparation_profile.submission_ready_at=ready_at;
     preparation_profile.report(ready_at);
@@ -7183,15 +7195,6 @@ void tick(){
     else EM_ASM({window.menuPreparationDone?.();});
     running=!pending;menu_clock.reset();suppress_draw=preparation.suppress_source_draw(pending);
     message=match?match_message:results?"Original Results":prize?"Original unlock notification":source_menu_message();
-#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
-    if(history_start_ready_hold_pending()){
-     // One explicit original source presentation publishes the agreed scene.
-     // Its real effects stay canonical; no tick or extra input is consumed.
-     running=false;suppress_draw=0;
-     history_start_publish_initial_source(present_source);
-     return;
-    }
-#endif
    }else{
     ++preparation_profile.submission_wait_callbacks;
     check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
@@ -7451,6 +7454,10 @@ void tick(){
                          source_frames.draws();
     }
 #endif
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+    const bool agreed_prefix_tick=history_start_prefix_running();
+    if(agreed_prefix_tick)history_start_before_tick(sample,input->samples);
+#endif
     match->tick(sample);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if(replay_whole)later_sss_pause_after();
@@ -7468,6 +7475,9 @@ void tick(){
     }
     const bool closes_current_batch=!replay||replay->closes_draw_batch(replay_cursor);
     source_frames.did_step(closes_current_batch);
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+    if(agreed_prefix_tick&&history_start_after_tick())break;
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     if(paired_v11_tick)
      stadium_paired_v11_after_match_tick(paired_world_ticks_before,
@@ -7845,7 +7855,13 @@ void tick(){
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif
-  if(!first_css_draw_terminal)(void)prepare_deferred_pipelines();
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  // Publish this callback's ordinary source/timing evidence. The private
+  // settle owns renderer service and quiet callbacks starting next turn.
+  agreed_prefix_final_draw=match_history.start.state==MatchHistoryStartPublishing&&
+                           match_history.start.prefix_final_drawn;
+#endif
+  if(!agreed_prefix_final_draw&&!first_css_draw_terminal)(void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick retains the last match image when the
   // renderer guarantees complete draws. Menu priming retains its existing path.
@@ -7859,7 +7875,8 @@ void tick(){
        source_frames.steps(),source_frames.draws(),source_frames.pending());
    if(!hold_startup_ownerless_present)present_source();
   }
-  if(!first_css_draw_terminal&&preparation.warming()&&!preparation.preparation_draws_source()){
+  if(!agreed_prefix_final_draw&&!first_css_draw_terminal&&preparation.warming()&&
+     !preparation.preparation_draws_source()){
    const double service_started=emscripten_get_now();
    check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
    preparation_ms+=emscripten_get_now()-service_started;
@@ -7889,6 +7906,10 @@ void tick(){
 #endif
  }catch(const std::exception& e){
   const std::string primary=e.what();
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+  if(history_start_ready_hold_pending()||match_history.start.state==MatchHistoryStartPublishing)
+   history_refuse(e.what());
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   if(current_sss_exit.armed&&current_sss_exit.profile==CurrentSssExitProfile::Stock4None){
    current_sss_exit.failed=true;current_sss_exit.error=primary;
@@ -7932,7 +7953,7 @@ void tick(){
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines)!=0||
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
   (actual_source_draw&&stats_after.lastTextureUploadSize!=0);
- const bool was_warming=preparation.warming();
+ const bool was_warming=!agreed_prefix_final_draw&&preparation.warming();
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
@@ -7952,7 +7973,8 @@ void tick(){
 #else
  const unsigned pending_selected=0;
 #endif
- if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines+pending_selected,render_preparation_activity)){
+ if(!agreed_prefix_final_draw&&preparation.observe_render(
+      actual_source_draw,stats_after.queuedPipelines+pending_selected,render_preparation_activity)){
   preparation_profile.submission_wait_started=finished;
   preparation_profile.pending_staging_at_settle=
       aurora_browser_submission_status().pendingStagingBuffers;
