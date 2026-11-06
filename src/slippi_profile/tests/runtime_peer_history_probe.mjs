@@ -68,6 +68,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
     try {
       switch (operation) {
         case 'episodeEnable': return owner.enableEpisode();
+        case 'inlineEnable': return owner.enableInlineDispatch();
         case 'arenaEnable': {
           const enabled = owner.enableArenaHistory();
           arenaEnabled = true;
@@ -181,7 +182,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             !(operation === 'command' && value === 'cleanup'))
           throw episodeFailure;
       }
-      if (operation.startsWith('episode') || operation === 'arenaEnable')
+      if (operation.startsWith('episode') || operation === 'arenaEnable' || operation === 'inlineEnable')
         return episode(operation, value);
       if (episodeBusy) throw Error('Episode command owns the page');
       switch (operation) {

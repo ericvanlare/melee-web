@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Private one-tick ordinary-runtime owner. Commands execute on the native
-// owner's rAF callback; this transport neither polls PAD nor performs source work.
+// Private ordinary-runtime owner. The transport admits native commands and
+// observes their completion without polling PAD or performing source work.
 import {collectCpuEndpointInPage} from './tests/cpu_endpoint.mjs';
 
 export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,present:4,
@@ -227,6 +227,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||module[PREFIX+'input_bytes']()!==INPUT_BYTES)
     throw Error('Private runtime history ABI differs from its controller');
   let busy=false,failed=null,terminal=false,captured=false,episodeMode=false,arenaMode=false;
+  let inlineMode=false,nativeCallPending=false;
   let identityText=null;
   const journal=[];
   const read=(pointer,size)=>{
@@ -237,7 +238,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(!start||!Number.isSafeInteger(size)||size<=0||start+size>heap.length)throw Error('Native history borrowed extent');
     return heap.slice(start,start+size);
   };
-  const status=()=>decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode,arenaMode});
+  const status=()=>{
+    if(nativeCallPending)throw Error('Runtime history Asyncify call is in progress');
+    return decodeRuntimeMatchHistoryStatus(read(module[PREFIX+'status'](),STATUS_BYTES),{episodeMode,arenaMode});
+  };
   const errorText=()=>module.UTF8ToString(module[PREFIX+'error']());
   const latch=error=>{failed??=error;return error;};
   const check=(snapshot,allowFailure=false)=>{
@@ -328,6 +332,17 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(episodeExport(name)(...args)!==1)
       throw latch(Error(`Native history episode ${name} refused: ${errorText()}`));
   };
+  const inlineCall=async(name,...args)=>{
+    nativeCallPending=true;
+    try{return await module.ccall(PREFIX.slice(1)+name,'number',args.map(()=>'number'),args,{async:true});}
+    finally{nativeCallPending=false;}
+  };
+  const requireInlineRequest=async(name,...args)=>{
+    if(typeof module[PREFIX+name]!=='function')
+      throw Error(`Private inline runtime history export ${name} is unavailable`);
+    if(await inlineCall(name,...args)!==1)
+      throw Error(`Native history ${name} refused: ${errorText()}`);
+  };
   let padArgument=0,padArgumentStart=0,frameArgument=0,frameArgumentStart=0,padArgumentReleased=false;
   const writePadArgument=bytes=>{
     if(!padArgument||padArgumentReleased)throw Error('Runtime history PAD argument storage is unavailable');
@@ -362,16 +377,20 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     heap.set(bytes,frameArgumentStart);
     return frameArgumentStart;
   };
-  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null)=>{
+  const deadlineError=(label,detail)=>
+    latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null,acceptLateCompletion=false)=>{
     for(;;){
       const snapshot=check(status(),allowFailure);
+      if(inlineMode&&!acceptLateCompletion&&performance.now()>=deadline)throw deadlineError(label,detail);
       if(predicate(snapshot))return snapshot;
       if(performance.now()>=deadline)
-        throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+        throw deadlineError(label,detail);
       if(onBlocked){
-        onBlocked(snapshot);
+        const blocked=onBlocked(snapshot);
+        if(inlineMode)await blocked;
         if(performance.now()>=deadline)
-          throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+          throw deadlineError(label,detail);
       }
       await new Promise(resolve=>setTimeout(resolve,5));
     }
@@ -443,6 +462,19 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       allocateFrameArgument();
       requireEpisodeSuccess('arena_enable');
       episodeMode=true;arenaMode=true;
+      check(status());
+      return true;
+    },
+    enableInlineDispatch(){
+      active();
+      if(!arenaMode||captured||inlineMode)
+        throw Error('Inline dispatch requires explicit arena history before PRE capture and can only be enabled once');
+      const snapshot=check(status());
+      if(snapshot.ownerState!==1||snapshot.pendingCommand||snapshot.requestSequence||snapshot.endpointActive)
+        throw Error('Inline dispatch requires a fresh terminal takeover owner');
+      if(typeof module.ccall!=='function')throw Error('Inline dispatch requires Asyncify ccall');
+      requireEpisodeSuccess('inline_dispatch_enable');
+      inlineMode=true;
       check(status());
       return true;
     },
@@ -695,9 +727,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         const prepare=waitForRenderer?module[PREFIX+'renderer_prepare_json']:null;
         const rendererDetail=()=>entry.rendererPreparation?
           ` (renderer preparation: ${JSON.stringify(entry.rendererPreparation)})`:'';
-        const onBlocked=typeof prepare==='function'?value=>{
-          if(value.pendingCommand||!value.gpuPending)return;
-          const pointer=prepare(command);
+        const retainPreparation=pointer=>{
           if(!pointer)return;
           const receipt=JSON.parse(module.UTF8ToString(pointer));
           if(receipt.schema!==1||receipt.command!==command||
@@ -708,6 +738,11 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(receipt.action)entry.rendererPreparation.flush=receipt;
           if(receipt.action===2&&!allowFailure)
             throw Error(`Native history refused: ${errorText()}${rendererDetail()}`);
+        };
+        const onBlocked=typeof prepare==='function'?value=>{
+          if(value.pendingCommand||!value.gpuPending)return;
+          if(inlineMode)return inlineCall('renderer_prepare_json',command).then(retainPreparation);
+          retainPreparation(prepare(command));
         }:null;
         const before=await wait(value=>value.pendingCommand===0&&
           (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail);
@@ -728,17 +763,23 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(typeof module[PREFIX+'request_rebase']!=='function'||
             typeof module[PREFIX+'rebase_identity_json']!=='function')
             throw Error('Private confirmed rebase exports are unavailable');
-          requireSuccess('request_rebase',confirmedEnd);
+          if(inlineMode)await requireInlineRequest('request_rebase',confirmedEnd);
+          else requireSuccess('request_rebase',confirmedEnd);
         }else if(framePayload){
           const h=before.metadata;
           if(!captured||!frameArgument||ticketId>before.requestSequence||
             (name==='forwardTicket'?![4,21].includes(h.phase):h.phase!==11))
             throw Error('Episode ticket command is outside its captured source phase');
           const pointer=writeFrameArgument(planBytes);
-          requireEpisodeSuccess(name==='forwardTicket'?'request_episode_forward':'request_episode_replay',
-            ticketId,pointer,FRAME_BYTES);
-        }else requireSuccess('request',command);
-        const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,deadline,name,allowFailure);
+          const request=name==='forwardTicket'?'request_episode_forward':'request_episode_replay';
+          if(inlineMode)await requireInlineRequest(request,ticketId,pointer,FRAME_BYTES);
+          else requireEpisodeSuccess(request,ticketId,pointer,FRAME_BYTES);
+        }else if(inlineMode)await requireInlineRequest('request',command);
+        else requireSuccess('request',command);
+        // Completion and deadline checks occur only after native Asyncify
+        // settles. Cleanup may release an already retired owner even if late.
+        const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,
+          deadline,name,allowFailure,null,rendererDetail,allowFailure);
         if(after.requestSequence!==next||after.lastCompletedCommand!==command)
           throw Error('Native command completion sequence mismatch');
         if(recordingIdle||name==='recordingPresent'){
@@ -785,6 +826,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         if(name==='cleanup'){
           if(after.ownerState!==2)throw Error('Native cleanup did not retire the owner');
           releasePadArgument();terminal=true;
+          if(inlineMode&&performance.now()>=deadline)throw deadlineError(name,rendererDetail);
         }
         if(name==='capture')captured=true;
         if(name==='rebase'){

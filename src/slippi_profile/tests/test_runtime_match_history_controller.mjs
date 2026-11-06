@@ -779,3 +779,146 @@ test('recording present and idle preserve the actual forward source boundary',as
   }
   assert.deepEqual(f.calls,[1,19,5]);
 });
+
+function inlineFixture(options){
+  const f=episodeFixture();
+  f.module[prefix+'arena_enable']=()=>1;
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  let enableCalls=0;
+  f.module[prefix+'inline_dispatch_enable']=()=>{enableCalls++;return 1;};
+  const owner=createRuntimeMatchHistoryController(f.module,options);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  return {...f,owner,inlineEnableCalls:()=>enableCalls};
+}
+
+test('inline forward retains the plan and forbids native reentry while Asyncify is suspended',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  assert.throws(()=>owner.enableInlineDispatch(),/explicit arena history/);
+  owner.enableArenaHistory();
+  assert.throws(()=>owner.enableInlineDispatch(),/requires Asyncify ccall/);
+  let resolveForward,startedForward;
+  const forwardStarted=new Promise(resolve=>{startedForward=resolve;});
+  let statusCalls=0,callInFlight=false;
+  const status=module[prefix+'status'];
+  module[prefix+'status']=()=>{
+    assert.equal(callInFlight,false,'status entered native during Asyncify');
+    statusCalls++;
+    return status();
+  };
+  module.ccall=async(name,result,types,args,options)=>{
+    assert.equal(result,'number');
+    assert.deepEqual(types,args.map(()=>'number'));
+    assert.deepEqual(options,{async:true});
+    if(name===prefix.slice(1)+'request_episode_forward'){
+      callInFlight=true;
+      startedForward(args);
+      await new Promise(resolve=>{resolveForward=resolve;});
+      callInFlight=false;
+    }
+    return module['_'+name](...args);
+  };
+  assert.equal(owner.enableInlineDispatch(),true);
+  assert.equal(f.inlineEnableCalls(),1);
+  assert.throws(()=>owner.enableInlineDispatch(),/enabled once/);
+  await owner.command('capture');
+  await owner.command('beginEpisode');
+  f.put(56,4); // Armed PRE is available after its endpoint copy.
+  await owner.command('pollTicket');
+  const ticket=owner.ticket(),plan=ticket.raw.slice();
+  plan[12]^=1;
+  const expected=plan.slice();
+  const task=owner.forwardTicket(ticket.ticketId,plan);
+  const [id,pointer,size]=await forwardStarted;
+  assert.equal(id,ticket.ticketId);
+  assert.equal(size,44);
+  const reads=statusCalls;
+  plan.fill(0);
+  assert.throws(()=>owner.status(),/Asyncify call is in progress/);
+  assert.throws(()=>owner.ticket(),/command is in progress/);
+  await assert.rejects(owner.command('cleanup'),/cleanup owner unavailable/);
+  await assert.rejects(owner.command('pollTicket'),/command is in progress/);
+  assert.equal(statusCalls,reads);
+  assert.deepEqual(f.frees,[]);
+  assert.deepEqual(module.HEAPU8.slice(pointer,pointer+size),expected);
+  resolveForward();
+  assert.equal((await task).metadata.currentFrame,1);
+  assert.deepEqual(owner.receipt(0).forward,expected);
+  await owner.command('cleanup');
+  assert.equal(f.frees.length,2);
+});
+
+test('inline idle waits for yielded renderer preparation and rejects a late return without dispatch',async(t)=>{
+  const f=inlineFixture({commandTimeoutMs:30}),{owner,module}=f;
+  const clock=t.mock.method(performance,'now',()=>now);
+  let now=0,resolvePreparation,startedPreparation;
+  const preparationStarted=new Promise(resolve=>{startedPreparation=resolve;});
+  module[prefix+'renderer_prepare_json']=()=>assert.fail('direct renderer preparation call');
+  module.ccall=async(name,result,types,args,options)=>{
+    assert.deepEqual(options,{async:true});
+    if(name!==prefix.slice(1)+'renderer_prepare_json')return module['_'+name](...args);
+    assert.deepEqual([result,types,args],['number',['number'],[5]]);
+    startedPreparation();
+    await new Promise(resolve=>{resolvePreparation=resolve;});
+    f.put(116,0);
+    return 2048;
+  };
+  const utf8=module.UTF8ToString;
+  module.UTF8ToString=pointer=>pointer===2048?JSON.stringify({schema:1,command:5,action:1,
+    before:{cacheStatus:1},after:{cacheStatus:0}}):utf8(pointer);
+  owner.enableArenaHistory();
+  owner.enableInlineDispatch();
+  f.put(116,1);
+  const idle=owner.command('idle');
+  await preparationStarted;
+  now=31;
+  assert.throws(()=>owner.status(),/Asyncify call is in progress/);
+  await assert.rejects(owner.command('cleanup'),/cleanup owner unavailable/);
+  assert.deepEqual(f.calls,[]);
+  resolvePreparation();
+  await assert.rejects(idle,/idle exceeded its 30 ms deadline/);
+  assert.deepEqual(f.calls,[]);
+  assert.equal(owner.journal()[0].rendererPreparation.flush.after.cacheStatus,0);
+  await owner.command('cleanup');
+  assert.deepEqual(f.calls,[10]);
+  clock.mock.restore();
+});
+
+test('inline request refusal and Asyncify rejection preserve first failure and allow owned cleanup',async()=>{
+  for(const failure of ['refuse','reject','native']){
+    const f=inlineFixture(),{owner,module}=f;
+    const original=Error('Asyncify rejected after settling');
+    module.ccall=async(name,_type,_types,args)=>{
+      if(args[0]===1){
+        if(failure==='refuse')return 0;
+        if(failure==='reject')throw original;
+        f.put(12,9);
+      }
+      return module['_'+name](...args);
+    };
+    owner.enableArenaHistory();
+    owner.enableInlineDispatch();
+    const expected=failure==='reject'?original:/Native history .*refused: synthetic refusal/;
+    await assert.rejects(owner.command('capture'),expected);
+    await assert.rejects(owner.command('capture'),expected);
+    assert.equal((await owner.command('cleanup')).ownerState,2);
+  }
+});
+
+test('inline dispatch does not accept a completed command after its deadline',async(t)=>{
+  const f=inlineFixture({commandTimeoutMs:30}),{owner,module}=f;
+  let now=0;
+  t.mock.method(performance,'now',()=>now);
+  module.ccall=async(name,_type,_types,args)=>{
+    const result=module['_'+name](...args);
+    if(args[0]===1)now=31;
+    return result;
+  };
+  owner.enableArenaHistory();
+  owner.enableInlineDispatch();
+  await assert.rejects(owner.command('capture'),/capture exceeded its 30 ms deadline/);
+  assert.equal(owner.status().lastCompletedCommand,1);
+  assert.deepEqual(f.frees,[]);
+  assert.equal((await owner.command('cleanup')).ownerState,2);
+  assert.equal(f.frees.length,2);
+});

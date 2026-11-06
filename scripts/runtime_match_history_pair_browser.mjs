@@ -32,7 +32,7 @@ const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
 const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
-  'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false}},strict:true});
+  'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false},'inline-dispatch':{type:'boolean',default:false}},strict:true});
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
@@ -45,6 +45,8 @@ if(values['arena-history'])assert.equal(values.phase,'four-tick-correction','--a
 const presentForward=values['present-forward'];
 if(presentForward)assert(values['arena-history']&&values.phase==='four-tick-correction',
   '--present-forward requires four-tick-correction with --arena-history');
+const inlineDispatch=values['inline-dispatch'];
+if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
@@ -190,6 +192,7 @@ const report={schema:values.phase==='four-tick-correction'?
     map_path:mapPath,map_sha256:mapSha256,wire_rows:wire.length,
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
   arena_history_mode:values['arena-history'],
+  ...(inlineDispatch?{inline_dispatch:true}:{}),
   ...(presentForward?{forward_presentation_scope:'one actual source draw per forward tick; corrected presentations occur only at sealed ENDs; no cadence claim'}:{}),
   arena_comparator:{path:'src/slippi_profile/tests/cpu_arena_endpoint.mjs',
     sha256:await hashFile(path.join(ROOT,'src/slippi_profile/tests/cpu_arena_endpoint.mjs'))},
@@ -1113,6 +1116,7 @@ async function runFourTickEpisode(alpha,beta){
     catch(error){event.error=String(error);throw error;}
   };
   await joinOwned('episode-enable',items.map(item=>log(item,values['arena-history']?'arenaEnable':'episodeEnable')));
+  if(inlineDispatch)await joinOwned('episode-inline-enable',items.map(item=>log(item,'inlineEnable')));
   const episodes=twoArenaEpisodes?2:1;
   if(twoArenaEpisodes)proof.windows=[];
   let previous=null;

@@ -97,7 +97,7 @@ struct MatchHistoryControl {
  uint32_t requested_ticket_id{};
  std::array<uint8_t,44> requested_plan{};
  std::array<uint8_t,11> remote{};
- bool remote_ready{},dispatching{},identity_ready{},episode_enabled{},arena_enabled{};
+ bool remote_ready{},dispatching{},identity_ready{},episode_enabled{},arena_enabled{},inline_dispatch{};
  melee_web::GameplayCpuArenaEndpoint arena_endpoint{};
  std::string identity;
  std::array<std::string,4> identity_host;
@@ -983,8 +983,12 @@ int history_request(unsigned command,uint32_t end_frame,bool explicit_episode_pa
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  c.requested_rebase_end=end_frame;
  ++c.status.request_seq;c.status.pending_command=command;
- // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
- (void)emscripten_request_animation_frame(history_dispatch,nullptr);
+ if(c.inline_dispatch){
+  (void)history_dispatch(0.0,nullptr);
+ }else{
+  // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
+  (void)emscripten_request_animation_frame(history_dispatch,nullptr);
+ }
  return 1;
 }
 } // namespace
@@ -1174,6 +1178,19 @@ int melee_web_native_menu_match_history_episode_enable() {
 int melee_web_native_menu_match_history_arena_enable() {
  if(!melee_web_native_menu_match_history_episode_enable())return 0;
  match_history.arena_enabled=true;
+ return 1;
+}
+int melee_web_native_menu_match_history_inline_dispatch_enable() {
+ auto& c=match_history;
+ if(c.inline_dispatch||!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    c.status.request_seq||c.status.complete_seq||c.status.last_completed_command||
+    c.status.pending_command||c.dispatching||match_history_in_tick||c.capsule||c.remote_ready||
+    !c.identity_ready||!c.statics||!match||match.get()!=c.match_owner||
+    match->source_frames()!=c.status.expected_frame||!history_start_export_idle()||
+    history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::CapturePre,
+      c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
+  return history_refuse("Inline dispatch requires one initial idle pre-capture owner admission");
+ c.inline_dispatch=true;
  return 1;
 }
 int melee_web_native_menu_match_history_request_episode_forward(

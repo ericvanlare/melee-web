@@ -66,6 +66,7 @@ struct MatchHistoryControl {
   bool dispatching=false;
   bool episode_enabled=false;
   bool arena_enabled=false;
+  bool inline_dispatch=false;
   uint32_t requested_rebase_end=0;
   Capsule* capsule=nullptr;
   std::array<char,512> error{};
@@ -175,6 +176,122 @@ int main() {
             ('compile', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
                          str(source), '-o', str(binary)]),
             ('dispatch-controls', [str(binary)]),
+        ]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
+    def test_inline_dispatch_is_opt_in_and_runs_one_staged_request(self):
+        history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
+
+        def section(start, end):
+            begin = history.index(start)
+            return history[begin:history.index(end, begin)]
+
+        refusal = section('bool history_refuse(', 'bool history_runtime_idle() noexcept;')
+        request = section('int history_request(', '} // namespace')
+        enable = section('int melee_web_native_menu_match_history_inline_dispatch_enable()',
+                         'int melee_web_native_menu_match_history_request_episode_forward(')
+        fixture = r'''#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <memory>
+#include <array>
+using EM_BOOL=int;
+constexpr EM_BOOL EM_FALSE=0;
+struct Status { uint32_t owner_state=1,first_failure=0,pending_command=0,last_completed_command=0;
+ uint32_t request_seq=0,complete_seq=0,expected_frame=50; };
+struct Session { uint32_t frame=50; uint32_t source_frames() const { return frame; } };
+struct Capsule { bool endpoint_active() const { return false; } };
+struct Control { Status status{};bool dispatching=false,identity_ready=true,remote_ready=false,
+ episode_enabled=false,arena_enabled=false,inline_dispatch=false;Capsule* capsule=nullptr;
+ int* statics=nullptr;uint32_t requested_rebase_end{};
+ Session* match_owner=nullptr;std::array<char,512> error{}; };
+Control match_history{};
+std::unique_ptr<Session> match;
+bool match_history_terminal=true,match_history_in_tick=false,boundary_admitted=true,runtime_idle=true;
+unsigned rAF_calls=0,dispatch_calls=0;
+using Callback=EM_BOOL(*)(double,void*);
+Callback queued_callback=nullptr;void* queued_data=nullptr;
+namespace melee_web {
+enum class RuntimeMatchHistoryGatePoint { CapturePre };
+enum class RuntimeMatchHistoryGateResult { Admitted, Refused };
+}
+melee_web::RuntimeMatchHistoryGateResult history_boundary(const Session& s,
+ melee_web::RuntimeMatchHistoryGatePoint,uint32_t frame,void*) {
+ return boundary_admitted&&s.source_frames()==frame?
+  melee_web::RuntimeMatchHistoryGateResult::Admitted:melee_web::RuntimeMatchHistoryGateResult::Refused;
+}
+bool history_start_export_idle() { return runtime_idle&&!match_history_in_tick&&
+  !match_history.dispatching&&!match_history.status.pending_command; }
+EM_BOOL history_dispatch(double,void*);
+int emscripten_request_animation_frame(Callback cb,void* data) {
+ ++rAF_calls;queued_callback=cb;queued_data=data;return 0;
+}
+@REFUSAL@
+EM_BOOL history_dispatch(double,void*) {
+ ++dispatch_calls;auto& c=match_history;
+ const uint32_t command=c.status.pending_command;
+ if(!command||c.dispatching)return EM_FALSE;
+ c.dispatching=true;c.status.last_completed_command=command;
+ c.status.complete_seq=c.status.request_seq;c.status.pending_command=0;
+ c.dispatching=false;return EM_FALSE;
+}
+@REQUEST@
+@ENABLE@
+static int configured_statics_storage=1;
+static int* configured_statics=&configured_statics_storage;
+void reset() {
+ match_history=Control{};match=std::make_unique<Session>();
+ match_history_terminal=true;match_history_in_tick=false;boundary_admitted=true;runtime_idle=true;
+ rAF_calls=dispatch_calls=0;queued_callback=nullptr;queued_data=nullptr;
+ match_history.status.expected_frame=match->source_frames();
+ match_history.match_owner=match.get();match_history.statics=configured_statics;
+}
+int main() {
+ reset();
+ assert(!match_history.inline_dispatch);
+ assert(history_request(4,0)==1);
+ assert(rAF_calls==1&&dispatch_calls==0&&queued_callback==history_dispatch);
+ assert(match_history.status.request_seq==1&&match_history.status.pending_command==4);
+ queued_callback(1.0,queued_data);
+ assert(rAF_calls==1&&dispatch_calls==1);
+ assert(match_history.status.complete_seq==1&&match_history.status.pending_command==0);
+
+ reset();
+ assert(melee_web_native_menu_match_history_inline_dispatch_enable()==1);
+ assert(match_history.inline_dispatch);
+ assert(history_request(4,0)==1);
+ assert(rAF_calls==0&&dispatch_calls==1);
+ assert(match_history.status.request_seq==1&&match_history.status.last_completed_command==4);
+ assert(match_history.status.complete_seq==1&&match_history.status.pending_command==0);
+ assert(melee_web_native_menu_match_history_inline_dispatch_enable()==0);
+ assert(match_history.inline_dispatch&&match_history.status.first_failure==1);
+
+ reset();Capsule capsule{};match_history.capsule=&capsule;
+ assert(melee_web_native_menu_match_history_inline_dispatch_enable()==0);
+ assert(!match_history.inline_dispatch&&match_history.status.first_failure==1);
+ assert(rAF_calls==0&&dispatch_calls==0);
+
+ reset();match_history.status.pending_command=4;
+ assert(melee_web_native_menu_match_history_inline_dispatch_enable()==0);
+ assert(!match_history.inline_dispatch&&match_history.status.first_failure==1);
+ assert(rAF_calls==0&&dispatch_calls==0);
+}
+'''
+        source_text = (fixture.replace('@REFUSAL@', refusal)
+                              .replace('@REQUEST@', request)
+                              .replace('@ENABLE@', enable))
+        source = self.work / 'inline-dispatch.cpp'
+        binary = self.work / 'inline-dispatch'
+        source.write_text(source_text)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [
+            ('compile', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                         str(source), '-o', str(binary)]),
+            ('inline-dispatch-controls', [str(binary)]),
         ]:
             result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
             output = result.stdout + result.stderr
