@@ -135,7 +135,8 @@ GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
         arena.reset(physical.prepared);
         if(physical.status!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||!arena)
             return payload_refusal("sdk-prepare",physical.status);
-        const auto mirror=melee_web_source_memory_history_prepare(o.shadow);
+        const auto mirror=melee_web_source_memory_history_prepare_arena_coupled(
+            o.shadow,arena.get());
         shadow.reset(mirror.prepared);
         if(mirror.status!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK||!shadow)
             return payload_refusal("shadow-prepare",mirror.status,

@@ -1320,14 +1320,25 @@ melee_web_source_memory_snapshot_restore(const MeleeWebSourceMemorySnapshot* sna
     }
 }
 
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
+    defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+struct HistoryPieceRestoreSpan {
+    uint64_t begin, end;
+    uint32_t outer_source, outer_bytes;
+    uint64_t outer_generation;
+};
+#endif
+
 struct MeleeWebSourceMemoryHistory {
     MeleeWebSourceMemorySnapshot snapshot;
     uint64_t revision;
+    const MeleeWebGameplayHeapHistorySnapshot* bound_arena_pre = nullptr;
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     std::vector<PieceCell> pieces;
     uint64_t piece_instance;
     uint64_t piece_revision;
     uint32_t piece_watermark;
+    uint32_t piece_begin, piece_end, piece_count;
 #endif
     std::shared_ptr<HistoryValidationScratch> validation_scratch;
 };
@@ -1341,6 +1352,11 @@ struct MeleeWebSourceMemoryHistoryPrepared {
     uint64_t end_piece_revision;
     uint32_t end_piece_watermark;
 #endif
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
+    defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    std::vector<HistoryPieceRestoreSpan> coupled_piece_spans;
+#endif
+    const MeleeWebGameplayHeapHistoryPrepared* arena_plan = nullptr;
     mutable bool admitted = false;
     bool committed = false;
 };
@@ -1385,6 +1401,8 @@ bool history_preserves_pieces(const MeleeWebSourceMemoryHistory& pre)
 {
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if (pre.piece_instance != piece_owner.instance || pre.pieces.size() != piece_owner.count ||
+        pre.piece_begin != piece_owner.begin || pre.piece_end != piece_owner.end ||
+        pre.piece_count != piece_owner.count ||
         pre.piece_revision > piece_owner.serial || pre.piece_watermark > piece_owner.next_generation)
         return false;
     return std::equal(pre.pieces.begin(), pre.pieces.end(), piece_owner.cells,
@@ -1513,6 +1531,154 @@ bool history_live_shape_valid(HistoryValidationScratch& scratch)
     return true;
 }
 
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
+    defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+const HostAllocation* history_find_source_allocation(
+    uint64_t source, const HistoryValidationScratch& scratch)
+{
+    const auto found = std::upper_bound(scratch.source_indices.begin(),
+        scratch.source_indices.end(), source,
+        [](uint64_t value, size_t index) {
+            return value < allocations[index].source.value();
+        });
+    if (found == scratch.source_indices.begin())
+        return nullptr;
+    const auto& row = allocations[*std::prev(found)];
+    const uint64_t begin = row.source.value();
+    return source >= begin && source - begin < row.requested ? &row : nullptr;
+}
+
+const HostAllocation* history_find_pre_generation(
+    const MeleeWebSourceMemoryHistory& pre, uint64_t generation)
+{
+    const auto& rows = pre.snapshot.allocations;
+    const auto found = std::lower_bound(rows.begin(), rows.end(), generation,
+        [](const HostAllocation& row, uint64_t value) { return row.generation < value; });
+    return found != rows.end() && found->generation == generation ? &*found : nullptr;
+}
+
+bool history_piece_interval(uint32_t range_begin, uint32_t range_end,
+                            uint32_t range_count, size_t index,
+                            const PieceCell& cell, uint64_t* out_begin,
+                            uint64_t* out_end)
+{
+    if (!out_begin || !out_end || !(cell.geometry & piece_live) ||
+        index >= range_count || range_begin >= range_end ||
+        range_count != (range_end - range_begin) / 32u)
+        return false;
+    const uint64_t begin = uint64_t(range_begin) + uint64_t(index) * 32u;
+    const uint64_t extent = uint64_t(piece_extent(cell));
+    const uint32_t padding = (cell.geometry >> 26) & 31u;
+    if (!extent || extent % 32u || extent < padding ||
+        extent > std::numeric_limits<uint32_t>::max() ||
+        begin < range_begin || begin + extent < begin || begin + extent > range_end)
+        return false;
+    const uint32_t requested = static_cast<uint32_t>(extent) - padding;
+    if (!requested || requested > UINT32_MAX - 31u ||
+        ((requested + 31u) & ~uint32_t(31u)) != extent)
+        return false;
+    *out_begin = begin;
+    *out_end = begin + extent;
+    return true;
+}
+
+bool history_span_in_stable_pre_allocation(
+    const MeleeWebSourceMemoryHistory& pre,
+    const HistoryValidationScratch& scratch,
+    uint64_t begin, uint64_t end, HistoryPieceRestoreSpan* out)
+{
+    if (!out || begin >= end)
+        return false;
+    const auto* current = history_find_source_allocation(begin, scratch);
+    if (!current || end - begin > current->requested -
+            static_cast<uint32_t>(begin - current->source.value()))
+        return false;
+    const auto* saved = history_find_pre_generation(pre, current->generation);
+    if (!saved || !history_allocation_equal(*saved, *current) ||
+        saved->source.value() != current->source.value() ||
+        saved->requested != current->requested ||
+        begin < saved->source.value() ||
+        end > uint64_t(saved->source.value()) + saved->requested)
+        return false;
+    *out = {begin, end, current->source.value(), current->requested,
+            current->generation};
+    return true;
+}
+
+bool history_piece_restore_rows_valid(
+    const MeleeWebSourceMemoryHistory& pre,
+    const std::vector<HistoryPieceRestoreSpan>& spans,
+    const HistoryValidationScratch& scratch)
+{
+    if (spans.empty())
+        return true;
+    size_t span_index = 0;
+    for (size_t i = 0; i < piece_owner.count; ++i) {
+        const auto& cell = piece_owner.cells[i];
+        if (!(cell.geometry & piece_live))
+            continue;
+        uint64_t begin = 0, end = 0;
+        if (!history_piece_interval(piece_owner.begin, piece_owner.end,
+                piece_owner.count, i, cell, &begin, &end))
+            return false;
+        while (span_index < spans.size() && spans[span_index].end <= begin)
+            ++span_index;
+        for (size_t j = span_index; j < spans.size() && spans[j].begin < end; ++j) {
+            const auto& span = spans[j];
+            if (begin >= span.end || end <= span.begin)
+                continue;
+            if (begin < span.outer_source ||
+                end > uint64_t(span.outer_source) + span.outer_bytes)
+                return false;
+            const auto* current = history_find_source_allocation(begin, scratch);
+            if (!current || current->generation != span.outer_generation ||
+                current->source.value() != span.outer_source ||
+                current->requested != span.outer_bytes ||
+                end > uint64_t(current->source.value()) + current->requested)
+                return false;
+            const auto* saved = history_find_pre_generation(pre, current->generation);
+            if (!saved || !history_allocation_equal(*saved, *current))
+                return false;
+        }
+    }
+    return true;
+}
+
+bool history_build_coupled_piece_restore_spans(
+    const MeleeWebSourceMemoryHistory& pre,
+    std::vector<HistoryPieceRestoreSpan>* out)
+{
+    if (!out || !pre.validation_scratch || pre.piece_instance != piece_owner.instance ||
+        pre.pieces.size() != piece_owner.count ||
+        pre.piece_begin != piece_owner.begin || pre.piece_end != piece_owner.end ||
+        pre.piece_count != piece_owner.count ||
+        pre.piece_revision > piece_owner.serial ||
+        pre.piece_watermark > piece_owner.next_generation ||
+        !history_observer_admit())
+        return false;
+    out->clear();
+    uint64_t previous_end = 0;
+    const auto& scratch = *pre.validation_scratch;
+    for (size_t i = 0; i < pre.pieces.size(); ++i) {
+        const auto& saved = pre.pieces[i];
+        const auto& live = piece_owner.cells[i];
+        if (!(saved.geometry & piece_live) || history_piece_equal(saved, live))
+            continue;
+        uint64_t begin = 0, end = 0;
+        if (!history_piece_interval(pre.piece_begin, pre.piece_end,
+                pre.piece_count, i, saved, &begin, &end) ||
+            (previous_end && begin < previous_end))
+            return false;
+        HistoryPieceRestoreSpan span{};
+        if (!history_span_in_stable_pre_allocation(pre, scratch, begin, end, &span))
+            return false;
+        out->push_back(span);
+        previous_end = end;
+    }
+    return history_piece_restore_rows_valid(pre, *out, scratch);
+}
+#endif
+
 MeleeWebSourceMemoryPayloadSnapshotStatus typed_current_payload_header(
     const MeleeWebSourceMemoryPayloadSnapshot* snapshot,
     MeleeWebSourcePayloadEndpointHeader* out)
@@ -1598,10 +1764,11 @@ melee_web_source_memory_history_capture(void)
             return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, nullptr};
         auto* history = new MeleeWebSourceMemoryHistory{
             {owner_epoch, source_heap_handle, world_generation, next_generation,
-             source_address_heap->state(), allocations, fighters}, topology_revision
+             source_address_heap->state(), allocations, fighters}, topology_revision, nullptr
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
             , {piece_owner.cells, piece_owner.cells + piece_owner.count},
-            piece_owner.instance, piece_owner.serial, piece_owner.next_generation
+            piece_owner.instance, piece_owner.serial, piece_owner.next_generation,
+            piece_owner.begin, piece_owner.end, piece_owner.count
 #endif
             , std::move(scratch)
         };
@@ -1609,6 +1776,45 @@ melee_web_source_memory_history_capture(void)
     } catch (const std::bad_alloc&) {
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED, nullptr};
     }
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_bind_arena_pre(
+    MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistorySnapshot* arena_pre)
+{
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    if (!pre || !arena_pre)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    if (pre->bound_arena_pre)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+    const auto current = melee_web_source_memory_history_current_admit(pre);
+    if (current != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return current;
+    const auto observed = melee_web_source_memory_history_observe(pre);
+    if (observed.status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK || !observed.exact_pre ||
+        pre->revision != topology_revision || pre->snapshot.watermark != next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (pre->piece_instance != piece_owner.instance ||
+        pre->piece_revision != piece_owner.serial ||
+        pre->piece_watermark != piece_owner.next_generation ||
+        pre->piece_begin != piece_owner.begin || pre->piece_end != piece_owner.end ||
+        pre->piece_count != piece_owner.count || pre->pieces.size() != piece_owner.count)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+#endif
+    const auto physical = melee_web_gameplay_heap_history_snapshot_match_current(arena_pre);
+    if (physical == MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER;
+    if (physical != MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+    pre->bound_arena_pre = arena_pre;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+#else
+    (void)pre;
+    (void)arena_pre;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+#endif
 }
 
 extern "C" MeleeWebSourceMemoryHistoryStatus
@@ -1626,6 +1832,8 @@ melee_web_source_memory_history_current_admit(const MeleeWebSourceMemoryHistory*
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED;
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if (pre->piece_instance != piece_owner.instance || pre->pieces.size() != piece_owner.count ||
+        pre->piece_begin != piece_owner.begin || pre->piece_end != piece_owner.end ||
+        pre->piece_count != piece_owner.count ||
         pre->piece_revision > piece_owner.serial || pre->piece_watermark > piece_owner.next_generation)
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
 #endif
@@ -1837,6 +2045,8 @@ extern "C" void melee_web_source_memory_history_describe_pre_change(
     }
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if (pre->piece_instance != piece_owner.instance || pre->pieces.size() != piece_owner.count ||
+        pre->piece_begin != piece_owner.begin || pre->piece_end != piece_owner.end ||
+        pre->piece_count != piece_owner.count ||
         pre->piece_revision > piece_owner.serial || pre->piece_watermark > piece_owner.next_generation) {
         std::snprintf(out, out_bytes, "piece-owner-fence");
         return;
@@ -1855,21 +2065,52 @@ extern "C" void melee_web_source_memory_history_describe_pre_change(
 #endif
 }
 
-extern "C" MeleeWebSourceMemoryHistoryPrepareResult
-melee_web_source_memory_history_prepare(const MeleeWebSourceMemoryHistory* pre)
+namespace {
+MeleeWebSourceMemoryHistoryPrepareResult history_prepare_impl(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistoryPrepared* arena_plan)
 {
-    const auto status = melee_web_source_memory_history_current_admit(pre);
-    if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
-        return {status, nullptr};
-    if (!topology_revision_available() || next_generation == UINT64_MAX)
-        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
-#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
-    if (piece_owner.serial == UINT64_MAX || piece_owner.next_generation == UINT32_MAX)
-        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
+    defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    std::vector<HistoryPieceRestoreSpan> coupled_spans;
 #endif
-    if (!history_preserves_pre(pre->snapshot) || !history_preserves_pieces(*pre))
-        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
     try {
+        const auto status = melee_web_source_memory_history_current_admit(pre);
+        if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+            return {status, nullptr};
+        if (!topology_revision_available() || next_generation == UINT64_MAX)
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        if (piece_owner.serial == UINT64_MAX || piece_owner.next_generation == UINT32_MAX)
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#endif
+        if (arena_plan) {
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+            if (!pre->bound_arena_pre)
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+            const auto physical = melee_web_gameplay_heap_history_plan_stage(
+                arena_plan, pre->bound_arena_pre,
+                MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_PREPARED);
+            if (physical == MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER)
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, nullptr};
+            if (physical != MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE, nullptr};
+            if (!history_preserves_pre(pre->snapshot))
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+            if (!history_build_coupled_piece_restore_spans(*pre, &coupled_spans))
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
+#else
+            if (!history_preserves_pieces(*pre))
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
+#endif
+#else
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#endif
+        } else {
+            if (!history_preserves_pre(pre->snapshot) || !history_preserves_pieces(*pre))
+                return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
+        }
         auto candidate = std::unique_ptr<MeleeWebSourceMemoryHistoryPrepared>(
             new MeleeWebSourceMemoryHistoryPrepared{*pre, std::make_unique<Heap>(), topology_revision, next_generation
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
@@ -1878,10 +2119,32 @@ melee_web_source_memory_history_prepare(const MeleeWebSourceMemoryHistory* pre)
             });
         if (candidate->heap->restore(pre->snapshot.heap) != Status::ok)
             return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED && \
+    defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+        candidate->coupled_piece_spans = std::move(coupled_spans);
+#endif
+        candidate->arena_plan = arena_plan;
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK, candidate.release()};
     } catch (const std::bad_alloc&) {
         return {MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED, nullptr};
     }
+}
+}
+
+extern "C" MeleeWebSourceMemoryHistoryPrepareResult
+melee_web_source_memory_history_prepare(const MeleeWebSourceMemoryHistory* pre)
+{
+    return history_prepare_impl(pre, nullptr);
+}
+
+extern "C" MeleeWebSourceMemoryHistoryPrepareResult
+melee_web_source_memory_history_prepare_arena_coupled(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistoryPrepared* arena_plan)
+{
+    if (!arena_plan)
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT, nullptr};
+    return history_prepare_impl(pre, arena_plan);
 }
 
 extern "C" MeleeWebSourceMemoryHistoryStatus
@@ -1905,8 +2168,32 @@ melee_web_source_memory_history_admit(const MeleeWebSourceMemoryHistoryPrepared*
         prepared->end_piece_watermark != piece_owner.next_generation)
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
 #endif
-    if (!history_preserves_pre(prepared->pre.snapshot) || !history_preserves_pieces(prepared->pre))
+    if (!history_preserves_pre(prepared->pre.snapshot))
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+    if (prepared->arena_plan) {
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+        const auto physical = melee_web_gameplay_heap_history_plan_stage(
+            prepared->arena_plan, prepared->pre.bound_arena_pre,
+            MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_ADMITTED);
+        if (physical == MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER)
+            return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER;
+        if (physical != MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+            return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        if (!history_piece_restore_rows_valid(prepared->pre,
+                prepared->coupled_piece_spans,
+                *prepared->pre.validation_scratch))
+            return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+#else
+        if (!history_preserves_pieces(prepared->pre))
+            return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+#endif
+#else
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+#endif
+    } else if (!history_preserves_pieces(prepared->pre)) {
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+    }
     prepared->admitted = true;
     return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
 }
@@ -1939,10 +2226,24 @@ melee_web_source_memory_history_commit_prevalidated(
 #if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
     if (!piece_owner.cells || piece_owner.state != 2 || piece_owner.reason ||
         prepared->pre.piece_instance != piece_owner.instance ||
+        prepared->pre.piece_begin != piece_owner.begin ||
+        prepared->pre.piece_end != piece_owner.end ||
+        prepared->pre.piece_count != piece_owner.count ||
         prepared->end_piece_revision != piece_owner.serial ||
         prepared->end_piece_watermark != piece_owner.next_generation)
         return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
 #endif
+    if (prepared->arena_plan) {
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+        if (melee_web_gameplay_heap_history_plan_stage(
+                prepared->arena_plan, prepared->pre.bound_arena_pre,
+                MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_COMMITTED) !=
+                    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+            return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#else
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#endif
+    }
     source_address_heap.swap(prepared->heap);
     allocations.swap(prepared->pre.snapshot.allocations);
     fighters.swap(prepared->pre.snapshot.fighters);

@@ -84,6 +84,11 @@ typedef struct MeleeWebGameplayHeapHistoryObservation {
     uint64_t compared_bytes;
     uint64_t first_difference;
 } MeleeWebGameplayHeapHistoryObservation;
+typedef enum MeleeWebGameplayHeapHistoryPlanStage {
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_PREPARED = 1,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_ADMITTED = 2,
+    MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_COMMITTED = 3,
+} MeleeWebGameplayHeapHistoryPlanStage;
 MeleeWebGameplayHeapHistoryCaptureResult melee_web_gameplay_heap_history_capture(void);
 MeleeWebGameplayHeapHistoryPrepareResult melee_web_gameplay_heap_history_prepare(
     const MeleeWebGameplayHeapHistorySnapshot* snapshot);
@@ -93,6 +98,16 @@ MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_admit(
  * without requiring the current arena to equal the frozen PRE image. */
 MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_current_admit(
     const MeleeWebGameplayHeapHistorySnapshot* snapshot);
+/* Typed companion proof for a source-memory class-piece sidecar restore.
+ * Snapshot check requires exact live bytes and the current owned SDK heap.
+ * Plan-stage check binds a prepared/admitted/committed plan to that exact PRE
+ * snapshot and current owner; it does not repeat full arena validation. */
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_snapshot_match_current(
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot);
+MeleeWebGameplayHeapHistoryStatus melee_web_gameplay_heap_history_plan_stage(
+    const MeleeWebGameplayHeapHistoryPrepared* prepared,
+    const MeleeWebGameplayHeapHistorySnapshot* snapshot,
+    MeleeWebGameplayHeapHistoryPlanStage required_stage);
 /* Reports exact bytes compared from live storage against PRE; first_difference
  * is UINT64_MAX on equality. This never re-emits saved bytes as live evidence. */
 MeleeWebGameplayHeapHistoryObservation melee_web_gameplay_heap_history_observe(

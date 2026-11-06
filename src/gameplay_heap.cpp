@@ -594,6 +594,49 @@ melee_web_gameplay_heap_history_current_admit(const HistorySnapshot* snapshot)
     return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK;
 }
 
+extern "C" MeleeWebGameplayHeapHistoryStatus
+melee_web_gameplay_heap_history_snapshot_match_current(const HistorySnapshot* snapshot)
+{
+    if (!snapshot) return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT;
+    if (!history_owner_matches(snapshot))
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER;
+    if (snapshot->image.size() != snapshot->arena_bytes ||
+        !history_disjoint(snapshot->image.data(), snapshot->image.size(),
+                          snapshot->arena, snapshot->arena_bytes))
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_STATE;
+    if (std::memcmp(snapshot->arena, snapshot->image.data(), snapshot->arena_bytes) != 0)
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_LIVE_STATE;
+    return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK;
+}
+
+extern "C" MeleeWebGameplayHeapHistoryStatus
+melee_web_gameplay_heap_history_plan_stage(
+    const HistoryPrepared* prepared, const HistorySnapshot* snapshot,
+    MeleeWebGameplayHeapHistoryPlanStage required_stage)
+{
+    if (!prepared || !snapshot || prepared->snapshot != snapshot)
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT;
+    if (!history_owner_matches(prepared))
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_STALE_OWNER;
+    switch (required_stage) {
+    case MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_PREPARED:
+        if (prepared->committed || prepared->admitted)
+            return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_NOT_ADMITTED;
+        break;
+    case MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_ADMITTED:
+        if (!prepared->admitted || prepared->committed)
+            return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_NOT_ADMITTED;
+        break;
+    case MELEE_WEB_GAMEPLAY_HEAP_HISTORY_PLAN_COMMITTED:
+        if (!prepared->committed)
+            return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_NOT_ADMITTED;
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK;
+    default:
+        return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_INVALID_ARGUMENT;
+    }
+    return MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK;
+}
+
 extern "C" MeleeWebGameplayHeapHistoryObservation
 melee_web_gameplay_heap_history_observe(const HistorySnapshot* snapshot)
 {

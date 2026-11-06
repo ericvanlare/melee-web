@@ -31,6 +31,7 @@ std::unique_ptr<GameplayCpuStatics> statics(bool history=false){
 bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topology;}
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
 }
+static unsigned coupled_prepare_calls=0;
 extern "C" {
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
 int slippi_particle_presentation_anchor_admit(SlippiParticlePresentationAnchor){return admitted(11);}
@@ -123,6 +124,14 @@ MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare
     return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK,
             reinterpret_cast<MeleeWebSourceMemoryHistoryPrepared*>(1)};
 }
+MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare_arena_coupled(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebGameplayHeapHistoryPrepared* arena_plan)
+{
+    assert(!writes&&pre&&arena_plan);
+    ++coupled_prepare_calls;
+    return melee_web_source_memory_history_prepare(pre);
+}
 void melee_web_source_memory_history_describe_pre_change(
     const MeleeWebSourceMemoryHistory*,char* out,size_t bytes)
 { assert(!writes);std::snprintf(out,bytes,"modeled first mismatch"); }
@@ -146,6 +155,7 @@ static void arena_coordinator()
         "leaf=shadow-admit status=6","leaf=shadow-prepare status=5 modeled first mismatch"};
     for(arena_refusal=0;arena_refusal<sizeof(expected)/sizeof(*expected);++arena_refusal){
         writes=order=fail_admission=0;
+        coupled_prepare_calls=0;
         fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
         static_value=3;invariant=5;
         auto s=statics(true);
@@ -161,6 +171,7 @@ static void arena_coordinator()
         char refusal[96]{};
         assert(gameplay_cpu_commit_history_pre(o,refusal,sizeof(refusal))==expected[arena_refusal]);
         assert(std::strcmp(refusal,detail[arena_refusal])==0);
+        assert(coupled_prepare_calls==(arena_refusal==1?0u:1u));
         if(arena_refusal)
             assert(writes==0&&static_value==9&&fighter_fields==9&&private_slots==9);
         else

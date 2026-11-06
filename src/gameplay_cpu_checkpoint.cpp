@@ -151,6 +151,12 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
             if(const char* error=c->history_arena_failure()){
                 refused(stage,0,error);return {};
             }
+            const auto bound=melee_web_source_memory_history_bind_arena_pre(
+                c->commit_.shadow,c->commit_.arena);
+            if(bound!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK){
+                refused(stage,static_cast<std::uint32_t>(bound),
+                        "Owned SDK arena shadow PRE binding refused");return {};
+            }
             if(!gameplay_cpu_history_audio_disjoint(c->commit_)){
                 refused(CpuComparisonDomain::Audio,0,"Audio-owned ranges overlap SDK arena or are unavailable");return {};
             }
