@@ -13,12 +13,40 @@ import {
   RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
+import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
 
 const loadedIdentity = Object.freeze({
   runtime_sha256: '1'.repeat(64),
   asset_identity_sha256: '2'.repeat(64),
   save_profile_sha256: '3'.repeat(64),
   profile_identity: RUNTIME_MATCH_HISTORY_PEER_PROFILE,
+});
+
+test('actual page bridge routes arena enable through the serialized episode owner', async t => {
+  assert.equal(globalThis.__meleeRuntimePeerHistoryProbe, undefined);
+  assert.equal(globalThis.__meleeRuntimeMatchHistory, undefined);
+  t.after(() => {
+    delete globalThis.__meleeRuntimePeerHistoryProbe;
+    delete globalThis.__meleeRuntimeMatchHistory;
+  });
+  let enables = 0;
+  globalThis.__meleeRuntimeMatchHistory = {
+    enableArenaHistory() { ++enables; return {enabled: true}; },
+    enableEpisode() { throw Error('Wrong episode enable path'); },
+    validatePad() { return true; },
+  };
+  const options = {role: 'alpha', relayUrl: 'ws://127.0.0.1:8787',
+    roomId: 'a'.repeat(24), sourceIdentityJson: identityText(0), loadedIdentity,
+    initialRemotePad: [...Buffer.from(lockstepConstants.neutralPad, 'hex')]};
+  installRuntimePeerHistoryProbe({...options, inputTicks: 4});
+  assert.deepEqual(await globalThis.__meleeRuntimePeerHistoryProbe.call('arenaEnable'),
+    {enabled: true});
+  assert.equal(enables, 1);
+  delete globalThis.__meleeRuntimePeerHistoryProbe;
+  installRuntimePeerHistoryProbe({...options, inputTicks: 1});
+  await assert.rejects(globalThis.__meleeRuntimePeerHistoryProbe.call('arenaEnable'),
+    /Episode timeline owner unavailable/);
+  assert.equal(enables, 1);
 });
 
 function sourceIdentity(sourceFrame = 120, overrides = {}) {

@@ -145,7 +145,8 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             !(operation === 'command' && value === 'cleanup'))
           throw episodeFailure;
       }
-      if (operation.startsWith('episode')) return episode(operation, value);
+      if (operation.startsWith('episode') || operation === 'arenaEnable')
+        return episode(operation, value);
       if (episodeBusy) throw Error('Episode command owns the page');
       switch (operation) {
         case 'peerStart': {
