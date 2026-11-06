@@ -12409,7 +12409,7 @@
           },
           "continuation_364": {
             "issue": 364,
-            "state": "TWO_ADJACENT_CORRECTIONS_PASS; OWNED_ARENA_FIRST_RESTORE_AND_END4_SEAL_PASS; END4_RENDERER_IDLE_PENDING",
+            "state": "TWO_ADJACENT_CORRECTIONS_AND_FOUR_TICK_PARTIALLY_CONFIRMED_EPISODE_PASS",
             "native_and_harness_producer": "21e508a0ae1d7e7bca9ff374047d141450124753",
             "native_candidate": {
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-rebase-candidate-v3/freeze.json",
@@ -12498,8 +12498,8 @@
               },
               "scope": "External source draft had wrong pre/post phase checks, PRE/current conflation, unbound report, test overwrite and incomplete continuity/default receipts. Fixed before any capture; raw draft retained."
             },
-            "next": "Attribute END4 renderer pending state and service only actually observed deferred pipeline persistence under the unchanged owner/submission/source guards; keep deadline and strict comparison. Second restore and final peer checksum remain unrun.",
-            "scope": "Two individually confirmed one-tick local functional windows. No sustained speculative window, full match, public enablement, Internet/physical-input/performance acceptance or complete profile claim. Full regression and exact-head CI for #364 remain pending its complete milestone.",
+            "next": "Finish current-head CI/integration, then repeat confirmed arena episodes across rebase and introduce paced per-forward presentation without resetting match/socket/input ownership. Preserve physical seven-tick, three-incarnation/two-restore bounds and stop for confirmation at capacity.",
+            "scope": "Two individually confirmed one-tick windows plus one four-tick partially confirmed episode, all local functional. Full regression and affected builds pass; exact publication-head CI pending integration. Sustained/fullmatch and all acceptance gates remain open.",
             "four_tick_attempts": {
               "native_host_candidate": {
                 "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-native-candidate-v2/freeze.json",
@@ -12722,6 +12722,216 @@
                 "hypothesis": "Deferred pipeline persistence can make the strict idle observer unavailable; retained aggregate bit does not establish which renderer owner is pending."
               },
               "scope": "Local functional source-prefix and component evidence only. No completed four-tick correction, continuous/full-match rollback, Internet/physical/timing/PCM acceptance. Initial dispatch and compile-target mistakes plus failed focused controls remain retained."
+            },
+            "complete_four_tick": {
+              "native_and_harness": "7eda50d714f42772bb070e9f0d157a9f260a8b09",
+              "result": "FOUR_TICK_EPISODE_COMPLETE",
+              "browser": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v4/browser/result.json",
+                "sha256": "982466b8503c296477387d89be221446b5d0aff3c5eaec5f6e6446ad4c8063a7"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v4/result-summary.json",
+                "sha256": "8bfa22c493e43dbe10b1e2367a625a4cbb2ce863bf2b475973953f6b36bd7eec"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v4/owner.json",
+                "sha256": "3072df0daf118e0012a020e51f66f16d58c63e5254bac295d71d7c4bfdd8b1cf"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v4/independent-result-review.json",
+                "sha256": "7a7fc6737eda3a9bed35366e66f7e62659e7787352144b2602cf5ad8aa03db71"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-root-review-v4.json",
+                "sha256": "0292e35482f95b2f8018316f9bb8d307f9af000df7359ab4621342261b9672f0"
+              },
+              "producer": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-producer-v4/archive.json",
+                "sha256": "bae81ce12ed3cc0156e49f9ce8d0b6aac55813bac2016aaa6d4ee8a2e7f4ddcc"
+              },
+              "configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-catalog-v4/final-linked-configuration-v1.json",
+                "sha256": "11bbd54d0ae425f1a2c62b4a62dbbb91b4c3933f572553a55485367edcca35fa"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-build-v4/result.json",
+                "sha256": "c866b336aeeaa76f4a1ac5149914e3a85be3b3ad4a6449f7c23156576f56e173"
+              },
+              "renderer_candidate": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-renderer-preparation-v1/freeze.json",
+                "sha256": "44a7730e629737017c54bc7fded532e5afd0a5346e89eed79b8578889841274a"
+              },
+              "renderer_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-renderer-preparation-v1/root-review.json",
+                "sha256": "1db49371f0d450a5c66ba5b3950cab2ad5451effcee6d47a39828827b897e996"
+              },
+              "comparisons": {
+                "restored_pre_3": {
+                  "equal": true,
+                  "preSourceFrame": "0",
+                  "selectedSourceFrame": "3",
+                  "selectedRestoreCount": 0,
+                  "restoredRestoreCount": 1,
+                  "rawDomains": 9,
+                  "rawPreDifferencesAllowed": [
+                    "Payload.Header.Watermark",
+                    "Payload.Header.TopologyRevision"
+                  ],
+                  "sidecarBytes": 144,
+                  "arenaBytes": "33554432",
+                  "currentRevision": "3471",
+                  "currentPieceRevision": "26991",
+                  "particleHistorySerial": "981",
+                  "capturedRows": 12,
+                  "liveRows": 12
+                },
+                "end3": {
+                  "predicted_scene_state": "cd733eb4430c3f64",
+                  "corrected_scene_state": "72c963e012b6659d",
+                  "confirmed_pad_prefix": [
+                    {
+                      "tick": 0,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    },
+                    {
+                      "tick": 1,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    }
+                  ],
+                  "still_unconfirmed": [
+                    2
+                  ]
+                },
+                "restored_pre_4": {
+                  "equal": true,
+                  "preSourceFrame": "0",
+                  "selectedSourceFrame": "4",
+                  "selectedRestoreCount": 1,
+                  "restoredRestoreCount": 2,
+                  "rawDomains": 9,
+                  "rawPreDifferencesAllowed": [
+                    "Payload.Header.Watermark",
+                    "Payload.Header.TopologyRevision"
+                  ],
+                  "sidecarBytes": 144,
+                  "arenaBytes": "33554432",
+                  "currentRevision": "3479",
+                  "currentPieceRevision": "27177",
+                  "particleHistorySerial": "999",
+                  "capturedRows": 12,
+                  "liveRows": 12
+                },
+                "end4": {
+                  "prediction": {
+                    "equal": false,
+                    "bytes_left": 64,
+                    "bytes_right": 64,
+                    "different_byte_count": 31,
+                    "first_mismatch": {
+                      "offset": 24,
+                      "left": 27,
+                      "right": 225
+                    },
+                    "first_mismatch_channel": "input"
+                  },
+                  "corrected": {
+                    "equal": true,
+                    "bytes_left": 64,
+                    "bytes_right": 64,
+                    "different_byte_count": 0,
+                    "first_mismatch": null,
+                    "first_mismatch_channel": null
+                  },
+                  "predicted_scene_state": "d6e30decb9585e9e",
+                  "on_time_scene_state": "11153402f6e3fb35",
+                  "pad": [
+                    {
+                      "tick": 0,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    },
+                    {
+                      "tick": 1,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    },
+                    {
+                      "tick": 2,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    },
+                    {
+                      "tick": 3,
+                      "equal": true,
+                      "bytes_left": 44,
+                      "bytes_right": 44,
+                      "different_byte_count": 0,
+                      "first_mismatch": null
+                    }
+                  ]
+                }
+              },
+              "forward_before_remote2": {
+                "native_frame": 4,
+                "timeline": {
+                  "local_port": 0,
+                  "remote_port": 1,
+                  "start_tick": 0,
+                  "simulated_through": 3,
+                  "remote_contiguous_through": 1,
+                  "confirmed_through": 1,
+                  "dirty_from": null,
+                  "retained_from": 0,
+                  "local_input_count": 4,
+                  "remote_input_count": 2,
+                  "executed_input_count": 4,
+                  "max_prediction_ticks": 7,
+                  "max_history_ticks": 8,
+                  "max_lookahead_ticks": 4,
+                  "plan_outstanding": false,
+                  "terminal": null,
+                  "disposed": false
+                }
+              },
+              "native_cleanup": "Both ownerState2 with cleanup command10; native confirmed histories retired and page-owned sockets drained. All19 owned browser PIDs plus relay/server/capture absent.",
+              "renderer": "Zero actual cache flushes. Three END3 samples observed pending staging, cache READY and action0. END4 drained before service. Conditional flush is component-tested only; retained v3 END4 idle timeout remains unattributed.",
+              "scope": "One fixed PRE, four actual forward input samples, two corrections, and forward continuation while later input remains speculative inside ordinary match. Local headless functional batch; no sustained/fullmatch, real-time cadence, public/Internet, physical controller, audible PCM or complete profile acceptance."
+            },
+            "integration_validation": {
+              "source": "7eda50d714f42772bb070e9f0d157a9f260a8b09",
+              "full_regression": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-continuation-full-regression-v1/result.json",
+                "sha256": "5b66f152b8dd434767452257f9fcca3cca11d1e4409d4a4a70432cc5aa3d19f9"
+              },
+              "full_regression_count": 3102,
+              "full_regression_skips": 242,
+              "ordinary_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-continuation-ordinary-release-v1/result.json",
+                "sha256": "d5e2ae38ae90dc198988c4e12bf1459b7ee35c67b7cefb8190284918dee0d446"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-build-v4/result.json",
+                "sha256": "c866b336aeeaa76f4a1ac5149914e3a85be3b3ad4a6449f7c23156576f56e173"
+              },
+              "scope": "All executable changes match7eda50d7; subsequent edits are existing receipt documentation only. Exact publication-head CI pending."
             }
           }
         }

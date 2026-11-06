@@ -2031,21 +2031,36 @@ the typed native receipt. The late input changes scene state; tick 3 then advanc
 while tick 2 remains unconfirmed, and the formerly failing END4 seal and CPU
 endpoint both pass.
 
-The next failure is END4 presentation completion: the renderer-pending bit stays
-set until the unchanged five-second idle deadline. The second restore and final
-four-PAD/64-byte peer comparison remain unrun. Deferred pipeline persistence is a
-source-backed hypothesis; the aggregate pending bit does not identify the cause.
-The next bounded repair retains the actual busy owners and may service an
-observed pending cache transaction only after submission and source owners are
-idle. It must preserve the strict completion gate, source draw order and deadline.
-Alpha's native cleanup also times out on that bit; beta retires. Both browser
-contexts and page sockets close, and all 18 owned browser processes are absent.
-The earlier bridge-dispatch and compile-target failures remain retained.
+The first arena runtime run then stopped at END4 presentation completion:
+the renderer-pending bit stayed set until the unchanged five-second deadline.
+Alpha's native cleanup hit the same wait; beta retired, and owned processes
+closed. The retained result does not identify which renderer owner was pending.
+The added observation/service path records actual busy state and can finish a
+pending cache write only when the exact source and submission owners are idle;
+focused controls preserve the deadline and strict completion gate.
 
-Sustained/full-match rollback, public enablement, complete profile behavior and
-acceptance remain open. The structured receipt's `continuation_364` owns the
-source, raw result, catalog, review and cleanup identities. Full regression and
-exact-head CI remain pending the complete #364 milestone.
+Producer `7eda50d7` completes the full four-tick episode. Both actual restores
+compare the full 32 MiB arena, source shadow, all nine raw domains and 12 particle
+relations under the typed monotonic-fence contract. Each local input is polled
+once; corrections from dirty ticks 1 and 2 reuse the retained tickets. Tick 3
+advances before remote tick 2 is confirmed. Both predictions change scene state;
+all four authoritative 44-byte PAD frames and all 64 final gameplay-checksum
+bytes equal the on-time peer. Independent comparator replay and raw-result review
+pass. Both native owners retire and complete cleanup, sockets drain, and all 19
+owned browser processes are absent.
+
+The successful run performs **no cache flush**. Its observed busy samples show
+staging work with cache already ready, and END4 drains before service. The earlier
+renderer timeout remains unattributed; this is not evidence that the conditional
+cache service fixed it. All earlier payload, bridge-dispatch, compile-target and
+renderer failures remain retained.
+
+This is a local functional four-tick episode, not sustained or full-match
+rollback. Repeated arena rebase, paced forward presentation, public enablement,
+complete profile behavior and acceptance remain open. The structured receipt's
+`continuation_364` owns source, raw result, catalog, review and cleanup identities.
+The full 3,102-test regression passes with 242 skips, and ordinary/private Release
+builds pass at `7eda50d7`. Exact publication-head CI remains pending integration.
 
 ## Stage decision dependencies, issue #333
 
