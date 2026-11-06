@@ -1879,13 +1879,37 @@ hold. The private stopped-boundary flush repair passes focused controls and
 a Release build. V8 (`ac080bbe`) reaches an earlier strict source boundary:
 the original HPS stream is still loading, so initial publication refuses before
 the new flush runs. Native close/cache drain and owned-process cleanup pass.
-The next change services the existing bounded constructor audio transport;
-source and renderer quiescence guards remain unchanged. The earlier Release diagnostic
-build of native source 0f72ae25 completed in 38.64 seconds; its exact outputs
-are archived under runtime-agreed-start-producer-v1. V7 uses the later native
-and harness source checkpoint 08cffe8b. Exact producers and retained outcomes
-are pinned in `runtime_match_start_v1`. This is startup component evidence only,
-not takeover or rollback acceptance.
+
+V9 refuses frame-zero publication with “Agreed initial audio transfer lost its
+exact audio owner.” Follow-up source review shows that message was a false guard:
+the constructor may use a resident bank with its owned HPS stream while SSM has
+no pending work. The repair requires active SSM only for pending work, while
+retaining exact match-audio and pending-HPS ownership checks. The V9 binary was
+built by `runtime-agreed-start-build-v4` from source head `69174552` plus the
+separately pinned, redundant one-line `gameplay_audio_stream.h` include delta;
+the artifact identity includes that delta, and provenance review finds no new
+arithmetic or capture result. V10 next refuses because the original match
+presentation clock loses ownership. V11 reaches the actual ordinary
+Entry/Ready/Go boundary with 124 source tick/draw pairs, remains at gameplay
+frame zero, and passes held
+takeover and identity checks, then refuses terminal cleanup because the native
+request path treats Emscripten's opaque animation-frame handle as a result code.
+
+V12 (`33cdb16a`) passes the ordinary source GO prefix, held frame-zero takeover,
+source-serialized identity and terminal cleanup. The prefix records 124 actual
+source ticks and draws; no fixed GO tick count is assumed. Native cleanup retires
+the match and renderer owners, and the capture owner verifies browser, server
+and process cleanup. Its producer archive pins the ordinary first-use, SSM/HPS
+transfer and renderer-cache servicing changes together with the animation-frame
+handle repair. This is a scoped startup/admission/cleanup component pass only:
+no history capture, input correction, replay, peer session or rollback command
+ran. The V9–V12 receipts and producer identities are pinned in
+`runtime_match_start_v1`.
+
+The next boundary is two independently local browser runs held at GO before
+history commands. Original CSS counters and injected observer counters may
+differ, so keep the complete strict catalog unchanged while recording each
+baseline. V12 is not an accepted rollback result.
 
 ## Stage decision dependencies, issue #333
 

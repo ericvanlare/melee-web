@@ -11602,8 +11602,8 @@
         },
         "runtime_match_start_v1": {
           "issue": 362,
-          "status": "FRAME_ZERO_CONSTRUCTED_SOURCE_AUDIO_LOADING_NO_TAKEOVER",
-          "scope": "Private ordinary-runtime CSS/SSS keyboard startup, source-owned offer and negotiated-seed agreement/commit, source match construction at frame zero, and held-publication admission. No takeover, capture or rollback command.",
+          "status": "ORDINARY_GO_PREFIX_HELD_TAKEOVER_IDENTITY_AND_CLEANUP_COMPONENT_PASS_NO_HISTORY_OR_ROLLBACK",
+          "scope": "Private ordinary-runtime original CSS/SSS keyboard startup, native source offer and negotiated-seed agreement/commit, actual ordinary Entry/Ready/Go source prefix, held gameplay-frame-zero takeover and source identity, then terminal native and browser/server process cleanup. No history capture, input correction, replay, peer session or rollback command.",
           "native_release_build": {
             "source_head": "0f72ae25e73e21c875b89ff5167f205a0f23b3ec",
             "result": {
@@ -11726,8 +11726,8 @@
             },
             "current_observation": "V7 reaches original CSS/SSS and source-bound frame-zero construction. The initial publication fails on renderer quiescence descriptor schema/extent. Native close/cache flush and browser/server owner cleanup pass; no takeover or rollback command runs."
           },
-          "followup": "Current source review attributes the descriptor refusal to pending pipeline-cache writes while the ordinary source hold defers flush. Sol is implementing bounded private stopped-boundary use of the existing flush without relaxing guards. Update this boundary after the next result.",
-          "latest_attempt": {
+          "followup": "V9, V10 and V11 first failures remain pinned below. V12 passes the scoped startup/takeover/identity/cleanup boundary; the next held-browser baselines are recorded under latest_attempt.next.",
+          "v8_attempt": {
             "attempt": "v8",
             "producer": "ac080bbeacec6746890875197a0c7aef3a43223a",
             "summary": {
@@ -11752,6 +11752,124 @@
             },
             "observed": "Source HPS startup loading refuses initial publication before cache flush is exercised. Native close/cache drain and all recorded owned process cleanup pass.",
             "next": "Service the existing bounded constructor SSM/HPS resident transport before initial publication; full source, renderer and ownership checks remain required."
+          },
+          "v9_source_include_provenance": {
+            "artifact": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-source-include-provenance-v1.json",
+              "sha256": "d3a4bed13a15d9a3adcefb38b8001ca98d5bed8615c75f1078888c5521fc62e6"
+            },
+            "producer_identity": "runtime-agreed-start-build-v4 from source head 6917455263ac18d82f12f3605787e3329ae0883b plus the exact one-line gameplay_audio_stream.h include delta",
+            "source_note": "The pinned provenance reports that the included state header already includes gameplay_audio_stream.h and the direct include is redundant; it adds no arithmetic or capture finding."
+          },
+          "v10_presentation_clock_failure": {
+            "runtime_and_harness_head": "b0f8606cd0ae8afe74f8cd43d1c03056fc0dfe02",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v10/first-failure-summary.json",
+              "sha256": "1819761b531a519e51ce89c4ba5f0b0af6ae788cb4217cfd5e1a49b26b6b1ea7"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v10/browser/result.json",
+              "sha256": "3b31f592102ef65560fe771224931fd2b0e597af9a145bac8b44ce126f2382a9"
+            },
+            "first_failure": "Original match presentation clock lost ownership",
+            "scope": "Ordinary original-keyboard start admission only; no capture, network or rollback command."
+          },
+          "v11_raf_handle_failure": {
+            "runtime_and_harness_head": "47e690a613357c818819f59e45b532bcb5e5037e",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v11/first-failure-summary.json",
+              "sha256": "66aa3ed44b446e7f9c6d79d192ff949fcd03967325f466803417310e2897ff5a"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v11/browser/result.json",
+              "sha256": "364c5348011923160746f6d6edbdd298e3f8a30023d547dad4cadd20445fab59"
+            },
+            "observed": "The ordinary GO prefix contains 124 actual source tick/draw pairs, and held frame-zero takeover and identity checks pass. Terminal cleanup refuses because native code treats Emscripten\u2019s opaque animation-frame handle as EMSCRIPTEN_RESULT.",
+            "repair_control": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-raf-fix-v1/receipt.json",
+              "sha256": "41e3c34cc30dfb02755f8455c03be5f97a3e4ddedd39f7cb4313fa1aa3ee73a2"
+            }
+          },
+          "latest_attempt": {
+            "attempt": "v12",
+            "runtime_and_harness_head": "33cdb16a8593d7ec1499da13dcb825d26b955b02",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/result-summary.json",
+              "sha256": "5ba8056e2488237fd0eafd0abd476b67aa647c9896029925517a15040d46f1d0"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/browser/result.json",
+              "sha256": "84ccf0a194be93b08a057f5408d7a359a96067246cfc097e7f3fad4162539b51"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v12/owner.json",
+              "sha256": "13d0b69cc6eb407d71f0887995f40b31b4f222a3418616f95a06afd462f9d14a"
+            },
+            "producer_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/archive.json",
+              "sha256": "0077c1a4feb9f3243e031ec02836f354d980979547bb632e62031dae45acb2e8"
+            },
+            "producer_artifacts": {
+              "source_state": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history.source-state.json",
+                "sha256": "4c5a5f2151517413120a3384c5ba1a7e80244305d3a0297d65ecd311d8eca035"
+              },
+              "linker_map": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history.map",
+                "sha256": "722f09495cbb7d5a6c7aa33f2f85b41302990543ef16718f6769907aaa7a091a"
+              },
+              "wasm": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.wasm",
+                "sha256": "d020efaf211ac6c01bccbd13c7aab6fa2947d2b1b9290f0bd6d32ac9d85b2d86"
+              },
+              "javascript": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.js",
+                "sha256": "baf7a22e28d00a4cb7dedbcff10c5ffa7c68b9a4f3f4dce78f8ddd6cfe1e6dab"
+              },
+              "data": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser.data",
+                "sha256": "1eb094d18d16f0894840e297d975f52bb97ead994e723fa13887b6ecda0a17a6"
+              },
+              "producer_manifest": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-agreed-start-producer-v8/gameplay_menu_browser_match_history_producers.tsv",
+                "sha256": "8d30bd71a9da5fa76db2c5976ae4e44379cfef872047301283cf683e5786e355"
+              }
+            },
+            "observed": "PASS. Actual ordinary Entry/Ready/Go source prefix reaches held gameplay frame zero with 124 source ticks and 124 source draws. Same-turn admission confirms source frame zero, no pending GPU work, and no first-failure/renderer error; native source/runtime quiescence guards admit takeover (the optional host Asyncify property is not exported and is recorded null); source-serialized identity binds runtime, disc, save and frame; terminal command retires match and renderer. Initial and final resident-transfer drain counts are 1 and 0. Capture-owner cleanup passes, including browser/server process absence.",
+            "source_fixes": "The clean producer archive pins the actual first-use, bounded constructor SSM/HPS transport and renderer-cache servicing, plus the RAF opaque-handle repair.",
+            "scope": "Startup, held takeover, source identity and terminal native/owner cleanup component evidence only. No history capture, input correction, replay, peer session or rollback command.",
+            "raf_handle_repair": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-raf-fix-v1/receipt.json",
+              "sha256": "41e3c34cc30dfb02755f8455c03be5f97a3e4ddedd39f7cb4313fa1aa3ee73a2"
+            },
+            "next": "Run two independently local browser held baselines at GO before history commands. Original CSS source counters and injected observer counters may differ; keep the full strict comparison catalog unchanged. This is not accepted rollback evidence."
+          },
+          "v9_audio_guard_correction": {
+            "source_checkpoint": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v8/checkpoint.json",
+              "sha256": "aaea3dbf58a335e06698cff32d6e3e559d6a4d79bca0f8d3d39e9641e4205548"
+            },
+            "independent_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-match-start-sol-v8/root-review.json",
+              "sha256": "9cd7a944dbb12fab163b63caee66b4b5c9f522d789e729e8e1a477b6803943d7"
+            },
+            "finding": "Require active SSM only when it has pending work. Keep the exact match audio object and exact pending HPS owner mandatory; a mismatched or absent busy-bank owner still refuses."
+          },
+          "v9_initial_audio_guard_refusal": {
+            "artifact_provenance": "runtime-agreed-start-build-v4 from source head 6917455263ac18d82f12f3605787e3329ae0883b plus the redundant exact one-line include delta pinned in v9_source_include_provenance",
+            "summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v9/first-failure-summary.json",
+              "sha256": "f5b9599fa11885ea338be43957642debfb1595e3a51bf7a13efd2173610cb954"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v9/browser/result.json",
+              "sha256": "148c3dbcebc2065a62c9ddbc9092967082c556fa4f34c2965c5456142085d9cd"
+            },
+            "first_failure": "Agreed initial audio transfer lost its exact audio owner",
+            "scope": "Ordinary original-keyboard start admission only; no capture, network or rollback command.",
+            "interpretation": "The first-failure text reports an exact-audio-owner refusal. Later source review found this guard was too strict: the match constructor may use a legitimate resident bank with its owned HPS stream while SSM is inactive and has no pending work.",
+            "runtime_base_head": "6917455263ac18d82f12f3605787e3329ae0883b",
+            "harness_head": "6917455263ac18d82f12f3605787e3329ae0883b"
           }
         }
       }
