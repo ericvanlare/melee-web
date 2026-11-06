@@ -8,7 +8,7 @@ export function installRuntimePacedHistoryProbe({role}={}){
     throw Error('Paced probe requires the existing exclusive runtime and peer owners');
   const report={scope:'eight actual source inputs; native admission and measured headless cadence',
     role,result:'pending',events:[],presentations:[],admissions:[],polls:[],
-    authoritativeInputs:[],corrections:[],rebases:[],failure:null};
+    authoritativeInputs:[],corrections:[],rebases:[],callbacks:[],failure:null};
   let prepared=false,started=false,remoteNext=0;
   const selected=new Map();
   const state=()=>owner.status();
@@ -99,8 +99,15 @@ export function installRuntimePacedHistoryProbe({role}={}){
       started=true;report.startedAt=performance.now();
       try{
         owner.pacingStart();
+        let continueCallback=false,callback=null;
         for(;;){
-          await new Promise(resolve=>requestAnimationFrame(resolve));
+          if(!continueCallback){
+            const timestamp=await new Promise(resolve=>requestAnimationFrame(resolve));
+            callback={serial:report.callbacks.length+1,rafTimestamp:timestamp,
+              startedAt:performance.now(),grants:0,reconciliations:0};
+            report.callbacks.push(callback);
+          }
+          continueCallback=false;
           // Budget zero accounts for actual elapsed time before reconciliation;
           // the clock is never reset during a network wait or state transfer.
           owner.pacingSample(0);
@@ -122,9 +129,13 @@ export function installRuntimePacedHistoryProbe({role}={}){
             report.result='PACED_EIGHT_INPUTS_COMPLETE';break;
           }
           if(inputs.dirty_from!==null||
-              (frame-current.preFrame>=4&&confirmed>current.preFrame)){
+              (frame-current.preFrame===7&&confirmed>current.preFrame)){
+            if(callback.reconciliations===1)continue;
+            callback.reconciliations++;
             await reconcile(inputs);
-            owner.pacingSample(0);
+            const remaining=owner.pacingSample(0);
+            callback.lastWorkAt=performance.now();
+            continueCallback=(remaining.pendingSteps>0||frame===8)&&callback.grants<8;
             continue;
           }
           // Remote samples ahead of local execution are retained by the existing
@@ -132,9 +143,11 @@ export function installRuntimePacedHistoryProbe({role}={}){
           if(frame===8||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
             report.events.push({operation:'network-wait',frame,confirmed});continue;
           }
+          if(callback.grants===8)continue;
           const clock=owner.pacingSample(1);
           if(clock.steps===0)continue;
           if(clock.steps!==1||clock.currentFrame!==frame)throw Error('Paced grant differs from actual source frame');
+          callback.grants++;
           const polled=await call('episodePoll',{tick:frame});report.polls.push(polled.ticket);
           await call('episodePublish',{tick:frame,ticketId:polled.ticket.ticketId});
           // Network callbacks may retain packets during the reserved poll, but
@@ -142,6 +155,9 @@ export function installRuntimePacedHistoryProbe({role}={}){
           const actual=frame<=inputs.remote_contiguous_through;
           const forwarded=await call('episodeForward',{tick:frame,ticketId:polled.ticket.ticketId,actual});
           retainRows([forwarded]);await present(true);
+          const remaining=owner.pacingSample(0);
+          callback.lastWorkAt=performance.now();
+          continueCallback=(remaining.pendingSteps>0||frame+1===8)&&callback.grants<8;
         }
       }catch(error){
         report.result='FAIL';report.failure={message:String(error?.message??error),

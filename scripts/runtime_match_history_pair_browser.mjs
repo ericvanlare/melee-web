@@ -1510,6 +1510,8 @@ async function runPacedEightInputs(alpha,beta){
     }
     assert(run.clock.length>8&&run.clock.every(row=>!row.stalled));
     assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),8);
+    assert(run.callbacks.length>0&&run.callbacks.every(row=>row.grants<=8&&row.reconciliations<=1));
+    assert.equal(run.callbacks.reduce((sum,row)=>sum+row.grants,0),8);
     assert.equal(run.finalOwner.metadata.currentFrame,8);
     assert.equal(run.finalOwner.metadata.phase,18);
     assert.equal(run.admissions.every(row=>row.scope==='native-typed-admission-only'&&row.rawRowsPublished===false),true);
