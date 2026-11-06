@@ -28,6 +28,195 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
         (self.work / 'host-controls.log').write_text(result.stdout + result.stderr)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_actual_menu_boundary_scopes_owned_hps_to_interior_operations(self):
+        menu = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
+        native = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+        header = (ROOT / 'src/slippi_profile/runtime_match_history.hpp').read_text()
+
+        def section(text, start, end):
+            begin = text.index(start)
+            return text[begin:text.index(end, begin)]
+
+        enums = '\n'.join([
+            section(header, 'enum class RuntimeMatchHistoryGatePoint',
+                    'enum class RuntimeMatchHistoryGateResult'),
+            section(header, 'enum class RuntimeMatchHistoryGateResult',
+                    'using RuntimeMatchHistoryAudioStep'),
+            section(header, 'enum class RuntimeMatchHistoryPhase',
+                    'enum class RuntimeMatchHistoryFailure'),
+        ])
+        source_idle = section(menu, 'const char* history_source_idle_failure(const GameplayMatchSession& session) noexcept {',
+                              'bool history_source_idle(')
+        interior = section(menu, 'bool history_interior_hps_point(',
+                           'melee_web::RuntimeMatchHistoryGateResult history_source_boundary(')
+        boundaries = section(menu,
+            'melee_web::RuntimeMatchHistoryGateResult history_source_boundary(',
+            'struct MatchHistoryRendererSample')
+        capsule = section(native, 'bool RuntimeMatchHistory::interior_hps_pending(',
+                          'bool RuntimeMatchHistory::can_admit_poll_ticket(')
+
+        fixture = r'''#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <initializer_list>
+namespace melee_web {
+@ENUMS@
+}
+using uint32_t=std::uint32_t;
+constexpr int DVD_STATE_END=0,DVD_STATE_BUSY=1;
+struct Selection {uint32_t seed=7;};
+using GameplayMatchSession=struct Session;
+struct Session {
+ uint32_t frame=201;bool files=true,built=true,is_paused=false,is_ending=false,is_complete=false;
+ Selection selection{};
+ uint32_t source_frames()const{return frame;}
+ bool diagnostic_source_files_quiescent()const{return files;}
+ bool construction_complete()const{return built;}bool paused()const{return is_paused;}
+ bool ending()const{return is_ending;}bool complete()const{return is_complete;}
+ const Selection& start_selection()const{return selection;}
+};
+struct GameplayCpuCheckpoint {
+ const Session* owner{};uint32_t pre=196,span=7;bool pending=true,token=true;
+ bool interior_hps_pending(const Session& s)const noexcept {
+  return pending&&token&&owner==&s&&s.source_frames()>pre&&s.source_frames()<pre+span;
+ }
+};
+struct RuntimeMatchHistoryMetadata {};
+class RuntimeMatchHistory {
+public:
+ explicit RuntimeMatchHistory(Session& s):session_(s){}
+ bool interior_hps_pending(const Session&,uint32_t)const noexcept;
+ melee_web::RuntimeMatchHistoryPhase phase()const{return phase_;}
+ uint32_t current_frame()const{return session_.source_frames();}
+ bool live_owner(uint32_t f)const{return owner_live_&&session_.source_frames()==f;}
+ Session& session_;GameplayCpuCheckpoint* checkpoint_{};
+ bool episode_mode_=true,arena_mode_=true,owner_live_=true;
+ melee_web::RuntimeMatchHistoryPhase phase_=melee_web::RuntimeMatchHistoryPhase::EpisodePresentPending;
+};
+@CAPSULE@
+using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+using Result=melee_web::RuntimeMatchHistoryGateResult;
+struct Status {
+ uint32_t last_completed_command=19,request_seq=22,complete_seq=22;
+ struct {uint32_t current_frame=201;} history;
+};
+struct MatchHistoryControl {
+ Status status{};RuntimeMatchHistory* capsule{};bool episode_enabled=true,arena_enabled=true;
+ Session* match_owner{};int* archive_owner{};int* host_owner{};uint64_t asset_owner=1;
+ Selection selection{};uint64_t submitted_frame=500,presentation_serial=1;
+ uint32_t presentation_command=19,presentation_request_sequence=22;
+};
+int archive_tag=0,host_tag=0;
+struct Cache {int* get()const{return &archive_tag;}} archive_cache;
+struct MatchHandle {
+ Session* value{};explicit operator bool()const{return value!=nullptr;}
+ Session* get()const{return value;}Session* operator->()const{return value;}
+ Session& operator*()const{return *value;}
+};
+MatchHandle match{};int* host=&host_tag;uint64_t asset_generation=1;
+bool match_history_terminal=true,running=false,pending=false,replay=false,
+ menu_scene_rebuild_pending=false,first_use_draw_pending=false,faulted=false,net_active=false;
+enum class AssetDestination {None,Other};AssetDestination asset_destination=AssetDestination::None;
+struct Preparation {bool busy()const{return false;}} preparation;
+bool file_drive=false,bank_busy=false,stream_loading=true,memory_healthy=true,
+ runtime_ready=true,gpu_ready=true;
+int dvd_status=DVD_STATE_BUSY;
+bool melee_web_source_file_drive_busy(){return file_drive;}
+bool melee_web_audio_bank_transport_busy(){return bank_busy;}
+bool melee_web_audio_stream_source_loading(){return stream_loading;}
+int DVDGetDriveStatus(){return dvd_status;}
+bool melee_web_source_memory_healthy(){return memory_healthy;}
+bool melee_web_net_active(){return net_active;}
+bool history_runtime_idle(){return runtime_ready;}
+bool history_gpu_idle() noexcept {return gpu_ready;}
+struct AuroraBrowserQuiescenceDescriptor {uint64_t lastEndFrameId=500;};
+AuroraBrowserQuiescenceDescriptor descriptor{};
+const AuroraBrowserQuiescenceDescriptor* aurora_browser_quiescence_observe_descriptor(){return &descriptor;}
+MatchHistoryControl match_history{};
+@SOURCE_IDLE@
+@INTERIOR@
+@BOUNDARIES@
+int main(){
+ Session session{};RuntimeMatchHistory capsule{session};GameplayCpuCheckpoint proof{&session};
+ capsule.checkpoint_=&proof;match.value=&session;match_history.capsule=&capsule;
+ match_history.match_owner=&session;match_history.archive_owner=&archive_tag;
+ match_history.host_owner=&host_tag;match_history.asset_owner=asset_generation;
+ match_history.selection=session.selection;
+ assert(capsule.interior_hps_pending(session,201));
+ for(const auto point:{Gate::InteriorPoll,Gate::InteriorForwardBefore,Gate::InteriorForwardAfter,
+      Gate::InteriorReplayBefore,Gate::InteriorReplayAfter,Gate::InteriorPresentSubmit,
+      Gate::InteriorPresentComplete})
+  assert(history_boundary(session,point,201,nullptr)==Result::Admitted);
+ assert(history_renderer_prepare_hps_authorized(session,5,201));
+ assert(history_boundary(session,Gate::InteriorPresentComplete,201,nullptr)==Result::Admitted);
+ descriptor.lastEndFrameId=499;
+ assert(history_boundary(session,Gate::InteriorPresentComplete,201,nullptr)==Result::RendererBusy);
+ descriptor.lastEndFrameId=500;
+ assert(history_boundary(session,Gate::ForwardAfter,201,nullptr)==Result::SourceFilesBusy);
+ assert(history_boundary(session,Gate::EndpointComplete,201,nullptr)==Result::SourceFilesBusy);
+ assert(history_boundary(session,Gate::InteriorPoll,200,nullptr)==Result::WrongFrame);
+ Session foreign{};foreign.frame=201;
+ assert(!capsule.interior_hps_pending(foreign,201));
+ assert(history_boundary(foreign,Gate::InteriorPoll,201,nullptr)==Result::MatchOwnerChanged);
+ assert(!history_renderer_prepare_hps_authorized(session,10,201));
+ match_history.status.history.current_frame=200;
+ assert(!history_renderer_prepare_hps_authorized(session,5,201));
+ match_history.status.history.current_frame=201;
+ ++match_history.status.complete_seq;
+ assert(!history_renderer_prepare_hps_authorized(session,5,201));
+ --match_history.status.complete_seq;
+ match_history.status.last_completed_command=4;
+ assert(!history_renderer_prepare_hps_authorized(session,5,201));
+ match_history.status.last_completed_command=19;
+
+ proof.token=false;assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ proof.token=true;proof.pending=false;
+ assert(history_boundary(session,Gate::InteriorReplayAfter,201,nullptr)==Result::SourceFilesBusy);
+ proof.pending=true;capsule.owner_live_=false;
+ assert(history_boundary(session,Gate::InteriorForwardAfter,201,nullptr)==Result::SourceFilesBusy);
+ capsule.owner_live_=true;capsule.arena_mode_=false;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ capsule.arena_mode_=true;capsule.episode_mode_=false;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ capsule.episode_mode_=true;
+
+ session.files=false;assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ session.files=true;file_drive=true;assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ file_drive=false;bank_busy=true;assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ bank_busy=false;memory_healthy=false;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ memory_healthy=true;dvd_status=77;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::SourceFilesBusy);
+ dvd_status=DVD_STATE_END;stream_loading=true;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::Admitted);
+ dvd_status=DVD_STATE_BUSY;stream_loading=false;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::Admitted);
+ runtime_ready=false;assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::RuntimeBusy);
+ runtime_ready=true;gpu_ready=false;
+ assert(history_boundary(session,Gate::InteriorPoll,201,nullptr)==Result::RendererBusy);
+}
+'''
+        source_text = (fixture.replace('@ENUMS@', enums)
+            .replace('@CAPSULE@', capsule)
+            .replace('@SOURCE_IDLE@', source_idle)
+            .replace('@INTERIOR@', interior)
+            .replace('@BOUNDARIES@', boundaries))
+        source = self.work / 'owned-hps-boundary.cpp'
+        binary = self.work / 'owned-hps-boundary'
+        source.write_text(source_text)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [
+            ('compile-owned-hps-boundary', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                                            str(source), '-o', str(binary)]),
+            ('run-owned-hps-boundary', [str(binary)]),
+        ]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
     def test_request_dispatch_treats_raf_return_as_opaque_handle(self):
         history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
 
@@ -504,7 +693,8 @@ enum class RuntimeMatchHistoryPhase { PredictedCpuCopied, PredictedDrawPending,
   PredictedDrawIdle, CorrectedCpuCopied, CorrectedDrawPending, CorrectedDrawIdle,
   EpisodeRecording, EpisodePresentPending };
 enum class RuntimeMatchHistoryFailure { None, Boundary, Phase, Present };
-enum class RuntimeMatchHistoryGatePoint { PresentSubmit, PresentComplete };
+enum class RuntimeMatchHistoryGatePoint { PresentSubmit, PresentComplete,
+  InteriorPresentSubmit, InteriorPresentComplete };
 enum class RuntimeMatchHistoryPresentResult { Submitted, Refused };
 struct Session { std::uint32_t frame{}; std::uint32_t source_frames() const { return frame; } };
 struct Ticket { std::uint32_t ticket_id{}, source_frame{}, incarnation{}; std::uint64_t poll_serial{}; };
@@ -847,19 +1037,28 @@ int main() {
 #include <aurora/gfx.h>
 namespace melee_web {
 enum class RuntimeMatchHistoryGateResult { Admitted, WrongFrame, RuntimeBusy };
+enum class RuntimeMatchHistoryGatePoint { InteriorPoll, InteriorForwardBefore, InteriorForwardAfter,
+ InteriorReplayBefore, InteriorReplayAfter, InteriorPresentSubmit, InteriorPresentComplete,
+ InteriorRendererPrepare };
+enum class RuntimeMatchHistoryPhase { EpisodePresentPending };
 }
 using Gate=melee_web::RuntimeMatchHistoryGateResult;
 struct GameplayMatchSession {} session;
 struct Capsule {
   uint32_t current_frame() const { return 4; }
   bool endpoint_active() const { return false; }
+  bool interior_hps_pending(const GameplayMatchSession&,uint32_t) const { return false; }
+  melee_web::RuntimeMatchHistoryPhase phase() const {
+    return melee_web::RuntimeMatchHistoryPhase::EpisodePresentPending;
+  }
 } capsule;
 struct {
-  struct {unsigned owner_state=1,pending_command=0,last_completed_command=4;
+  struct {unsigned owner_state=1,pending_command=0,last_completed_command=4,request_seq=0,complete_seq=0;
           struct {uint32_t current_frame=4;} history;} status;
   Capsule* capsule=&::capsule;
-  uint64_t submitted_frame=7,cache_flush_frame=0;
-  bool dispatching=false;
+  uint64_t submitted_frame=7,cache_flush_frame=0,presentation_serial=0;
+  uint32_t presentation_command=0,presentation_request_sequence=0;
+  bool dispatching=false,episode_enabled=true,arena_enabled=true;
   std::array<char,2048> renderer_preparation{};
 } match_history;
 GameplayMatchSession* match=&session;
@@ -870,7 +1069,7 @@ AuroraBrowserQuiescenceLease lease{};
 AuroraPipelineCacheStatus cache=AURORA_PIPELINE_CACHE_PENDING;
 bool strict_failure_after_flush=false;
 bool history_runtime_idle(){return runtime_idle;}
-Gate history_source_boundary(const GameplayMatchSession&,uint32_t frame){
+Gate history_source_boundary(const GameplayMatchSession&,uint32_t frame,bool=false){
   return frame==4?owner_gate:Gate::WrongFrame;
 }
 void history_refuse(const char*){++refusals;}
@@ -930,8 +1129,10 @@ int main(){
   assert(flushes==2&&refusals==1);
 }
 """
-        fixture = fixture.replace('@HELPERS@', section('struct MatchHistoryRendererSample {',
-                                                       'bool history_audio_step('))
+        fixture = fixture.replace('@HELPERS@',
+            section('bool history_interior_hps_point(',
+                    'melee_web::RuntimeMatchHistoryGateResult history_source_boundary(') +
+            section('struct MatchHistoryRendererSample {', 'bool history_audio_step('))
         fixture = fixture.replace('@EXPORT@', section(
             'const char* melee_web_native_menu_match_history_renderer_prepare_json(',
             'const MatchHistoryStatus* melee_web_native_menu_match_history_status('))
