@@ -104,7 +104,7 @@ const diagnosticBindings=[
 ];
 
 const report={schema:'melee-web-runtime-match-history-paired-held-statics-v1',
-  scope:'two independently owned headless browser pages; original CSS/SSS keyboard route; same exact source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim',
+  scope:'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim',
   result:'RUNNING',started_at:new Date().toISOString(),phase:'held-statics',
   runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
   disc:{image_sha256:discImageHash},
@@ -114,7 +114,7 @@ const report={schema:'melee-web-runtime-match-history-paired-held-statics-v1',
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
   diagnostic_module_bindings:diagnosticBindings,
   coordination:{type:'Node-local diagnostic offer/agreement exchange only',seed_source:'alpha native CSS/SSS offer',
-    gameplay_input_or_relay_transport:false},
+    gameplay_input_or_relay_transport:false,shared_profile_input:null},
   pages:{alpha:{route:{},disc:{},checks:[],cleanup:{native_owner:'not_started',browser:'not_started'}},
     beta:{route:{},disc:{},checks:[],cleanup:{native_owner:'not_started',browser:'not_started'}}},
   startup_comparison:null,static_comparison:null,checks:[],failure:null,
@@ -144,16 +144,82 @@ async function profileSnapshot(page){
       if(m._melee_web_native_menu_snapshot_save_profile(ptr,length,0)!==1)
         throw Error(`Source save-profile export refused: ${m.UTF8ToString(m._melee_web_native_menu_message())}`);
       const copy=m.HEAPU8.slice(ptr,ptr+length);
+      let binary='';
+      for(let offset=0;offset<copy.length;offset+=0x8000)
+        binary+=String.fromCharCode(...copy.subarray(offset,offset+0x8000));
       return crypto.subtle.digest('SHA-256',copy).then(value=>({bytes:length,
-        sha256:Array.from(new Uint8Array(value),byte=>byte.toString(16).padStart(2,'0')).join('')}));
+        sha256:Array.from(new Uint8Array(value),byte=>byte.toString(16).padStart(2,'0')).join(''),
+        bytes_base64:btoa(binary)}));
     }finally{m._free(ptr);}
   });
 }
 
-async function startOwnedPage(role,chromium,browserConfig,browserPath,playwrightPath,onCreated){
+async function retainSourceCardSnapshot(role,profile){
+  const bytes=Buffer.from(profile.bytes_base64,'base64'),file=`${role}-source-card.bin`;
+  await fs.writeFile(path.join(out,file),bytes,{flag:'wx'});
+  const retained={file,bytes:bytes.length,sha256:sha256(bytes),
+    provenance:'raw bytes copied from the actual source-host card snapshot before profile identity comparison'};
+  report.pages[role].source_card_snapshot=retained;
+  return {bytes,retained};
+}
+
+async function stagePersonalProfile(page,profile){
+  const staged=await page.evaluate(async ({base64,expectedBytes,expectedSha256})=>{
+    const encoded=atob(base64),bytes=new Uint8Array(encoded.length);
+    for(let index=0;index<encoded.length;index++)bytes[index]=encoded.charCodeAt(index);
+    if(bytes.length!==expectedBytes)
+      throw Error(`Shared source profile has ${bytes.length} bytes; expected ${expectedBytes}`);
+    const digest=await crypto.subtle.digest('SHA-256',bytes);
+    const sha256=Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+    if(sha256!==expectedSha256)throw Error('Shared source profile bytes changed before beta staging');
+    // The development driver already waited for import readiness. Recheck
+    // the actual controls and native owner after the async digest and in the
+    // same task as the setter, before selecting a disc.
+    const disc=document.querySelector('#disc'),unload=document.querySelector('#unload');
+    if(!(disc instanceof HTMLInputElement)||disc.type!=='file'||disc.disabled||
+      !disc.getClientRects().length||disc.files?.length!==0||unload?.disabled!==true)
+      throw Error('Beta development runtime must be import-ready with no selected or loaded disc');
+    const runtimeError=document.querySelector('#status')?.dataset.runtimeError;
+    if(runtimeError)throw Error(runtimeError);
+    const module=globalThis.Module;
+    if(typeof module?._melee_web_native_menu_set_save_profile!=='function'||
+      typeof module._melee_web_native_menu_phase!=='function'||
+      typeof module._melee_web_native_menu_running!=='function')
+      throw Error('Existing native Personal-profile owner checks are unavailable');
+    const phase=module._melee_web_native_menu_phase(),running=module._melee_web_native_menu_running();
+    if(phase!==0||running!==0)
+      throw Error(`Beta source owner already exists before Personal-profile staging (phase ${phase}, running ${running})`);
+    const ptr=module._malloc(bytes.length);
+    if(!ptr)throw Error('Unable to allocate exact shared source profile transfer memory');
+    try{
+      module.HEAPU8.set(bytes,ptr);
+      if(module._melee_web_native_menu_set_save_profile(1,ptr,bytes.length)!==1)
+        throw Error(`Existing native Personal-profile setter refused beta input: ${module.UTF8ToString(module._melee_web_native_menu_message())}`);
+    }finally{module._free(ptr);}
+    return {mode:'personal',bytes:bytes.length,sha256,development_import_ready:true,
+      native_phase_before:phase,native_running_before:running,
+      provenance:'exact alpha source-host card bytes passed to the existing native Personal-profile setter'};
+  },{base64:profile.bytes_base64,expectedBytes:CARD_BYTES,expectedSha256:profile.sha256});
+  assert.equal(staged.sha256,profile.sha256,'Beta staged a different source profile than alpha exported');
+  return staged;
+}
+
+function compareProfileBytes(expected,actual){
+  const left=Buffer.from(expected.bytes_base64,'base64'),right=Buffer.from(actual.bytes_base64,'base64');
+  assert.equal(left.length,CARD_BYTES,'Alpha source profile byte extent changed');
+  assert.equal(right.length,CARD_BYTES,'Beta source profile byte extent changed');
+  let firstMismatch=null,differentByteCount=0;
+  for(let offset=0;offset<CARD_BYTES;offset++)if(left[offset]!==right[offset]){
+    firstMismatch??={offset,alpha:left[offset],beta:right[offset]};differentByteCount++;
+  }
+  return {equal:differentByteCount===0,alpha_sha256:expected.sha256,beta_sha256:actual.sha256,
+    bytes_compared:CARD_BYTES,different_byte_count:differentByteCount,first_mismatch:firstMismatch};
+}
+
+async function startOwnedPage(role,chromium,browserConfig,browserPath,playwrightPath,onCreated,sharedProfile=null){
   const item={role,browser:null,context:null,page:null,driver:null,admission:null,
     pageErrors:[],consoleMessages:[],websockets:[],externalRequests:[],controllerInstalled:false,
-    takenOver:false,nativeCleanupSucceeded:false,host:null,offer:null,profile:null,disc:null};
+    takenOver:false,nativeCleanupSucceeded:false,host:null,offer:null,profile:null,profileInput:null,disc:null};
   const pageReport=report.pages[role];
   onCreated?.(item);
   try{
@@ -198,8 +264,30 @@ async function startOwnedPage(role,chromium,browserConfig,browserPath,playwright
     item.admission=createRuntimeMatchAdmission({page:item.page,driver:item.driver,report:pageReport,
       host:()=>item.host,pageErrors:()=>item.pageErrors});
     await item.admission.configureControls();
+    if(sharedProfile){
+      pageReport.save_profile_input={mode:'personal',bytes:CARD_BYTES,
+        sha256:sharedProfile.sha256,source_role:'alpha',state:'staging-before-beta-disc-selection'};
+      item.profileInput=await stagePersonalProfile(item.page,sharedProfile);
+      pageReport.save_profile_input={...pageReport.save_profile_input,...item.profileInput,state:'staged'};
+    }
     await item.driver.selectDisc(discPath);await item.driver.waitForStart();
-    const profile=await profileSnapshot(item.page);assert.equal(profile.bytes,CARD_BYTES);
+    const profile=await profileSnapshot(item.page);
+    const retainedProfile=await retainSourceCardSnapshot(role,profile);
+    pageReport.save_profile={bytes:profile.bytes,sha256:profile.sha256,source_snapshot_sha256:profile.sha256,
+      retained_file:retainedProfile.retained.file,retained_file_sha256:retainedProfile.retained.sha256,
+      provenance:'actual active source-host card snapshot through _melee_web_native_menu_snapshot_save_profile; raw bytes retained before comparison'};
+    assert.equal(profile.bytes,CARD_BYTES,'Source card snapshot reported the wrong extent');
+    assert.equal(retainedProfile.bytes.length,CARD_BYTES,'Retained source card snapshot has the wrong extent');
+    assert.equal(retainedProfile.retained.sha256,profile.sha256,
+      `${role} retained source card bytes differ from the browser-computed source snapshot hash`);
+    if(sharedProfile){
+      const comparison=compareProfileBytes(sharedProfile,profile);
+      pageReport.save_profile.shared_input_comparison=comparison;
+      report.coordination.shared_profile_input.beta_source_snapshot_sha256=profile.sha256;
+      report.coordination.shared_profile_input.source_hashes_equal=
+        sharedProfile.sha256===profile.sha256&&comparison.equal;
+      assert(comparison.equal,`${role} source-loaded card bytes differ from alpha's exact Personal input: ${JSON.stringify(comparison.first_mismatch)}`);
+    }
     const loadedIdentity=await item.page.evaluate(()=>window.meleeNetPeerIdentity());
     assert.equal(loadedIdentity.algorithm,'sha256');assert.equal(loadedIdentity.wasm,actualWasmHash);
     const disc=loadedIdentity.disc;
@@ -210,8 +298,7 @@ async function startOwnedPage(role,chromium,browserConfig,browserPath,playwright
     item.host={runtime_sha256:loadedIdentity.wasm,asset_identity_sha256:sha256(Buffer.from(assetIdentity)),
       save_profile_sha256:profile.sha256,profile_identity:PROFILE};
     item.profile=profile;item.disc=disc;
-    pageReport.host_identity=item.host;pageReport.save_profile={...profile,
-      provenance:'actual active source-host card snapshot through _melee_web_native_menu_snapshot_save_profile'};
+    pageReport.host_identity=item.host;
     pageReport.disc.validated_identity={algorithm:disc.algorithm,dol:disc.dol,fst:disc.fst,
       dol_size:disc.dolSize,fst_size:disc.fstSize,canonical_identity_sha256:item.host.asset_identity_sha256};
     pageReport.offer=await item.admission.prepareOffer();
@@ -442,7 +529,20 @@ async function captureBrowserProcessInventory(item){
 try{
   const {chromium,browser:browserConfig,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
   const alpha=await startOwnedPage('alpha',chromium,browserConfig,browserPath,playwrightPath,item=>owned.push(item));
-  const beta=await startOwnedPage('beta',chromium,browserConfig,browserPath,playwrightPath,item=>owned.push(item));
+  const alphaProfileBytes=Buffer.from(alpha.profile.bytes_base64,'base64');
+  assert.equal(alphaProfileBytes.length,CARD_BYTES,'Alpha source snapshot has the wrong card extent');
+  const alphaProfileHash=sha256(alphaProfileBytes);
+  assert.equal(alphaProfileHash,alpha.profile.sha256,'Alpha source snapshot hash does not match its raw bytes');
+  report.coordination.shared_profile_input={mode:'personal',bytes:CARD_BYTES,
+    alpha_source_snapshot_sha256:alpha.profile.sha256,beta_staged_input_sha256:alphaProfileHash,
+    beta_source_snapshot_sha256:null,staged_before_beta_disc_selection:true,
+    alpha_source_snapshot_file:report.pages.alpha.source_card_snapshot.file,
+    provenance:'actual raw alpha source-host card snapshot retained in the run output and passed to beta through the existing native Personal-profile setter'};
+  const beta=await startOwnedPage('beta',chromium,browserConfig,browserPath,playwrightPath,
+    item=>owned.push(item),alpha.profile);
+  report.coordination.shared_profile_input.beta_source_snapshot_sha256=beta.profile.sha256;
+  report.coordination.shared_profile_input.source_hashes_equal=
+    alpha.profile.sha256===alphaProfileHash&&alphaProfileHash===beta.profile.sha256;
   assert.deepEqual(alpha.host,beta.host,'Loaded runtime/disc/save/profile identities differ across browser owners');
   addCheck('two distinct browser processes loaded the same reviewed runtime, disc, and save identity',alpha.host);
   report.coordination.alpha_local_seed_provenance=alpha.offer.offer.local_menu_rng_seed_provenance;
