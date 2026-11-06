@@ -977,7 +977,8 @@ int melee_web_native_menu_match_history_request(unsigned command) {
     (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>10||
     (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
  ++c.status.request_seq;c.status.pending_command=command;
- if(emscripten_request_animation_frame(history_dispatch,nullptr)!=EMSCRIPTEN_RESULT_SUCCESS){c.status.pending_command=0;return history_refuse("Owned animation-frame request failed");}
+ // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
+ (void)emscripten_request_animation_frame(history_dispatch,nullptr);
  return 1;
 }
 const MatchHistoryStatus* melee_web_native_menu_match_history_status(){
