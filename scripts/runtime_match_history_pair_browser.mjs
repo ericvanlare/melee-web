@@ -32,7 +32,8 @@ const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
 const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
 const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
-  'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false},'inline-dispatch':{type:'boolean',default:false}},strict:true});
+  'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false},
+  'inline-dispatch':{type:'boolean',default:false},'profile-history':{type:'boolean',default:false}},strict:true});
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
@@ -47,6 +48,8 @@ if(presentForward)assert(values['arena-history']&&values.phase==='four-tick-corr
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
+const profileHistory=values['profile-history'];
+if(profileHistory)assert(inlineDispatch,'--profile-history requires --inline-dispatch');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
@@ -193,6 +196,9 @@ const report={schema:values.phase==='four-tick-correction'?
     scope:'validated by existing validateCpuRestoreConfiguration; typed clock/cadence policies excluded from static byte bundle'},
   arena_history_mode:values['arena-history'],
   ...(inlineDispatch?{inline_dispatch:true}:{}),
+  ...(profileHistory?{history_cpu_attribution:{sampling_interval_us:100,
+    scope:'first alpha capture, seal, and restore historyCommand bridge calls only',
+    interpretation:'CPU attribution only; not a benchmark',profiles:[]}}:{}),
   ...(presentForward?{forward_presentation_scope:'one actual source draw per forward tick; corrected presentations occur only at sealed ENDs; no cadence claim'}:{}),
   arena_comparator:{path:'src/slippi_profile/tests/cpu_arena_endpoint.mjs',
     sha256:await hashFile(path.join(ROOT,'src/slippi_profile/tests/cpu_arena_endpoint.mjs'))},
@@ -645,6 +651,50 @@ async function recordHistoryStatus(item,label,expected){
   report.pages[item.role].match_history.statuses.push({label,value:status});
   return requireHistoryStatus(status,`${item.role} ${label}`,expected);
 }
+const profiledAlphaCommands=new Set();
+async function profileHistoryCommand(item,name,window,operation){
+  if(!profileHistory||item.role!=='alpha'||!['capture','seal','restore'].includes(name)||
+     profiledAlphaCommands.has(name))return operation();
+  profiledAlphaCommands.add(name);
+  const entry={role:'alpha',command:name,...(window?{window}:{}),sampling_interval_us:100,
+    profile_file:null,profile_bytes:null,profile_sha256:null,profiler_errors:[],session_detached:false};
+  report.history_cpu_attribution.profiles.push(entry);
+  let session=null,profilerEnabled=false,startAttempted=false,started=false;
+  try{
+    session=await item.context.newCDPSession(item.page);
+    await session.send('Profiler.enable');profilerEnabled=true;
+    await session.send('Profiler.setSamplingInterval',{interval:100});
+    startAttempted=true;
+    await session.send('Profiler.start');started=true;
+  }catch(error){
+    entry.profiler_errors.push(`start: ${String(error?.message||error)}`);
+  }
+  try{
+    return await operation();
+  }finally{
+    if(session){
+      try{
+        const result=await session.send('Profiler.stop');
+        if(result?.profile&&started){
+          const file=`alpha-first-${name}.cpuprofile`;
+          const bytes=Buffer.from(JSON.stringify(result.profile)+'\n');
+          await fs.writeFile(path.join(out,file),bytes,{flag:'wx'});
+          entry.profile_file=file;entry.profile_bytes=bytes.length;entry.profile_sha256=sha256(bytes);
+        }else if(startAttempted||started){
+          entry.profiler_errors.push('stop: Profiler.stop returned no profile');
+        }
+      }catch(error){
+        entry.profiler_errors.push(`stop/save: ${String(error?.message||error)}`);
+      }
+      if(profilerEnabled)try{await session.send('Profiler.disable');}
+      catch(error){entry.profiler_errors.push(`disable: ${String(error?.message||error)}`);}
+      try{await session.detach();entry.session_detached=true;}
+      catch(error){entry.profiler_errors.push(`detach: ${String(error?.message||error)}`);}
+    }
+    entry.started=started;entry.status=entry.profiler_errors.length?'profiler_error':
+      entry.profile_file?'profile_saved':'profile_missing';
+  }
+}
 async function historyCommand(item,name,expected){
   const journal=report.pages[item.role].match_history.commands;
   const window=expected?.window;
@@ -652,7 +702,8 @@ async function historyCommand(item,name,expected){
   const entry={name,...(window?{window}:{}),before:await recordHistoryStatus(item,`${prefix}before:${name}`,{preFrame:expected?.preFrame})};
   journal.push(entry);
   try{
-    entry.after=await peerOperation(item,'command',name);
+    entry.after=await profileHistoryCommand(item,name,window,
+      ()=>peerOperation(item,'command',name));
     return requireHistoryStatus(entry.after,`${item.role} ${prefix}after:${name}`,expected);
   }catch(error){
     entry.error=String(error?.message||error);
