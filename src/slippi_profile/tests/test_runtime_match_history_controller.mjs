@@ -4,7 +4,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
   decodeRuntimeMatchHistoryInput,decodeRuntimeMatchHistoryPollTicket,
-  decodeRuntimeMatchHistoryEpisodeInputRow,validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
+  decodeRuntimeMatchHistoryEpisodeInputRow,decodeRuntimeMatchHistoryPrefixHandoff,
+  validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
 const HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
@@ -164,6 +165,154 @@ function episodeFixture(){
   writeMetadata();
   return {...f,episodeState:()=>({current,phase,incarnation,forwardSteps,replaySteps,restoreCount,ownerState,
     pollSerial,lastPlan,enableCalls,ticketPointer,rowPointer})};
+}
+
+function confirmedPrefixFixture({failCommand=0}={}){
+  const f=episodeFixture(),{module,put,view}=f;
+  const stringPointer=2048,ticketPointer=16384,originPointer=16768,boundaryPointer=16960,checksumPointer=17152;
+  const rows=[2,3].map((sourceFrame,index)=>{
+    const raw=Uint8Array.from({length:44},(_,offset)=>(index*53+offset*11+7)&255);
+    const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
+    [1,176,700+index,sourceFrame,1,0,1,1]
+      .forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,9007199254741001n+BigInt(index),true);
+    bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
+    return {bytes,ticketId:700+index,sourceFrame,incarnation:1,localPort:0,remotePort:1,
+      pollSerial:(9007199254741001n+BigInt(index)).toString(),raw};
+  });
+  const state={ownerState:0,firstFailure:0,pending:0,lastCommand:0,requestSequence:0,completeSequence:0,
+    expectedFrame:0,localPort:0,remotePort:1,phase:0,preFrame:0,currentFrame:0,sealedEnd:0,
+    incarnation:0,restoreCount:0,endpointMask:0,forwardSteps:0,replaySteps:0,pollSerial:0n,
+    inputReady:0,gpuPending:0,endpointActive:0,rendererErrors:0,confirmedFrame:2,
+    latestTicketId:0,latestRaw:new Uint8Array(44),forwarded:[],descriptor:{
+      schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+      selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:0,rebaseRequestSequence:0,
+      suffixCount:2,suffixCursor:0,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+      ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+      ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'}};
+  let ticketBytesReads=0,ticketDataReads=0;
+  const writeStatus=()=>{
+    put(0,1);put(4,128);put(8,state.ownerState);put(12,state.firstFailure);put(16,state.pending);
+    put(20,state.lastCommand);put(24,state.requestSequence);put(28,state.completeSequence);
+    put(32,state.expectedFrame);put(36,state.localPort);put(40,state.remotePort);put(44,0);
+    put(48,1);put(52,64);put(56,state.phase);put(60,0);put(64,state.preFrame);
+    put(68,state.currentFrame);put(72,state.sealedEnd);put(76,state.incarnation);
+    put(80,state.restoreCount);put(84,state.endpointMask);put(88,state.forwardSteps);
+    put(92,state.replaySteps);view.setBigUint64(352,state.pollSerial,true);
+    put(104,0);put(108,0);put(112,state.inputReady);put(116,state.gpuPending);
+    put(120,state.endpointActive);put(124,state.rendererErrors);
+  };
+  const writeString=value=>{
+    const bytes=new TextEncoder().encode(value+'\0');module.HEAPU8.set(bytes,stringPointer);return stringPointer;
+  };
+  const writeTicket=(ticketId,sourceFrame,incarnation,pollSerial,raw)=>{
+    const bytes=new Uint8Array(88),data=new DataView(bytes.buffer);
+    [1,88,ticketId,sourceFrame,incarnation,0,1,0]
+      .forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,BigInt(pollSerial),true);bytes.set(raw,40);
+    module.HEAPU8.set(bytes,ticketPointer);
+  };
+  const sourceBoundary=()=>{
+    const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
+    [1,176,500,1,1,0,1,2].forEach((value,field)=>data.setUint32(field*4,value,true));
+    data.setBigUint64(32,8800n,true);
+    const raw=Uint8Array.from({length:44},(_,offset)=>(offset*9+5)&255);
+    bytes.set(raw,40);bytes.set(raw,84);bytes.set(raw,128);
+    module.HEAPU8.set(bytes,boundaryPointer);
+  };
+  const request=command=>{
+    f.calls.push(command);state.pending=command;state.requestSequence++;writeStatus();
+    queueMicrotask(()=>{
+      state.pending=0;state.completeSequence=state.requestSequence;state.lastCommand=command;
+      if(command===failCommand){state.firstFailure=9;writeStatus();return;}
+      if(command===1){state.phase=1;state.inputReady=0;}
+      else if(command===18){state.phase=3;state.incarnation=1;state.currentFrame=state.preFrame;
+        state.forwardSteps=0;state.replaySteps=0;state.restoreCount=0;state.inputReady=0;}
+      else if(command===20){state.phase=23;state.currentFrame=state.confirmedFrame;
+        state.sealedEnd=state.confirmedFrame;state.inputReady=1;
+        state.descriptor.finishRequestSequence=state.requestSequence;}
+      else if(command===21){state.phase=25;}
+      else if(command===22){state.phase=26;}
+      else if(command===23){state.expectedFrame=state.confirmedFrame;state.preFrame=state.confirmedFrame;
+        state.currentFrame=state.confirmedFrame;state.sealedEnd=0;state.phase=0;state.incarnation=0;
+        state.restoreCount=0;state.endpointMask=0;state.forwardSteps=0;state.replaySteps=0;
+        state.pollSerial=0n;state.inputReady=0;state.descriptor.rebaseRequestSequence=state.requestSequence;}
+      else if(command===24){
+        const origin=rows[state.descriptor.suffixCursor];
+        if(origin){state.latestTicketId=origin.ticketId;state.latestRaw=origin.raw.slice();
+          state.currentFrame=state.confirmedFrame+state.descriptor.suffixCursor;
+          state.pollSerial=BigInt(origin.pollSerial);state.inputReady=1;
+          writeTicket(origin.ticketId,origin.sourceFrame,state.incarnation,origin.pollSerial,origin.raw);}
+      }else if(command===12){
+        state.latestTicketId=state.requestSequence;state.latestRaw=Uint8Array.from({length:44},(_,i)=>(i+3)&255);
+        state.pollSerial=9007199254741111n+BigInt(state.requestSequence);
+        state.inputReady=1;state.phase=state.phase===4?4:21;
+        writeTicket(state.latestTicketId,state.currentFrame,state.incarnation,state.pollSerial,state.latestRaw);
+      }else if(command===13){
+        state.currentFrame++;state.phase=21;state.forwardSteps++;state.inputReady=1;
+        state.descriptor.suffixCursor++;
+      }
+      if(command===10)state.ownerState=2;
+      writeStatus();
+    });
+    return 1;
+  };
+  module[prefix+'take_over']=(frame,local,remote)=>{
+    state.ownerState=1;state.expectedFrame=frame;state.preFrame=frame;state.currentFrame=frame;
+    state.localPort=local;state.remotePort=remote;writeStatus();return 1;
+  };
+  module[prefix+'request']=request;
+  module[prefix+'request_prefix_finish']=frame=>{state.confirmedFrame=frame;return request(20);};
+  module[prefix+'request_prefix_rebase']=frame=>{state.confirmedFrame=frame;return request(23);};
+  module[prefix+'episode_enable']=()=>1;module[prefix+'arena_enable']=()=>1;
+  module[prefix+'cpu_arena_endpoint_data']=()=>19000;
+  module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  module[prefix+'identity_json']=()=>writeString(JSON.stringify({...host,source_frame:0,
+    current_rng:'fedcba98',selection:{stage:2}}));
+  module[prefix+'rebase_identity_json']=()=>writeString(JSON.stringify({...host,source_frame:2,
+    current_rng:'01234567',selection:{stage:2}}));
+  module[prefix+'prefix_handoff_json']=()=>writeString(JSON.stringify(state.descriptor));
+  module[prefix+'prefix_origin_row_bytes']=()=>176;
+  module[prefix+'prefix_origin_row_data']=ordinal=>{
+    const row=rows[ordinal];if(!row)return 0;
+    module.HEAPU8.set(row.bytes,originPointer);return originPointer;
+  };
+  module[prefix+'input_row_bytes']=()=>176;
+  module[prefix+'input_row_data']=ordinal=>{sourceBoundary();return ordinal===1?boundaryPointer:0;};
+  module[prefix+'ticket_bytes']=()=>{ticketBytesReads++;return 88;};
+  module[prefix+'ticket_data']=()=>{ticketDataReads++;return ticketPointer;};
+  module[prefix+'request_episode_forward']=(ticketId,pointer,size)=>{
+    if(size!==44||ticketId!==state.latestTicketId)return 0;
+    state.forwarded.push(module.HEAPU8.slice(pointer,pointer+size));return request(13);
+  };
+  module[prefix+'checksum_data']=()=>checksumPointer;
+  module[prefix+'checksum_bytes']=()=>64;
+  const checksum=new Uint8Array(64),checksumView=new DataView(checksum.buffer);
+  checksumView.setUint32(0,1,true);checksumView.setUint32(4,3,true);checksumView.setUint32(12,2,true);
+  module.HEAPU8.set(checksum,checksumPointer);
+  writeStatus();
+  return {...f,state,rows,originPointer,writeStatus,setPhase:(phase,extra={})=>{
+    Object.assign(state,{phase},extra);writeStatus();
+  },mutateHandoff:fn=>{fn(state.descriptor);},writeString,
+  ticketReads:()=>({bytes:ticketBytesReads,data:ticketDataReads})};
+}
+
+async function preparePrefixAdoption({failCommand=0}={}){
+  const f=confirmedPrefixFixture({failCommand}),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);owner.enableArenaHistory();
+  await owner.command('capture');
+  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:1,
+    restoreCount:1,forwardSteps:4,replaySteps:2,pollSerial:990n,inputReady:1});
+  await owner.command('finishPrefix',2);
+  f.setPhase(24);
+  const checksum=owner.checksum();
+  const origins=[owner.prefixOrigin(0),owner.prefixOrigin(1)];
+  await owner.command('closePrefix');await owner.command('retirePrefix');
+  const rebase=await owner.command('rebaseConfirmedPrefix',2);
+  await owner.command('capture');await owner.command('beginEpisode');
+  f.setPhase(4);
+  return {f,owner,checksum,origins,rebase};
 }
 
 const host=Object.freeze({runtime_sha256:'a'.repeat(64),asset_identity_sha256:'b'.repeat(64),
@@ -418,6 +567,112 @@ test('episode receipt decoders preserve uint64 serials and reject malformed tick
   [1,176,7,176,1,0,1,0].forEach((value,index)=>emptyView.setUint32(index*4,value,true));
   emptyView.setBigUint64(32,1n,true);nonzeroEmpty[84]=1;
   assert.throws(()=>decodeRuntimeMatchHistoryEpisodeInputRow(nonzeroEmpty),/Unconsumed episode ticket/);
+});
+
+test('confirmed-prefix handoff decoder preserves bounded source identity and rejects stale metadata',()=>{
+  const handoff={schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+    selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:7,rebaseRequestSequence:0,
+    suffixCount:2,suffixCursor:1,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+    ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+    ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'};
+  assert.deepEqual(decodeRuntimeMatchHistoryPrefixHandoff(JSON.stringify(handoff)),handoff);
+  const reject=(label,mutate,pattern=/Runtime prefix handoff/)=>{
+    const value=structuredClone(handoff);mutate(value);
+    assert.throws(()=>decodeRuntimeMatchHistoryPrefixHandoff(JSON.stringify(value)),pattern,label);
+  };
+  reject('extra fields are refused',value=>{value.reserved=0;},/exact field set/);
+  reject('confirmed frame must be strictly inside the selected interval',value=>{value.confirmedFrame=4;});
+  reject('suffix count must describe the untouched tail',value=>{value.suffixCount=1;});
+  reject('rebase request must follow finish',value=>{value.rebaseRequestSequence=7;});
+  reject('uint64 metadata stays canonical decimal',value=>{value.worldGeneration='041';},/canonical uint64 decimal/);
+  reject('owner tokens stay fixed-width lowercase hex',value=>{value.ownerFlow='00000000000000AF';},/owner token/);
+  reject('zero owner tokens are invalid',value=>{value.ownerAudio='0000000000000000';},/owner token/);
+});
+
+test('confirmed-prefix controller copies the actual C checksum and replays suffix tickets without polling',async()=>{
+  const {f,owner,checksum,origins,rebase}=await preparePrefixAdoption();
+  const record=new DataView(checksum.buffer);
+  assert.deepEqual([record.getUint32(0,true),record.getUint32(4,true),record.getUint32(12,true)],[1,3,2]);
+  assert.deepEqual([rebase.status.expectedFrame,rebase.status.metadata.preFrame,
+    rebase.status.completeSequence,rebase.status.lastCompletedCommand],[2,2,5,23]);
+  assert.deepEqual(owner.prefixHandoff(),{
+    schema:'melee-web-runtime-prefix-handoff-v1',oldPreFrame:0,confirmedFrame:2,
+    selectedEndFrame:4,oldIncarnation:1,finishRequestSequence:2,rebaseRequestSequence:5,
+    suffixCount:2,suffixCursor:0,localPort:0,remotePort:1,worldGeneration:'41',contextEpoch:'9',
+    ownerStorage:'0000000000000001',ownerContext:'0000000000000002',
+    ownerFlow:'0000000000000003',ownerAudio:'0000000000000004'});
+  f.module.HEAPU8.fill(0,f.originPointer,f.originPointer+176);
+  assert.equal(origins[0].sourceFrame,2);
+  assert.deepEqual(origins[0].rawBytes.slice(40,84),origins[0].raw,
+    'the origin accessor returned an owned copy of the immutable 176-byte row');
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18]);
+  let ticketReads=f.ticketReads();
+  for(const origin of origins){
+    await owner.command('adoptNextPrefixTicket');
+    const ticket=owner.adoptedTicket(origin);
+    assert.equal(ticket.ticketId,origin.ticketId);
+    assert.notEqual(ticket.ticketId,f.state.requestSequence,
+      'the preserved source ticket ID is not the new capsule request sequence');
+    assert.equal(ticket.sourceFrame,origin.sourceFrame);
+    assert.equal(ticket.incarnation,1,'the adopted ticket binds to the fresh capsule incarnation');
+    assert.equal(ticket.pollSerial,origin.pollSerial);
+    assert.deepEqual(ticket.raw,origin.raw);
+    const reads=f.ticketReads();
+    assert.deepEqual({bytes:reads.bytes-ticketReads.bytes,data:reads.data-ticketReads.data},{bytes:1,data:1},
+      'one cmd24 completion yields one copied 88-byte ticket');
+    ticketReads=reads;
+    const plan=ticket.raw.slice();plan[11]^=0x40;
+    await owner.forwardTicket(ticket.ticketId,plan);
+    assert.deepEqual(f.state.forwarded.at(-1),plan);
+  }
+  assert.equal(owner.prefixHandoff().suffixCursor,2);
+  await owner.command('pollTicket');
+  assert.equal(owner.ticket().sourceFrame,4,'fresh polling resumes only after the preserved suffix ends');
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24,13,24,13,12]);
+  for(const command of [20,21,22,23,24,13,12])
+    assert.equal(f.calls.filter(value=>value===command).length,command===13?2:command===24?2:1,
+      `native command ${command} is dispatched exactly once per suffix boundary`);
+});
+
+test('confirmed-prefix controller rejects stale handoffs, malformed origins, and mismatched adopted tickets',async()=>{
+  const stale=await preparePrefixAdoption();
+  stale.f.mutateHandoff(value=>{value.finishRequestSequence=100;value.rebaseRequestSequence=101;});
+  assert.throws(()=>stale.owner.prefixHandoff(),/request sequence is ahead/);
+
+  const malformed=await preparePrefixAdoption();
+  malformed.f.rows[0].bytes[0]=9;
+  assert.throws(()=>malformed.owner.prefixOrigin(0),/metadata violation/);
+
+  const mismatch=await preparePrefixAdoption();
+  await mismatch.owner.command('adoptNextPrefixTicket');
+  const wrong={...mismatch.origins[0],rawBytes:mismatch.origins[0].rawBytes.slice()};
+  wrong.rawBytes[40]^=1;
+  const reads=mismatch.f.ticketReads();
+  assert.throws(()=>mismatch.owner.adoptedTicket(wrong),/exact immutable origin row/);
+  assert.deepEqual(mismatch.f.ticketReads(),reads,
+    'a mismatched caller row is rejected before reading adopted ticket storage');
+});
+
+test('confirmed-prefix generic close refusal is dispatched once and remains terminal',async()=>{
+  const f=confirmedPrefixFixture({failCommand:21}),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});owner.identity(host);owner.enableArenaHistory();
+  await owner.command('capture');
+  f.setPhase(11,{expectedFrame:0,preFrame:0,currentFrame:2,sealedEnd:4,incarnation:1,
+    restoreCount:1,forwardSteps:4,replaySteps:2,pollSerial:990n,inputReady:1});
+  await owner.command('finishPrefix',2);f.setPhase(24);
+  await assert.rejects(owner.command('closePrefix'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21]);
+  await assert.rejects(owner.command('retirePrefix'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21],'the failed close is never retried and later work is blocked');
+});
+
+test('confirmed-prefix ticket adoption refusal does not read or repeat the native ticket',async()=>{
+  const {f,owner,origins}=await preparePrefixAdoption({failCommand:24});
+  await assert.rejects(owner.command('adoptNextPrefixTicket'),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24]);
+  assert.deepEqual(f.ticketReads(),{bytes:0,data:0});
+  assert.throws(()=>owner.adoptedTicket(origins[0]),/Native history refused/);
+  assert.deepEqual(f.calls,[1,20,21,22,23,1,18,24]);
 });
 
 test('agreed-start forwards host identities and seed while returning exact native bytes and held-frame receipt',()=>{

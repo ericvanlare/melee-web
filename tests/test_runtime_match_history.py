@@ -394,6 +394,102 @@ int main() {
         (self.work / 'native-rebase-guard.log').write_text(output)
         self.assertEqual(result.returncode, 0, output)
 
+    def test_prefix_poll_gate_stays_closed_until_suffix_then_opens_monotonically(self):
+        source_text = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+        start = source_text.index('bool RuntimeMatchHistory::can_admit_poll_ticket(')
+        end = source_text.index('bool RuntimeMatchHistory::admit_poll_ticket(', start)
+        admission = source_text[start:end]
+
+        fixture = r'''#include <array>
+#include <cassert>
+#include <cstdint>
+constexpr unsigned PAD_MAX_CONTROLLERS=4;
+struct Session {
+  uint32_t frame=0;
+  uint32_t source_frames() const { return frame; }
+};
+enum class RuntimeMatchHistoryPhase { Armed, EpisodeRecording };
+struct Receipt { unsigned local_port=0,remote_port=0; };
+struct PrefixHandoff {
+  bool active_=true;
+  uint32_t suffix_cursor_=0,suffix_count_=2,selected_end_frame_=42;
+};
+class RuntimeMatchHistory {
+public:
+  Session session_{};
+  RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::Armed;
+  bool prefix_handoff_imported_=true;
+  PrefixHandoff* prefix_handoff_=nullptr;
+  bool episode_mode_=true,checkpoint_=true,current_ticket_pending_=false;
+  bool owner_ok_=true;
+  uint32_t pre_frame_=40,last_ticket_id_=100,ticket_count_=0;
+  std::array<Receipt,7> episode_rows_{};
+  bool live_owner(uint32_t expected) const { return owner_ok_&&session_.frame==expected; }
+  bool can_admit_poll_ticket(uint32_t,unsigned,unsigned) const noexcept;
+};
+@ADMISSION@
+int main() {
+  PrefixHandoff handoff{};
+  RuntimeMatchHistory history{};
+  history.prefix_handoff_=&handoff;
+  history.episode_rows_[0]={0,1};
+
+  // No original suffix receipt has been adopted yet.
+  history.session_.frame=40;
+  history.ticket_count_=0;
+  assert(!history.can_admit_poll_ticket(101,0,1));
+
+  // One of two suffix rows is still outstanding.
+  handoff.suffix_cursor_=1;
+  history.session_.frame=41;
+  history.ticket_count_=1;
+  assert(!history.can_admit_poll_ticket(101,0,1));
+
+  // Even an exhausted cursor cannot poll until execution has returned to F.
+  handoff.suffix_cursor_=handoff.suffix_count_;
+  assert(!history.can_admit_poll_ticket(101,0,1));
+
+  // F, F+1, and F+2 are admitted in sequence after each successful forward.
+  history.session_.frame=42;
+  history.ticket_count_=2;
+  assert(history.can_admit_poll_ticket(101,0,1));
+  history.session_.frame=43;
+  history.ticket_count_=3;
+  history.last_ticket_id_=101;
+  assert(history.can_admit_poll_ticket(102,0,1));
+  history.session_.frame=44;
+  history.ticket_count_=4;
+  history.last_ticket_id_=102;
+  assert(history.can_admit_poll_ticket(103,0,1));
+  assert(!history.can_admit_poll_ticket(102,0,1)); // stale id
+  history.ticket_count_=3;
+  assert(!history.can_admit_poll_ticket(103,0,1)); // source/counter mismatch
+  history.ticket_count_=4;
+  history.owner_ok_=false;
+  assert(!history.can_admit_poll_ticket(103,0,1)); // current owner refused
+}
+'''.replace('@ADMISSION@', admission)
+
+        source = self.work / 'prefix-poll-gate.cpp'
+        binary = self.work / 'prefix-poll-gate'
+        source.write_text(fixture)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        command = [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                   str(source), '-o', str(binary)]
+        compile_result = subprocess.run(command, cwd=ROOT, capture_output=True,
+                                        text=True, timeout=30)
+        (self.work / 'prefix-poll-gate-compile.log').write_text(
+            compile_result.stdout + compile_result.stderr)
+        self.assertEqual(compile_result.returncode, 0,
+                         compile_result.stdout + compile_result.stderr)
+        run_result = subprocess.run([str(binary)], cwd=ROOT, capture_output=True,
+                                    text=True, timeout=30)
+        (self.work / 'prefix-poll-gate-run.log').write_text(
+            run_result.stdout + run_result.stderr)
+        self.assertEqual(run_result.returncode, 0,
+                         run_result.stdout + run_result.stderr)
+
     def test_native_recording_present_uses_actual_callback_once_per_source_frame(self):
         source_text = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
         begin = source_text.index('bool RuntimeMatchHistory::submit_present() noexcept')
