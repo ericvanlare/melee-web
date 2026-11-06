@@ -10,6 +10,7 @@ export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,pr
   closePrefix:21,retirePrefix:22,rebaseConfirmedPrefix:23,
   adoptNextPrefixTicket:24,sealPresentedFrontier:25});
 const PREFIX='_melee_web_native_menu_match_history_';
+const QUEUE_COMPLETION_OBSERVER_KEY='__meleeWebRuntimeHistoryQueueCompletionV1';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11,FRAME_BYTES=44,TICKET_BYTES=88,INPUT_ROW_BYTES=176;
 const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
 const START_PREFIX_SCHEMA='melee-web-runtime-match-start-prefix-v1';
@@ -288,10 +289,89 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     throw Error('Private runtime history ABI differs from its controller');
   let busy=false,failed=null,terminal=false,captured=false,episodeMode=false,arenaMode=false;
   let inlineMode=false,nativeCallPending=false;
-  let identityText=null;
+  let identityText=null,lastPresentationSubmission=null;
   let adoptedPrefixTicket=null,unclaimedPrefixTicket=false,confirmedPrefixActive=false;
   const journal=[],pacingJournal=[];
   let pacingStarted=false;
+  const queueCompletionWindow=globalThis.window??null;
+  let queueCompletionInstalled=false,queueCompletionClosed=false;
+  let latestQueueCompletion=null,consumedQueueCompletion=null,pendingQueueCompletion=null;
+  const queueCompletionWords=(lo,hi)=>{
+    if(!Number.isInteger(lo)||lo<0||lo>UINT32_MAX||
+       !Number.isInteger(hi)||hi<0||hi>UINT32_MAX)return null;
+    return ((BigInt(hi)<<32n)|BigInt(lo)).toString();
+  };
+  const queueCompletionMatches=(actual,target)=>actual&&target&&
+    actual.frameId===target.frameId&&actual.stagingGeneration===target.stagingGeneration&&
+    actual.registrationSequence===target.registrationSequence;
+  const queueCompletionNewer=(candidate,prior)=>{
+    if(!prior)return true;
+    const generation=BigInt(candidate.stagingGeneration),oldGeneration=BigInt(prior.stagingGeneration);
+    return generation>oldGeneration||
+      (generation===oldGeneration&&BigInt(candidate.registrationSequence)>BigInt(prior.registrationSequence));
+  };
+  const queueCompletionObserver=Object.freeze({notify(frameLo,frameHi,generationLo,generationHi,registrationLo,registrationHi){
+    if(queueCompletionClosed)return;
+    try{
+      const frameId=queueCompletionWords(frameLo,frameHi);
+      const stagingGeneration=queueCompletionWords(generationLo,generationHi);
+      const registrationSequence=queueCompletionWords(registrationLo,registrationHi);
+      if(frameId===null||stagingGeneration===null||registrationSequence===null)return;
+      const completion=Object.freeze({frameId,stagingGeneration,registrationSequence});
+      if(queueCompletionNewer(completion,latestQueueCompletion))latestQueueCompletion=completion;
+      if(pendingQueueCompletion&&queueCompletionMatches(latestQueueCompletion,pendingQueueCompletion.target)){
+        const pending=pendingQueueCompletion;pendingQueueCompletion=null;
+        consumedQueueCompletion=latestQueueCompletion;pending.resolve(true);
+      }
+    }catch(_){/* A diagnostic notification must never throw into Aurora's callback. */}
+  }});
+  const installQueueCompletionObserver=()=>{
+    if(!queueCompletionWindow)return;
+    if(Object.hasOwn(queueCompletionWindow,QUEUE_COMPLETION_OBSERVER_KEY))
+      throw Error('A private runtime-history queue-completion observer is already active');
+    Object.defineProperty(queueCompletionWindow,QUEUE_COMPLETION_OBSERVER_KEY,
+      {value:queueCompletionObserver,configurable:true,enumerable:false,writable:false});
+    queueCompletionInstalled=true;
+  };
+  const closeQueueCompletionObserver=()=>{
+    if(queueCompletionClosed)return;
+    queueCompletionClosed=true;
+    latestQueueCompletion=null;consumedQueueCompletion=null;
+    if(pendingQueueCompletion){const pending=pendingQueueCompletion;pendingQueueCompletion=null;pending.resolve(false);}
+    if(queueCompletionInstalled&&queueCompletionWindow){
+      try{
+        const descriptor=Object.getOwnPropertyDescriptor(queueCompletionWindow,QUEUE_COMPLETION_OBSERVER_KEY);
+        if(descriptor?.value===queueCompletionObserver&&descriptor.configurable)
+          delete queueCompletionWindow[QUEUE_COMPLETION_OBSERVER_KEY];
+      }catch(_){/* A foreign replacement cannot make teardown fail. */}
+    }
+    queueCompletionInstalled=false;
+  };
+  const waitForQueueCompletion=(target,deadline)=>{
+    if(!queueCompletionInstalled||queueCompletionClosed)return Promise.resolve(false);
+    if(queueCompletionMatches(latestQueueCompletion,target)){
+      if(queueCompletionMatches(consumedQueueCompletion,target))return Promise.resolve(null);
+      consumedQueueCompletion=latestQueueCompletion;return Promise.resolve(true);
+    }
+    if(pendingQueueCompletion)return Promise.reject(Error('Private runtime-history queue waiter already has an owner'));
+    if(deadline-performance.now()<=0)return Promise.resolve(false);
+    let resolveEvent,timer=0;
+    const eventPromise=new Promise(resolve=>{resolveEvent=resolve;});
+    pendingQueueCompletion={target,resolve:resolveEvent};
+    if(queueCompletionMatches(latestQueueCompletion,target)){
+      consumedQueueCompletion=latestQueueCompletion;pendingQueueCompletion=null;resolveEvent(true);
+    }
+    const deadlinePromise=new Promise(resolve=>{
+      timer=setTimeout(()=>{
+        if(pendingQueueCompletion?.resolve===resolveEvent)pendingQueueCompletion=null;
+        resolve(false);
+      },Math.min(5,Math.max(0,deadline-performance.now())));
+    });
+    return Promise.race([eventPromise,deadlinePromise]).finally(()=>{
+      if(timer)clearTimeout(timer);
+      if(pendingQueueCompletion?.resolve===resolveEvent)pendingQueueCompletion=null;
+    });
+  };
   const read=(pointer,size)=>{
     if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>0xffffffff)throw Error('Native history pointer');
     const start=pointer>>>0,heap=module.HEAPU8;
@@ -503,20 +583,58 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   };
   const deadlineError=(label,detail)=>
     latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
-  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null,acceptLateCompletion=false)=>{
+  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null,acceptLateCompletion=false,waitReceipt=null)=>{
+    let waiterStartedAt=null;
+    const updateElapsed=()=>{
+      if(waitReceipt&&waiterStartedAt!==null)
+        waitReceipt.elapsedMs=Math.max(0,performance.now()-waiterStartedAt);
+    };
+    const noteWake=(kind,started)=>{
+      if(!waitReceipt)return;
+      if(waiterStartedAt===null)waiterStartedAt=started;
+      waitReceipt.waitCount++;
+      waitReceipt.lastWake=kind;
+      if(kind==='event')waitReceipt.eventWakeCount++;
+      else waitReceipt.poll5msWakeCount++;
+      updateElapsed();
+    };
     for(;;){
       const snapshot=check(status(),allowFailure);
-      if(inlineMode&&!acceptLateCompletion&&performance.now()>=deadline)throw deadlineError(label,detail);
-      if(predicate(snapshot))return snapshot;
-      if(performance.now()>=deadline)
-        throw deadlineError(label,detail);
+      if(inlineMode&&!acceptLateCompletion&&performance.now()>=deadline){
+        updateElapsed();throw deadlineError(label,detail);
+      }
+      if(predicate(snapshot)){updateElapsed();return snapshot;}
+      if(performance.now()>=deadline){
+        updateElapsed();throw deadlineError(label,detail);
+      }
+      if(waitReceipt&&waiterStartedAt===null)waiterStartedAt=performance.now();
+      let completionTarget=null;
       if(onBlocked){
         const blocked=onBlocked(snapshot);
-        if(inlineMode)await blocked;
-        if(performance.now()>=deadline)
-          throw deadlineError(label,detail);
+        completionTarget=inlineMode?await blocked:blocked;
+        if(performance.now()>=deadline){
+          updateElapsed();throw deadlineError(label,detail);
+        }
       }
-      await new Promise(resolve=>setTimeout(resolve,5));
+      if(completionTarget&&waitReceipt){
+        if(waitReceipt.target===null)waitReceipt.target=completionTarget;
+        else if(!queueCompletionMatches(waitReceipt.target,completionTarget))completionTarget=null;
+      }
+      if(completionTarget){
+        const waitStarted=performance.now();
+        const notified=await waitForQueueCompletion(completionTarget,deadline);
+        if(notified===null){
+          const pollStarted=performance.now();
+          await new Promise(resolve=>setTimeout(resolve,5));
+          noteWake('poll5ms',pollStarted);
+        }else{
+          noteWake(notified?'event':'poll5ms',waitStarted);
+        }
+      }else{
+        const pollStarted=performance.now();
+        await new Promise(resolve=>setTimeout(resolve,5));
+        noteWake('poll5ms',pollStarted);
+      }
     }
   };
   let allocatedPadArgument=0;
@@ -527,6 +645,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     if(padArgumentStart+PAD_BYTES>module.HEAPU8.length)
       throw Error('Runtime history PAD argument allocation is outside Wasm memory');
     padArgument=allocatedPadArgument;
+    installQueueCompletionObserver();
     return Object.freeze({
     status,
     journal:()=>structuredClone(journal),
@@ -953,6 +1072,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const after=check(status());
       if(after.gpuPending>before.gpuPending||!sameJsonValue({...after,gpuPending:before.gpuPending},before))
         throw Error('Runtime history presentation changed its native owner status');
+      lastPresentationSubmission=submission.toString();
       return receipt;
     },
     forwardTicket(ticketId,plan){
@@ -1002,18 +1122,21 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           throw Error('Whole-END rebase requires the exhausted confirmed-prefix handoff');
         prefixHandoffComplete=true;
       }
+      const waitForRenderer=name==='idle'||name==='cleanup';
       busy=true;const started=performance.now(),deadline=started+commandTimeoutMs;
-      const entry={command,name,started,status:'pending'};journal.push(entry);
+      const entry={command,name,started,status:'pending'};
+      if(waitForRenderer)entry.queueWait={target:null,eventWakeCount:0,poll5msWakeCount:0,
+        waitCount:0,elapsedMs:0,lastWake:null};
+      journal.push(entry);
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
         entry.confirmedEnd=confirmedEnd;
       try{
         const allowFailure=name==='cleanup';
-        const waitForRenderer=name==='idle'||name==='cleanup';
         const prepare=waitForRenderer?module[PREFIX+'renderer_prepare_json']:null;
         const rendererDetail=()=>entry.rendererPreparation?
           ` (renderer preparation: ${JSON.stringify(entry.rendererPreparation)})`:'';
         const retainPreparation=pointer=>{
-          if(!pointer)return;
+          if(!pointer)return null;
           const receipt=JSON.parse(module.UTF8ToString(pointer));
           if(receipt.schema!==1||receipt.command!==command||
              ![0,1,2].includes(receipt.action)||!receipt.before||(receipt.action===1&&!receipt.after))
@@ -1023,14 +1146,28 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(receipt.action)entry.rendererPreparation.flush=receipt;
           if(receipt.action===2&&!allowFailure)
             throw Error(`Native history refused: ${errorText()}${rendererDetail()}`);
+          const before=receipt.before;
+          if(!queueCompletionInstalled||receipt.observed!==1||receipt.action!==0||
+             receipt.ownerGate!==0||receipt.submittedFrame!==lastPresentationSubmission||
+             before.pendingPackets!==0||before.pendingStaging!==1||before.workerBusy!==0||
+             before.queuedPipelines!==0||before.cacheStatus!==0||before.leaseCacheStatus!==0||
+             before.rendererErrors!==0||before.staleCallbacks!=='0'||
+             before.beginFrame!==receipt.submittedFrame||before.endFrame!==receipt.submittedFrame)
+            return null;
+          const frameId=canonicalU64(receipt.submittedFrame,'queue-wait submitted frame',{positive:true});
+          const stagingGeneration=canonicalU64(before.stagingGeneration,'queue-wait staging generation');
+          const registrationSequence=canonicalU64(before.registration,'queue-wait registration sequence',{positive:true});
+          return Object.freeze({frameId:frameId.toString(),stagingGeneration:stagingGeneration.toString(),
+            registrationSequence:registrationSequence.toString()});
         };
         const onBlocked=typeof prepare==='function'?value=>{
-          if(value.pendingCommand||!value.gpuPending)return;
+          if(value.pendingCommand||!value.gpuPending)return null;
           if(inlineMode)return inlineCall('renderer_prepare_json',command).then(retainPreparation);
-          retainPreparation(prepare(command));
+          return retainPreparation(prepare(command));
         }:null;
         const before=await wait(value=>value.pendingCommand===0&&
-          (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail);
+          (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail,
+          false,entry.queueWait);
         const recordingIdle=name==='idle'&&before.metadata.phase===22;
         if(name==='recordingPresent'&&(!captured||before.metadata.phase!==21||
             before.metadata.currentFrame<=before.metadata.preFrame||before.gpuPending||before.endpointActive))
@@ -1274,7 +1411,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         }
         if(name==='cleanup'){
           if(after.ownerState!==2)throw Error('Native cleanup did not retire the owner');
-          releasePadArgument();terminal=true;
+          releasePadArgument();terminal=true;closeQueueCompletionObserver();
           if(inlineMode&&performance.now()>=deadline)throw deadlineError(name,rendererDetail);
         }
         if(name==='capture')captured=true;
@@ -1340,10 +1477,11 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         return name==='rebase'||name==='rebaseConfirmedPrefix'?
           {status:after,identity:entry.identity}:after;
       }catch(error){entry.status='failed';entry.error=String(error);entry.elapsedMs=performance.now()-started;throw latch(error);}
-      finally{busy=false;}
+      finally{if(name==='cleanup')closeQueueCompletionObserver();busy=false;}
     },
   });
   }catch(error){
+    closeQueueCompletionObserver();
     if(allocatedPadArgument){
       try{module._free(allocatedPadArgument);}
       catch(cleanupError){throw new AggregateError([error,cleanupError],

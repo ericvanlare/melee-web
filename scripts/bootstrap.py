@@ -19,6 +19,9 @@ from workspace_resources import operation
 # Future/object bootstrap path. Both are exact isolated-index trees, never an
 # arbitrary locally modified checkout.
 AURORA_PREVIOUS_PATCH_TREES = (
+    # Exact reviewed main tree before private history completion notifications.
+    # Other dependency edits still refuse; only this known delta is applied.
+    "c065b38cf0d1ba1d9ad1e6717cc79ee1b38eb11e",
     # Exact reviewed hosted-telemetry candidate before caller-owned admission.
     "fa255c8adc3bab486929b388b89ef922455e00c6",
     # Exact main predecessor before allowing opt-in telemetry on the isolated

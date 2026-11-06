@@ -1700,7 +1700,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..9fe8bd7426cee8680344ad5c719debc4
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..22a65cc6106cd3dbdaf9a81ef897ead12e73415f 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..031dbb08590fd8d60529eb3dc93af001ef4597d8 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,7 +1,16 @@
@@ -2626,7 +2626,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..22a65cc6106cd3dbdaf9a81ef897ead1
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
      g_resources.stats.mergedDrawCallCount = stats.mergedDrawCallCount;
-@@ -686,15 +1391,576 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,15 +1391,600 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -2661,7 +2661,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..22a65cc6106cd3dbdaf9a81ef897ead1
 +          stagingSlot, registrationSequence, generation, queueHandle, encoderHandle);
 +      const wgpu::Future future = g_queue.OnSubmittedWorkDone(
 +          wgpu::CallbackMode::AllowSpontaneous,
-+          [stagingSlot, generation, registrationSequence, completionRegistrationMs,
++          [frameId, stagingSlot, generation, registrationSequence, completionRegistrationMs,
 +           diagnosticSourceFrame](wgpu::QueueWorkDoneStatus status, wgpu::StringView message) {
 +            const uint64_t callbackSequence =
 +                g_browserCallbackSequence.fetch_add(1, std::memory_order_acq_rel) + 1;
@@ -2685,6 +2685,30 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..22a65cc6106cd3dbdaf9a81ef897ead1
 +              Log.fatal("Browser staging submission failed: {}", message);
 +            }
 +            g_stagingSlots.release(stagingSlot);
++            if (outcome == BrowserOwnerCallbackOutcome::Completed) {
++              // This private diagnostic notification is opt-in at both compile
++              // time (AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC) and runtime (the
++              // match-history controller owns the single window observer).
++              // It only calls a JS scalar notifier; the continuation rechecks
++              // native ownership after this spontaneous GPU callback returns.
++              EM_ASM({
++                try {
++                  const observer = typeof window === 'undefined' ? null :
++                      window.__meleeWebRuntimeHistoryQueueCompletionV1;
++                  if (observer && typeof observer.notify === 'function') {
++                    observer.notify($0 >>> 0, $1 >>> 0, $2 >>> 0, $3 >>> 0, $4 >>> 0, $5 >>> 0);
++                  }
++                } catch (_) {
++                  // Diagnostic observers cannot throw into Aurora's GPU callback.
++                }
++              },
++              static_cast<uint32_t>(frameId),
++              static_cast<uint32_t>(frameId >> 32),
++              static_cast<uint32_t>(generation),
++              static_cast<uint32_t>(generation >> 32),
++              static_cast<uint32_t>(registrationSequence),
++              static_cast<uint32_t>(registrationSequence >> 32));
++            }
 +          });
 +      g_browserSubmissionOwners.publish_future_if_current(
 +          stagingSlot,
@@ -3204,7 +3228,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..22a65cc6106cd3dbdaf9a81ef897ead1
  
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
-@@ -734,5 +2000,44 @@ float calculate_fps() noexcept {
+@@ -734,5 +2024,44 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  

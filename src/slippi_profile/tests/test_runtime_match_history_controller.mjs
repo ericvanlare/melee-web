@@ -1306,3 +1306,169 @@ test('inline dispatch does not accept a completed command after its deadline',as
   assert.equal((await owner.command('cleanup')).ownerState,2);
   assert.equal(f.frees.length,2);
 });
+
+
+const queueCompletionKey='__meleeWebRuntimeHistoryQueueCompletionV1';
+const splitU64=value=>{
+  const number=BigInt(value);
+  return [Number(number&0xffffffffn),Number(number>>32n)];
+};
+function installTestWindow(){
+  const prior=Object.getOwnPropertyDescriptor(globalThis,'window');
+  if(prior&&!prior.configurable)throw Error('Node test window property is not configurable');
+  const browserWindow={};
+  Object.defineProperty(globalThis,'window',{value:browserWindow,configurable:true,writable:true});
+  return {browserWindow,restore(){
+    if(prior)Object.defineProperty(globalThis,'window',prior);
+    else delete globalThis.window;
+  }};
+}
+async function completionWaitFixture({commandTimeoutMs=100}={}){
+  const globalWindow=installTestWindow(),{browserWindow}=globalWindow;
+  try{
+    const f=fixture(),{module}=f;
+    module[prefix+'arena_enable']=()=>1;
+    module[prefix+'cpu_arena_endpoint_data']=()=>0;
+    module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+    const owner=createRuntimeMatchHistoryController(module,{commandTimeoutMs});
+    owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+    owner.enableArenaHistory();
+    await owner.command('capture');
+    f.put(56,21);f.put(64,0);f.put(68,1);f.put(76,1);f.put(88,1);f.put(108,20);f.put(112,1);
+    f.view.setBigUint64(352,9007199254740993n,true);
+    const request=module[prefix+'request'];
+    module[prefix+'request']=command=>{
+      const result=request(command);
+      if(command===19)queueMicrotask(()=>{f.put(56,22);f.put(116,1);});
+      if(command===5)queueMicrotask(()=>f.put(56,21));
+      return result;
+    };
+    const submitted=await owner.command('recordingPresent');
+    assert.equal(submitted.metadata.phase,22);
+    const presentation={schema:1,command:19,requestSequence:submitted.completeSequence,
+      sourceFrameBefore:1,sourceFrameAfter:1,priorSubmission:'9007199254741001',
+      submission:'9007199254741002',presentationSerial:'1'};
+    module[prefix+'presentation_json']=()=>2048;
+    module.HEAPU8.set(new TextEncoder().encode(JSON.stringify(presentation)+'\0'),2048);
+    assert.deepEqual(owner.presentation(),presentation);
+    let statusReads=0;
+    const status=module[prefix+'status'];
+    module[prefix+'status']=()=>{statusReads++;return status();};
+    const target={frameId:presentation.submission,stagingGeneration:'18446744073709550000',
+      registrationSequence:'9007199254740997'};
+    const rendererReceipt=command=>({schema:1,command,sourceFrame:1,ownerGate:0,observed:1,
+      submittedFrame:presentation.submission,action:0,before:{cacheStatus:0,leaseCacheStatus:0,
+        pendingPackets:0,pendingStaging:1,workerBusy:0,queuedPipelines:0,rendererErrors:0,frameIndex:1,
+        stagingGeneration:target.stagingGeneration,beginFrame:presentation.submission,
+        endFrame:presentation.submission,registration:target.registrationSequence,
+        callback:'9007199254740996',staleCallbacks:'0',strictFailure:'Renderer staging slot is busy'},
+      after:null});
+    const rendererPointer=4096,utf8=module.UTF8ToString;
+    let prepareCalls=0,lastPrepareCommand=0;
+    module[prefix+'renderer_prepare_json']=command=>{
+      prepareCalls++;lastPrepareCommand=command;return rendererPointer;
+    };
+    module.UTF8ToString=pointer=>pointer===rendererPointer?
+      JSON.stringify(rendererReceipt(lastPrepareCommand)):utf8(pointer);
+    return {f,owner,module,browserWindow,globalWindow,target,rendererReceipt,
+      statusReads:()=>statusReads,prepareCalls:()=>prepareCalls,
+      async cleanup(){try{await owner.command('cleanup');}catch(_){}globalWindow.restore();}};
+  }catch(error){globalWindow.restore();throw error;}
+}
+
+test('queue completion notification wakes only after release and native idle is rechecked',async()=>{
+  const c=await completionWaitFixture();
+  let synchronousNativeReentry=false,readsAtNotify=0,scheduled=false;
+  try{
+    const prepare=c.module[prefix+'renderer_prepare_json'];
+    c.module[prefix+'renderer_prepare_json']=command=>{
+      const pointer=prepare(command);
+      if(!scheduled){
+        scheduled=true;
+        setTimeout(()=>{
+          c.f.put(116,0);
+          const readsBefore=c.statusReads();
+          const observer=c.browserWindow[queueCompletionKey];
+          const frame=splitU64(c.target.frameId),generation=splitU64(c.target.stagingGeneration),
+            registration=splitU64(c.target.registrationSequence);
+          if(observer)observer.notify(...frame,...generation,...registration);
+          readsAtNotify=readsBefore;
+          synchronousNativeReentry=c.statusReads()!==readsBefore;
+        },0);
+      }
+      return pointer;
+    };
+    const result=await c.owner.command('idle');
+    assert.equal(result.lastCompletedCommand,5);
+    assert.equal(synchronousNativeReentry,false);
+    assert.ok(c.statusReads()>readsAtNotify,'native status must be read again after the callback returns');
+    const wait=c.owner.journal().find(entry=>entry.name==='idle').queueWait;
+    assert.deepEqual(wait.target,c.target);
+    assert.deepEqual([wait.eventWakeCount,wait.poll5msWakeCount,wait.waitCount],[1,0,1]);
+    assert.ok(Number.isFinite(wait.elapsedMs)&&wait.elapsedMs>=0);
+  }finally{await c.cleanup();}
+});
+
+test('wrong tuple does not wake the exact waiter; a missing notification still uses 5 ms polling',async()=>{
+  for(const wrongField of [null,'frame','generation','registration']){
+    const c=await completionWaitFixture({commandTimeoutMs:150});
+    let scheduled=false;
+    try{
+      const prepare=c.module[prefix+'renderer_prepare_json'];
+      c.module[prefix+'renderer_prepare_json']=command=>{
+        const pointer=prepare(command);
+        if(!scheduled){
+          scheduled=true;
+          setTimeout(()=>{
+            if(wrongField){
+              const frame=splitU64(wrongField==='frame'?
+                (BigInt(c.target.frameId)+1n).toString():c.target.frameId);
+              const generation=splitU64(wrongField==='generation'?
+                (BigInt(c.target.stagingGeneration)+1n).toString():c.target.stagingGeneration);
+              const registration=splitU64(wrongField==='registration'?
+                (BigInt(c.target.registrationSequence)+1n).toString():c.target.registrationSequence);
+              const observer=c.browserWindow[queueCompletionKey];
+              if(observer)observer.notify(...frame,...generation,...registration);
+            }
+            setTimeout(()=>c.f.put(116,0),12);
+          },0);
+        }
+        return pointer;
+      };
+      const result=await c.owner.command('idle');
+      assert.equal(result.lastCompletedCommand,5);
+      const wait=c.owner.journal().find(entry=>entry.name==='idle').queueWait;
+      assert.deepEqual(wait.target,c.target);
+      assert.equal(wait.eventWakeCount,0);
+      // Prove polling made progress; timer batching does not promise two wakes.
+      assert.ok(wait.poll5msWakeCount>=1);
+      assert.ok(wait.waitCount>=1);
+    }finally{await c.cleanup();}
+  }
+});
+
+test('queue waiter teardown ignores a hostile nonconfigurable foreign accessor and resets busy after failure',async()=>{
+  const globalWindow=installTestWindow();
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  const nativeRequest=f.module[prefix+'request'];
+  let attempts=0;
+  f.module[prefix+'request']=command=>{
+    const result=nativeRequest(command);
+    if(command===10&&++attempts===1)queueMicrotask(()=>f.put(8,1));
+    return result;
+  };
+  const getter=()=>{throw Error('foreign observer getter ran');};
+  Object.defineProperty(globalWindow.browserWindow,queueCompletionKey,
+    {get:getter,configurable:false});
+  try{
+    await assert.rejects(owner.command('cleanup'),/Native cleanup did not retire the owner/);
+    const descriptor=Object.getOwnPropertyDescriptor(globalWindow.browserWindow,queueCompletionKey);
+    assert.equal(descriptor.get,getter);
+    assert.equal(descriptor.configurable,false);
+    assert.equal((await owner.command('cleanup')).ownerState,2);
+    assert.equal(f.frees.length,1);
+  }finally{
+    try{await owner.command('cleanup');}catch(_){}
+    globalWindow.restore();
+  }
+});

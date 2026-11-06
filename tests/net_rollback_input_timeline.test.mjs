@@ -196,6 +196,35 @@ test('duplicates, conflicts, stale packets, and out-of-order packets have bounde
   assert.equal(value.status().remote_contiguous_through, 11);
 });
 
+test('120-input session stays within eight-tick timeline history and lookahead', () => {
+  const value=timeline({maxHistoryTicks:8,maxLookaheadTicks:8});
+  for(let tick=0;tick<8;++tick)assert.equal(value.acceptRemote(tick,pad(tick)).status,'accepted');
+  assert.equal(value.status().max_history_ticks,8);
+  assert.equal(value.status().max_lookahead_ticks,8);
+  assert.throws(()=>value.acceptRemote(8,pad(8)),/lookahead/);
+  for(let tick=0;tick<120;++tick){
+    if(tick>=8)assert.equal(value.acceptRemote(tick,pad(tick)).status,'accepted');
+    value.recordLocal(tick,pad(tick+20));
+    const plan=value.planForward();
+    assert.equal(plan.tick,tick);
+    assert.equal(plan.remote_source,'actual');
+    assert.equal(plan.speculative_ticks,0);
+    value.commitForward(plan);
+    const status=value.status();
+    assert.equal(status.max_history_ticks,8);
+    assert.equal(status.max_lookahead_ticks,8);
+    assert(status.local_input_count<=8);
+    assert(status.executed_input_count<=8);
+    assert(status.remote_input_count<=16);
+  }
+  const terminal=value.status();
+  assert.equal(terminal.simulated_through,119);
+  assert.equal(terminal.remote_contiguous_through,119);
+  assert.equal(terminal.confirmed_through,119);
+  assert.equal(terminal.dirty_from,null);
+  assert.equal(terminal.retained_from,112);
+});
+
 test('Buffer aliases and caller-owned byte arrays cannot mutate retained or planned samples', () => {
   const value = timeline();
   const localBuffer = Buffer.from(pad(21));
