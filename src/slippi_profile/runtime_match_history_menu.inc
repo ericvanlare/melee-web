@@ -281,10 +281,39 @@ bool history_start_capture_offer_impl(const MeleeWebMenuMatchSelection& selectio
  }catch(const std::exception& error){return history_refuse(error.what());}
 }
 
+bool history_start_finish_renderer_persistence() {
+ const auto status=aurora_pipeline_cache_status();
+ if(status==AURORA_PIPELINE_CACHE_READY)return true;
+ if(status!=AURORA_PIPELINE_CACHE_PENDING)
+  return history_refuse("Agreed source publication renderer cache persistence is unavailable");
+
+ // The strict descriptor requires a drained cache transaction as well as an
+ // idle GPU. Ordinary play defers writes. This private callback already owns
+ // the stopped, prepared match and can finish that transaction before asking
+ // Aurora for the same strict descriptor used by terminal takeover.
+ const auto* owner=match_history.start.match_owner;
+ if(!owner||match.get()!=owner||!owner->construction_complete()||owner->source_frames()!=0||
+    pending||running||faulted||melee_web_cpu_interval_active()||!history_runtime_idle())
+  return history_refuse("Agreed renderer cache flush requires the stopped frame-zero owner");
+ if(const auto* error=history_source_idle_failure(*owner))return history_refuse(error);
+ const auto submitted=aurora_browser_submission_status();
+ const auto* stats=aurora_get_stats();
+ if(submitted.pendingFramePackets||submitted.pendingStagingBuffers||submitted.workerBusy||
+    !stats||stats->queuedPipelines||stats->lastBeginFrameId!=stats->lastEndFrameId||
+    match_history_renderer_errors)
+  return history_refuse("Agreed renderer cache flush requires idle submission and pipelines");
+ if(!aurora_flush_pipeline_cache()||aurora_pipeline_cache_status()!=AURORA_PIPELINE_CACHE_READY)
+  return history_refuse("Agreed source publication renderer cache flush failed");
+ if(match.get()!=owner||!history_runtime_idle())
+  return history_refuse("Agreed renderer cache flush lost the frame-zero runtime owner");
+ if(const auto* error=history_source_idle_failure(*owner))return history_refuse(error);
+ return true;
+}
+
 bool history_start_enter_ready_hold_impl() {
  auto& start=match_history.start;
  if(start.state!=MatchHistoryStartPublishing||start.publication.source_draws!=1||
-    !history_gpu_idle()||!start.match_owner||
+    !start.match_owner||
     match.get()!=start.match_owner||!match->construction_complete()||
     match->source_frames()!=0||match->start_selection().random_seed!=start.negotiated_seed||
     history_start_payload(match->start_selection())!=
@@ -293,6 +322,7 @@ bool history_start_enter_ready_hold_impl() {
     replay||melee_web_net_active()||asset_destination!=AssetDestination::None||
     match->paused()||match->ending()||match->complete())
   return history_refuse("Agreed match did not reach its actual prepared frame-zero owner");
+ if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
  try {
   start.live_identity_json=melee_web::slippi_profile::serialize_live_match_identity(
       *match,history_start_bound_host_agreement());
@@ -319,12 +349,13 @@ bool history_start_publication_begin() {
   return history_refuse("Agreed source publication requires stopped, idle scene preparation");
  if(!history_runtime_idle())
   return history_refuse("Agreed source publication requires the idle main-thread Asyncify runtime");
- if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
  if(const auto* error=history_source_idle_failure(*match))return history_refuse(error);
  if(melee_web_cpu_interval_active())
   return history_refuse("Agreed source publication requires an unarmed CPU interval");
  if(history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
   return history_refuse("Agreed source publication selection differs from its agreement");
+ if(!history_start_finish_renderer_persistence())return false;
+ if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
  const auto* stats=aurora_get_stats();
  if(!stats)return history_refuse("Agreed source publication has no actual renderer stats");
  start.publication.prior_submission=stats->lastEndFrameId;
@@ -398,8 +429,11 @@ bool history_start_service_publication() {
    const bool pipelines_ready=true;
 #endif
    const bool complete=!submitted.pendingFramePackets&&!submitted.pendingStagingBuffers&&!submitted.workerBusy;
-   if(preparation.arm(complete&&pipelines_ready)){
-    if(!history_start_enter_ready_hold_impl())throw std::runtime_error(match_history.error.data());
+   if(complete&&pipelines_ready){
+    if(!history_start_finish_renderer_persistence())
+     throw std::runtime_error(match_history.error.data());
+    if(preparation.arm(true)&&!history_start_enter_ready_hold_impl())
+     throw std::runtime_error(match_history.error.data());
    }
   }else throw std::runtime_error("Agreed source publication left renderer-only preparation");
  }catch(const std::exception& error){history_refuse(error.what());faulted=true;running=false;}

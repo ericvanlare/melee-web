@@ -43,8 +43,22 @@ std::string serialize_live_match_identity(const GameplayMatchSession& m,const Ru
 }
 bool runtime_idle=true,gpu_idle=true,source_idle=true,complete_draws=true;
 bool history_runtime_idle() noexcept {return runtime_idle;}
-bool history_gpu_idle() noexcept {return gpu_idle;}
-const char* history_gpu_idle_failure() noexcept {return gpu_idle?nullptr:"fixture renderer busy";}
+enum AuroraPipelineCacheStatus {
+ AURORA_PIPELINE_CACHE_READY,AURORA_PIPELINE_CACHE_PENDING,AURORA_PIPELINE_CACHE_ERROR,
+};
+AuroraPipelineCacheStatus cache_status=AURORA_PIPELINE_CACHE_READY;
+unsigned cache_flushes=0;
+bool cache_flush_ok=true;
+AuroraPipelineCacheStatus aurora_pipeline_cache_status(){return cache_status;}
+bool aurora_flush_pipeline_cache(){
+ ++cache_flushes;
+ if(cache_flush_ok)cache_status=AURORA_PIPELINE_CACHE_READY;
+ return cache_flush_ok;
+}
+const char* history_gpu_idle_failure() noexcept {
+ if(cache_status!=AURORA_PIPELINE_CACHE_READY)return "fixture persistence pending";
+ return gpu_idle?nullptr:"fixture renderer busy";
+}
 const char* history_source_idle_failure(const GameplayMatchSession&) noexcept {
  return source_idle?nullptr:"fixture source files busy";
 }
@@ -120,6 +134,7 @@ void reset(){
  fixture.phase=MELEE_WEB_MENU_CSS;host=&fixture;
  preparation.reset();asset_destination=AssetDestination::None;
  renderer_services=0;submitted={};stats={};
+ cache_status=AURORA_PIPELINE_CACHE_READY;cache_flushes=0;cache_flush_ok=true;
 }
 void offer(){
  assert(melee_web_native_menu_match_history_start_enable());
@@ -176,8 +191,11 @@ int main(){
   scoped_assets=deferred;
   construct(deferred);
   unsigned draws=0;
+  cache_status=AURORA_PIPELINE_CACHE_PENDING;
   history_start_publish_initial_source([&]{
    ++draws;
+   assert(cache_flushes==1&&cache_status==AURORA_PIPELINE_CACHE_READY);
+   cache_status=AURORA_PIPELINE_CACHE_PENDING;
    assert(!preparation.busy()&&!running&&first_use_draw_pending);
    stats.lastBeginFrameId=stats.lastEndFrameId=1;
    submitted.pendingStagingBuffers=1;
@@ -187,9 +205,10 @@ int main(){
   assert(preparation.arming());assert(renderer_services==2);
   assert(history_start_ordinary_callback_impl());assert(preparation.arming());
   assert(first_use_draw_pending&&!melee_web_native_menu_match_history_start_publication_data());
+  assert(cache_flushes==1);
   submitted.pendingStagingBuffers=0;
   assert(history_start_ordinary_callback_impl());
-  assert(draws==1&&!first_use_draw_pending&&!running);
+  assert(draws==1&&!first_use_draw_pending&&!running&&cache_flushes==2);
   const auto* receipt=static_cast<const MatchHistoryPublication*>(melee_web_native_menu_match_history_start_publication_data());
   assert(receipt&&receipt->source_frame==0&&receipt->source_draws==1&&receipt->source_submission==1);
   assert(melee_web_native_menu_match_history_start_publication_bytes()==48);
@@ -234,6 +253,23 @@ int main(){
  assert(history_start_ordinary_callback_impl());
  assert(faulted&&first_use_draw_pending);
  assert(!melee_web_native_menu_match_history_start_publication_data());
+ // Failed persistence and live submissions cannot open the draw.
+ for(bool busy:{false,true}){
+  construct(false);
+  cache_status=AURORA_PIPELINE_CACHE_PENDING;
+  cache_flush_ok=false;
+  submitted.pendingStagingBuffers=busy;
+  try {
+   history_start_publish_initial_source([]{assert(false);return true;});
+   assert(false);
+  }catch(const std::runtime_error& error){
+   assert(std::string(error.what())==(busy?
+          "Agreed renderer cache flush requires idle submission and pipelines":
+          "Agreed source publication renderer cache flush failed"));
+  }
+  assert(cache_flushes==(busy?0u:1u)&&first_use_draw_pending);
+ }
+
  // A preflight refusal retains the first specific boundary error. The failed
  // owner remains held until ordinary close has actually retired its session.
  construct(false);
