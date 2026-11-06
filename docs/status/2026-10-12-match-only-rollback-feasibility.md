@@ -2161,13 +2161,26 @@ the Worker and all 19 owned browser processes are clean. The same receipt pins
 all producers, reviews, controls and retained drafts in
 `continuous_366.confirmed_prefix_v1`.
 
-The private Release build and focused leaf, endpoint/coordinator and eight
-integrated host controls pass. Full milestone integration regression and CI are
-still pending. This is one bounded local transfer, with serialized command
-samples only. Repeated transfers, advancing an anchor when prediction was
-correct, paced play, combat/KO and full-match rollback remain incomplete. The
-next experiment covers those two repeat/confirmation boundaries before adding
-a continuous clock-driven loop; it keeps the same snapshot/input/deadline bounds.
+The repeated handoff also passes at native `e8421d8a` / harness `02483dff`.
+After C2/F4, correct prediction allows PRE2 → C3 while F5 remains ahead;
+the original 176-byte tick3 receipt survives both transfers even though its
+current capsule forward input differs. A later wrong input restores fresh PRE3
+and corrects to F6. Independent raw review confirms exact PRE0/PRE2/PRE3 arena
+and shadow restores, all nine domains and the actual 12/11/8 particle relations,
+all eight authoritative PAD frames, and full checksums at C2/C3/F6/F8. The exact
+11/8 presentation schedule, six owner/statics/audio joins, checked whole-END8
+rebase with handoff clearance, and cleanup of all 18 owned browser processes
+pass. `continuous_366.repeated_prefix_v1` pins the sources, controls, build,
+reports and independent review; retained earlier drafts are unchanged.
+
+The affected private Release build and nine focused runtime/timeline controls
+pass. Full milestone integration regression and CI are still pending. These
+remain serialized local functional witnesses. Paced play, combat/KO, full-match
+and public-relay rollback remain incomplete. Next is a page-owned loop using
+the existing clock and timing guard, with an explicit already-presented frontier
+restore path. Native endpoint admission must be labeled separately from full
+raw observation; the new loop must not draw a speculative frontier twice or
+invent a CPU-before-draw receipt.
 
 ## Stage decision dependencies, issue #333
 

@@ -13015,7 +13015,7 @@
               "renderer_cache_flushes": 0
             },
             "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
-            "next": "Repeat confirmed-prefix transfer with an already-adopted origin and correct predictions, then paced browser-owned loop under existing clock/debt guards. Keep whole-match/profile/acceptance gaps explicit.",
+            "next": "Use existing 60Hz clock and distinct already-presented frontier admission for bounded page-owned paced loop. Keep raw publication separate from native endpoint admission; preserve all source/timing/history guards.",
             "per_forward_present_v1": {
               "state": "TWO_ARENA_EPISODES_COMPLETE",
               "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
@@ -13471,6 +13471,134 @@
                 "No arbitrary object-lifetime, combat, repeated-transfer, paced-loop, full-match or public-relay rollback claim.",
                 "Full integration regression, ordinary Release and exact-head CI for milestone366 remain pending."
               ]
+            },
+            "repeated_prefix_v1": {
+              "status": "REPEATED_CONFIRMED_PREFIX_COMPLETE",
+              "native_producer": "e8421d8adf87784be137ce0ff7256c3287936a11",
+              "harness_producer": "02483dffd2950812ce0a25cf9aaf8efcf9e4b9aa",
+              "observed": {
+                "actual_source_inputs_per_peer": 8,
+                "exact_restored_pres": [
+                  0,
+                  2,
+                  3
+                ],
+                "arena_bytes_per_restore": 33554432,
+                "raw_domains_per_restore": 9,
+                "particle_relations_per_restore": [
+                  12,
+                  11,
+                  8
+                ],
+                "confirmed_prefixes": [
+                  {
+                    "pre": 0,
+                    "frontier": 4,
+                    "confirmed_end": 2,
+                    "dirty_from": 1
+                  },
+                  {
+                    "pre": 2,
+                    "frontier": 5,
+                    "confirmed_end": 3,
+                    "dirty_from": null
+                  }
+                ],
+                "original_tick3_full176_bytes_reused_twice": true,
+                "original_tick3_ticket": 15,
+                "original_tick3_poll_serial": "452",
+                "current_capsule_tick3_forward_differs_from_origin": true,
+                "checksum_source_frames": [
+                  2,
+                  3,
+                  6,
+                  8
+                ],
+                "checksum_bytes_each": 64,
+                "all_checksums_equal": true,
+                "authoritative_pad_frames": 8,
+                "pad_bytes_each": 44,
+                "all_authoritative_pad_equal": true,
+                "actual_source_presents": {
+                  "alpha": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    4,
+                    5,
+                    5,
+                    6,
+                    6,
+                    7,
+                    8
+                  ],
+                  "beta": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8
+                  ]
+                },
+                "final_whole_end_rebase": 8,
+                "same_match_and_page_sockets": true,
+                "owner_statics_audio_joins": 6,
+                "owned_browser_pids_absent": 18,
+                "owned_native_worker_server_cleanup": true
+              },
+              "scope": [
+                "Repeated local functional confirmed-prefix handoff, including clean predictions and an original receipt carried through two capsules.",
+                "Serialized eight-input witness; no paced, combat/KO, full-match, full-profile or public-relay rollback claim.",
+                "Full integration regression, ordinary Release and exact-head CI remain pending."
+              ],
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-probe-candidate-v1/independent-combined-source-review.json",
+                "sha256": "126c5c0b33ccf2b7f799d2c88f5e617c96db6707297922e89ba7e5f7dafa153f"
+              },
+              "native_rebase_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-whole-end-rebase-handoff-candidate-v1/independent-review.json",
+                "sha256": "54312343ef285dcda00accd3b70b3c24f523b59a58d31f3f9c954dc5f0753eb0"
+              },
+              "focused_controls": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-controls-v1.json",
+                "sha256": "1c9ee83d7bebc698b26665f76e63f983565b4ad9f145426860b488b2947ac099"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-build-v1/result.json",
+                "sha256": "e75a4d56f1491f80697abc524ef43cfc2053b4afd270bd78b0423917e53f78d8"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-producer-v1/archive.json",
+                "sha256": "b8b109b43218e5c218c0ace487ea0e1a2a93294d40c22ae0d5e3ef10899cb92c"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-repeated-prefix-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "48d19068eba60270ad44bbc8795a4d6a0c0104890d07b87d0075e29960777e3c"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-root-review-v1.json",
+                "sha256": "c2286acd82e092e61a88f41f5e5ae556e7b838f1cdd980074d9c5b92962bed4e"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/result-summary.json",
+                "sha256": "4ded5f6037106d8a3774986e1f49e8778493387fd077483fa2fcdc692e83dc72"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/browser/result.json",
+                "sha256": "4d4d24fdfa454bd55a01dfe2902a215084603ff2715d19ee49bc58cd8ae072bc"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/owner.json",
+                "sha256": "ae3196c2386720bde3640ae6c85f190e1afb4a6d7a77f069cb6feed09907857e"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-repeated-prefix-v1/independent-result-review.json",
+                "sha256": "8487608d81eda395e712a1570e885ff75ba15a9592b1333ac09ef3f3af5414a0"
+              }
             }
           }
         }
