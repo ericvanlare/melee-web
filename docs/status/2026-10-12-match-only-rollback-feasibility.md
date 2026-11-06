@@ -1906,10 +1906,49 @@ no history capture, input correction, replay, peer session or rollback command
 ran. The V9–V12 receipts and producer identities are pinned in
 `runtime_match_start_v1`.
 
-The next boundary is two independently local browser runs held at GO before
-history commands. Original CSS counters and injected observer counters may
-differ, so keep the complete strict catalog unchanged while recording each
-baseline. V12 is not an accepted rollback result.
+Same-instance restore V1 failed before its forward command because its harness
+compared capture PRE against armed PRE. A raw reducer retained exactly one
+cross-phase difference: `Effects.EffectToken[0]` changes from 0 to 1 when
+`begin` allocates the armed incarnation. The V2 probe compares endpoints within
+their matching phases and passes one same-input restore control. It retains
+strict equal PRE, CPU and DRAW endpoints across nine domains and 12 particles,
+plus exact 4,272-byte PCM equality. One literal P1 KeyD poll at serial 490 was
+reused after restore; P2 came from the held prefix. The original present/idle
+commands remain around both source draw boundaries, the motor commit receipt
+completed with zero events, and native/browser-owner cleanup passed. Native
+producer `33cdb16a8593d7ec1499da13dcb825d26b955b02`, harness producer
+`c379ac1da375de6d965417093a84d57b7237af21`, probe SHA-256
+`1a6ece8bcf147cfb97d4cf8335d36776c207c2d95041d23f368afc4a6f899b80`, and
+independent review are pinned in `runtime_match_start_v1`. This is one
+same-input control, not a wrong-prediction, browser-relay or full-match result;
+the legacy observation, RNG-profile, transfer and draw-diagnostics lanes remain
+unobserved.
+
+The separate paired held-static V1 stopped at loaded identity because its two
+source card hashes differed. Source-only inspection suggests timestamp
+variation may explain the mismatch, but the V1 card bytes were not retained, so
+no offset-level difference is proven. Read-only source review traces the likely
+cause to first-run timestamp writes from `lbTime_GetTimeInSeconds()` into the
+card-relative table at `0x318`; it finds no evidence of an RNG cause. Paired
+held-static V2 retained both 61,892-byte card snapshots with identical hashes
+and matched live identity, actual PAD prefixes and 124-tick/124-draw startup
+prefixes. Its held static comparison is still diagnostic and unequal: 188 of
+3,797 rows differ across 7,029 bytes; the first mismatch is wire row 74 in
+`.data.efAsync_DatEntries` at byte offset 8. Source review identifies this value
+as `EF_DAT_Entry[0].data`, a live Wasm pointer; the retained bytes prove address
+divergence, not the pointee contents. All rows and both source cards are
+retained. No capture, begin or forward command ran, and owner cleanup passed.
+This does not establish a menu-only exclusion or resolve pointer/local-state
+ownership. A bounded architecture review proposes one asymmetric peer proof
+using the existing typed restore and semantic checksum; no peer capture has run.
+The V2 producer is native
+`33cdb16a8593d7ec1499da13dcb825d26b955b02` and harness
+`39d67d46e444229a9f1c8df9699a265575599ccf`.
+
+These runs remain private component diagnostics and source integration is
+unmerged. Neither is accepted rollback or full-match evidence. Any peer proof
+must retain the full strict catalog, both local inputs and endpoint evidence,
+and stop at the first failure without an unchanged retry.
 
 ## Stage decision dependencies, issue #333
 
