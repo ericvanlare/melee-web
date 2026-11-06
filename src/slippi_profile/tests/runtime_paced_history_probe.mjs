@@ -32,7 +32,7 @@ export function installRuntimePacedHistoryProbe({role,
     throw Error('Paced probe requires the existing exclusive owners and an explicit supported finite horizon');
   const targetFrame=inputTicks;
   const paced120=inputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
-  const lateScenario=lateClassPiece?{target_source_tick:26,keyboard_change:null,held_packet:null,
+  const lateScenario=lateClassPiece?{target_source_tick:26,anchor:null,keyboard_change:null,held_packet:null,
     release_gate:null,alpha_frontier:null,network_release:null}:null;
   const report={scope:lateClassPiece?'120 actual source inputs with one deferred actual peer packet at source tick 26; existing clock and rollback bounds':
       paced120?'120 actual source inputs; functional pacing clock trace with native-sized rollback windows':
@@ -231,6 +231,21 @@ export function installRuntimePacedHistoryProbe({role,
           await admitAvailable();
           let inputs=await timeline(),current=state().metadata;
           const frame=current.currentFrame,confirmed=inputs.remote_contiguous_through+1;
+          const lateAnchorFrame=21;
+          const needsLateAnchor=lateClassPiece&&!lateScenario.anchor;
+          const atLateAnchor=needsLateAnchor&&frame===lateAnchorFrame;
+          if(needsLateAnchor&&frame>lateAnchorFrame)
+            throw Error('Late-piece run advanced past its required frame-21 native anchor');
+          if(atLateAnchor&&inputs.dirty_from===null){
+            if(inputs.confirmed_through<lateAnchorFrame-1){
+              report.events.push({operation:'late-anchor-network-wait',frame,confirmed});
+              continue;
+            }
+            if(current.preFrame===lateAnchorFrame)
+              lateScenario.anchor={pre_frame:current.preFrame,current_frame:frame,
+                confirmed_through:inputs.confirmed_through,
+                evidence:'existing native PRE after confirmed rebase'};
+          }
           if(lateClassPiece&&role==='beta'&&frame===26&&!lateScenario.keyboard_change){
             if(current.preFrame>26)throw Error('Late key-change target tick 26 is already before the active native PRE');
             await lateKeyGate.pause({source_tick:frame,pre_frame:current.preFrame,
@@ -240,7 +255,8 @@ export function installRuntimePacedHistoryProbe({role,
           if(lateClassPiece&&role==='alpha'&&!lateScenario.alpha_frontier){
             const frontier=Math.min(28,current.preFrame+7);
             if(frame===frontier&&frame>26){
-              if(!(current.preFrame<=26&&26<frame&&frame<=current.preFrame+7))
+              if(!(lateScenario.anchor?.pre_frame===21&&current.preFrame===21&&
+                  frame===28&&26<frame&&frame<=current.preFrame+7))
                 throw Error('Late alpha frontier is outside the current native PRE and seven-tick bound');
               if(inputs.remote_contiguous_through<25){
                 report.events.push({operation:'late-prefix-network-wait',frame,
@@ -302,8 +318,11 @@ export function installRuntimePacedHistoryProbe({role,
             }
             report.result=paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
-          if(inputs.dirty_from!==null||
-              (frame-current.preFrame===7&&confirmed>current.preFrame)){
+          const fullWindow=frame-current.preFrame===7;
+          const cleanRebase=lateClassPiece
+            ? (fullWindow||atLateAnchor)&&confirmed>=frame&&current.preFrame<frame
+            : fullWindow&&confirmed>current.preFrame;
+          if(inputs.dirty_from!==null||cleanRebase){
             if(callback.reconciliations===1)continue;
             callback.reconciliations++;
             await reconcile(inputs);
