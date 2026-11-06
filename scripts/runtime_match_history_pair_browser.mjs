@@ -645,6 +645,11 @@ async function historyCommand(item,name,expected){
     try{entry.failure_status=await peerOperation(item,'status');}
     catch(statusError){entry.failure_status_error=String(statusError);}
     throw error;
+  }finally{
+    try{
+      entry.controller_command=await item.page.evaluate(()=>
+        globalThis.__meleeRuntimeMatchHistory?.journal().at(-1)??null);
+    }catch(journalError){entry.controller_journal_error=String(journalError);}
   }
 }
 async function historyRebase(item,confirmedEnd,{before,after}){

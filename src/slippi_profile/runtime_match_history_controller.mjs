@@ -362,11 +362,17 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     heap.set(bytes,frameArgumentStart);
     return frameArgumentStart;
   };
-  const wait=async(predicate,deadline,label,allowFailure=false)=>{
+  const wait=async(predicate,deadline,label,allowFailure=false,onBlocked=null,detail=null)=>{
     for(;;){
       const snapshot=check(status(),allowFailure);
       if(predicate(snapshot))return snapshot;
-      if(performance.now()>=deadline)throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline`));
+      if(performance.now()>=deadline)
+        throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+      if(onBlocked){
+        onBlocked(snapshot);
+        if(performance.now()>=deadline)
+          throw latch(Error(`Runtime history ${label} exceeded its ${commandTimeoutMs} ms deadline${detail?.()??''}`));
+      }
       await new Promise(resolve=>setTimeout(resolve,5));
     }
   };
@@ -654,8 +660,26 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(name==='rebase')entry.confirmedEnd=confirmedEnd;
       try{
         const allowFailure=name==='cleanup';
+        const waitForRenderer=name==='idle'||name==='cleanup';
+        const prepare=waitForRenderer?module[PREFIX+'renderer_prepare_json']:null;
+        const rendererDetail=()=>entry.rendererPreparation?
+          ` (renderer preparation: ${JSON.stringify(entry.rendererPreparation)})`:'';
+        const onBlocked=typeof prepare==='function'?value=>{
+          if(value.pendingCommand||!value.gpuPending)return;
+          const pointer=prepare(command);
+          if(!pointer)return;
+          const receipt=JSON.parse(module.UTF8ToString(pointer));
+          if(receipt.schema!==1||receipt.command!==command||
+             ![0,1,2].includes(receipt.action)||!receipt.before||(receipt.action===1&&!receipt.after))
+            throw Error('Native renderer preparation receipt is invalid');
+          entry.rendererPreparation??={};
+          entry.rendererPreparation.latest=receipt;
+          if(receipt.action)entry.rendererPreparation.flush=receipt;
+          if(receipt.action===2&&!allowFailure)
+            throw Error(`Native history refused: ${errorText()}${rendererDetail()}`);
+        }:null;
         const before=await wait(value=>value.pendingCommand===0&&
-          (!['idle','cleanup'].includes(name)||value.gpuPending===0),deadline,name,allowFailure);
+          (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail);
         const next=before.requestSequence+1;
         if(name==='rebase'){
           const h=before.metadata;

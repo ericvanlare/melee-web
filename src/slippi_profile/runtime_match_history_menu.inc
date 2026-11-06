@@ -88,7 +88,8 @@ struct MatchHistoryControl {
  RuntimeArchiveCache* archive_owner{};
  MeleeWebMenuHost* host_owner{};
  uint64_t asset_owner{};
- uint64_t submitted_frame{};
+ uint64_t submitted_frame{},cache_flush_frame{};
+ std::array<char,2048> renderer_preparation{};
  uint32_t requested_rebase_end{};
  uint32_t requested_ticket_id{};
  std::array<uint8_t,44> requested_plan{};
@@ -677,9 +678,8 @@ const char* history_source_idle_failure(const GameplayMatchSession& session) noe
 bool history_source_idle(const GameplayMatchSession& session) noexcept {
  return !history_source_idle_failure(session);
 }
-melee_web::RuntimeMatchHistoryGateResult history_boundary(
- const GameplayMatchSession& session,melee_web::RuntimeMatchHistoryGatePoint point,
- uint32_t frame,void*) noexcept {
+melee_web::RuntimeMatchHistoryGateResult history_source_boundary(
+ const GameplayMatchSession& session,uint32_t frame) noexcept {
  using G=melee_web::RuntimeMatchHistoryGateResult;
  auto& c=match_history;
  try {
@@ -694,14 +694,64 @@ melee_web::RuntimeMatchHistoryGateResult history_boundary(
    return G::IdentityRefused;
   if(!history_source_idle(session))return G::SourceFilesBusy;
   if(!history_runtime_idle())return G::RuntimeBusy;
-  if(!history_gpu_idle())return G::RendererBusy;
-  if(point==melee_web::RuntimeMatchHistoryGatePoint::PresentComplete){
-   const auto* d=static_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observe_descriptor());
-   if(!d||d->lastEndFrameId!=c.submitted_frame)return G::RendererBusy;
-  }
   return G::Admitted;
  }catch(...){return G::IdentityRefused;}
 }
+melee_web::RuntimeMatchHistoryGateResult history_boundary(
+ const GameplayMatchSession& session,melee_web::RuntimeMatchHistoryGatePoint point,
+ uint32_t frame,void*) noexcept {
+ using G=melee_web::RuntimeMatchHistoryGateResult;
+ const auto source=history_source_boundary(session,frame);
+ if(source!=G::Admitted)return source;
+ if(!history_gpu_idle())return G::RendererBusy;
+ if(point==melee_web::RuntimeMatchHistoryGatePoint::PresentComplete){
+  const auto* d=static_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observe_descriptor());
+  if(!d||d->lastEndFrameId!=match_history.submitted_frame)return G::RendererBusy;
+ }
+ return G::Admitted;
+}
+
+struct MatchHistoryRendererSample {
+ AuroraBrowserQuiescenceLease lease{};
+ unsigned cache_status{},renderer_errors{};
+ const char* strict_failure{};
+};
+MatchHistoryRendererSample history_renderer_sample() noexcept {
+ MatchHistoryRendererSample sample{};
+ (void)aurora_browser_quiescence_capture_lease(&sample.lease);
+ sample.cache_status=aurora_pipeline_cache_status();
+ sample.renderer_errors=match_history_renderer_errors;
+ sample.strict_failure=history_gpu_idle_failure();
+ return sample;
+}
+bool history_renderer_can_flush(const MatchHistoryRendererSample& sample,
+ uint64_t submitted,uint64_t already_flushed) noexcept {
+ const auto& lease=sample.lease;
+ return submitted&&submitted!=already_flushed&&sample.strict_failure&&
+  sample.cache_status==AURORA_PIPELINE_CACHE_PENDING&&
+  lease.pipelineCacheStatus==AURORA_PIPELINE_CACHE_PENDING&&
+  lease.stagingGeneration&&lease.currentFrameIndex!=UINT32_MAX&&
+  lease.lastBeginFrameId==submitted&&lease.lastEndFrameId==submitted&&
+  !lease.pendingFramePackets&&!lease.pendingStagingBuffers&&!lease.workerBusy&&
+  !lease.queuedPipelines&&!lease.staleCallbackCount&&!sample.renderer_errors;
+}
+std::array<char,768> history_renderer_sample_json(const MatchHistoryRendererSample& s) noexcept {
+ const auto& x=s.lease;
+ std::array<char,768> out{};
+ std::snprintf(out.data(),out.size(),
+  "{\"cacheStatus\":%u,\"leaseCacheStatus\":%u,\"pendingPackets\":%u,\"pendingStaging\":%u,"
+  "\"workerBusy\":%u,\"queuedPipelines\":%u,\"rendererErrors\":%u,\"frameIndex\":%u,"
+  "\"stagingGeneration\":\"%llu\",\"beginFrame\":\"%llu\",\"endFrame\":\"%llu\","
+  "\"registration\":\"%llu\",\"callback\":\"%llu\",\"staleCallbacks\":\"%llu\",\"strictFailure\":\"%s\"}",
+  s.cache_status,x.pipelineCacheStatus,x.pendingFramePackets,x.pendingStagingBuffers,x.workerBusy,
+  x.queuedPipelines,s.renderer_errors,x.currentFrameIndex,
+  static_cast<unsigned long long>(x.stagingGeneration),static_cast<unsigned long long>(x.lastBeginFrameId),
+  static_cast<unsigned long long>(x.lastEndFrameId),static_cast<unsigned long long>(x.lastRegistrationSequence),
+  static_cast<unsigned long long>(x.lastCallbackSequence),static_cast<unsigned long long>(x.staleCallbackCount),
+  s.strict_failure?s.strict_failure:"");
+ return out;
+}
+
 bool history_audio_step(GameplayMatchSession& session,void*) noexcept {
  try {char error[256]{};render_audio_tick(session.audio(),error,sizeof(error));return true;}
  catch(const std::exception& e){return history_refuse(e.what());}
@@ -1126,6 +1176,40 @@ const char* melee_web_native_menu_match_history_rebase_identity_json(){
       c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
   return nullptr;
  return c.identity.c_str();
+}
+const char* melee_web_native_menu_match_history_renderer_prepare_json(unsigned command){
+ auto& c=match_history;
+ if((command!=5&&command!=10)||!match_history_terminal||c.status.owner_state!=1||
+    c.status.pending_command||c.dispatching||match_history_in_tick)return nullptr;
+ using Gate=melee_web::RuntimeMatchHistoryGateResult;
+ const bool runtime_idle=history_runtime_idle();
+ const uint32_t frame=runtime_idle&&c.capsule?c.capsule->current_frame():c.status.history.current_frame;
+ const auto owner=runtime_idle&&match?history_source_boundary(*match,frame):Gate::RuntimeBusy;
+ auto before=runtime_idle?history_renderer_sample():MatchHistoryRendererSample{};
+ MatchHistoryRendererSample after{};
+ bool after_observed=false;
+ unsigned action=0;
+ if(owner==Gate::Admitted&&c.capsule&&!c.capsule->endpoint_active()&&
+    c.status.last_completed_command==4&&
+    history_renderer_can_flush(before,c.submitted_frame,c.cache_flush_frame)){
+  c.cache_flush_frame=c.submitted_frame;
+  const bool flushed=aurora_flush_pipeline_cache();
+  const bool still_owned=match&&history_source_boundary(*match,frame)==Gate::Admitted;
+  if(still_owned){after=history_renderer_sample();after_observed=true;}
+  action=flushed&&still_owned&&!after.strict_failure&&
+      after.cache_status==AURORA_PIPELINE_CACHE_READY&&
+      after.lease.lastBeginFrameId==c.submitted_frame&&
+      after.lease.lastEndFrameId==c.submitted_frame?1u:2u;
+  if(action==2)history_refuse("Terminal renderer cache flush did not reach strict quiescence");
+ }
+ const auto before_json=history_renderer_sample_json(before);
+ const auto after_json=history_renderer_sample_json(after);
+ const int count=std::snprintf(c.renderer_preparation.data(),c.renderer_preparation.size(),
+  "{\"schema\":1,\"command\":%u,\"sourceFrame\":%u,\"ownerGate\":%u,\"observed\":%u,"
+  "\"submittedFrame\":\"%llu\",\"action\":%u,\"before\":%s,\"after\":%s}",
+  command,frame,static_cast<unsigned>(owner),runtime_idle?1u:0u,
+  static_cast<unsigned long long>(c.submitted_frame),action,before_json.data(),after_observed?after_json.data():"null");
+ return count>0&&static_cast<size_t>(count)<c.renderer_preparation.size()?c.renderer_preparation.data():nullptr;
 }
 const MatchHistoryStatus* melee_web_native_menu_match_history_status(){
  // Direct polling during an Asyncify suspension reads only fixed transport.

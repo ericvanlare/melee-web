@@ -2020,18 +2020,32 @@ guards and their order and identifies the exact leaf: payload snapshot topology
 changed in the source main heap. Both failed captures, source reviews and
 producer identities are retained; owned browser, relay and server cleanup passes.
 
-The current payload-only snapshot deliberately requires unchanged allocation
-topology. The next reduced experiment uses the original SDK allocator to test
-restoring its stable owned arena and source-address mirror together across
-allocation/free/reuse. It must preserve real host/observer identities and prove
-external borrower safety before integration. The legacy payload guard and strict
-comparator remain unchanged; exact restored source state and advancing observer
-fences require distinct, explicit evidence. The exact END4 allocation or free
-is not yet attributed. Multi-tick speculative continuation, sustained/full-match
-rollback, public enablement, complete profile behavior and acceptance remain open.
-The structured receipt's `continuation_364` owns the source, raw result, catalog,
-review and cleanup identities. Full regression and exact-head CI remain pending
-the complete #364 milestone.
+The reduced original SDK allocator and active source-shadow control now passes
+allocation/free/reuse and two exact paired restores, while preserving monotonic
+observer identities and rejecting stale preparations before writes. The optional
+owned-arena path keeps the legacy payload guard and strict comparator unchanged.
+Its actual-runtime producer `01805a9c` restores the full 32 MiB arena and source
+shadow exactly at the first correction. All nine raw domains and 12 particle
+relations compare, with two advancing observer counters checked separately by
+the typed native receipt. The late input changes scene state; tick 3 then advances
+while tick 2 remains unconfirmed, and the formerly failing END4 seal and CPU
+endpoint both pass.
+
+The next failure is END4 presentation completion: the renderer-pending bit stays
+set until the unchanged five-second idle deadline. The second restore and final
+four-PAD/64-byte peer comparison remain unrun. Deferred pipeline persistence is a
+source-backed hypothesis; the aggregate pending bit does not identify the cause.
+The next bounded repair retains the actual busy owners and may service an
+observed pending cache transaction only after submission and source owners are
+idle. It must preserve the strict completion gate, source draw order and deadline.
+Alpha's native cleanup also times out on that bit; beta retires. Both browser
+contexts and page sockets close, and all 18 owned browser processes are absent.
+The earlier bridge-dispatch and compile-target failures remain retained.
+
+Sustained/full-match rollback, public enablement, complete profile behavior and
+acceptance remain open. The structured receipt's `continuation_364` owns the
+source, raw result, catalog, review and cleanup identities. Full regression and
+exact-head CI remain pending the complete #364 milestone.
 
 ## Stage decision dependencies, issue #333
 

@@ -656,3 +656,37 @@ test('arena history requires explicit native enablement before capture and keeps
   const g=episodeFixture(),legacy=createRuntimeMatchHistoryController(g.module);
   assert.throws(()=>legacy.endpoint({arenaHistoryEndpoint:true}),/was not enabled/);
 });
+
+test('owned idle preparation retains renderer receipt without changing status polling',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  const calls=[];
+  f.put(116,1);
+  f.module[prefix+'renderer_prepare_json']=command=>{
+    calls.push(command);
+    f.put(116,0);
+    return 2048;
+  };
+  const utf8=f.module.UTF8ToString;
+  f.module.UTF8ToString=pointer=>pointer===2048?JSON.stringify({schema:1,command:5,action:1,
+    before:{cacheStatus:1},after:{cacheStatus:0}}):utf8(pointer);
+  assert.equal(owner.status().gpuPending,1);
+  assert.deepEqual(calls,[]);
+  assert.equal((await owner.command('idle')).lastCompletedCommand,5);
+  assert.deepEqual(calls,[5]);assert.deepEqual(f.calls,[5]);
+  assert.equal(owner.journal()[0].rendererPreparation.flush.after.cacheStatus,0);
+});
+
+test('alternate renderer work retains its receipt on the original idle and cleanup deadlines',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module,{commandTimeoutMs:30});
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  f.put(116,1);
+  let lastCommand=0;
+  f.module[prefix+'renderer_prepare_json']=command=>{lastCommand=command;return 2048;};
+  f.module.UTF8ToString=()=>JSON.stringify({schema:1,command:lastCommand,action:0,
+    before:{pendingStaging:1},after:{pendingStaging:1}});
+  await assert.rejects(owner.command('idle'),/idle exceeded its 30 ms deadline.*pendingStaging/);
+  await assert.rejects(owner.command('cleanup'),/cleanup exceeded its 30 ms deadline.*pendingStaging/);
+  assert.deepEqual(f.calls,[]);
+  assert.equal(owner.journal()[1].rendererPreparation.latest.command,10);
+});

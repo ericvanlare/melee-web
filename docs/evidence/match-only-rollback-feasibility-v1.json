@@ -12409,7 +12409,7 @@
           },
           "continuation_364": {
             "issue": 364,
-            "state": "TWO_ADJACENT_CORRECTIONS_PASS; FOUR_TICK_CONTINUATION_REACHES_END4_THEN_PAYLOAD_TOPOLOGY_REFUSES",
+            "state": "TWO_ADJACENT_CORRECTIONS_PASS; OWNED_ARENA_FIRST_RESTORE_AND_END4_SEAL_PASS; END4_RENDERER_IDLE_PENDING",
             "native_and_harness_producer": "21e508a0ae1d7e7bca9ff374047d141450124753",
             "native_candidate": {
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-confirmed-rebase-candidate-v3/freeze.json",
@@ -12498,7 +12498,7 @@
               },
               "scope": "External source draft had wrong pre/post phase checks, PRE/current conflation, unbound report, test overwrite and incomplete continuity/default receipts. Fixed before any capture; raw draft retained."
             },
-            "next": "Reduced actual original SDK allocator and source mirror control for a typed owned-arena restore across allocation/free/reuse, with retained PRE ownership, monotonic observer fences and verified external borrowers. Legacy payload-only guard and strict comparator remain unchanged; no third browser run before causal reduction and review.",
+            "next": "Attribute END4 renderer pending state and service only actually observed deferred pipeline persistence under the unchanged owner/submission/source guards; keep deadline and strict comparison. Second restore and final peer checksum remain unrun.",
             "scope": "Two individually confirmed one-tick local functional windows. No sustained speculative window, full match, public enablement, Internet/physical-input/performance acceptance or complete profile claim. Full regression and exact-head CI for #364 remain pending its complete milestone.",
             "four_tick_attempts": {
               "native_host_candidate": {
@@ -12597,6 +12597,131 @@
               },
               "observed_prefix": "First strict local Armed/Restored PRE compares all9 domains and12 particle relations; correction reaches END3. Alpha next actually advances tick3 while remote_contiguous_through/confirmed_through remain1 and simulated_through is3. END4 seal refuses before second restore, final4 PAD and64B peer comparison.",
               "limit": "No successful four-tick episode. Current payload-only restore cannot span allocation topology changes. Exact allocating/freeing source operation is unobserved. V2 changes attribution only; all predicates and order retained."
+            },
+            "owned_arena_attempts": {
+              "state": "SOURCE_PREFIX_ONLY_END4_PRESENT_IDLE_DEADLINE",
+              "joined_sdk_shadow_control": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-arena-joint-control-v1/freeze.json",
+                "sha256": "5361e43a86caef7951fe7f327e151543ebad0adb16eb1f34c3ef46b096a0a830"
+              },
+              "joined_control_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-arena-joint-control-v1/root-review.json",
+                "sha256": "2831a572a8ea5ea7658378a368fa464f0fcbcdbc2b67036e70a101d99abaf0c0"
+              },
+              "integrated_source": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-arena-integrated-source-v1.json",
+                "sha256": "87b3f43f2453ebed28a1c2ab7ba8a42e0c18bf6f0008cfccf213baf39850e83a"
+              },
+              "bridge_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-bridge-dispatch-review-v1.json",
+                "sha256": "6b7339fce408978c92a443a478d026e030e5b2e08df551ba030128dd26a8de05"
+              },
+              "compile_graph_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-arena-target-graph-review-v1.json",
+                "sha256": "13e532307fb2309a74bd02127cf49cc70402613a5884d0733634fac33ae8020d"
+              },
+              "actual_compile_graph_repair": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-compile-graph-repair-v3.json",
+                "sha256": "e2cebbc045ea2aaacf4a58544b50feff7bf4a869c1f270d8226a36c11f6a2e64"
+              },
+              "renderer_boundary_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-arena-end4-renderer-review-v1.json",
+                "sha256": "d38ae84cdc53063d4e22c47b86a5bdd443a5f9d3ee80271f058364682d5cce5d"
+              },
+              "attempts": [
+                {
+                  "version": 1,
+                  "native_producer": "e7583d8ff7217f18536e346b550bbba00e7bb70c",
+                  "harness_producer": "e7583d8ff7217f18536e346b550bbba00e7bb70c",
+                  "summary": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v1/result-summary.json",
+                    "sha256": "cee304849f96c822c015b8bd562ed4312ff0abaa3d495580e36537dca9d150c2"
+                  },
+                  "browser": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v1/browser/result.json",
+                    "sha256": "5a062b8f7afe22608674ad7514df05353ace05b4e02a2e9409eb257352989846"
+                  },
+                  "owner": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v1/owner.json",
+                    "sha256": "6191050c8835dc3c2947580e4bdada0dfbbd2895c252e2cca9e6eb476a960026"
+                  },
+                  "capture_review": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-root-review-v1.json",
+                    "sha256": "d8233c5ec266828e105703019fe7d5c48722a9c7686d2d5d7c0fcd504dd50ff2"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "page.evaluate: Error: Unknown runtime peer-history operation arenaEnable\n    at Object.call (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/tests/runtime_peer_history_probe.mjs:192:24)\n    at eval (eval at evaluate (:311:30), <anonymous>:4:19)\n    at UtilityScript.evaluate (<anonymous>:313:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+                  "owned_processes_absent": 19,
+                  "process_cleanup_passed": true
+                },
+                {
+                  "version": 2,
+                  "native_producer": "e7583d8ff7217f18536e346b550bbba00e7bb70c",
+                  "harness_producer": "72891b0f0c8809da9e247a01a7ce57a50a4dee6b",
+                  "summary": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v2/result-summary.json",
+                    "sha256": "e7b171e2d72a28e11305af568fe35db3b5714db1864e789035b8fb16735a6ece"
+                  },
+                  "browser": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v2/browser/result.json",
+                    "sha256": "f59f85500c98039216007d3120700f02f3e757675a204a74a326ba20ebdd1500"
+                  },
+                  "owner": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v2/owner.json",
+                    "sha256": "653ccbbaeddaa514d432a68da81620f5a40dcb0e8771d8d414fd26dbfc50f29c"
+                  },
+                  "capture_review": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-root-review-v2.json",
+                    "sha256": "26e00349d74a164f399b070f2416dc430725371282bc1a27609aab5938479d20"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "page.evaluate: Error: Native history refused: Owned SDK arena history requires the private match-history profile ({\"schema\":1,\"bytes\":128,\"ownerState\":1,\"firstFailure\":1,\"pendingCommand\":0,\"lastCompletedCommand\":1,\"requestSequence\":1,\"completeSequence\":1,\"expectedFrame\":0,\"localPort\":1,\"remotePort\":0,\"reserved\":0,\"metadata\":{\"schema\":1,\"bytes\":64,\"phase\":0,\"firstFailure\":0,\"preFrame\":0,\"currentFrame\":0,\"sealedEnd\":0,\"incarnation\":0,\"restoreCount\":0,\"endpointMask\":0,\"forwardSteps\":0,\"replaySteps\":0,\"pollSerial\":\"0\",\"preAudioPhase\":0,\"currentAudioPhase\":0},\"inputReady\":0,\"gpuPending\":0,\"endpointActive\":0,\"rendererErrors\":0})\n    at check (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs:245:19)\n    at wait (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs:367:22)\n    at async Object.command (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs:680:21)\n    at async <anonymous>:337:30",
+                  "owned_processes_absent": 18,
+                  "process_cleanup_passed": true
+                },
+                {
+                  "version": 3,
+                  "native_producer": "01805a9c235bd383791abc7429c681ad42317e55",
+                  "harness_producer": "01805a9c235bd383791abc7429c681ad42317e55",
+                  "summary": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v3/result-summary.json",
+                    "sha256": "d9a3f94d6e446455882e6a5c8f8f8f7c702cfe7c8e9de4f772cb074bedf91894"
+                  },
+                  "browser": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v3/browser/result.json",
+                    "sha256": "bbfe813ee30557422d03e60f3a37ad55eac6b2ac2550d53becd71a27f03de675"
+                  },
+                  "owner": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-v3/owner.json",
+                    "sha256": "54c36068316d3e6a50a27615ba48df1e72df462ba509f73a25de53fea55877a8"
+                  },
+                  "capture_review": {
+                    "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-four-tick-arena-root-review-v3.json",
+                    "sha256": "5c39235d43945cd423699e096f39cb37248e2bfadd1c7dc9b11289df17e5fddb"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "page.evaluate: Error: Runtime history idle exceeded its 5000 ms deadline\n    at wait (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs:369:50)\n    at async Object.command (http://127.0.0.1:8787/__melee_diag__/src/slippi_profile/runtime_match_history_controller.mjs:657:22)\n    at async <anonymous>:337:30",
+                  "owned_processes_absent": 18,
+                  "process_cleanup_passed": true
+                }
+              ],
+              "producer": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-producer-v3/archive.json",
+                "sha256": "dbe5453d29f328505b67a361c9a6d359ac73fa2c564af8aad92a9e41d9bbda3d"
+              },
+              "configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-four-tick-arena-catalog-v3/final-linked-configuration-v1.json",
+                "sha256": "1ff61a0d00d0d0592fa55d4dd2bfdde5885c45397787899c55734f0b0a99c23c"
+              },
+              "observed": {
+                "native_and_harness": "01805a9c235bd383791abc7429c681ad42317e55",
+                "restored_pre": "Actual 33554432-byte arena and active source shadow exact; nine raw domains and12 particle relations equal except two separately checked monotonic observer counters; old strict comparator unchanged.",
+                "first_correction": "Non-vacuous actual late tick1 changes scene checksum, tick2 remains speculative. Actual tick3 then advances and END4 seal/CPU endpoint/present all succeed.",
+                "first_failure": "After END4 present, alpha phase7 currentFrame4 firstFailure0 rendererErrors0 gpuPending1. Unchanged5000ms idle deadline expires before second restore or final peer comparison.",
+                "cleanup": "Alpha native cleanup blocked by same pending bit; beta native owner retired. Page sockets drain, contexts/browsers close, all18 owned browser PIDs absent; external process cleanup succeeds.",
+                "hypothesis": "Deferred pipeline persistence can make the strict idle observer unavailable; retained aggregate bit does not establish which renderer owner is pending."
+              },
+              "scope": "Local functional source-prefix and component evidence only. No completed four-tick correction, continuous/full-match rollback, Internet/physical/timing/PCM acceptance. Initial dispatch and compile-target mistakes plus failed focused controls remain retained."
             }
           }
         }

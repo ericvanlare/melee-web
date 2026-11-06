@@ -215,6 +215,122 @@ int main() {
             (self.work / f'{name}.log').write_text(output)
             self.assertEqual(result.returncode, 0, output)
 
+    def test_terminal_renderer_preparation_flushes_only_owned_pending_cache(self):
+        history = (ROOT / 'src/slippi_profile/runtime_match_history_menu.inc').read_text()
+        def section(start, end):
+            i = history.index(start)
+            return history[i:history.index(end, i)]
+        fixture = r"""
+#include <array>
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <aurora/aurora.h>
+#include <aurora/gfx.h>
+namespace melee_web {
+enum class RuntimeMatchHistoryGateResult { Admitted, WrongFrame, RuntimeBusy };
+}
+using Gate=melee_web::RuntimeMatchHistoryGateResult;
+struct GameplayMatchSession {} session;
+struct Capsule {
+  uint32_t current_frame() const { return 4; }
+  bool endpoint_active() const { return false; }
+} capsule;
+struct {
+  struct {unsigned owner_state=1,pending_command=0,last_completed_command=4;
+          struct {uint32_t current_frame=4;} history;} status;
+  Capsule* capsule=&::capsule;
+  uint64_t submitted_frame=7,cache_flush_frame=0;
+  bool dispatching=false;
+  std::array<char,2048> renderer_preparation{};
+} match_history;
+GameplayMatchSession* match=&session;
+bool match_history_terminal=true,match_history_in_tick=false,runtime_idle=true;
+unsigned match_history_renderer_errors=0,flushes=0,observations=0,refusals=0;
+Gate owner_gate=Gate::Admitted;
+AuroraBrowserQuiescenceLease lease{};
+AuroraPipelineCacheStatus cache=AURORA_PIPELINE_CACHE_PENDING;
+bool strict_failure_after_flush=false;
+bool history_runtime_idle(){return runtime_idle;}
+Gate history_source_boundary(const GameplayMatchSession&,uint32_t frame){
+  return frame==4?owner_gate:Gate::WrongFrame;
+}
+void history_refuse(const char*){++refusals;}
+int aurora_browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out){
+  ++observations;*out=lease;return cache==AURORA_PIPELINE_CACHE_READY;
+}
+AuroraPipelineCacheStatus aurora_pipeline_cache_status(){return cache;}
+const char* history_gpu_idle_failure(){
+  return cache!=AURORA_PIPELINE_CACHE_READY||strict_failure_after_flush?"not quiescent":nullptr;
+}
+bool aurora_flush_pipeline_cache(){
+  ++flushes;cache=AURORA_PIPELINE_CACHE_READY;lease.pipelineCacheStatus=cache;return true;
+}
+@HELPERS@
+@EXPORT@
+static const char* prepare(unsigned command=5){
+  const auto* result=melee_web_native_menu_match_history_renderer_prepare_json(command);
+  assert(result);
+  return result;
+}
+int main(){
+  lease.stagingGeneration=1;lease.currentFrameIndex=2;
+  lease.lastBeginFrameId=lease.lastEndFrameId=7;
+  lease.pipelineCacheStatus=cache;
+  assert(!melee_web_native_menu_match_history_renderer_prepare_json(4));
+  assert(!flushes&&!observations);
+  runtime_idle=false;
+  assert(std::strstr(prepare(),"\"observed\":0"));
+  assert(!flushes&&!observations);
+  runtime_idle=true;
+  owner_gate=Gate::WrongFrame;
+  assert(std::strstr(prepare(),"\"action\":0"));
+  owner_gate=Gate::Admitted;
+  for(auto field:{&lease.pendingFramePackets,&lease.pendingStagingBuffers,&lease.workerBusy,
+                  &lease.queuedPipelines}){
+    *field=1;
+    assert(std::strstr(prepare(),"\"action\":0"));
+    *field=0;
+  }
+  lease.lastEndFrameId=6;
+  assert(std::strstr(prepare(),"\"action\":0"));
+  lease.lastEndFrameId=7;
+  lease.staleCallbackCount=1;
+  assert(std::strstr(prepare(),"\"action\":0"));
+  lease.staleCallbackCount=0;
+  assert(!flushes&&!refusals);
+  const auto* receipt=prepare();
+  assert(flushes==1&&std::strstr(receipt,"\"action\":1"));
+  assert(std::strstr(receipt,"\"before\":{\"cacheStatus\":1"));
+  assert(std::strstr(receipt,"\"after\":{\"cacheStatus\":0"));
+  cache=AURORA_PIPELINE_CACHE_PENDING;lease.pipelineCacheStatus=cache;
+  assert(std::strstr(prepare(10),"\"action\":0")&&flushes==1);
+  match_history.submitted_frame=++lease.lastEndFrameId;
+  lease.lastBeginFrameId=lease.lastEndFrameId;
+  strict_failure_after_flush=true;
+  assert(std::strstr(prepare(10),"\"action\":2"));
+  assert(flushes==2&&refusals==1);
+}
+"""
+        fixture = fixture.replace('@HELPERS@', section('struct MatchHistoryRendererSample {',
+                                                       'bool history_audio_step('))
+        fixture = fixture.replace('@EXPORT@', section(
+            'const char* melee_web_native_menu_match_history_renderer_prepare_json(',
+            'const MatchHistoryStatus* melee_web_native_menu_match_history_status('))
+        source = self.work / 'renderer-preparation.cpp'
+        binary = self.work / 'renderer-preparation'
+        source.write_text(fixture)
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [('compile', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                '-D__EMSCRIPTEN__=1',
+                '-I', str(ROOT / '.deps/aurora/include'), str(source), '-o', str(binary)]),
+                ('run', [str(binary)])]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'renderer-preparation-{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
 
 if __name__ == '__main__':
     unittest.main()
