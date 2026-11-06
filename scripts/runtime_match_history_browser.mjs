@@ -123,8 +123,9 @@ async function observePageHealth(label,{requireRunning=false}={}){
       replayActive:!!globalThis.meleeNetRuntimeLockstepSnapshot?.(),
       diagnosticStatus:document.querySelector('#status')?.textContent?.slice(0,600)||null};
   });
-  if(state.runtime_error)throw Error(`${label}: ${state.runtime_error}`);
+  report.last_health={label,...state};
   if(state.history_error)throw Error(`${label}: ${state.history_error}`);
+  if(state.runtime_error)throw Error(`${label}: ${state.runtime_error}`);
   if(/^Paused after a timing disruption/i.test(state.timing_message||''))
     throw Error(`${label}: timing pause observed; automatic recovery is forbidden`);
   if(requireRunning&&state.running!==1)throw Error(`${label}: source runtime stopped (${state.timing_message||'no native message'})`);

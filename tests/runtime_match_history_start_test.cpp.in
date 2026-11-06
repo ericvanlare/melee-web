@@ -44,7 +44,10 @@ std::string serialize_live_match_identity(const GameplayMatchSession& m,const Ru
 bool runtime_idle=true,gpu_idle=true,source_idle=true,complete_draws=true;
 bool history_runtime_idle() noexcept {return runtime_idle;}
 bool history_gpu_idle() noexcept {return gpu_idle;}
-bool history_source_idle(const GameplayMatchSession&) noexcept {return source_idle;}
+const char* history_gpu_idle_failure() noexcept {return gpu_idle?nullptr:"fixture renderer busy";}
+const char* history_source_idle_failure(const GameplayMatchSession&) noexcept {
+ return source_idle?nullptr:"fixture source files busy";
+}
 bool melee_web_cpu_interval_active(){return false;}
 bool aurora_pipeline_complete_draws_enabled(){return complete_draws;}
 constexpr int MELEE_WEB_MENU_CSS=1,MELEE_WEB_MENU_SSS_READY=2,MELEE_WEB_MENU_SSS=3,MELEE_WEB_MENU_READY=5,GM_VS=7;
@@ -231,5 +234,21 @@ int main(){
  assert(history_start_ordinary_callback_impl());
  assert(faulted&&first_use_draw_pending);
  assert(!melee_web_native_menu_match_history_start_publication_data());
+ // A preflight refusal retains the first specific boundary error. The failed
+ // owner remains held until ordinary close has actually retired its session.
+ construct(false);
+ source_idle=false;
+ try {
+  history_start_publish_initial_source([]{assert(false);return true;});
+  assert(false);
+ }catch(const std::runtime_error& error){
+  assert(std::string(error.what())=="fixture source files busy");
+ }
+ assert(history_start_ordinary_callback_impl());
+ match_history_before_close();
+ assert(history_start_ordinary_callback_impl());
+ match.reset();host=nullptr;source_session_owned=false;
+ assert(!history_start_ordinary_callback_impl());
+ assert(std::string(match_history.error.data())=="fixture source files busy");
  std::cout << "Extracted start phase controls passed\n";
 }

@@ -47,7 +47,7 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
         fixture = fixture.replace('@START_FUNCTIONS@', '\n'.join([
             section('bool history_refuse(', 'void history_write_selection('),
             section('std::string_view history_start_string_argument(',
-                    'bool history_gpu_idle() noexcept {'),
+                    'const char* history_gpu_idle_failure() noexcept {'),
             section('void match_history_before_close() noexcept {',
                     'void match_history_after_match_close()'),
             section('int melee_web_native_menu_match_history_start_enable()',

@@ -94,6 +94,8 @@ bool history_refuse(const char* text) noexcept {
 }
 
 bool history_runtime_idle() noexcept;
+const char* history_gpu_idle_failure() noexcept;
+const char* history_source_idle_failure(const GameplayMatchSession&) noexcept;
 bool history_gpu_idle() noexcept;
 bool history_source_idle(const GameplayMatchSession&) noexcept;
 
@@ -305,14 +307,24 @@ bool history_start_enter_ready_hold_impl() {
 
 bool history_start_publication_begin() {
  auto& start=match_history.start;
- if(start.state!=MatchHistoryStartConsumed||start.publication.source_draws||!first_use_draw_pending||
-    !start.match_owner||match.get()!=start.match_owner||!match->construction_complete()||
-    match->source_frames()!=0||pending||running||faulted||
-    preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle||
-    !history_runtime_idle()||!history_gpu_idle()||!history_source_idle(*match)||
-    melee_web_cpu_interval_active()||
-    history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
-  return history_refuse("Agreed original source publication preflight refused");
+ if(start.state!=MatchHistoryStartConsumed||start.publication.source_draws)
+  return history_refuse("Agreed source publication was not an unconsumed one-shot draw");
+ if(!first_use_draw_pending)
+  return history_refuse("Agreed source publication has no pending first-use draw");
+ if(!start.match_owner||match.get()!=start.match_owner||!match->construction_complete())
+  return history_refuse("Agreed source publication lost its constructed match owner");
+ if(match->source_frames()!=0)
+  return history_refuse("Agreed source publication requires source frame zero");
+ if(pending||running||faulted||preparation.phase()!=melee_web::MenuPreparationState::Phase::Idle)
+  return history_refuse("Agreed source publication requires stopped, idle scene preparation");
+ if(!history_runtime_idle())
+  return history_refuse("Agreed source publication requires the idle main-thread Asyncify runtime");
+ if(const auto* error=history_gpu_idle_failure())return history_refuse(error);
+ if(const auto* error=history_source_idle_failure(*match))return history_refuse(error);
+ if(melee_web_cpu_interval_active())
+  return history_refuse("Agreed source publication requires an unarmed CPU interval");
+ if(history_start_payload(match->start_selection())!=history_start_payload(start.agreed_selection))
+  return history_refuse("Agreed source publication selection differs from its agreement");
  const auto* stats=aurora_get_stats();
  if(!stats)return history_refuse("Agreed source publication has no actual renderer stats");
  start.publication.prior_submission=stats->lastEndFrameId;
@@ -344,9 +356,9 @@ bool history_start_publication_end() {
 template<class Present>
 void history_start_publish_initial_source(const Present& present_source) {
  try {
-  check(history_start_publication_begin(),"Agreed initial presentation owner refused");
+  if(!history_start_publication_begin())throw std::runtime_error(match_history.error.data());
   check(present_source(),"Agreed initial source presentation did not draw");
-  check(history_start_publication_end(),"Agreed initial source presentation did not complete");
+  if(!history_start_publication_end())throw std::runtime_error(match_history.error.data());
  }catch(const std::exception& error){
   history_refuse(error.what());throw;
  }catch(...){
@@ -470,6 +482,9 @@ void history_start_finish_asset_match_impl() {
 
 bool history_start_ordinary_callback_impl() {
  auto& start=match_history.start;
+ // Ordinary unload revokes the private owners and retires the source session.
+ // Its later ownerless callbacks still own the top-level renderer/cache drain.
+ if(!host&&!world&&!match&&!results&&!prize&&!source_session_owned)return false;
  if(start.state==MatchHistoryStartOfferReady||
     start.state==MatchHistoryStartReadyHeld||
     (start.state!=MatchHistoryStartDisabled&&match_history.status.first_failure))return true;
@@ -480,31 +495,43 @@ bool history_start_ordinary_callback_impl() {
  return false;
 }
 
-bool history_gpu_idle() noexcept {
+const char* history_gpu_idle_failure() noexcept {
  const auto busy=aurora_browser_submission_status();
  const auto* d=static_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observe_descriptor());
  if(!d||d->schemaVersion!=5||d->byteSize!=aurora_browser_quiescence_descriptor_bytes()||
     d->frameDescriptorStride!=sizeof(AuroraBrowserFrameStagingDescriptor)||
     d->submissionDescriptorStride!=sizeof(AuroraBrowserSubmissionDescriptor)||
     d->frameDescriptorCount!=d->frameSlotCount||d->submissionDescriptorCount!=d->stagingSlotCount)
-  return false;
+  return "Renderer quiescence descriptor schema or extent refused";
  const uint64_t frames=uint64_t(d->frameDescriptorOffset)+uint64_t(d->frameDescriptorCount)*d->frameDescriptorStride;
  const uint64_t submissions=uint64_t(d->submissionDescriptorOffset)+uint64_t(d->submissionDescriptorCount)*d->submissionDescriptorStride;
- return d->frameDescriptorOffset>=sizeof(*d)&&frames<=d->submissionDescriptorOffset&&
-  submissions==d->byteSize&&!busy.pendingFramePackets&&!busy.pendingStagingBuffers&&!busy.workerBusy&&
-  !d->pendingFramePackets&&!d->pendingStagingBuffers&&!d->workerBusy&&
-  !d->queuedPipelines&&d->lastBeginFrameId==d->lastEndFrameId&&
-  !d->staleCallbackCount&&match_history_renderer_errors==0;
+ if(d->frameDescriptorOffset<sizeof(*d)||frames>d->submissionDescriptorOffset||submissions!=d->byteSize)
+  return "Renderer quiescence descriptor table ranges refused";
+ if(busy.pendingFramePackets||busy.pendingStagingBuffers||busy.workerBusy||
+    d->pendingFramePackets||d->pendingStagingBuffers||d->workerBusy)
+  return "Renderer submission packets, staging buffers or worker are busy";
+ if(d->queuedPipelines)return "Renderer still has queued pipelines";
+ if(d->lastBeginFrameId!=d->lastEndFrameId)return "Renderer frame begin/end IDs differ";
+ if(d->staleCallbackCount)return "Renderer recorded a stale completion callback";
+ if(match_history_renderer_errors)return "Renderer recorded an error";
+ return nullptr;
 }
+bool history_gpu_idle() noexcept {return !history_gpu_idle_failure();}
 bool history_runtime_idle() noexcept {
  return emscripten_is_main_runtime_thread()&&emscripten_is_main_browser_thread()&&
   emscripten_has_asyncify()==1&&match_history_asyncify_idle()==1;
 }
+const char* history_source_idle_failure(const GameplayMatchSession& session) noexcept {
+ if(!session.diagnostic_source_files_quiescent())return "Match source file scope is not quiescent";
+ if(melee_web_source_file_drive_busy())return "Match source file drive is busy";
+ if(melee_web_audio_bank_transport_busy())return "Match audio bank transport is busy";
+ if(melee_web_audio_stream_source_loading())return "Match audio stream source is loading";
+ if(DVDGetDriveStatus()!=DVD_STATE_END)return "Match DVD drive is not at DVD_STATE_END";
+ if(!melee_web_source_memory_healthy())return "Match source memory is unhealthy";
+ return nullptr;
+}
 bool history_source_idle(const GameplayMatchSession& session) noexcept {
- return session.diagnostic_source_files_quiescent()&&
-  !melee_web_source_file_drive_busy()&&!melee_web_audio_bank_transport_busy()&&
-  !melee_web_audio_stream_source_loading()&&DVDGetDriveStatus()==DVD_STATE_END&&
-  melee_web_source_memory_healthy();
+ return !history_source_idle_failure(session);
 }
 melee_web::RuntimeMatchHistoryGateResult history_boundary(
  const GameplayMatchSession& session,melee_web::RuntimeMatchHistoryGatePoint point,
