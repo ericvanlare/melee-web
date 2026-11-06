@@ -42,20 +42,21 @@ const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 const repeatPrefix=values.phase==='repeated-confirmed-prefix';
-const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs';
-const pacedInputTicks=values.phase==='paced-120-inputs'?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
+const pacedLatePiece=values.phase==='paced-120-late-piece';
+const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs'||pacedLatePiece;
+const pacedInputTicks=values.phase==='paced-120-inputs'||pacedLatePiece?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
   RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
-const paced120=values.phase==='paced-120-inputs';
+const paced120=pacedInputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
 const confirmedPrefix=values.phase==='confirmed-prefix'||repeatPrefix;
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),'--arena-history requires an arena episode');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs'].includes(values.phase),
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
@@ -90,10 +91,10 @@ const policyPath=path.resolve(path.dirname(configPath),config.policyFile);
 const policy=JSON.parse(await fs.readFile(policyPath,'utf8'));
 const manifest=JSON.parse(await fs.readFile(manifestPath,'utf8'));
 const [actualWasmHash,mapSha256,manifestSha256,policySha256,configSha256,discImageHash]=await Promise.all([
-  hashFile(path.join(ROOT,'build/browser-match-history-release/gameplay_menu_browser.wasm')),
+  hashFile(path.join(path.dirname(manifestPath),'gameplay_menu_browser.wasm')),
   hashFile(mapPath),hashFile(manifestPath),hashFile(policyPath),hashFile(configPath),hashFile(discPath),
 ]);
-assert.equal(actualWasmHash,values['runtime-wasm-sha256'],'Built ordinary runtime differs from its reviewed Wasm identity');
+assert.equal(actualWasmHash,values['runtime-wasm-sha256'],'Selected runtime differs from its reviewed Wasm identity');
 const identities={wasmSha256:actualWasmHash,mapSha256,manifestSha256,policySha256};
 assert.equal(manifest.configuration_identity?.link_map_sha256,mapSha256,'Exact source-state manifest does not bind the supplied link map');
 const wire=validateCpuRestoreConfiguration(config,policy,manifest,identities);
@@ -192,14 +193,14 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:paced?(paced120?'melee-web-runtime-paced-120-inputs-v1':'melee-web-runtime-paced-eight-inputs-v1'):repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
+const report={schema:paced?(pacedLatePiece?'melee-web-runtime-paced-120-late-class-piece-v1':paced120?'melee-web-runtime-paced-120-inputs-v1':'melee-web-runtime-paced-eight-inputs-v1'):repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
     (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
       values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
+  scope:pacedLatePiece?'120 actual source input ticks with one real beta keyboard change at tick 26, one deferred/released actual peer packet, alpha restore across that late tick and final confirmed checksum; no changed-piece restoration claim without the matched retained-producer control':paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
     (presentForward?
       'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
       twoArenaEpisodes?
@@ -925,14 +926,14 @@ function byteDifference(left,right){
   }
   return {equal:count===0,bytes_left:left.length,bytes_right:right.length,different_byte_count:count,first_mismatch:first};
 }
-async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad){
+async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad,deferredLocalTick=null){
   const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
-  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad})=>{
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick})=>{
     const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
-    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad});
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick});
   },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
       new URL('/__melee_diag__/',baseUrl)).href,
-    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad});
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad,deferredLocalTick});
 }
 function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus,{endView='DRAW_END'}={}){
   assert.equal(oldEnd.view,endView==='CPU_END'?CPU_ENDPOINT_VIEW.cpuEnd:CPU_ENDPOINT_VIEW.drawEnd);
@@ -1167,7 +1168,7 @@ async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionS
     receivedBetaPad:actualP2,drawEndpoints:[alphaDraw,betaDraw]};
 }
 
-async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads){
+async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads,deferredLocalTick=null){
   for(const item of [alpha,beta])
     report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
   const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
@@ -1178,7 +1179,7 @@ async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemo
     transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for the diagnostic'};
   await joinOwned('peer-bridge-install',[
     installPeerHistoryBridge(alpha,relayUrl,roomId,inputTicks,initialRemotePads?.alpha).then(value=>{alpha.peerInstalled=true;return value;}),
-    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta).then(value=>{beta.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta,deferredLocalTick).then(value=>{beta.peerInstalled=true;return value;}),
   ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
   for(const item of [alpha,beta]){
     const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
@@ -1502,25 +1503,27 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
     retired:windowProof.final_history_retirement};
 }
 
-async function runPacedInputs(alpha,beta,inputTicks){
+async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const items=[alpha,beta],targetFrame=inputTicks,paced120=inputTicks===120;
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
   assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
     'Both scripted first local inputs must differ from the actual held-prefix prediction');
-  const proof=report.peer_correction={claim:paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
+  const proof=report.peer_correction={claim:latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
       'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
     scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
     checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
-    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[]};
-  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]});
+    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
+    ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
+      key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{})};
+  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},latePiece?26:null);
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
-    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks})=>{
+    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece})=>{
       const {installRuntimePacedHistoryProbe}=await import(moduleUrl);
-      installRuntimePacedHistoryProbe({role,inputTicks});
+      installRuntimePacedHistoryProbe({role,inputTicks,lateClassPiece:latePiece});
       return globalThis.__meleeRuntimePacedHistory.prepare();
-    },{moduleUrl,role:item.role,inputTicks});
+    },{moduleUrl,role:item.role,inputTicks,latePiece});
   }));
   for(const item of items){
     await item.page.locator('#canvas').focus();
@@ -1530,11 +1533,93 @@ async function runPacedInputs(alpha,beta,inputTicks){
   }
   let operationFailure=null;
   const releaseErrors=[];
+  let runTasks=[],runSettled=null,firstRunFinish=null;
   try{
-    await joinOwned(paced120?'paced-120-inputs':'paced-eight-inputs',items.map(async item=>{
-      proof.pages[item.role].paced=await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run());
-    }));
+    if(latePiece){
+      runTasks=items.map(item=>item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run()).then(value=>{
+        proof.pages[item.role].paced=value;
+        if(value.result==='FAIL')throw Error(`${item.role} paced page failed: ${JSON.stringify(value.failure)}`);
+        return value;
+      }).catch(error=>{
+        (report.operation_failures??=[]).push({label:'paced-120-late-piece',role:item.role,error:String(error?.message||error)});
+        throw error;
+      }));
+      firstRunFinish=Promise.race(runTasks.map((task,index)=>task.then(value=>({index,value}),error=>({index,error}))));
+      runSettled=Promise.allSettled(runTasks);
+      const awaitGate=async(promise,label)=>{
+        const result=await Promise.race([promise.then(value=>({value})),firstRunFinish.then(finished=>({finished}))]);
+        if('finished' in result){
+          if(result.finished.error)throw result.finished.error;
+          throw Error(`${label}: a paced page completed before the late-input gate`);
+        }
+        return result.value;
+      };
+      const beta=items.find(item=>item.role==='beta'),alpha=items.find(item=>item.role==='alpha');
+      const inputGate=await awaitGate(beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange()),
+        'Late beta input gate');
+      assert.deepEqual([inputGate.source_tick,inputGate.current_frame],[26,26]);
+      assert(inputGate.pre_frame<=26,'Late keyboard target is already before beta PRE');
+      await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;
+      await beta.page.keyboard.down('ArrowRight');beta.keyToRelease='ArrowRight';
+      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.noteLateKeyChange({
+        from:'ArrowLeft',to:'ArrowRight'}));
+      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeLateKeyChange());
+      const [betaReleaseGate,alphaFrontier]=await Promise.all([
+        awaitGate(beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLatePacketGate()),
+          'Late beta packet-release gate'),
+        awaitGate(alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLateFrontier()),
+          'Late alpha frontier gate'),
+      ]);
+      const [alphaBoundary,betaEvidence,alphaBeforePacket]=await Promise.all([
+        alpha.page.evaluate(async()=>({status:globalThis.__meleeRuntimeMatchHistory.status(),
+          timeline:await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline')})),
+        beta.page.evaluate(()=>{const run=globalThis.__meleeRuntimePacedHistory.snapshot();
+          return {scenario:run.late_class_piece,poll:run.polls.find(row=>row.sourceFrame===26)};}),
+        alpha.page.evaluate(()=>globalThis.__meleeRuntimePeerHistoryProbe.call('peerRemoteSnapshot',{tick:26})),
+      ]);
+      assert.deepEqual([alphaBoundary.status.metadata.preFrame,alphaBoundary.status.metadata.currentFrame],
+        [alphaFrontier.pre_frame,alphaFrontier.frontier]);
+      assert.deepEqual([alphaBoundary.timeline.simulated_through,alphaBoundary.timeline.remote_contiguous_through,
+        alphaBoundary.timeline.dirty_from,alphaBoundary.timeline.plan_outstanding],
+        [alphaFrontier.frontier-1,25,null,false]);
+      assert.equal(alphaBeforePacket,null,'Actual beta tick 26 escaped before its held release');
+      assert.deepEqual([betaReleaseGate.frontier,betaEvidence.poll?.sourceFrame,betaEvidence.poll?.localPort],
+        [27,26,1]);
+      assert.deepEqual(Buffer.from(betaEvidence.poll.raw).subarray(11,22),P2_RIGHT,
+        'Beta native poll 26 did not read the actual Playwright key change');
+      assert.equal(betaEvidence.scenario.held_packet?.deferred_send,true,
+        'Actual beta tick 26 was not withheld by the existing transport primitive');
+      assert.deepEqual(Buffer.from(betaEvidence.scenario.held_packet.actual_local_pad),P2_RIGHT);
+      proof.late_class_piece.input_gate=inputGate;
+      proof.late_class_piece.beta_release_gate=betaReleaseGate;
+      proof.late_class_piece.alpha_frontier=alphaFrontier;
+      proof.late_class_piece.beta_native_poll=betaEvidence.poll;
+      const released=await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.releaseLatePacket());
+      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeLatePacket());
+      const remote=await alpha.page.evaluate(()=>globalThis.__meleeRuntimePeerHistoryProbe.call(
+        'peerWaitRemote',{tick:26,timeoutMs:5000}));
+      assert.deepEqual(Buffer.from(remote.receipt.pad),P2_RIGHT,'Released peer packet differs from the actual beta poll');
+      assert.equal(remote.receipt.protocol_input_tick,26);
+      assert.equal(remote.receipt.sender_role,'beta');
+      proof.late_class_piece.network_release=released;
+      proof.late_class_piece.alpha_remote_receipt=remote.receipt;
+      await alpha.page.evaluate(receipt=>globalThis.__meleeRuntimePacedHistory.resumeLateFrontier(receipt),
+        remote.receipt);
+      const settled=await runSettled;
+      const failed=settled.find(row=>row.status==='rejected');
+      if(failed)throw failed.reason;
+    }else{
+      await joinOwned(paced120?'paced-120-inputs':'paced-eight-inputs',items.map(async item=>{
+        proof.pages[item.role].paced=await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run());
+      }));
+    }
   }catch(error){operationFailure=error;
+    if(latePiece){
+      for(const item of items)try{
+        await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory?.abortLateScenario?.());
+      }catch{}
+      if(runSettled)await runSettled;
+    }
   }finally{
     for(const item of items)if(item.keyToRelease){
       try{await item.page.keyboard.up(item.keyToRelease);item.keyToRelease=null;}
@@ -1552,8 +1637,10 @@ async function runPacedInputs(alpha,beta,inputTicks){
     assert.deepEqual(run.polls.map(row=>row.sourceFrame),Array.from({length:targetFrame},(_,tick)=>tick));
     assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,targetFrame);
     for(const row of run.polls){
+      const expectedPad=latePiece&&item.role==='beta'&&row.sourceFrame>=26?P2_RIGHT:
+        item.role==='alpha'?P1_RIGHT:P2_LEFT;
       assert.deepEqual(Buffer.from(row.raw).subarray(row.localPort*11,(row.localPort+1)*11),
-        item.role==='alpha'?P1_RIGHT:P2_LEFT);
+        expectedPad);
     }
     assert(run.clock.length>8&&run.clock.every(row=>!row.stalled));
     assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),targetFrame);
@@ -1582,14 +1669,48 @@ async function runPacedInputs(alpha,beta,inputTicks){
   assert.equal(releaseErrors.length,0,`Owned keyboard release failed: ${JSON.stringify(releaseErrors)}`);
   assert(a.corrections.some(row=>row.dirty!==null)||b.corrections.some(row=>row.dirty!==null),
     'Paced run must actually correct a wrong prediction');
+  if(latePiece){
+    const correction=a.corrections.find(row=>row.dirty===26);
+    assert(correction,'Alpha did not record the actual late tick-26 prediction correction');
+    const presentedChecksum=a.late_class_piece.presented_checksum;
+    assert.equal(presentedChecksum?.status,'captured');
+    assert.deepEqual([presentedChecksum.pre_frame,presentedChecksum.frontier],
+      [correction.pre,correction.frontier]);
+    assert.equal(presentedChecksum.bytes.length,64);
+    proof.late_class_piece.alpha_presented_checksum=presentedChecksum;
+    const restoreEvent=a.events[correction.restore_event_index];
+    assert.equal(restoreEvent.operation,'command');assert.equal(restoreEvent.value,'restore');
+    assert.equal(restoreEvent.result.metadata.restoreCount,correction.restore_status.metadata.restoreCount);
+    assert(correction.pre<=26&&26<correction.frontier&&correction.frontier<=correction.pre+7);
+    assert.equal(correction.frontier,proof.late_class_piece.alpha_frontier.frontier);
+    assert(correction.confirmed>26);
+    assert.equal(correction.restore_status.metadata.restoreCount>=1,true);
+    const rows=correction.prefix?.rows??correction.replay?.rows;
+    const tick26=rows?.find(entry=>(entry.row??entry).sourceFrame===26)?.row??
+      rows?.find(entry=>(entry.row??entry).sourceFrame===26);
+    assert(tick26,'Late correction did not return the native source tick-26 row');
+    assert.deepEqual(Buffer.from(tick26.forward).subarray(11,22),P2_LEFT,
+      'Tick 26 forward PAD does not show the real earlier prediction');
+    assert.deepEqual(Buffer.from(tick26.selected).subarray(11,22),P2_RIGHT,
+      'Tick 26 corrected selection does not show the actual late beta PAD');
+    assert.equal(tick26.state,2,'Tick 26 was not retained as a completed replay row');
+    proof.late_class_piece.alpha_correction={kind:correction.kind,pre:correction.pre,
+      frontier:correction.frontier,confirmed:correction.confirmed,dirty:correction.dirty,
+      restore_count:correction.restore_status.metadata.restoreCount,
+      tick26_forward_remote_pad:[...tick26.forward.slice(11,22)],
+      tick26_corrected_remote_pad:[...tick26.selected.slice(11,22)],
+      changed_piece_restoration_claim:'requires matched retained-producer control'};
+  }
   proof.comparisons[`end${targetFrame}`]=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
   assert.equal(a.finalChecksum.bytes.length,64);assert.equal(b.finalChecksum.bytes.length,64);
   assert(proof.comparisons[`end${targetFrame}`].equal,'Paced confirmed post-draw checksums differ');
   proof.comparisons.authoritative_pad=a.authoritativeInputs.map((row,index)=>({tick:row.tick,
     ...byteDifference(Buffer.from(row.bytes),Buffer.from(b.authoritativeInputs[index].bytes))}));
   assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
-  proof.status=paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
-  report.result=paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
+  proof.status=latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
+  report.result=latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
+  if(latePiece)addCheck('actual tick-26 late input, deferred packet release, bounded native restore and final-120 checksum agreement',
+    {changed_piece_restoration:'requires matched retained-producer control'});
 }
 
 async function runConfirmedPrefixTransfer(alpha,beta){
@@ -2126,7 +2247,7 @@ try{
     assert.equal(identity,report.pages[item.role].route.takeover.identity,`${item.role} identity changed after exact static configuration`);
     report.pages[item.role].route.configured_identity=identity;
   }
-  if(paced)await runPacedInputs(alpha,beta,pacedInputTicks);
+  if(paced)await runPacedInputs(alpha,beta,pacedInputTicks,pacedLatePiece);
   else if(confirmedPrefix)await runConfirmedPrefixTransfer(alpha,beta);
   else if(values.phase==='four-tick-correction')await runFourTickEpisode(alpha,beta);
   else if(values.phase==='peer-correction')await runPeerCorrection(alpha,beta);

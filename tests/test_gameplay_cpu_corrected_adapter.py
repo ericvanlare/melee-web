@@ -9,7 +9,7 @@ import sys
 import unittest
 
 from test_gameplay_cpu_restore_adapter import (
-    REPO_ROOT, STUB_CHECKPOINT_HEADER, source_overlay,
+    REPO_ROOT, CANDIDATE_ROOT, STUB_CHECKPOINT_HEADER, source_overlay, compile_texture_bounds,
     extract_fixture_observations, write_record,
 )
 from owned_test_workspace import OwnedWorkspaceTests
@@ -41,7 +41,7 @@ class GameplayCpuCorrectedAdapterTests(OwnedWorkspaceTests):
             '    bool retire_confirmed(const GameplayMatchSession&) noexcept;\n    bool finish_replay(')
         self.assertEqual(header.count('bool retire_confirmed('),1)
         (stubs/'gameplay_cpu_checkpoint.hpp').write_text(header)
-        base=(REPO_ROOT/'tests/cpu_restore_adapter_control.cpp.in').read_text().split('\nint main() {')[0]
+        base=(CANDIDATE_ROOT/'tests/cpu_restore_adapter_control.cpp.in').read_text().split('\nint main() {')[0]
         owner_fixture=('    struct CpuOwners {MeleeWebAudio* audio;};\n'
             '    CpuOwners diagnostic_cpu_owners() const noexcept {return {reinterpret_cast<MeleeWebAudio*>(std::uintptr_t(0x102))};}')
         self.assertEqual(base.count(owner_fixture),1)
@@ -98,6 +98,7 @@ class GameplayCpuCorrectedAdapterTests(OwnedWorkspaceTests):
             result=subprocess.run(cmd,cwd=out,env=env,text=True,capture_output=True,timeout=120)
             write_record(out/f'compile-{i}.json',cmd,result)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        objects.append(compile_texture_bounds(compiler, out, env))
         target=out/'control.js'
         cmd=[sys.executable,str(compiler/'em++.py'),'-O1','-fexceptions',*map(str,objects),
              '-sENVIRONMENT=node','-sEXIT_RUNTIME=1','-sASSERTIONS=2','-sSAFE_HEAP=1','-sALLOW_MEMORY_GROWTH=1','-o',str(target)]
@@ -107,7 +108,7 @@ class GameplayCpuCorrectedAdapterTests(OwnedWorkspaceTests):
         result=subprocess.run(cmd,cwd=out,env=env,text=True,capture_output=True,timeout=30)
         write_record(out/'run.json',cmd,result);self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn('Actual corrected adapter control PASS',result.stdout)
-        pins=[template,Path(__file__),REPO_ROOT/'tests/cpu_restore_adapter_control.cpp.in',
+        pins=[template,Path(__file__),REPO_ROOT/'src/hsd_texture_bounds.c',CANDIDATE_ROOT/'tests/cpu_restore_adapter_control.cpp.in',
               REPO_ROOT/'src/slippi_profile/tests/cpu_corrected_adapter.inc',
               REPO_ROOT/'src/slippi_profile/tests/cpu_restore_adapter.inc',control]
         (out/'receipt.json').write_text(json.dumps({'status':'PASS','scope':__doc__,

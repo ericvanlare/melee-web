@@ -4,6 +4,7 @@
  * replacement coordinator or a complete source-game restore test. */
 #include "gameplay_cpu_commit.hpp"
 #include "gameplay_cpu_interval.h"
+#include "hsd_texture_bounds.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -16,6 +17,51 @@ unsigned legacy_action_writes=0,corrected_action_writes=0;
 unsigned fighter_fields=9, private_slots=9,audio_value=9,flow_value=9,bootstrap_value=9,context_value=9;
 unsigned static_value=3, invariant=5;
 bool stable_owner=true,stable_topology=true,corrected_action_ok=true;
+constexpr uint64_t kTextureWorld=0x556677u;
+constexpr uintptr_t kTexturePreKey=0x101000u,kTextureEndKey=0x202000u,kTextureMutationKey=0x303000u;
+const MeleeWebTextureBoundsSnapshot* expected_texture_snapshot=nullptr;
+uint64_t expected_texture_world=0;
+unsigned texture_commit_step=7,texture_commit_calls=0;
+bool mutate_texture_on_payload_admit=false,mutate_texture_in_action_prepare=false;
+void texture_clear(){
+    melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTexturePreKey));
+    melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureEndKey));
+    melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureMutationKey));
+}
+void texture_set_end(){
+    texture_clear();
+    melee_web_texture_bounds_bind(reinterpret_cast<const void*>(kTextureEndKey),1,0);
+}
+void texture_mutate_again(){
+    melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureEndKey));
+    melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureMutationKey));
+    melee_web_texture_bounds_bind(reinterpret_cast<const void*>(kTextureMutationKey),2,1);
+}
+struct TextureOwner {
+    MeleeWebTextureBoundsSnapshot* snapshot{};
+    TextureOwner(){
+        texture_clear();
+        melee_web_texture_bounds_bind(reinterpret_cast<const void*>(kTexturePreKey),3,2);
+        snapshot=melee_web_texture_bounds_capture(kTextureWorld);
+        assert(snapshot&&melee_web_texture_bounds_matches_current(snapshot,kTextureWorld));
+        texture_set_end();
+        expected_texture_snapshot=snapshot;expected_texture_world=kTextureWorld;
+    }
+    ~TextureOwner(){
+        melee_web_texture_bounds_snapshot_destroy(snapshot);
+        melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTexturePreKey));
+        melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureEndKey));
+        melee_web_texture_bounds_remove(reinterpret_cast<const void*>(kTextureMutationKey));
+        expected_texture_snapshot=nullptr;expected_texture_world=0;
+    }
+    void attach(GameplayCpuCommitOwners& owners)const{
+        owners.texture_bounds=snapshot;owners.texture_world=kTextureWorld;
+    }
+    void prepare_end(){texture_set_end();}
+    bool matches_pre()const{
+        return melee_web_texture_bounds_matches_current(snapshot,kTextureWorld)==1;
+    }
+};
 std::unique_ptr<GameplayCpuStatics> statics(bool history=false){
     CpuStaticRow rows[2]={{uint32_t(uintptr_t(&static_value)),sizeof(static_value),CpuStaticPolicy::Restore,CpuStaticDomain::OriginalSourceC},
                          {uint32_t(uintptr_t(&invariant)),sizeof(invariant),CpuStaticPolicy::Invariant,CpuStaticDomain::OriginalSourceC}};
@@ -30,6 +76,16 @@ std::unique_ptr<GameplayCpuStatics> statics(bool history=false){
 }
 bool admitted(unsigned n){return fail_admission!=n&&stable_owner&&stable_topology;}
 void write(unsigned n){assert(order+1==n);order=n;++writes;}
+}
+extern "C" void melee_web_texture_bounds_commit_prevalidated_impl(
+    MeleeWebTextureBoundsPrepared*);
+extern "C" void melee_web_texture_bounds_commit_prevalidated(
+    MeleeWebTextureBoundsPrepared* prepared){
+    assert(expected_texture_snapshot&&expected_texture_world==kTextureWorld&&static_value==9&&
+           fighter_fields==3&&private_slots==3&&order+1==texture_commit_step);
+    melee_web_texture_bounds_commit_prevalidated_impl(prepared);
+    assert(melee_web_texture_bounds_matches_current(expected_texture_snapshot,expected_texture_world)==1);
+    ++texture_commit_calls;write(texture_commit_step);
 }
 static unsigned coupled_prepare_calls=0;
 extern "C" {
@@ -49,7 +105,10 @@ int melee_web_audio_snapshot_admit(MeleeWebAudio*,const MeleeWebAudioSnapshot*){
 int melee_web_match_flow_cpu_snapshot_admit(MeleeWebMatchFlow*,const MeleeWebMatchFlowCpuSnapshot*,char*,size_t){return admitted(4);}
 int melee_web_gameplay_bootstrap_snapshot_admit(const MeleeWebGameplayBootstrapSnapshot*,char*,size_t){return admitted(5);}
 int melee_web_match_context_snapshot_admit(MeleeWebMatchContext*,const MeleeWebMatchContextSnapshot*,char*,size_t){return admitted(6);}
-MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(const MeleeWebSourceMemoryPayloadSnapshot*){return admitted(7)?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;}
+MeleeWebSourceMemoryPayloadSnapshotStatus melee_web_source_memory_payload_snapshot_admit(const MeleeWebSourceMemoryPayloadSnapshot*){
+    if(mutate_texture_on_payload_admit)texture_mutate_again();
+    return admitted(7)?MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK:MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_TOPOLOGY_CHANGED;
+}
 int melee_web_action_interval_restore(MeleeWebActionInterval*){if(!admitted(2)||fighter_fields!=9||private_slots!=9)return 0;++legacy_action_writes;write(1);private_slots=3;assert(fighter_fields==9);return 1;}
 int melee_web_action_interval_restore_corrected(MeleeWebActionInterval*){if(!corrected_action_ok||!admitted(2)||fighter_fields!=9||private_slots!=9)return 0;++corrected_action_writes;write(1);private_slots=3;assert(fighter_fields==9);return 1;}
 int melee_web_audio_snapshot_restore(MeleeWebAudio* a,const MeleeWebAudioSnapshot* s){if(!melee_web_audio_snapshot_admit(a,s))return 0;write(2);audio_value=3;return 1;}
@@ -93,7 +152,7 @@ int slippi_particle_presentation_captured_pools_admit(SlippiParticlePresentation
 int melee_web_cpu_interval_motor_history_restore_admit(uint64_t token,uint64_t inc,uint32_t end)
 { assert(!writes);return token==4&&inc==1&&end==102; }
 void melee_web_cpu_interval_motor_history_restore_commit(uint64_t,uint64_t,uint32_t)
-{ assert(static_value==3&&fighter_fields==3);write(8); }
+{ assert(static_value==3&&fighter_fields==3&&order==8);write(9); }
 MeleeWebGameplayHeapHistoryPrepareResult melee_web_gameplay_heap_history_prepare(
     const MeleeWebGameplayHeapHistorySnapshot*)
 {
@@ -139,6 +198,7 @@ MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(
     const MeleeWebSourceMemoryHistoryPrepared*)
 {
     assert(!writes);
+    if(arena_refusal==7)texture_mutate_again();
     return arena_refusal==5?MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE:
         MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
 }
@@ -150,14 +210,17 @@ void melee_web_source_memory_history_prepared_destroy(MeleeWebSourceMemoryHistor
 static void arena_coordinator()
 {
     using R=GameplayCpuCommitResult;
-    const R expected[]{R::Ok,R::Payload,R::Audio,R::Particle,R::Payload,R::Payload,R::Payload};
+    texture_commit_step=8;
+    const R expected[]{R::Ok,R::Payload,R::Audio,R::Particle,R::Payload,R::Payload,R::Payload,R::TextureBounds};
     const char* detail[]{"","leaf=sdk-prepare status=1","","","leaf=sdk-admit status=1",
-        "leaf=shadow-admit status=6","leaf=shadow-prepare status=5 modeled first mismatch"};
+        "leaf=shadow-admit status=6","leaf=shadow-prepare status=5 modeled first mismatch",
+        "leaf=texture-bounds-admit status=0"};
     for(arena_refusal=0;arena_refusal<sizeof(expected)/sizeof(*expected);++arena_refusal){
         writes=order=fail_admission=0;
-        coupled_prepare_calls=0;
+        coupled_prepare_calls=texture_commit_calls=0;
         fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
         static_value=3;invariant=5;
+        TextureOwner textures;
         auto s=statics(true);
         auto actions=GameplayActionStoreHistory::capture();
         GameplayCpuCommitOwners o{nullptr,reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
@@ -165,6 +228,7 @@ static void arena_coordinator()
             reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),reinterpret_cast<MeleeWebMatchContext*>(7),
             reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
         o.action_history=actions.get();o.history_incarnation=1;o.history_end_frame=102;
+        textures.attach(o);
         o.arena=reinterpret_cast<const MeleeWebGameplayHeapHistorySnapshot*>(1);
         o.shadow=reinterpret_cast<MeleeWebSourceMemoryHistory*>(1);
         o.arena_base=physical_arena;o.arena_bytes=sizeof(physical_arena);
@@ -175,7 +239,9 @@ static void arena_coordinator()
         if(arena_refusal)
             assert(writes==0&&static_value==9&&fighter_fields==9&&private_slots==9);
         else
-            assert(writes==8&&static_value==3&&fighter_fields==3&&private_slots==3);
+            assert(writes==9&&static_value==3&&fighter_fields==3&&private_slots==3&&
+                   texture_commit_calls==1&&order==9);
+        if(arena_refusal)assert(texture_commit_calls==0);
     }
     puts("Owned arena coordinator rejects before writes and commits in order");
 }
@@ -184,6 +250,7 @@ int main(){
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     arena_coordinator();
 #endif
+    texture_commit_step=7;
     using R=GameplayCpuCommitResult;
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
     const unsigned last_refusal=9
@@ -200,10 +267,11 @@ int main(){
     for(unsigned fail=1;fail<=last_refusal;++fail){
         writes=order=0;fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
         legacy_action_admits=corrected_action_admits=legacy_action_writes=corrected_action_writes=0;
-        static_value=3;invariant=5;auto s=statics();
+        texture_commit_calls=0;static_value=3;invariant=5;TextureOwner textures;auto s=statics();
         GameplayCpuCommitOwners o{reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
             reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
             reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
+        textures.attach(o);
         fail_admission=fail;if(fail==8)invariant=6;
         const auto result=gameplay_cpu_commit(o);
         assert(result!=R::Ok);assert(writes==0&&order==0&&fighter_fields==9&&private_slots==9&&static_value==9);
@@ -215,15 +283,29 @@ int main(){
         const bool action_reached=fail>=2&&fail<=8;
         assert(legacy_action_admits==(action_reached?1u:0u)&&legacy_action_writes==0);
     }
-    fail_admission=0;writes=order=0;invariant=5;static_value=3;
+    fail_admission=0;writes=order=0;invariant=5;static_value=3;texture_commit_calls=0;
     legacy_action_admits=corrected_action_admits=legacy_action_writes=corrected_action_writes=0;
-    auto s=statics();
+    TextureOwner textures;auto s=statics();
     GameplayCpuCommitOwners o{reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
         reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
         reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),s.get(),4};
-    assert(gameplay_cpu_commit(o)==R::Ok);assert(writes==6&&order==6);
+    textures.attach(o);
+    assert(gameplay_cpu_commit(o)==R::Ok);assert(writes==7&&order==7&&texture_commit_calls==1);
     assert(legacy_action_admits==1&&legacy_action_writes==1&&corrected_action_admits==0&&corrected_action_writes==0);
     assert(fighter_fields==3&&private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3&&static_value==3);
+    // The real texture registry must refuse after every other admission passes
+    // if its generation changes between plan preparation and final admission.
+    writes=order=0;fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
+    static_value=3;invariant=5;legacy_action_admits=legacy_action_writes=texture_commit_calls=0;
+    TextureOwner stale_texture;auto stale_statics=statics();
+    GameplayCpuCommitOwners stale_owners{
+        reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
+        reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
+        reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),stale_statics.get(),4};
+    stale_texture.attach(stale_owners);mutate_texture_on_payload_admit=true;
+    assert(gameplay_cpu_commit(stale_owners)==R::TextureBounds);
+    mutate_texture_on_payload_admit=false;
+    assert(writes==0&&order==0&&texture_commit_calls==0&&fighter_fields==9&&static_value==9);
 #if defined(MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 #if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
@@ -241,11 +323,12 @@ int main(){
     for(unsigned fail=1;fail<=last_refusal;++fail){
         writes=order=0;fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
         legacy_action_admits=corrected_action_admits=legacy_action_writes=corrected_action_writes=0;
-        static_value=3;invariant=5;auto corrected_statics=statics();
+        texture_commit_calls=0;static_value=3;invariant=5;TextureOwner corrected_texture;auto corrected_statics=statics();
         GameplayCpuCommitOwners corrected_owners{
             reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
             reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
             reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),corrected_statics.get(),4};
+        corrected_texture.attach(corrected_owners);
         fail_admission=fail;
         if(fail==8)invariant=6;
         const bool action_reached=fail>=2&&fail<=8;
@@ -256,20 +339,22 @@ int main(){
         assert(corrected_action_admits==(action_reached?1u:0u));
         if(fail==2)assert(result==R::Action);
     }
-    fail_admission=0;writes=order=0;corrected_action_ok=true;invariant=5;static_value=3;
+    fail_admission=0;writes=order=0;corrected_action_ok=true;invariant=5;static_value=3;texture_commit_calls=0;
     legacy_action_admits=corrected_action_admits=legacy_action_writes=corrected_action_writes=0;
-    auto corrected_statics=statics();
+    TextureOwner corrected_texture;auto corrected_statics=statics();
     GameplayCpuCommitOwners corrected_owners{
         reinterpret_cast<MeleeWebActionInterval*>(1),reinterpret_cast<MeleeWebAudio*>(2),reinterpret_cast<MeleeWebAudioSnapshot*>(3),
         reinterpret_cast<MeleeWebMatchFlow*>(4),reinterpret_cast<MeleeWebMatchFlowCpuSnapshot*>(5),reinterpret_cast<MeleeWebGameplayBootstrapSnapshot*>(6),
         reinterpret_cast<MeleeWebMatchContext*>(7),reinterpret_cast<MeleeWebMatchContextSnapshot*>(8),reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(9),corrected_statics.get(),4};
+    corrected_texture.attach(corrected_owners);
     assert(gameplay_cpu_commit_corrected(corrected_owners)==R::Ok);
-    assert(writes==6&&order==6&&corrected_action_admits==1&&corrected_action_writes==1);
+    assert(writes==7&&order==7&&texture_commit_calls==1&&corrected_action_admits==1&&corrected_action_writes==1);
     assert(legacy_action_admits==0&&legacy_action_writes==0);
     assert(fighter_fields==3&&private_slots==3&&audio_value==3&&flow_value==3&&bootstrap_value==3&&context_value==3&&static_value==3);
     writes=order=0;fighter_fields=private_slots=audio_value=flow_value=bootstrap_value=context_value=9;
     legacy_action_admits=corrected_action_admits=legacy_action_writes=corrected_action_writes=0;
-    static_value=3;invariant=5;corrected_action_ok=false;auto refused_corrected_statics=statics();
+    texture_commit_calls=0;static_value=3;invariant=5;corrected_action_ok=false;TextureOwner refused_corrected_texture;auto refused_corrected_statics=statics();
+    refused_corrected_texture.attach(corrected_owners);
     corrected_owners.statics=refused_corrected_statics.get();
     assert(gameplay_cpu_commit_corrected(corrected_owners)==R::Action);
     assert(writes==0&&order==0&&corrected_action_admits==1&&corrected_action_writes==0&&legacy_action_admits==0);

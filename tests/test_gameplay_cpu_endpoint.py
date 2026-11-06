@@ -54,13 +54,20 @@ class GameplayCpuEndpointControls(OwnedWorkspaceTests):
         directory=self.work/'admitted';directory.mkdir();tmp=directory/'tmp';tmp.mkdir()
         binary=directory/'control.js'
         env=dict(os.environ,TMPDIR=str(tmp))
+        texture_object=directory/'texture-bounds.o'
+        texture_command=[str(self.emxx.with_name('emcc')),'-std=c11','-O1','-c',
+            str(SOURCE/'src/hsd_texture_bounds.c'),'-o',str(texture_object)]
+        texture_result=subprocess.run(texture_command,cwd=ROOT,env=env,
+            capture_output=True,text=True,timeout=120)
+        (directory/'texture-compile.log').write_text(texture_result.stdout+texture_result.stderr)
+        self.assertEqual(texture_result.returncode,0,texture_result.stdout+texture_result.stderr)
         command=[str(self.emxx),*self.common(),'-DMELEE_WEB_CPU_ENDPOINT_TEST=1',
             '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
             '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
             str(SOURCE/'src/gameplay_cpu_endpoint.cpp'),
             str(SOURCE/'src/gameplay_cpu_checkpoint.cpp'),
             str(SOURCE/'src/gameplay_cpu_statics.cpp'),
-            str(SOURCE/'tests/gameplay_cpu_endpoint_admitted_control.cpp'),
+            str(SOURCE/'tests/gameplay_cpu_endpoint_admitted_control.cpp'),str(texture_object),
             '-sENVIRONMENT=node','-sEXIT_RUNTIME=1','-sASSERTIONS=2','-o',str(binary)]
         compiled=subprocess.run(command,cwd=ROOT,env=env,capture_output=True,text=True,timeout=120)
         (directory/'compile.log').write_text(compiled.stdout+compiled.stderr)

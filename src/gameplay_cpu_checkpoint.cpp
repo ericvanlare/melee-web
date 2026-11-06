@@ -72,6 +72,12 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_checked(
            c->owner_.frame>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN)){
             refused(stage,code(CpuCaptureRefusal::OwnerTuple),"History PRE requires quiet source files and a bounded source-frame window");return {};
         }
+        c->commit_.texture_world=c->owner_.world;
+        c->commit_.texture_bounds=melee_web_texture_bounds_capture(c->owner_.world);
+        if(!c->commit_.texture_bounds){
+            refused(CpuComparisonDomain::Owner,code(CpuCaptureRefusal::TextureBoundsOwner),
+                    "Texture-bounds PRE owner capture returned null");return {};
+        }
         c->statics_=std::move(statics);c->commit_.statics=c->statics_.get();
         c->commit_.audio=c->owner_.audio;c->commit_.flow=c->owner_.flow;c->commit_.context=c->owner_.context;
         char leaf_error[160]{};
@@ -993,6 +999,8 @@ void GameplayCpuCheckpoint::release() noexcept {
     melee_web_gameplay_heap_history_snapshot_destroy(
         const_cast<MeleeWebGameplayHeapHistorySnapshot*>(commit_.arena));
 #endif
+    melee_web_texture_bounds_snapshot_destroy(
+        const_cast<MeleeWebTextureBoundsSnapshot*>(commit_.texture_bounds));
     melee_web_source_memory_payload_snapshot_destroy(const_cast<MeleeWebSourceMemoryPayloadSnapshot*>(commit_.payload));
     melee_web_source_memory_payload_snapshot_destroy(post_payload_);
     melee_web_match_flow_cpu_snapshot_destroy(post_flow_);

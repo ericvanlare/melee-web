@@ -116,6 +116,18 @@ def write_record(path, command, result):
     }, indent=2) + "\n")
 
 
+def compile_texture_bounds(compiler, output_dir, env):
+    source = REPO_ROOT / "src/hsd_texture_bounds.c"
+    output = output_dir / "texture-bounds.o"
+    command = [sys.executable, str(compiler / "emcc.py"), "-std=c11", "-O1",
+               "-ffunction-sections", "-fdata-sections", "-c", str(source), "-o", str(output)]
+    result = subprocess.run(command, cwd=output_dir, env=env,
+                            capture_output=True, text=True, timeout=120)
+    write_record(output_dir / "compile-texture-bounds.json", command, result)
+    if result.returncode:
+        raise AssertionError(result.stdout + result.stderr)
+    return output
+
 def source_overlay(output_dir):
     overlay = output_dir / "src"
     candidate_src = CANDIDATE_ROOT / "src"
@@ -216,13 +228,12 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
         overlay_src = source_overlay(output_dir)
         template = (CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in").read_text()
         fixture_probe = CANDIDATE_ROOT / "tests/gameplay_snapshot_probe.cpp"
-        if not fixture_probe.is_file():fixture_probe=REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
         if not fixture_probe.is_file(): fixture_probe = REPO_ROOT / "tests/gameplay_snapshot_probe.cpp"
         actual_fixture = extract_fixture_observations(fixture_probe)
         generated = template.replace("@ACTUAL_FIXTURE_OBSERVATIONS@", actual_fixture)
         # Extract the real shared source/frame admission predicate: modeled
         # owner/runtime/transfer leaves remain explicit in the control.
-        browser_source = (CANDIDATE_ROOT / "src/slippi_profile/tests/synctest_browser.cpp").read_text()
+        browser_source = (overlay_src / "slippi_profile/tests/synctest_browser.cpp").read_text()
         start = browser_source.index("uint32_t payload_admission_source_boundary(")
         end = browser_source.index("uint32_t payload_admission_boundary(", start)
         actual_source_boundary = browser_source[start:end].rstrip()
@@ -261,6 +272,7 @@ class GameplayCpuRestoreAdapterTests(OwnedWorkspaceTests):
             write_record(output_dir / f"compile-{index}.json", command, result)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+        texture_object = compile_texture_bounds(compiler, output_dir, env)
         output = output_dir / "cpu_restore_adapter_control.js"
         link = [sys.executable, str(compiler / "em++.py"), "-O1", "-fexceptions",
                 *map(str, sorted(output_dir.glob("*.o"))), "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1",
@@ -346,7 +358,7 @@ console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         v5_output=output_dir/"control-v5.js"
         v5_link=[sys.executable,str(compiler/"em++.py"),"-O1","-fexceptions",
-                 str(v5_commit_object),str(output_dir/"cpp-1.o"),str(v5_object),
+                 str(v5_commit_object),str(output_dir/"cpp-1.o"),str(v5_object),str(texture_object),
                  "-sENVIRONMENT=node","-sEXIT_RUNTIME=1","-sASSERTIONS=2","-sSAFE_HEAP=1",
                  "-sALLOW_MEMORY_GROWTH=1","-o",str(v5_output)]
         result=subprocess.run(v5_link,cwd=output_dir,env=env,capture_output=True,text=True,timeout=120)
@@ -359,7 +371,7 @@ console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
             "schema": "actual-cpu-restore-adapter-focused-control-v1",
             "result": "PASS",
             "scope": "Actual cpu_restore_adapter.inc and actual fixture observation declarations; modeled named component/session/provider leaves, not a complete source-world restore.",
-            "adapter_sha256": sha256(CANDIDATE_ROOT / "src/slippi_profile/tests/cpu_restore_adapter.inc"),
+            "adapter_sha256": sha256(overlay_src / "slippi_profile/tests/cpu_restore_adapter.inc"),
             "control_template_sha256": sha256(CANDIDATE_ROOT / "tests/cpu_restore_adapter_control.cpp.in"),
             "fixture_probe_sha256": sha256(fixture_probe),
             "js_consumer": {"path":str(helper),"sha256":sha256(helper)},
@@ -367,7 +379,7 @@ console.log('PASS actual adapter; modeled origin leaf remains UNKNOWN');"""
             "actual_witness_sha256":sha256(witness_bytes),
             "generated_control_sha256": sha256(control_source),
             "receipt_path": str(output_dir),
-            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["link.json", "run.json", "actual-js-bridge.json", "actual-witness-js-bridge.json", "compile-v5-commit.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
+            "commands": [f"compile-{index}.json" for index in range(len(commands))] + ["compile-texture-bounds.json", "link.json", "run.json", "actual-js-bridge.json", "actual-witness-js-bridge.json", "compile-v5-commit.json", "compile-v5.json", "link-v5.json", "run-v5.json"],
             "checks": [
                 "actual two-tick adapter 300/301 baseline and replay; idle waits, raw/typed evidence and first replay refusal stop before next tick",
                 "default-v5 compile rejects new route before source work while legacy routes still pass",

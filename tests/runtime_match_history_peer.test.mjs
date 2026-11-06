@@ -165,11 +165,11 @@ function createEndpointBus() {
 
 function makePeer(bus, role, {sourceFrame = 120, sourceJson = identityText(sourceFrame),
   identity = loadedIdentity, validateNativePad = () => true, inputTicks = 1, timeoutMs = 1000,
-  sampleTimeoutMs = timeoutMs} = {}) {
+  sampleTimeoutMs = timeoutMs,deferredLocalTick = null} = {}) {
   return createRuntimeMatchHistoryPeer({
     role, relayUrl: 'ws://local.test/room', roomId: 'R'.repeat(24), timeoutMs, sampleTimeoutMs,
     sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks,
-    validateNativePad, createEndpoint: bus.createEndpoint,
+    validateNativePad,deferredLocalTick,createEndpoint: bus.createEndpoint,
   });
 }
 
@@ -331,6 +331,44 @@ test('local refusal is nonpublishing, sample deadlines are finite, and a success
     assert.deepEqual(alpha.snapshot().local_contribution.pad, accepted.pad);
   } finally {
     await Promise.allSettled([alpha.close(), beta.close()]);
+  }
+});
+
+test('explicit deferred peer sample releases once with its original poll identity and PAD bytes', async () => {
+  const bus=createEndpointBus();
+  const alpha=makePeer(bus,'alpha',{inputTicks:2}),beta=makePeer(bus,'beta',{inputTicks:2,deferredLocalTick:0});
+  try{
+    await Promise.all([alpha.start(),beta.start()]);
+    const pad=validPad(73),original=[...pad];
+    await assert.rejects(alpha.publishLocal({port:0,tick:0,pollSerial:'1',pad,deferSend:true}),
+      /differs from its explicitly configured tick/);
+    await assert.rejects(beta.publishLocal({port:1,tick:0,pollSerial:'2',pad}),
+      /differs from its explicitly configured tick/);
+    await assert.rejects(beta.releaseDeferredLocal(1),
+      /differs from its explicitly configured tick/);
+    const held=await beta.publishLocal({port:1,tick:0,pollSerial:'2601',pad,deferSend:true});
+    pad.fill(0);
+    assert.deepEqual(held,{accepted_by:'native-validated-local-poll',local_port:1,
+      protocol_input_tick:0,poll_serial:'2601',pad:original});
+    assert.equal(alpha.remoteSnapshot(0),null,'deferred actual sample escaped before release');
+    await assert.rejects(beta.publishLocal({port:1,tick:0,pollSerial:'2601',pad:original,deferSend:true}),
+      /accepts local PAD publications once/);
+    const releaseAttempts=await Promise.allSettled([
+      beta.releaseDeferredLocal(0),beta.releaseDeferredLocal(0),
+    ]);
+    assert.equal(releaseAttempts[0].status,'fulfilled');
+    assert.equal(releaseAttempts[1].status,'rejected');
+    assert.match(String(releaseAttempts[1].reason),/requires its retained original publication/);
+    assert.equal(bus.sent.beta.filter(text=>JSON.parse(text).type==='state').length,1,
+      'concurrent release emitted more than one original packet');
+    const released=releaseAttempts[0].value;
+    assert.deepEqual(released,held,'release changed the original native poll receipt');
+    const remote=await alpha.waitForRemoteSample({tick:0,timeoutMs:100});
+    assert.deepEqual(remote.pad,original);
+    await assert.rejects(beta.releaseDeferredLocal(0),
+      /requires its retained original publication/);
+  }finally{
+    await Promise.allSettled([alpha.close(),beta.close()]);
   }
 });
 

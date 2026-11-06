@@ -14479,6 +14479,256 @@
                 },
                 "observed": "Piece index 37917 was a retired 24-requested/32-physical-byte TEXP_CNST sidecar (MELEE_WEB_CLASS_PIECE_SITE_TEXP_CNST); saved PRE geometry/tag/generation/site remained while the live row was zeroed. Both pages refused at shadow prepare. No successful late restore or browser reuse was observed."
               }
+            },
+            "issue_369_late_correction_v1": {
+              "issue": 369,
+              "status": "MATCHED_LATE_CORRECTION_PASS; FULL_REGRESSION_AND_RELEASE_PASS; ISSUE_369_PUBLICATION_CI_PENDING",
+              "scope": "Finite local two-peer 120-input capture with unchanged seven-row, three-incarnation and two-restore bounds. Demonstrates one actual late correction after observed TEXP_CNST class-piece retirement; does not establish whole-match or online acceptance.",
+              "producer_history": {
+                "positive_native_and_harness": "37a9617b1ee977f7756611418779d2de6f34df54",
+                "scenario_js_source": "feadb3ad3c0c464df7d85800d785f85c7f744a09",
+                "matched_pre_repair_native": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                "texture_diagnostic_native": "db92be55206ef45ef21513a449f5acf6484b6ea9"
+              },
+              "positive_capture": {
+                "independent_result_review": {
+                  "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-late-piece-texture-restored-v1/independent-result-review.json",
+                  "sha256": "f8bafa8a8d030b5228f2eef3a9342252bed7c25ea77d81f963e59a5e3f256321",
+                  "decision": "PASS matched late native restore and replay through the bounded 120-input result"
+                },
+                "raw_result_sha256": "7e60d6fabe4198866d3ecf1fb424e3f7eeec43a14a769342e5bf9c55f47b8d7b",
+                "summary_sha256": "e2b509465219c78309805b3ee1b08c25a3540bbf6aa0e69edfb66b77dd14a2d0",
+                "producer_archive_sha256": "59004bb7faa4212963201db72b9b73c3e6e57678b50489c49efe4a868c4195e2",
+                "alpha_late_restore": {
+                  "pre_frame": 21,
+                  "selected_frontier": 28,
+                  "dirty_index": 26,
+                  "restore_count": 1,
+                  "replayed_ticks": [
+                    21,
+                    22,
+                    23,
+                    24,
+                    25,
+                    26,
+                    27
+                  ],
+                  "corrected_present_frame": 28,
+                  "actual_input": [
+                    0,
+                    0,
+                    127,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  "prior_prediction": [
+                    0,
+                    0,
+                    129,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                  ],
+                  "retained_packet_reused_without_second_poll": true
+                },
+                "matched_input_and_checksum": {
+                  "matched_forward_prefix_rows": 28,
+                  "matched_forward_prefix_pad44_sha256": "e123d103a6276b362776e5fe51a9fbc58e8a7ef1878f994a8f35dcdd725392d8",
+                  "authoritative_rows_compared": 120,
+                  "authoritative_rows_equal": true,
+                  "pre_restore_checksum_sha256": "05abc50d542a77561286e328b6a4c965fac798d1ea32c68ff4905a66b5e7a6e5",
+                  "terminal_checksum_bytes": 64,
+                  "terminal_checksum_sha256": "74330ed7eed26cc31a3398e0ee73e559630c73c674834f9961c79e19c3de544c",
+                  "checksum_view": "presented-frontier",
+                  "exchange": "Local exact byte comparison; no peer checksum exchange"
+                },
+                "cadence_draws_and_cleanup": {
+                  "alpha": {
+                    "polls": 120,
+                    "forward_draws": 120,
+                    "corrected_draw": 28,
+                    "clock_stalled": false
+                  },
+                  "beta": {
+                    "polls": 120,
+                    "forward_draws": 120,
+                    "corrected_draw": 1,
+                    "clock_stalled": false
+                  },
+                  "native_owners": "retired",
+                  "owned_browser_pids_absent": 19,
+                  "owner_passed": true,
+                  "worker_disposed_and_group_dead": true,
+                  "peer_and_browser_cleanup": "both peers closed; both browser contexts and browsers closed",
+                  "pins_unchanged": true
+                },
+                "h1": {
+                  "alpha_export": "retained",
+                  "beta_export": "retained",
+                  "incidents_each": 0,
+                  "projection": "missing; H1 event coverage not established"
+                }
+              },
+              "matched_pre_repair_control": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-late-piece-negative-v2/independent-result-review.json",
+                "sha256": "fd92eea1286a6e5df3289b54a8bfafae448009bf125d54963dd632e87eed0721",
+                "native": "16eb6f8e7be962a5f9f44c09ec567652c66773fb",
+                "scenario_js_source": "feadb3ad3c0c464df7d85800d785f85c7f744a09",
+                "match": {
+                  "pre_frame": 21,
+                  "frontier": 28,
+                  "dirty_index": 26,
+                  "pre_restore_checksum_sha256": "05abc50d542a77561286e328b6a4c965fac798d1ea32c68ff4905a66b5e7a6e5",
+                  "matched_forward_prefix_rows": 28,
+                  "matched_forward_prefix_pad44_sha256": "e123d103a6276b362776e5fe51a9fbc58e8a7ef1878f994a8f35dcdd725392d8"
+                },
+                "result": "FAILED_AT_SHADOW_PREPARE_AFTER_OBSERVED_TEXP_CNST_CLASS_PIECE_RETIREMENT; matched old producer did not restore the late piece"
+              },
+              "texture_bounds_diagnostic": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-late-piece-texture-diagnostic-v1/independent-result-review.json",
+                "sha256": "c4250f2f8bdd01e2068bc50d73475066277ff0e78dcd1c4887094cbc99c429c3",
+                "native": "db92be55206ef45ef21513a449f5acf6484b6ea9",
+                "first_unchanged_prefix_replay_tick": 21,
+                "observed_call": {
+                  "object": "0x378c4c0",
+                  "channel": 1,
+                  "float_bits": "0x41000000",
+                  "float_value": 8.0,
+                  "binding_lookup_observed": true,
+                  "binding_value": 0,
+                  "binding_present": false,
+                  "live_entries_observed": 51,
+                  "selected_authored_image_table_count_observed": false,
+                  "refusal": "binding-missing"
+                },
+                "limits": "The selected authored image-table count was unobserved; PRE registry membership is unknown. The missing binding is a call-site observation, not a complete causal explanation."
+              },
+              "focused_component_controls": {
+                "integrated_peer_controls": {
+                  "path": "runtime369-integrated-focused-v1/result.json",
+                  "sha256": "c4476912c0d407f441027a398ac62527c91ef695acf728eb9db971e8dcb39227",
+                  "command": "node --test tests/runtime_match_history_peer.test.mjs",
+                  "result": "PASS"
+                },
+                "diagnostic_reducer": {
+                  "path": "runtime369-texture-bounds-focused-v1/result.json",
+                  "sha256": "17b8e8bdc6af8cb1e4d33b6c698288886dc096e39744f3c12c10f73ce3b98837",
+                  "result": "PASS; reproduces diagnostic registry lifecycle only, not the production restore repair"
+                },
+                "snapshot_leaf_focused_run": {
+                  "path": "hsd-texture-bounds-snapshot-candidate-v2/focused-run-v2.json",
+                  "sha256": "48fd0d0906d288afb56f457864cd519c47f117466289433abb0d9f900eba2918",
+                  "result": "PASS; actual C snapshot lifecycle controls"
+                },
+                "snapshot_leaf_independent_review": {
+                  "path": "hsd-texture-bounds-snapshot-candidate-v2/independent-leaf-review.json",
+                  "sha256": "153da9ed659d9a4885fc62f0b0161bc88b7c241fef161f032b68af26f6e766ac",
+                  "result": "GO leaf to aggregate integration"
+                },
+                "aggregate_controls": {
+                  "path": "hsd-texture-bounds-adapter-controls-candidate-v1/aggregate-focused-v1.log",
+                  "sha256": "9d7639e8d5745a0c15fe70cc38ba92c25cb0f2b24a0974b3f040886a8a9539a7",
+                  "controls": 10,
+                  "result": "PASS"
+                },
+                "adapter_controls": {
+                  "path": "hsd-texture-bounds-adapter-controls-candidate-v1/focused-v1.log",
+                  "sha256": "556558c688257844d57cf78e09458001cfc06b6fad6f1c9ef3a0d12387197ceb",
+                  "tests": 3,
+                  "result": "PASS"
+                }
+              },
+              "retained_failed_attempts": [
+                {
+                  "path": "runtime-peer-late-piece-repaired-v1/result-summary.json",
+                  "sha256": "ffbc70c06c42f9673b21e4c72a76abf98b22f64676f0d9f327f188816b0211a4",
+                  "failure_analysis": {
+                    "path": "runtime-peer-late-piece-repaired-v1/failure-analysis.json",
+                    "sha256": "43193cd53b0375cd904e2ab1793b874d3322d265777d541f6d6c5d97a80ff0df"
+                  },
+                  "result": "clock stalled at frame 15 before the target late window"
+                },
+                {
+                  "path": "runtime-peer-late-piece-negative-v1/independent-result-review.json",
+                  "sha256": "bff00550cf9dc6b96fb3da4e58e5b3efda42d40ddb1f9930a56933f93c19f94a",
+                  "result": "unmatched PRE22/F28 negative refused at shadow prepare; superseded by matched v2 control"
+                },
+                {
+                  "path": "runtime-peer-late-piece-repaired-v2/independent-result-review.json",
+                  "sha256": "c4f710a30877bf650e763e94cc8e2e05d26e418e3c749c608574b3c9dadde840",
+                  "result": "TObjUpdateFunc panic at alpha tick 21; raw arguments not retained; alpha native cleanup timed out at 5000 ms; H1 alpha export missing"
+                },
+                {
+                  "path": "runtime-peer-late-piece-texture-diagnostic-v1/independent-result-review.json",
+                  "sha256": "c4250f2f8bdd01e2068bc50d73475066277ff0e78dcd1c4887094cbc99c429c3",
+                  "result": "binding-missing diagnostic confirmed; no completed replay; alpha native cleanup timed out at 5000 ms; H1 alpha export missing; later owner process cleanup passed"
+                },
+                {
+                  "path": "runtime369-texture-restore-preparation-refusal-v1.json",
+                  "sha256": "225e6d054158c16985ec58ede978d1d13c54870a84f0641cd20d25862a41ee0d",
+                  "result": "preparation refused stale native C++ pins; capture was not launched"
+                }
+              ],
+              "fixture_only_failures": "The external overlay-path and controlMissingOwner fixture failures were fixture-only and corrected; they are not browser failures.",
+              "validation": {
+                "source_head": "37a9617b1ee977f7756611418779d2de6f34df54",
+                "full_regression": {
+                  "status": "PASS",
+                  "tests": 3110,
+                  "skips": 242,
+                  "failures": 0,
+                  "elapsed_seconds": 735.8058044998907,
+                  "result_path": "runtime369-integration-validation-v1/full-regression-result.json",
+                  "result_sha256": "cdb9a5aae53ad7516fc6599073170c426622629d05736fe60f0fecda12f6ddd3",
+                  "log_sha256": "a1bc9f89de852007c8d51015889a3b2c30bf88a45c23da9d776db62444bd6fe9"
+                },
+                "ordinary_release_build": {
+                  "status": "PASS",
+                  "elapsed_seconds": 21.40787558304146,
+                  "result_path": "runtime369-integration-validation-v1/ordinary-release-result.json",
+                  "result_sha256": "f5b7513c329891cd4ae1b357b99afe89f9dc017ede4cbe96f8d21f0c5c602498",
+                  "log_sha256": "e47730c210918757e609b70ddedf272158c89e05c44f4e2a0020a002982a9e35"
+                },
+                "private_diagnostic_release_build": {
+                  "status": "PASS",
+                  "result_path": "runtime-texture-restore-build-v1/result.json",
+                  "result_sha256": "cd09c26af308e658e6be33f02d7a27d5d1a595c183633b43063515010a991fe3",
+                  "log_sha256": "74801a8ca2e4f44d4b31917c45e57fd4f82772add5e21e194fb1c94a357c826d"
+                },
+                "issue_369_publication_ci": "PENDING_ROOT_RESULT"
+              },
+              "limits": [
+                "No complete source-world byte comparison.",
+                "No full-match, public/internet relay, human acceptance, or sustained 60 Hz claim.",
+                "Late correction and local 120-row/checksum agreement do not establish whole-session acceptance."
+              ],
+              "texture_bounds_restore_fix": {
+                "contract": "An exact PRE registry snapshot is bound to a typed owner; prepare/admit validate it before writes. Commit swaps host rows after SDK and shadow payload writes and before statics; the existing lookup guard and authored bounds remain unchanged."
+              },
+              "issue_368_baseline_merge": {
+                "receipt": {
+                  "path": "runtime368-integration-receipt-v1.json",
+                  "sha256": "e69b7f4854ab974eba3ba332103ffe095d42f7e6b3c560510dd29f1effc783b5"
+                },
+                "merge_commit": "1c56df6ed082d69ec91610be3d720bf84ba2cb4a",
+                "publication_head": "5eb6b32264e00eaf285a61094abca495488e0ce4",
+                "reviewed_merged_tree_equal": true,
+                "checks": {
+                  "success": 13,
+                  "expected_skips": 2
+                }
+              }
             }
           }
         }

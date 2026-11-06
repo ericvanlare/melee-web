@@ -229,6 +229,8 @@ namespace melee_web {
 GameplayCpuCheckpoint::~GameplayCpuCheckpoint() {
     if(source_step_possible_&&!retired_) std::abort();
     if(actions_) melee_web_action_interval_destroy(actions_);
+    melee_web_texture_bounds_snapshot_destroy(
+        const_cast<MeleeWebTextureBoundsSnapshot*>(commit_.texture_bounds));
     melee_web_cpu_restore_mark_destroy();
 }
 std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture(
@@ -274,6 +276,9 @@ std::unique_ptr<GameplayCpuCheckpoint> GameplayCpuCheckpoint::capture_range(
         value->commit_.context_snapshot=reinterpret_cast<MeleeWebMatchContextSnapshot*>(std::uintptr_t(0x108));
         value->commit_.payload=reinterpret_cast<MeleeWebSourceMemoryPayloadSnapshot*>(std::uintptr_t(0x109));
         value->commit_.statics=value->statics_.get();
+        value->commit_.texture_world=1; // Modeled source world.
+        value->commit_.texture_bounds=melee_web_texture_bounds_capture(value->commit_.texture_world);
+        if(!value->commit_.texture_bounds)return {};
         return value;
     } catch(...) { return {}; }
 }
