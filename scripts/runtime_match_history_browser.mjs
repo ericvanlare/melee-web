@@ -14,14 +14,23 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
 import {createRuntimeMatchAdmission} from './runtime_match_history_admission.mjs';
+import {validateCpuRestoreConfiguration} from '../src/slippi_profile/tests/cpu_restore_runner.mjs';
+import {runSameInstanceRuntimeHistory} from '../src/slippi_profile/tests/runtime_history_probe.mjs';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const WASM_REL='gameplay_menu_browser.wasm';
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
 const CARD_BYTES=0x1790+7*0x1f2c;
-const options=Object.fromEntries(['url','disc','out','playwright','runtime-wasm-sha256']
+const options=Object.fromEntries(['url','disc','out','playwright','runtime-wasm-sha256',
+  'phase','linked-config','manifest','map']
   .map(name=>[name,{type:'string'}]));
 const {values}=parseArgs({options,strict:true});
+const phase=values.phase??'admission';
+assert(['admission','same-input-replay'].includes(phase),'Unknown runtime history phase');
+if(phase==='same-input-replay')for(const name of ['linked-config','manifest','map'])
+  assert(values[name],`--${name} is required for same-input-replay`);
+else assert(!values['linked-config']&&!values.manifest&&!values.map,
+  'CPU configuration is only supported by the same-input-replay phase');
 for(const name of ['url','disc','out','runtime-wasm-sha256'])
   if(!values[name])throw Error(`--${name} is required`);
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,
@@ -53,9 +62,30 @@ const wasmPath=path.join(ROOT,'build/browser-match-history-release',WASM_REL);
 const actualWasmHash=await hashFile(wasmPath);
 assert.equal(actualWasmHash,values['runtime-wasm-sha256'],
   'Built ordinary runtime differs from the reviewed Wasm identity');
+let linkedConfiguration=null,historyWire=null;
+if(phase==='same-input-replay'){
+  const configPath=path.resolve(values['linked-config']),manifestPath=path.resolve(values.manifest),mapPath=path.resolve(values.map);
+  const config=JSON.parse(await fs.readFile(configPath,'utf8'));
+  assert.equal(config.schema,'aggregate-cpu-final-linked-configuration-v1');
+  assert.equal(typeof config.policyFile,'string');
+  const policyPath=path.resolve(path.dirname(configPath),config.policyFile);
+  const policy=JSON.parse(await fs.readFile(policyPath,'utf8'));
+  const manifest=JSON.parse(await fs.readFile(manifestPath,'utf8'));
+  const [mapSha256,manifestSha256,policySha256,configSha256]=await Promise.all([
+    hashFile(mapPath),hashFile(manifestPath),hashFile(policyPath),hashFile(configPath)]);
+  assert.equal(manifest.configuration_identity?.link_map_sha256,mapSha256);
+  historyWire=validateCpuRestoreConfiguration(config,policy,manifest,
+    {wasmSha256:actualWasmHash,mapSha256,manifestSha256,policySha256});
+  linkedConfiguration={config_path:configPath,config_sha256:configSha256,
+    policy_path:policyPath,policy_sha256:policySha256,manifest_path:manifestPath,
+    manifest_sha256:manifestSha256,map_path:mapPath,map_sha256:mapSha256,wire_rows:historyWire.length};
+}
 
 const report={schema:'melee-web-runtime-match-history-admission-v1',
-  scope:'one headless ordinary-runtime page; original CSS/SSS keyboard route; native agreed start, recorded ordinary-local Entry/Ready/Go input and draw prefix, then held gameplay-frame-zero terminal takeover; no capture, network session, replay or rollback command',
+  phase,linked_configuration:linkedConfiguration,
+  scope:phase==='admission'
+    ?'one headless ordinary-runtime page; original CSS/SSS keyboard route; native agreed start, recorded ordinary-local Entry/Ready/Go input and draw prefix, then held gameplay-frame-zero terminal takeover; no capture, network session, replay or rollback command'
+    :'one headless ordinary-runtime page; original menu/startup route; one actual keyboard forward tick, strict same-input snapshot/restore/replay and original presentation; no wrong prediction, peer transport, full-match or acceptance claim',
   result:'RUNNING',started_at:new Date().toISOString(),
   runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
   disc:{image_sha256:discImageHash,validated_identity:null},
@@ -245,6 +275,43 @@ async function admitTerminalTakeover(){
 
   await page.screenshot({path:path.join(out,'terminal-owner-admitted.png'),fullPage:false});
   report.screenshots.push('terminal-owner-admitted.png');
+  if(phase==='same-input-replay'){
+    await page.evaluate(wire=>globalThis.__meleeRuntimeMatchHistory.configure(wire),historyWire);
+    const held=report.route.agreed_start.held;
+    // This is an assertion of the existing SDL two-keyboard mapping, never an
+    // injected input: KeyD maps to PAD_AXIS_LEFT_X_POS, whose raw magnitude is
+    // 127. The native forward command still polls all four actual PAD rows.
+    const expectedLocalPad=Uint8Array.from([0,0,127,0,0,0,0,0,0,0,0]);
+    let probe,probeError=null;
+    try{
+      probe=await runSameInstanceRuntimeHistory(page,{
+        prefixJSON:held.prefix_json,
+        publication:{...held.publication,raw:Uint8Array.from(held.publication.raw)},
+        liveIdentity:held.live_identity,actionLabel:'actual P1 KeyD / right; two-keyboard layout',
+        expectedLocalPad,
+        pressLocalAction:async ownedPage=>{
+          await ownedPage.locator('#canvas').focus();
+          assert(await ownedPage.evaluate(()=>document.activeElement?.id==='canvas'));
+          await ownedPage.keyboard.down('KeyD');
+        },
+        releaseLocalAction:ownedPage=>ownedPage.keyboard.up('KeyD'),
+      });
+    }catch(error){probe=error.sameInstanceRuntimeHistoryPartial??null;probeError=error;}
+    if(probe){
+      const bytes=Buffer.from(JSON.stringify(probe)+'\n');
+      await fs.writeFile(path.join(out,'same-input-restore.json'),bytes);
+      report.same_input_restore={file:'same-input-restore.json',sha256:sha256(bytes),bytes:bytes.length,
+        status:probe.status,first_failure:probe.firstFailure??null,
+        comparisons:probe.comparisons,unobserved:probe.unobserved};
+    }
+    if(probeError)throw probeError;
+    assert.equal(probe?.status,'same-input-restore-control-complete');
+    addCheck('same-instance actual-input source snapshot, forward, restore and identical-input replay',
+      report.same_input_restore);
+    await observePageHealth('after same-input restore control');
+    await page.screenshot({path:path.join(out,'same-input-restored-match.png'),fullPage:false});
+    report.screenshots.push('same-input-restored-match.png');
+  }
   const clean=await page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.command('cleanup'));
   report.route.cleanup=clean;
   nativeCleanupSucceeded=clean.ownerState===2&&clean.gpuPending===0;
