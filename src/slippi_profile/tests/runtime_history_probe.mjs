@@ -46,6 +46,14 @@ function remotePortFromHeldPrefix(prefix) {
   return fullPad.subarray(PORTS.remote * PAD_BYTES, (PORTS.remote + 1) * PAD_BYTES);
 }
 
+function endpointEffectToken(endpoint, label) {
+  const row = endpoint.domains[1]?.records.find(record =>
+    record.kindName === 'EffectToken' && record.index === 0);
+  if (!row || row.fields.length !== 1 || !/^(0|[1-9][0-9]*)$/.test(row.fields[0]))
+    throw new Error(`${label} has no canonical Effects.EffectToken row`);
+  return BigInt(row.fields[0]);
+}
+
 function overwritePadPort(frame, port, pad) {
   if (frame.length !== FRAME_BYTES || pad.length !== PAD_BYTES)
     throw new Error('Runtime history PAD comparison extent');
@@ -296,12 +304,20 @@ export async function runSameInstanceRuntimeHistory(page, {
     await command('capture');
     const capturePre = await endpoint('capturePre', CPU_ENDPOINT_VIEW.pre,
       CPU_ENDPOINT_PROVENANCE.sharedPre, 0, PHASE.capturedPre);
-    report.reference = {preEndpoint: 'capturePre'};
+    report.reference = {capturePreEndpoint: 'capturePre'};
 
     await command('begin');
     const armedPre = await endpoint('armedPre', CPU_ENDPOINT_VIEW.pre,
       CPU_ENDPOINT_PROVENANCE.sharedPre, 0, PHASE.armedPre);
-    report.comparisons.armedPre = compareCpuReferenceParticleEndpoints(capturePre, armedPre);
+    const captureToken = endpointEffectToken(capturePre, 'Capture PRE');
+    const armedToken = endpointEffectToken(armedPre, 'Armed PRE');
+    if (captureToken !== 0n || armedToken === 0n)
+      throw new Error(`History begin did not transition its phase-owned effect token from zero to nonzero (${captureToken} -> ${armedToken})`);
+    report.lifecycle = {capturePreEndpoint: 'capturePre', armedPreEndpoint: 'armedPre',
+      effectTokenAtCapture: captureToken.toString(), effectTokenAfterBegin: armedToken.toString(),
+      effectTokenTransition: 'expected capture-only zero token to armed nonzero token',
+      crossPhaseStrictComparison: 'not applicable; both complete raw endpoints retained'};
+    report.reference.preEndpoint = 'armedPre';
 
     await pageOperation(page, 'remotePad', [...remotePad]);
     report.remotePad = {source: 'held-prefix:last-row:port-1', bytesBase64: encodeBase64(remotePad)};
@@ -364,7 +380,7 @@ export async function runSameInstanceRuntimeHistory(page, {
     const restoredPre = await endpoint('restoredPre', CPU_ENDPOINT_VIEW.pre,
       CPU_ENDPOINT_PROVENANCE.sharedPre, 0, PHASE.restoredPre);
     report.restored.preEndpoint = 'restoredPre';
-    report.comparisons.restoredPre = compareCpuReferenceParticleEndpoints(capturePre, restoredPre);
+    report.comparisons.restoredPre = compareCpuReferenceParticleEndpoints(armedPre, restoredPre);
 
     await pageOperation(page, 'remotePad', [...remotePad]);
     await command('correct');
@@ -385,7 +401,7 @@ export async function runSameInstanceRuntimeHistory(page, {
     report.corrected.cpuEndpoint = 'correctedCpu';
     // Preserve and compare the first corrected CPU endpoint before any draw.
     report.comparisons.cpu = compareCpuParticleEndpoints(referenceCpu, correctedCpu, {
-      preLeft: capturePre, preRight: restoredPre,
+      preLeft: armedPre, preRight: restoredPre,
     });
     const correctedPcm = await bytes('pcm');
     report.corrected.pcmBase64 = correctedPcm.toString('base64');
@@ -414,7 +430,7 @@ export async function runSameInstanceRuntimeHistory(page, {
       CPU_ENDPOINT_PROVENANCE.corrected, 1, PHASE.correctedComplete);
     report.corrected.drawEndpoint = 'correctedDraw';
     report.comparisons.draw = compareCpuParticleEndpoints(referenceDraw, correctedDraw, {
-      preLeft: capturePre, preRight: restoredPre,
+      preLeft: armedPre, preRight: restoredPre,
     });
 
     await command('close');
