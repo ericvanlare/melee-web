@@ -2244,17 +2244,36 @@ reproduced a cause. A minimal header-alias fix is committed at validation source
 `3d9c8d99`; the four affected focused modules pass. Full regression v2 on that
 An independent review approves composed source `3d9c8d99`. Full regression v2
 passes (3,109 tests, 242 skips), and both the ordinary Release and private
-history diagnostic Release builds pass. Their receipts are pinned below;
-publication-head CI remains pending.
+history diagnostic Release builds pass. PR #370 later merged as `1c56df6e`; its
+publication head `5eb6b322` matched the reviewed tree and all 15 checks completed
+(13 successes, 2 expected skips). The merge receipt is pinned below.
 
-The next execution gate is issue #369: one actual late-input correction with a
-nonzero dirty index after the speculative branch crosses the observed
-class-piece retirement boundary. Retain the 120 actual PAD rows, terminal
-64-byte checksum, native owner/status checks, corrected presentation order and
-cleanup evidence. The current route does not publish whole raw CPU/DRAW
-endpoints, so do not claim those comparisons. The default 120-input capture will
-not be repeated. Keep history bounds, restore counts and deadlines unchanged.
-Issue #368 remains open until the late browser correction is demonstrated.
+### Issue #369: late correction after class-piece retirement
+
+In the matched two-peer capture, a real ArrowLeft→ArrowRight keyboard change produces
+a packet that is held and released unchanged, without repolling. Alpha restores PRE21
+at F28 (dirty=26), replays ticks 21–27 within the seven-row bound, then presents corrected
+frame 28. A matched pre-repair producer with the same 28 forward PAD rows and
+pre-restore presented-frontier checksum refuses after observed `TEXP_CNST` retirement.
+
+At the first unchanged-prefix replay tick 21, the diagnostic reports a missing texture binding
+(object `0x378c4c0`, channel 1, bits `0x41000000`/8.0f; 51 live entries). The selected
+authored image-table count and PRE membership are unknown. The repair binds an exact
+PRE registry snapshot to a typed owner, and prepare/admit validate it before writes.
+Commit swaps host rows after SDK and shadow payload writes and before statics; the
+existing lookup guard is unchanged. Focused C, aggregate, and adapter controls pass as
+component evidence.
+
+Both peers complete 120 polls with all 120 authoritative 44-byte PAD rows and the
+terminal 64-byte presented-frontier checksum equal locally. Alpha draws 120 forward
+frames plus corrected frame 28; beta's correction is frame 1. Neither clock stalls.
+Cleanup retires owners, closes peers/browsers, disposes the Worker, and confirms 19
+owned browser PIDs absent. H1 exports persist with zero incidents; the missing
+projection leaves event coverage unestablished.
+
+Bounded local result only: no complete source-world bytes, full match, public relay,
+human acceptance, or sustained 60 Hz claim. Full regression and ordinary/private
+diagnostic Release builds pass at `37a9617b`; issue #369 CI remains pending.
 
 ## Stage decision dependencies, issue #333
 
