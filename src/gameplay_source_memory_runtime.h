@@ -242,6 +242,25 @@ melee_web_source_memory_payload_endpoint_allocated_cell(
 MeleeWebSourcePayloadEndpointHeader
 melee_web_source_memory_payload_current_endpoint_header(
     const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot);
+/* Typed arena history END admission. This rebuilds private pre-owned sorted
+ * scratch on each call and returns shadow admission separately from the
+ * payload header status. On shadow success, out->status is always the actual
+ * payload admission result; only an all-OK result binds this exact output
+ * object for the following serialized allocation lookups. Any later rebuild
+ * or refusal invalidates that borrowed header. */
+MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_current_endpoint_header(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebSourceMemoryPayloadSnapshot* payload,
+    MeleeWebSourcePayloadEndpointHeader* out);
+/* Exact-host lookup using the sorted scratch bound by the preceding successful
+ * typed header call. Pass the same header object by address; copied/stale
+ * headers refuse. No allocation or source callback occurs in this lookup. */
+MeleeWebSourceMemoryReadStatus
+melee_web_source_memory_history_current_allocation_read(
+    const MeleeWebSourceMemoryHistory* pre,
+    const MeleeWebSourcePayloadEndpointHeader* admitted_header,
+    const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out);
 MeleeWebSourcePayloadEndpointRow
 melee_web_source_memory_payload_current_endpoint_row(
     const MeleeWebSourceMemoryPayloadSnapshot* owner_snapshot,

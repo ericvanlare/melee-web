@@ -182,7 +182,7 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
                     pre_frame):false);
             if(!statics_admitted)return collect_refusal("history-static-pre");
         }
-        if(!pre&&!checkpoint.history_endpoint_admit(*session_))
+        if(!pre&&!checkpoint.history_endpoint_admit(*session_,&out.payload))
             return collect_refusal("history-end-admit");
         out.history_phase=static_cast<std::uint32_t>(checkpoint.phase_);
         out.history_incarnation=checkpoint.history_incarnation_;
@@ -238,7 +238,7 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     if(checkpoint.commit_.arena){
-        if(!history_mode_||(pre&&!checkpoint.history_payload_admit()))
+        if(!history_mode_||(pre&&!checkpoint.history_payload_admit(&out.payload)))
             return collect_refusal("arena-history-owner");
         const auto sdk=melee_web_gameplay_heap_history_observe(checkpoint.commit_.arena);
         const auto shadow=melee_web_source_memory_history_observe(checkpoint.commit_.shadow);
@@ -268,9 +268,9 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 
 #endif
 
-    out.payload=pre&&!out.arena.schema?
-        melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
-        melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
+    if(!out.arena.schema)
+        out.payload=pre?melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
+            melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
     if(out.payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||out.payload.schema!=1||
        out.payload.row_count>UINT32_MAX||out.payload.free_cell_count>UINT32_MAX||
        out.payload.allocated_cell_count>UINT32_MAX)

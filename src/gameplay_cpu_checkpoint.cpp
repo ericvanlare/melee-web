@@ -335,47 +335,59 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
     return true;
 }
 
-bool GameplayCpuCheckpoint::history_payload_admit() const noexcept
+bool GameplayCpuCheckpoint::history_payload_admit(
+    MeleeWebSourcePayloadEndpointHeader* arena_payload) const noexcept
 {
-    return commit_.arena?!history_arena_failure():
+    return commit_.arena?!history_arena_failure(arena_payload):
         melee_web_source_memory_payload_snapshot_admit(commit_.payload)==
             MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK;
 }
 
-const char* GameplayCpuCheckpoint::history_arena_failure() const noexcept
+const char* GameplayCpuCheckpoint::history_arena_failure(
+    MeleeWebSourcePayloadEndpointHeader* arena_payload) const noexcept
 {
 #if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
     const void* base=nullptr;
     size_t bytes=0;
     if(!melee_web_gameplay_active_arena_view(&base,&bytes)||base!=commit_.arena_base||
        bytes!=commit_.arena_bytes)return "Owned SDK arena identity or extent changed";
-    if(melee_web_source_memory_history_current_admit(commit_.shadow)!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+    MeleeWebSourcePayloadEndpointHeader shadow{};
+    if(melee_web_source_memory_history_current_endpoint_header(
+           commit_.shadow,commit_.payload,&shadow)!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
         return "Owned SDK arena selected shadow state refused";
-    const auto shadow=melee_web_source_memory_payload_current_endpoint_header(commit_.payload);
     if(shadow.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
         return "Owned SDK arena shadow payload observation refused";
-    auto shadow_owner=shadow;
+    // The synchronous SDK visitor performs no source work. Each lookup
+    // validates the same freshly admitted owner/fence before reading the index.
+    struct ShadowView {
+        const MeleeWebSourceMemoryHistory* pre;
+        const MeleeWebSourcePayloadEndpointHeader& header;
+    } view{commit_.shadow,shadow};
     const auto visit=[](void* context,uint64_t,const void* payload,uint32_t capacity)->int {
-        const auto& owner=*static_cast<const MeleeWebSourcePayloadEndpointHeader*>(context);
+        const auto& view=*static_cast<const ShadowView*>(context);
+        const auto& owner=view.header;
         MeleeWebSourceMemoryAllocation row{};
-        return melee_web_source_memory_allocation_read(payload,&row)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
+        return melee_web_source_memory_history_current_allocation_read(
+            view.pre,&owner,payload,&row)==MELEE_WEB_SOURCE_MEMORY_READ_OK&&
             row.live&&row.source_heap_handle==owner.source_heap_handle&&
             row.world_generation==owner.world_generation&&row.allocation_generation&&
             row.requested_bytes&&row.requested_bytes<=capacity;
     };
     uint64_t count=0;
     if(melee_web_gameplay_heap_history_visit_allocations(
-        commit_.arena,visit,&shadow_owner,&count)!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
+        commit_.arena,visit,&view,&count)!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK)
         return "Owned SDK arena allocation chain or shadow row refused";
     if(count!=shadow.row_count)return "Owned SDK arena and shadow allocation counts disagree";
+    if(arena_payload)*arena_payload=shadow;
     return nullptr;
 #else
+    (void)arena_payload;
     return "Owned SDK arena history requires the private match-history profile";
 #endif
 }
 
 bool GameplayCpuCheckpoint::history_endpoint_admit(
-    const GameplayMatchSession& session) const noexcept {
+    const GameplayMatchSession& session,MeleeWebSourcePayloadEndpointHeader* arena_payload) const noexcept {
     const bool selected=phase_==Phase::HistorySealed||
                         phase_==Phase::HistoryCorrectedSealed;
     return history_mode_&&selected&&same_owner(session)&&
@@ -391,7 +403,7 @@ bool GameplayCpuCheckpoint::history_endpoint_admit(
         melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)&&
         melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)&&
         melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)&&
-        history_payload_admit()&&
+        history_payload_admit(arena_payload)&&
         history_actions_&&
         history_actions_->endpoint_admit()==MELEE_WEB_ACTION_ENDPOINT_OK&&
         statics_->history_endpoint_header().status==CpuStaticEndpointStatus::Ok&&

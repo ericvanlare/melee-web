@@ -58,7 +58,8 @@ public:
     bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
     bool seal_history_incarnation(const GameplayMatchSession&,
                                   const char** refusal=nullptr) noexcept;
-    bool history_endpoint_admit(const GameplayMatchSession&) const noexcept;
+    bool history_endpoint_admit(const GameplayMatchSession&,
+                                MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
     /* Archive a predicted endpoint before PRE restore. This closes only the
      * reusable CPU static bank; ActionStore remains open for correction. */
     bool archive_history_endpoint(const GameplayMatchSession&) noexcept;
@@ -115,8 +116,8 @@ private:
     const bool reusable_loop_;
     std::uint64_t motor_token_{};
     bool same_owner(const GameplayMatchSession&) const noexcept;
-    bool history_payload_admit() const noexcept;
-    const char* history_arena_failure() const noexcept;
+    bool history_payload_admit(MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
+    const char* history_arena_failure(MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);
     bool matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>&,const AudioRanges&,std::size_t) noexcept;
