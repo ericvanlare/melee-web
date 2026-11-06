@@ -21,12 +21,17 @@ function bytes(value, label) {
 }
 
 export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
-  sourceIdentityJson, loadedIdentity, inputTicks = 1, initialRemotePad} = {}) {
+  sourceIdentityJson, loadedIdentity, inputTicks = 1, initialRemotePad,
+  deferredLocalTick = null} = {}) {
   if (globalThis.__meleeRuntimePeerHistoryProbe)
     throw Error('Runtime peer-history bridge is already installed');
   const owner = globalThis.__meleeRuntimeMatchHistory;
   if (!owner) throw Error('Existing runtime-history controller is unavailable');
-  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,
+  if (deferredLocalTick !== null &&
+      (inputTicks !== RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ||
+       !Number.isSafeInteger(deferredLocalTick) || deferredLocalTick < 0 || deferredLocalTick >= inputTicks))
+    throw Error('Deferred peer publication requires one explicit in-range tick of the paced-120 session');
+  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,deferredLocalTick,
     timeoutMs: 5000, sampleTimeoutMs: 5000, sourceIdentityJson, loadedIdentity,
     sourceFrame: 0, validateNativePad: sample => owner.validatePad(sample)});
 
@@ -111,12 +116,31 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         }
         case 'episodePublish': {
           const ordinal = ordinalAt(value.tick, preFrame());
+          const deferSend = value?.deferSend === true;
+          if (deferSend !== (deferredLocalTick === value.tick))
+            throw Error('Episode publication defer policy differs from its explicitly configured source tick');
           const row = owner.receipt(ordinal);
           if (row.ordinal !== ordinal || row.sourceFrame !== value.tick ||
               row.ticketId !== value.ticketId || row.localPort !== localPort)
             throw Error('Episode publication does not bind a retained native poll');
-          return await peer.publishLocal({tick: value.tick, port: localPort, pollSerial: row.pollSerial,
-            pad: padAt(row.raw, localPort)});
+          const receipt = await peer.publishLocal({tick: value.tick, port: localPort, pollSerial: row.pollSerial,
+            pad: padAt(row.raw, localPort), deferSend});
+          return deferSend ? {receipt, deferred_send: true} : receipt;
+        }
+        case 'episodeReleaseLocal': {
+          const tick = value?.tick;
+          if (tick !== deferredLocalTick || !Number.isSafeInteger(tick))
+            throw Error('Episode deferred publication release differs from its configured source tick');
+          const origin = actualOrigins.get(tick);
+          if (!origin || origin.sourceFrame !== tick || origin.localPort !== localPort ||
+              origin.pollSerial !== lastPollSerial.toString(10))
+            throw Error('Deferred network release lost the original native source poll identity');
+          const receipt = await peer.releaseDeferredLocal(tick);
+          if (receipt.protocol_input_tick !== tick || receipt.local_port !== localPort ||
+              receipt.poll_serial !== origin.pollSerial ||
+              !same(Uint8Array.from(receipt.pad), padAt(origin.raw, localPort)))
+            throw Error('Deferred network release changed its original actual local PAD sample');
+          return {receipt, source: publicRow(origin)};
         }
         case 'episodeAdmit': {
           const receipt = await peer.waitForRemoteSample({tick: value.tick});

@@ -189,6 +189,7 @@ function withDeadline(promise, timeoutMs, label) {
 export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs = RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS,
   sampleTimeoutMs = timeoutMs, sourceIdentityJson, loadedIdentity, sourceFrame,
   inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
+  deferredLocalTick = null,
   validateNativePad, createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   timeoutMs = timeoutValue(timeoutMs, 'Runtime history peer timeout');
   sampleTimeoutMs = timeoutValue(sampleTimeoutMs, 'Runtime history remote sample timeout');
@@ -205,6 +206,9 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
     'Runtime history peer supports one, two, four, eight, or 120 indexed input samples');
+  requireCondition(deferredLocalTick === null || (Number.isSafeInteger(deferredLocalTick) &&
+    deferredLocalTick >= 0 && deferredLocalTick < inputTicks),
+  'Runtime history peer deferred publication requires one explicit in-range local tick');
   const sourceTicks = inputTicks + 2;
   const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame, inputTicks});
   const localPort = role === 'alpha' ? 0 : 1;
@@ -217,6 +221,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   let peer = null, endpoint = null, startOperation = null, closeOperation = null;
   let failure = null, intentionalClose = false, closed = false;
   const localPads = new Map(), localReceipts = new Map(), remoteReceipts = new Map();
+  const deferredLocalTicks = new Set();
+  const deferredLocalReleasePending = new Set();
   const localPublishPending = new Set();
   const remoteWaiters = new Set();
 
@@ -372,8 +378,12 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     return startOperation;
   }
 
-  async function publishLocal({port, tick, pollSerial, pad} = {}) {
+  async function publishLocal({port, tick, pollSerial, pad, deferSend = false} = {}) {
     throwIfFailed();
+    requireCondition(typeof deferSend === 'boolean',
+      'Runtime history local PAD deferSend must be an explicit boolean');
+    requireCondition(deferSend === (deferredLocalTick === tick),
+      'Runtime history local PAD deferSend differs from its explicitly configured tick');
     requireCondition(!closed && peer?.ready,
       'Runtime history local PAD requires a ready, open peer');
     requireCondition(Number.isSafeInteger(tick) && tick >= 0 &&
@@ -393,7 +403,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     localPublishPending.add(tick);
     localPads.set(tick, new Uint8Array(bytes));
     try {
-      await peer.addLocalInput(tick, new Uint8Array(bytes), {
+      await peer.addLocalInput(tick, new Uint8Array(bytes), {deferSend,
         nativeSample: new Uint8Array(bytes),
       });
       throwIfFailed();
@@ -405,6 +415,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         pad: Object.freeze(Array.from(bytes)),
       });
       localReceipts.set(tick, receipt);
+      if (deferSend) deferredLocalTicks.add(tick);
       return frozenReceipt(receipt);
     } catch (error) {
       latch(error);
@@ -412,6 +423,30 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     } finally {
       localPublishPending.delete(tick);
     }
+  }
+
+  async function releaseDeferredLocal(tick) {
+    throwIfFailed();
+    requireCondition(!closed && peer?.ready,
+      'Runtime history deferred local PAD requires a ready, open peer');
+    tick = inputTick(tick);
+    requireCondition(tick === deferredLocalTick,
+      'Runtime history deferred local PAD release differs from its explicitly configured tick');
+    const receipt = localReceipts.get(tick), pad = localPads.get(tick);
+    requireCondition(deferredLocalTicks.has(tick) && !deferredLocalReleasePending.has(tick) && receipt && pad,
+      'Runtime history deferred local PAD release requires its retained original publication');
+    deferredLocalReleasePending.add(tick);
+    try {
+      await peer.addLocalInput(tick, new Uint8Array(pad), {
+        nativeSample: new Uint8Array(pad),
+      });
+      throwIfFailed();
+      deferredLocalTicks.delete(tick);
+      return frozenReceipt(receipt);
+    } catch (error) {
+      latch(error);
+      throw failure;
+    } finally { deferredLocalReleasePending.delete(tick); }
   }
 
   function inputTick(value) {
@@ -521,7 +556,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     return closeOperation;
   }
 
-  return Object.freeze({start, publishLocal, remoteSnapshot, waitForRemoteSample, snapshot, close,
+  return Object.freeze({start, publishLocal, releaseDeferredLocal, remoteSnapshot, waitForRemoteSample, snapshot, close,
     get failure() { return failure; }, get closed() { return closed; }});
 }
 
