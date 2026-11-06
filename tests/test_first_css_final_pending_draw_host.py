@@ -78,6 +78,8 @@ PRELUDE = r"""
 #include <stdio.h>
 #include <string.h>
 #define MELEE_WEB_STADIUM_C1A_DIAGNOSTIC 1
+/* These modeled draw leaves assert the opt-in particle scope lifecycle. */
+#define MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE 1
 #define TARGET_PC 1
 #define MELEE_WEB_SAVE_PROFILE_CARD_BYTES 8
 #define MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED 3

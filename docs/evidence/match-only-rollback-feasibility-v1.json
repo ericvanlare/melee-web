@@ -11602,8 +11602,8 @@
         },
         "runtime_match_start_v1": {
           "issue": 362,
-          "status": "ORDINARY_GO_PREFIX_HELD_TAKEOVER_IDENTITY_AND_CLEANUP_COMPONENT_PASS_NO_HISTORY_OR_ROLLBACK",
-          "scope": "Private ordinary-runtime original CSS/SSS keyboard startup, native source offer and negotiated-seed agreement/commit, actual ordinary Entry/Ready/Go source prefix, held gameplay-frame-zero takeover and source identity, then terminal native and browser/server process cleanup. No history capture, input correction, replay, peer session or rollback command.",
+          "status": "ONE_ACTUAL_ORDINARY_RUNTIME_PEER_CORRECTION_FUNCTIONAL_PASS",
+          "scope": "Private original-menu startup and live-match takeover, followed by one wrong-prediction correction using actual browser-owned sockets to the pinned local Worker. Native source input, restore, no-draw corrected tick and presentation are exercised. Not sustained rollback, Internet, full-match or acceptance evidence.",
           "native_release_build": {
             "source_head": "0f72ae25e73e21c875b89ff5167f205a0f23b3ec",
             "result": {
@@ -12150,7 +12150,7 @@
               "Held-frame-zero paired static diagnostic only; no rollback or full-match claim.",
               "The static comparison is unequal; no pass is claimed.",
               "The source review identifies pointer-value divergence but does not compare pointee contents or establish a broad menu-only exclusion.",
-              "The reviewed asymmetric peer proof is proposed architecture only; no peer capture has run."
+              "At this earlier boundary the asymmetric peer proof was proposed only; subsequent peer-correction V2 is recorded separately below."
             ],
             "owner": {
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-paired-held-statics-v2/owner.json",
@@ -12167,6 +12167,188 @@
               "proposed_scope": "One asymmetric peer proof using actual authoritative inputs, one local restore, existing semantic checksum and strict local endpoints; no preroll source frame.",
               "runtime_peer_capture_completed": false
             }
+          },
+          "peer_correction_v1": {
+            "result": "FAILED_BEFORE_HISTORY_OR_RELAY_ON_HARNESS_BRIDGE_INSTALL_ORDER",
+            "native_producer": "17c48b102faec1aeb999bd87d2ca3af86562cc6e",
+            "harness_producer": "f6e34d7a",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v1/result-summary.json",
+              "sha256": "4b3a0beb1e0bb05a007c85163f7919cb515f26b54fd44c9eef23ea134eda1ca5"
+            },
+            "fix": "Move initial peer status reads after page bridge installation. No native or comparator change.",
+            "cleanup_passed": true
+          },
+          "peer_correction_v2": {
+            "result": "BROWSER_EXERCISED_ONE_WRONG_PREDICTION_CORRECTED_AGAINST_ON_TIME_PEER",
+            "native_producer": "17c48b102faec1aeb999bd87d2ca3af86562cc6e",
+            "harness_producer": "76b2dff311badb30affd08d03afcadcd34397028",
+            "result_summary": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/result-summary.json",
+              "sha256": "9b2bd216707881463eb0cc39361abd724d29896cf8f4e677971f007209fb9dbe"
+            },
+            "browser_result": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/browser/result.json",
+              "sha256": "99ff3af3856ae0f57f9165794a5a16a57e33b65c1135ffa0059bea6f9ae205a7"
+            },
+            "owner": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/owner.json",
+              "sha256": "1807a0dace1f4526ed4c381e5caf853a4145e07168d00145ee28bdf61b9f94a0"
+            },
+            "independent_result_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-v2/independent-result-review.json",
+              "sha256": "86e15aa9b296ef11aac5b74c5854bf808f60b0b3306f92148f8d33a51194b8ca"
+            },
+            "native_build": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-build-v1/result.json",
+              "sha256": "ab591aa5d36e8eb61a9ea3f743468b2ed8a6745ca1d024808b18b382bffc9a6b"
+            },
+            "native_archive": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-producer-v1/archive.json",
+              "sha256": "df536191ec6e22fc3821fe7ec5e19fa1c69fe53b330e744366acbfc77b71520c"
+            },
+            "linked_catalog": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-checksum-catalog-v1/final-linked-configuration-v1.json",
+              "sha256": "f516a23806ec4eecd7bf3bfc19d87fc832e53c4760e12c448c9e8c88c09d800a"
+            },
+            "harness_repair": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-harness-repair-v1/freeze.json",
+              "sha256": "18e6bffc4e465114ccd97359c9402f662582fafcc301d91eda5073455109be20"
+            },
+            "first_capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-root-review-v1.json",
+              "sha256": "624e00cbe867f6cf238ee74bdd502d309c63f4ea9cc0a34f96cf1057e41769e5"
+            },
+            "second_capture_review": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-correction-root-review-v2.json",
+              "sha256": "5ae9f56eb002a787dbc54e5f7068130c81fe2c1e1bf2b8c0327b9d886ce3696d"
+            },
+            "input": {
+              "alpha": "actual P1 KeyD at poll 490",
+              "beta": "actual P2 ArrowLeft at poll 441",
+              "prediction": "last actual held-prefix P2 sample",
+              "correction": "received beta contribution; original alpha local poll retained, no repoll",
+              "authoritative_pad_bytes_equal": 44
+            },
+            "comparisons": {
+              "local_armed_restored_pre": {
+                "strict_domains": 9,
+                "particle_live_captured_incarnation_relations": [
+                  12,
+                  12,
+                  12
+                ],
+                "equal": true
+              },
+              "prediction_changes_scene_state": true,
+              "predicted_scene_state": "4ab89f73db1f779f",
+              "on_time_scene_state": "9312981f00f2debe",
+              "corrected_vs_on_time_native_checksum_bytes": 64,
+              "corrected_vs_on_time_native_checksum_equal": true
+            },
+            "transport": "Real browser-owned WebSockets through the existing pinned local RoomRelay Worker. Two protocol-only neutral pre-roll rows and one input row; no pre-roll source ticks. Checksums copied and compared by harness, not exchanged over this diagnostic peer protocol.",
+            "cleanup": {
+              "both_native_owner_state": 2,
+              "both_native_last_command": 10,
+              "browser_pids_absent": 17,
+              "relay_server_capture_pids_absent": 3,
+              "sockets_drained_and_closed": true,
+              "owned_relay_disposable_scratch_removed": true
+            },
+            "limits": [
+              "Exactly one input tick and one correction; no sustained history, full match, combat breadth or playable rollback claim.",
+              "Local relay transport only; no Internet or two-machine result.",
+              "Peer comparison is the unchanged finite native gameplay-checksum projection, not all memory. Full strict endpoint comparison applies locally to restore.",
+              "Alpha PRE audio phase 20 and beta 40; no cross-peer PCM/audio equality claimed.",
+              "Legacy observation, RNG-profile, transfer and runtime draw-diagnostic lanes remain unobserved.",
+              "Integration validation is tracked by issue #362; native capture and later source-integration identities remain separate."
+            ]
+          },
+          "integration_regression_v1": {
+            "result": "FAILED",
+            "source_head": "76b2dff311badb30affd08d03afcadcd34397028",
+            "tests": 3073,
+            "failures": 7,
+            "errors": 3,
+            "skips": 247,
+            "receipt": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v1/result.json",
+              "sha256": "00ae47bea06a92d6e1397ecd92f6f17dc0a8dc74fce8554ce3d7419de79ca47b"
+            },
+            "log": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-full-regression-v1/regression.log",
+              "sha256": "1b163e7e6d671566af163c9fd1b06b8288f288b7a6278135df899ac7431c88fa"
+            },
+            "scope": "Retained integration failure: stale source/extraction expectations and missing local default build/explicit TObj graph. Repair and rerun required; no passing full-suite claim."
+          },
+          "integration_repairs_v2": {
+            "source_head": "4597f008936203d4e70cb041862f8364012c96e4",
+            "validation": {
+              "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-validation-v2/result.json",
+              "sha256": "fa0a3fff205aa35ce6147e068fccd3fa1b9274095d40fc20cd658e9625c5d4db"
+            },
+            "ordinary_release": "PASS",
+            "private_release": "PASS",
+            "full_local_regression": {
+              "tests": 3096,
+              "failures": 3,
+              "errors": 0,
+              "skips": 242,
+              "scope": "Only three shared profile-fixture failures remained. Their modeled draw leaves require profile enabled, but the fixture had not explicitly enabled it after production hooks became opt-in. Failed artifacts retained."
+            },
+            "remote_admission_repair": {
+              "freeze": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/freeze.json",
+                "sha256": "f38fcbb30b4a5891ab02539c2c4dabf9fb57371ed80f87321986ef77bb84108d"
+              },
+              "causal_control": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/result.json",
+                "sha256": "56e43fc98b1c1565887316df914e8d9f0ed5a05cbda0bf97b53989b476dc056c"
+              },
+              "root_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-net-admission-race-v1/root-review.json",
+                "sha256": "2912f9a6c9379e865d2dd8a6834bfe317fee855e00fcb41f29228c9f53015180"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-root-repair-review-v2.json",
+                "sha256": "d7fc8e616754b2ce68d87afbf51dffcca101cb7fe9767cb6b138536fcf6bbe0c"
+              },
+              "scope": "New remote PAD is staged outside pump/input-ACK maps and packet ACK sequence advances only after successful observer admission. Original control fails; repaired accepted/refused controls pass."
+            },
+            "profile_fixture_repair": {
+              "review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-particle-profile-fixture-review-v1/review.json",
+                "sha256": "09da99c819e24857dce529abf22825b57c81ed777dd871ef50a8fdff53d42583"
+              },
+              "focused": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-profile-fixture-focused-v1/result.json",
+                "sha256": "0384b3b693229d3d4ffdb34a5cc68073736726715676539705f807a74f58726f"
+              },
+              "scope": "Explicitly enable the particle profile in the shared modeled draw fixture; assertions and default-off header test retained. All affected CSS/SSS fixture modules pass. No production source change."
+            },
+            "setup_and_source_fixture_repairs": {
+              "setup_v1": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-setup-repair-v1/result.json",
+                "sha256": "859c4937c4f83e686a3f5476ec517d2a7eb5001d71b9397b290e73dd4c1aee10"
+              },
+              "setup_v2": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-setup-repair-v2/result.json",
+                "sha256": "fe8759ddf617ba81266d204ff1ed192d1a8a9a77cbcc8c02195f78ad382920a0"
+              },
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-fixture-root-review-v1.json",
+                "sha256": "9754bdc363b9f5a9a94b104c93a5cdedeff6c511588d10751f0cac5b3196edc0"
+              },
+              "focused_v1": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-integration-focused-v1/result.json",
+                "sha256": "a81676937686d67e816527a5c8042369edcd60e42b17c67cf90f264f4b870d47"
+              },
+              "focused_v2": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime362-integration-focused-v2/result.json",
+                "sha256": "d57f74a9a8803b989958ae8017ff78ddc729f7ee15ef721b50662b0364715dfe"
+              }
+            },
+            "integration_gate": "Complete final full regression and exact-head CI before merging; tracking issue #362 owns integration state."
           }
         }
       }

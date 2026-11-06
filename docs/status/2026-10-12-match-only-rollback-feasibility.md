@@ -1940,15 +1940,48 @@ divergence, not the pointee contents. All rows and both source cards are
 retained. No capture, begin or forward command ran, and owner cleanup passed.
 This does not establish a menu-only exclusion or resolve pointer/local-state
 ownership. A bounded architecture review proposes one asymmetric peer proof
-using the existing typed restore and semantic checksum; no peer capture has run.
+using the existing typed restore and semantic checksum; this earlier baseline
+did not run a peer correction.
 The V2 producer is native
 `33cdb16a8593d7ec1499da13dcb825d26b955b02` and harness
 `39d67d46e444229a9f1c8df9699a265575599ccf`.
 
-These runs remain private component diagnostics and source integration is
-unmerged. Neither is accepted rollback or full-match evidence. Any peer proof
-must retain the full strict catalog, both local inputs and endpoint evidence,
-and stop at the first failure without an unchanged retry.
+The subsequent peer correction V2 passes one actual wrong-prediction control in
+two ordinary-runtime browsers. Alpha polls P1 KeyD once and predicts P2 from its
+actual held prefix from beta; beta receives alpha's real input through
+browser-owned WebSockets to the pinned local Worker before polling P2 ArrowLeft. The prediction
+changes the native scene-state checksum. Alpha restores its strict local Armed
+PRE across all nine domains and 12 particle relations, replays the retained local
+input plus beta's received input without source draw, then presents the result.
+Its authoritative 44-byte PAD record and all 64 native gameplay-checksum bytes
+match beta's on-time result. Independent raw replay verifies the comparison and
+peer receipts. Both native owners retire; all 17 owned Chrome processes and the
+relay, server and capture processes are absent. This is local functional evidence
+for one correction, not sustained rollback or a full match. The checksum is the
+existing finite gameplay projection; independently allocated memory is not
+claimed byte-identical. The harness copies and compares checksums locally; this
+diagnostic peer protocol exchanges input, not checksum receipts.
+
+Native producer `17c48b102faec1aeb999bd87d2ca3af86562cc6e` and harness
+`76b2dff311badb30affd08d03afcadcd34397028` remain distinct. The failed V1 stopped
+before history or relay work because it read the page bridge before installing
+it; the ordering-only repair and both attempts are retained. Alpha and beta PRE
+audio phases differ, so this peer control makes no cross-peer PCM claim. These
+results do not establish Internet play, physical-input acceptance, performance,
+combat breadth or a complete profile. The existing unobserved lanes remain open.
+
+Independent integration review found a remote-input admission race: a concurrent
+local input could let the frame pump consume a received remote row before its
+observer accepted it. The repair keeps new remote input and packet acknowledgments
+staged until admission. Controlled tests fail on the earlier core and pass on the
+repair for both acceptance and refusal. Ordinary and private Release builds pass
+on `4597f008`; retained regression failures and their build-setup/source-fixture
+repairs are recorded in `runtime_match_start_v1`. The final fixture repair explicitly
+enables the profile that its modeled draw leaves require, preserving assertions
+and the separate default-off control. Integration and final merge checks are tracked
+by [#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
+boundary is confirmed retirement and rebase into adjacent correction windows in
+the same live match.
 
 ## Stage decision dependencies, issue #333
 
