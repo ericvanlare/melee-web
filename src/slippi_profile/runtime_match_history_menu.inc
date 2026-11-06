@@ -882,8 +882,9 @@ EM_BOOL history_dispatch(double,void*) {
   }
  }catch(const std::exception& e){history_refuse(e.what());}
  catch(...){history_refuse("Terminal dispatch threw an unknown exception");}
+ history_sync(); // Preserve a specific capsule failure before the generic dispatch fallback.
  if(!okay)history_refuse("Terminal match history command refused");
- history_sync();history_copy_input();
+ history_copy_input();
  c.requested_rebase_end=0;
  c.requested_ticket_id=0;c.requested_plan={};
  c.status.last_completed_command=command;c.status.complete_seq=c.status.request_seq;c.status.pending_command=0;

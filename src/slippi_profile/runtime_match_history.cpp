@@ -317,8 +317,9 @@ bool RuntimeMatchHistory::seal_incarnation() noexcept
        actual-pre_frame_>7u||forward_steps_!=actual-pre_frame_||
        !live_owner(actual)||!gate(RuntimeMatchHistoryGatePoint::ForwardAfter,actual))
         return fail(RuntimeMatchHistoryFailure::Seal,"Episode incarnation seal boundary refused");
-    if(!checkpoint_->seal_history_incarnation(session_))
-        return checkpoint_failure(RuntimeMatchHistoryFailure::Seal,"Episode native incarnation seal refused");
+    const char* refusal=nullptr;
+    if(!checkpoint_->seal_history_incarnation(session_,&refusal))
+        return checkpoint_failure(RuntimeMatchHistoryFailure::Seal,refusal);
     sealed_end_=actual;replay_target_end_=actual;endpoint_mask_=0;
     phase_=RuntimeMatchHistoryPhase::PredictedSealed;
     return true;

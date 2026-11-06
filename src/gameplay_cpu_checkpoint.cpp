@@ -235,30 +235,60 @@ bool GameplayCpuCheckpoint::begin_history_incarnation(
 }
 
 bool GameplayCpuCheckpoint::seal_history_incarnation(
-    const GameplayMatchSession& session) noexcept {
-    if(!history_mode_||phase_!=Phase::HistoryRecording||!same_owner(session)){
-        phase_=history_mode_?Phase::Failed:phase_;return false;
-    }
+    const GameplayMatchSession& session,const char** refusal) noexcept {
+    comparison_={};
+    if(refusal)*refusal=nullptr;
+    const auto fail_seal=[&](CpuComparisonDomain domain,const char* text,
+                             std::uint32_t detail=0,bool admitted=false){
+        comparison_={static_cast<std::uint32_t>(domain),1,UINT32_MAX,UINT32_MAX,0,0,0,0,detail};
+        if(refusal)*refusal=text;
+        if(admitted)disarm();
+        if(history_mode_)phase_=Phase::Failed;
+        return false;
+    };
+    if(!history_mode_||phase_!=Phase::HistoryRecording||!same_owner(session))
+        return fail_seal(CpuComparisonDomain::Owner,"History seal phase or live owner refused");
+    const auto refused=[&](CpuComparisonDomain domain,const char* text,std::uint32_t detail=0){
+        return fail_seal(domain,text,detail,true);
+    };
     const auto actual_end=session.source_frames();
-    if(!session.diagnostic_source_files_quiescent()||
-       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
-       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
-       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
-       !melee_web_cpu_interval_admit(commit_.effect_token)||
-       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
-       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
-       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
-       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
-       melee_web_source_memory_payload_snapshot_admit(commit_.payload)!=
-            MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||
-       actual_end<=history_start_frame_||actual_end<=owner_.frame||
-       actual_end-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
-       !melee_web_cpu_interval_motor_history_seal(commit_.effect_token,
-            history_incarnation_,actual_end)||
-       !history_actions_||!history_actions_->seal_incarnation(history_incarnation_)||
-       !statics_->history_seal_endpoint(history_incarnation_,actual_end)){
-        disarm();phase_=Phase::Failed;return false;
+    if(!session.diagnostic_source_files_quiescent())
+        return refused(CpuComparisonDomain::Owner,"History seal source files are not quiescent");
+    if(!slippi_lobj_anchor_admit(commit_.lobj_anchor))
+        return refused(CpuComparisonDomain::Effects,"History seal LObj anchor refused");
+    if(!slippi_tobj_anchor_admit(commit_.tobj_anchor))
+        return refused(CpuComparisonDomain::Effects,"History seal TObj anchor refused");
+    if(!slippi_particle_presentation_anchor_admit(commit_.particle_anchor))
+        return refused(CpuComparisonDomain::Effects,"History seal particle anchor refused");
+    if(!melee_web_cpu_interval_admit(commit_.effect_token))
+        return refused(CpuComparisonDomain::Effects,"History seal CPU effect interval refused",
+                       melee_web_cpu_interval_failure());
+    if(!melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot))
+        return refused(CpuComparisonDomain::Audio,"History seal audio snapshot refused");
+    if(!melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0))
+        return refused(CpuComparisonDomain::Flow,"History seal match-flow snapshot refused");
+    if(!melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0))
+        return refused(CpuComparisonDomain::Bootstrap,"History seal bootstrap snapshot refused");
+    if(!melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0))
+        return refused(CpuComparisonDomain::Context,"History seal match-context snapshot refused");
+    const auto payload=melee_web_source_memory_payload_snapshot_admit(commit_.payload);
+    if(payload!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
+        return refused(CpuComparisonDomain::Payload,"History seal payload snapshot refused",
+                       static_cast<std::uint32_t>(payload));
+    if(actual_end<=history_start_frame_||actual_end<=owner_.frame||
+       actual_end-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN)
+        return refused(CpuComparisonDomain::Owner,"History seal END is outside the retained frame span");
+    if(!melee_web_cpu_interval_motor_history_seal(commit_.effect_token,history_incarnation_,actual_end)){
+        const auto* motor=melee_web_cpu_interval_motor_evidence();
+        return refused(CpuComparisonDomain::Effects,"History seal motor journal refused",
+                       motor?motor->failure:0);
     }
+    if(!history_actions_||!history_actions_->seal_incarnation(history_incarnation_))
+        return refused(CpuComparisonDomain::Actions,"History seal action store refused",
+                       history_actions_?history_actions_->active_failure():0);
+    if(!statics_->history_seal_endpoint(history_incarnation_,actual_end))
+        return refused(CpuComparisonDomain::Statics,"History seal statics endpoint refused",
+                       static_cast<std::uint32_t>(statics_->endpoint_header().status));
     history_end_frame_=actual_end;
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;

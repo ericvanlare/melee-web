@@ -55,7 +55,8 @@ public:
     GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
     bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
-    bool seal_history_incarnation(const GameplayMatchSession&) noexcept;
+    bool seal_history_incarnation(const GameplayMatchSession&,
+                                  const char** refusal=nullptr) noexcept;
     bool history_endpoint_admit(const GameplayMatchSession&) const noexcept;
     /* Archive a predicted endpoint before PRE restore. This closes only the
      * reusable CPU static bank; ActionStore remains open for correction. */
