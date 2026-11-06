@@ -62,6 +62,9 @@ int slippi_particle_presentation_world_end(uint64_t world_generation);
 SlippiParticlePresentationAnchor slippi_particle_presentation_anchor_capture(void);
 int slippi_particle_presentation_anchor_admit(
     SlippiParticlePresentationAnchor anchor);
+/* Read-only exact captured pool check before the first arena-restore writer. */
+int slippi_particle_presentation_captured_pools_admit(
+    SlippiParticlePresentationAnchor anchor);
 int slippi_particle_presentation_cell_endpoint_header(
     SlippiParticlePresentationAnchor anchor,
     SlippiParticleCellEndpointHeader* out);
@@ -130,6 +133,9 @@ static inline SlippiParticlePresentationAnchor
 slippi_particle_presentation_anchor_capture(void)
 { SlippiParticlePresentationAnchor a = {0, 0, 0, 0, 0}; return a; }
 static inline int slippi_particle_presentation_anchor_admit(
+    SlippiParticlePresentationAnchor anchor)
+{ (void) anchor; return 1; }
+static inline int slippi_particle_presentation_captured_pools_admit(
     SlippiParticlePresentationAnchor anchor)
 { (void) anchor; return 1; }
 static inline int slippi_particle_presentation_cell_endpoint_header(

@@ -18,6 +18,7 @@
 #include <memory>
 #include <new>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -64,7 +65,8 @@ struct PoolAssociation {
     uint32_t stride=0,count=0,alignment_mask=0,pool_bytes=0;
     uint64_t generation=0,epoch=0,world=0;
 };
-// Diagnostic lifetime only: never copied/restored by either snapshot kind.
+// Sticky diagnostic poison is never restored. Explicit history can carry
+// observed facts only for unchanged PRE allocation identities.
 // reason: 1 hook inactive, 2 missing event, 3 target, 4 mask, 5 extent,
 // 6 duplicate/conflict, 7 internal heap unsupported, 8 stale metadata.
 uint32_t pool_refusal=0;
@@ -1206,6 +1208,372 @@ melee_web_source_memory_snapshot_restore(const MeleeWebSourceMemorySnapshot* sna
     } catch (const std::bad_alloc&) {
         return MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_ALLOCATION_FAILED;
     }
+}
+
+struct MeleeWebSourceMemoryHistory {
+    MeleeWebSourceMemorySnapshot snapshot;
+    uint64_t revision;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    std::vector<PieceCell> pieces;
+    uint64_t piece_instance;
+    uint64_t piece_revision;
+    uint32_t piece_watermark;
+#endif
+};
+
+struct MeleeWebSourceMemoryHistoryPrepared {
+    MeleeWebSourceMemoryHistory pre;
+    std::unique_ptr<Heap> heap;
+    uint64_t end_revision;
+    uint64_t end_watermark;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    uint64_t end_piece_revision;
+    uint32_t end_piece_watermark;
+#endif
+    mutable bool admitted = false;
+    bool committed = false;
+};
+
+namespace {
+using HistoryStatus = MeleeWebSourceMemoryHistoryStatus;
+
+HistoryStatus history_owner_admit(const MeleeWebSourceMemorySnapshot& snapshot)
+{
+    const auto status = melee_web_source_memory_snapshot_admit(&snapshot);
+    if (status == MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_INACTIVE ||
+        status == MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_STALE_OWNER)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER;
+    if (status != MELEE_WEB_SOURCE_MEMORY_SNAPSHOT_OK ||
+        !source_address_heap || !source_address_heap->initialized())
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+bool history_observer_admit()
+{
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    return piece_owner.cells && piece_owner.state == 2 && !piece_owner.reason &&
+           piece_owner.epoch == owner_epoch && piece_owner.world == world_generation &&
+           piece_owner.instance && piece_owner.begin < piece_owner.end &&
+           piece_owner.count == (piece_owner.end - piece_owner.begin) / 32u &&
+           (piece_slab_trace.state != 2 || piece_slab_trace.closed);
+#else
+    return true;
+#endif
+}
+
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+bool history_piece_equal(const PieceCell& a, const PieceCell& b)
+{
+    return std::tie(a.geometry, a.tag, a.generation, a.origin_site) ==
+           std::tie(b.geometry, b.tag, b.generation, b.origin_site);
+}
+#endif
+
+bool history_preserves_pieces(const MeleeWebSourceMemoryHistory& pre)
+{
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (pre.piece_instance != piece_owner.instance || pre.pieces.size() != piece_owner.count ||
+        pre.piece_revision > piece_owner.serial || pre.piece_watermark > piece_owner.next_generation)
+        return false;
+    return std::equal(pre.pieces.begin(), pre.pieces.end(), piece_owner.cells,
+                      [](const PieceCell& saved, const PieceCell& live) {
+                          return !(saved.geometry & piece_live) || history_piece_equal(saved, live);
+                      });
+#else
+    (void)pre;
+    return true;
+#endif
+}
+
+bool history_allocation_equal(const HostAllocation& a, const HostAllocation& b)
+{
+    if (a.host != b.host || a.requested != b.requested ||
+        a.source.value() != b.source.value() || a.generation != b.generation)
+        return false;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    const auto pool = [](const PoolAssociation& p) {
+        return std::tie(p.state, p.descriptor, p.stride, p.count, p.alignment_mask,
+                        p.pool_bytes, p.generation, p.epoch, p.world);
+    };
+    const auto origin = [](const AllocationOrigin& o) {
+        return std::tie(o.file, o.line, o.kind, o.generation, o.epoch, o.world);
+    };
+    return pool(a.pool) == pool(b.pool) && origin(a.origin) == origin(b.origin);
+#else
+    return true;
+#endif
+}
+
+bool history_lease_equal(const FighterLease& a, const FighterLease& b)
+{
+    return std::tie(a.host, a.source, a.world_generation, a.allocation_generation, a.live) ==
+           std::tie(b.host, b.source, b.world_generation, b.allocation_generation, b.live);
+}
+
+bool history_preserves_pre(const MeleeWebSourceMemorySnapshot& pre)
+{
+    // Allocation rows are appended and erased in place. Surviving PRE rows
+    // must still occur in order, with their original lifetime and source facts.
+    auto live = allocations.begin();
+    for (const auto& row : pre.allocations) {
+        live = std::find_if(live, allocations.end(), [&](const HostAllocation& current) {
+            return current.generation == row.generation;
+        });
+        if (live == allocations.end() || !history_allocation_equal(row, *live))
+            return false;
+        ++live;
+    }
+    // A Fighter release changes no allocation fence. Recheck leases even
+    // after a matching revision and watermark.
+    return fighters.size() >= pre.fighters.size() &&
+           std::equal(pre.fighters.begin(), pre.fighters.end(), fighters.begin(),
+                      history_lease_equal) &&
+           std::none_of(fighters.begin() + pre.fighters.size(), fighters.end(),
+                        [](const FighterLease& lease) { return lease.live; });
+}
+
+bool history_live_shape_valid()
+{
+    const auto& heap = source_address_heap->state();
+    if (allocations.size() != heap.allocated.size() ||
+        !validate_live_allocations(allocations) || !current_heap_state_valid(heap))
+        return false;
+    uint64_t previous_generation = 0;
+    for (size_t i = 0; i < allocations.size(); ++i) {
+        const auto& row = allocations[i];
+        const auto& cell = heap.allocated[allocations.size() - 1 - i];
+        if (row.generation <= previous_generation || row.generation > next_generation ||
+            uint64_t(row.source.value()) != uint64_t(cell.start.value()) + 32u ||
+            row.requested > cell.bytes - 32u)
+            return false;
+        previous_generation = row.generation;
+    }
+    for (const auto& lease : fighters) {
+        if (lease.world_generation != world_generation ||
+            !lease.allocation_generation || lease.allocation_generation > next_generation)
+            return false;
+        if (!lease.live)
+            continue;
+        const auto* row = find_host_allocation(lease.host);
+        if (!row || lease.allocation_generation <= row->generation ||
+            lease.source != row->source.value() + (lease.host - row->host))
+            return false;
+    }
+    return true;
+}
+
+bool history_heap_equal(const melee_web::source::HeapState& a,
+                        const melee_web::source::HeapState& b)
+{
+    const auto cell_equal = [](const auto& x, const auto& y) {
+        return x.start.value() == y.start.value() && x.bytes == y.bytes;
+    };
+    return a.arena_begin.value() == b.arena_begin.value() &&
+           a.arena_end.value() == b.arena_end.value() && a.heap_bytes == b.heap_bytes &&
+           std::equal(a.free.begin(), a.free.end(), b.free.begin(), b.free.end(), cell_equal) &&
+           std::equal(a.allocated.begin(), a.allocated.end(), b.allocated.begin(),
+                      b.allocated.end(), cell_equal);
+}
+}
+
+extern "C" MeleeWebSourceMemoryHistoryCaptureResult
+melee_web_source_memory_history_capture(void)
+{
+    if (!active)
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER, nullptr};
+    if (!healthy || !source_address_heap || !source_address_heap->initialized() ||
+        !history_live_shape_valid())
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+    if (!history_observer_admit())
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED, nullptr};
+    try {
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK, new MeleeWebSourceMemoryHistory{
+            {owner_epoch, source_heap_handle, world_generation, next_generation,
+             source_address_heap->state(), allocations, fighters}, topology_revision
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+            , {piece_owner.cells, piece_owner.cells + piece_owner.count},
+            piece_owner.instance, piece_owner.serial, piece_owner.next_generation
+#endif
+        }};
+    } catch (const std::bad_alloc&) {
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED, nullptr};
+    }
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_current_admit(const MeleeWebSourceMemoryHistory* pre)
+{
+    if (!pre)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    const auto status = history_owner_admit(pre->snapshot);
+    if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return status;
+    if (!history_observer_admit())
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (pre->piece_instance != piece_owner.instance || pre->pieces.size() != piece_owner.count ||
+        pre->piece_revision > piece_owner.serial || pre->piece_watermark > piece_owner.next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+#endif
+    if (topology_revision < pre->revision || next_generation < pre->snapshot.watermark ||
+        !history_live_shape_valid())
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+extern "C" MeleeWebSourceMemoryHistoryPrepareResult
+melee_web_source_memory_history_prepare(const MeleeWebSourceMemoryHistory* pre)
+{
+    const auto status = melee_web_source_memory_history_current_admit(pre);
+    if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return {status, nullptr};
+    if (!topology_revision_available() || next_generation == UINT64_MAX)
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (piece_owner.serial == UINT64_MAX || piece_owner.next_generation == UINT32_MAX)
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+#endif
+    if (!history_preserves_pre(pre->snapshot) || !history_preserves_pieces(*pre))
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED, nullptr};
+    try {
+        auto candidate = std::unique_ptr<MeleeWebSourceMemoryHistoryPrepared>(
+            new MeleeWebSourceMemoryHistoryPrepared{*pre, std::make_unique<Heap>(), topology_revision, next_generation
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+                , piece_owner.serial, piece_owner.next_generation
+#endif
+            });
+        if (candidate->heap->restore(pre->snapshot.heap) != Status::ok)
+            return {MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE, nullptr};
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_OK, candidate.release()};
+    } catch (const std::bad_alloc&) {
+        return {MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED, nullptr};
+    }
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_admit(const MeleeWebSourceMemoryHistoryPrepared* prepared)
+{
+    if (!prepared)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    prepared->admitted = false;
+    if (prepared->committed)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+    const auto status = history_owner_admit(prepared->pre.snapshot);
+    if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return status;
+    if (!history_observer_admit())
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED;
+    if (prepared->end_revision != topology_revision ||
+        prepared->end_watermark != next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (prepared->end_piece_revision != piece_owner.serial ||
+        prepared->end_piece_watermark != piece_owner.next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#endif
+    if (!history_preserves_pre(prepared->pre.snapshot) || !history_preserves_pieces(prepared->pre))
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED;
+    prepared->admitted = true;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_commit(MeleeWebSourceMemoryHistoryPrepared* prepared) noexcept
+{
+    const auto status = melee_web_source_memory_history_admit(prepared);
+    if (status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return status;
+    return melee_web_source_memory_history_commit_prevalidated(prepared);
+}
+
+extern "C" MeleeWebSourceMemoryHistoryStatus
+melee_web_source_memory_history_commit_prevalidated(
+    MeleeWebSourceMemoryHistoryPrepared* prepared) noexcept
+{
+    if (!prepared)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+    if (!prepared->admitted || prepared->committed)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+    prepared->admitted = false;
+    // Only a cheap owner/fence check here. The aggregate's earlier writers
+    // may have changed arena bytes after full admission.
+    const auto& pre = prepared->pre.snapshot;
+    if (!active || !healthy || pre.epoch != owner_epoch || pre.world != world_generation ||
+        pre.heap_handle != source_heap_handle || prepared->end_revision != topology_revision ||
+        prepared->end_watermark != next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    if (!piece_owner.cells || piece_owner.state != 2 || piece_owner.reason ||
+        prepared->pre.piece_instance != piece_owner.instance ||
+        prepared->end_piece_revision != piece_owner.serial ||
+        prepared->end_piece_watermark != piece_owner.next_generation)
+        return MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE;
+#endif
+    source_address_heap.swap(prepared->heap);
+    allocations.swap(prepared->pre.snapshot.allocations);
+    fighters.swap(prepared->pre.snapshot.fighters);
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    std::swap_ranges(prepared->pre.pieces.begin(), prepared->pre.pieces.end(), piece_owner.cells);
+    ++piece_owner.serial;
+#endif
+    advance_topology_revision();
+    prepared->committed = true;
+    return MELEE_WEB_SOURCE_MEMORY_HISTORY_OK;
+}
+
+extern "C" MeleeWebSourceMemoryHistoryObservation
+melee_web_source_memory_history_observe(const MeleeWebSourceMemoryHistory* pre)
+{
+    MeleeWebSourceMemoryHistoryObservation out{};
+    if (!pre) {
+        out.status = MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT;
+        return out;
+    }
+    const auto& snapshot = pre->snapshot;
+    out.status = history_owner_admit(snapshot);
+    if (out.status != MELEE_WEB_SOURCE_MEMORY_HISTORY_OK)
+        return out;
+    out.pre_revision = pre->revision;
+    out.current_revision = topology_revision;
+    out.pre_watermark = snapshot.watermark;
+    out.current_watermark = next_generation;
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+    out.pre_piece_revision = pre->piece_revision;
+    out.current_piece_revision = piece_owner.serial;
+    out.pre_piece_watermark = pre->piece_watermark;
+    out.current_piece_watermark = piece_owner.next_generation;
+    out.pool_refusal = pool_refusal;
+    out.origin_refusal = origin_refusal;
+    out.piece_refusal = piece_owner.reason;
+#endif
+    if (!history_observer_admit()) {
+        out.status = MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED;
+        return out;
+    }
+    const bool exact = history_heap_equal(snapshot.heap, source_address_heap->state()) &&
+        std::equal(snapshot.allocations.begin(), snapshot.allocations.end(),
+                   allocations.begin(), allocations.end(), history_allocation_equal) &&
+        std::equal(snapshot.fighters.begin(), snapshot.fighters.end(),
+                   fighters.begin(), fighters.end(), history_lease_equal)
+#if defined(MELEE_WEB_CPU_INTERVAL_ENABLED) && MELEE_WEB_CPU_INTERVAL_ENABLED
+        && pre->piece_instance == piece_owner.instance && pre->pieces.size() == piece_owner.count &&
+        std::equal(pre->pieces.begin(), pre->pieces.end(), piece_owner.cells, history_piece_equal)
+#endif
+        ;
+    out.exact_pre = exact;
+    return out;
+}
+
+extern "C" void melee_web_source_memory_history_destroy(MeleeWebSourceMemoryHistory* pre)
+{
+    delete pre;
+}
+
+extern "C" void melee_web_source_memory_history_prepared_destroy(
+    MeleeWebSourceMemoryHistoryPrepared* prepared)
+{
+    delete prepared;
 }
 
 extern "C" MeleeWebSourceMemoryPayloadSnapshotCaptureResult

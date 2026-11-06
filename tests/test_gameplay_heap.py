@@ -5,20 +5,21 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
 import unittest
+
+from owned_test_workspace import OwnedWorkspaceTests
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-class GameplayHeapTests(unittest.TestCase):
+class GameplayHeapTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         sdk = ROOT / ".deps/emsdk"
         cls.compiler = sdk / "upstream/emscripten"
         config = sdk / ".emscripten"
-        fmt = ROOT / "build/browser/_deps/fmt-src/include"
-        if not (cls.compiler / "em++.py").is_file() or not (fmt / "fmt/format.h").is_file():
+        cls.fmt = ROOT / "build/browser/_deps/fmt-src/include"
+        if not (cls.compiler / "em++.py").is_file() or not (cls.fmt / "fmt/format.h").is_file():
             raise unittest.SkipTest("Project SDK/Aurora build dependencies unavailable; run bootstrap/build")
         node_setting = next(ast.literal_eval(statement.value)
             for statement in ast.parse(config.read_text()).body if isinstance(statement, ast.Assign)
@@ -28,25 +29,57 @@ class GameplayHeapTests(unittest.TestCase):
             raise RuntimeError("Expected the project-local Node runtime")
         cls.env = dict(os.environ, EMSDK=str(sdk), EM_CONFIG=str(config),
                        EM_CACHE=str(cls.compiler / "cache"), EMSDK_PYTHON=sys.executable)
-        cls.temp = tempfile.TemporaryDirectory(prefix="melee SDK heap ")
-        cls.addClassCleanup(cls.temp.cleanup)
-        cls.directory = Path(cls.temp.name)
+        cls.directory = cls.new_workspace(ROOT, "gameplay-sdk-heap-")
         cls.output = cls.directory / "heap.js"
         cls.original = ROOT / ".deps/aurora/lib/dolphin/os/OSAlloc.cpp"
         cls.digest = hashlib.sha256(cls.original.read_bytes()).digest()
+        cls.compile_trace(cls.output, ROOT / "tests/gameplay_heap_trace.cpp",
+                          extra_sources=[ROOT / "src/gameplay_heap.cpp"])
+
+    @classmethod
+    def compile_trace(cls, output, fixture, *, extra_sources=(), options=()):
         result = subprocess.run([sys.executable, str(cls.compiler / "em++.py"),
             "-std=c++20", "-O1", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off",
             "-DTARGET_PC", "-DFMT_HEADER_ONLY", "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/aurora/include"),
-            "-I", str(fmt), str(ROOT / "src/gameplay_heap.cpp"),
+            "-I", str(cls.fmt), *options, *map(str, extra_sources),
             str(ROOT / "src/gameplay_source_memory_runtime.cpp"),
             str(ROOT / "src/source_address_context.cpp"),
             str(ROOT / "src/source_game_heap_context.cpp"),
-            str(ROOT / ".deps/aurora/lib/logging.cpp"), str(ROOT / "tests/gameplay_heap_trace.cpp"),
+            str(ROOT / ".deps/aurora/lib/logging.cpp"), str(fixture),
             "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sASSERTIONS=2", "-sSAFE_HEAP=1",
-            "-o", str(cls.output)], env=cls.env, cwd=cls.directory,
+            "-o", str(output)], env=cls.env, cwd=cls.directory,
             capture_output=True, text=True, timeout=120)
+        (output.with_suffix(".compile.log")).write_text(result.stdout + result.stderr)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
+
+    def run_history(self, case, marker):
+        generated = ROOT / "build/gameplay-source-slippi-profile/src"
+        tracking = (generated / "sysdolphin/baselib/jobj.h").is_file()
+        if case == "joint" and not tracking:
+            self.skipTest("Private profile generated source headers unavailable")
+        output = self.directory / "heap-history.js"
+        if not output.is_file():
+            options = ["-fexceptions", "-sDISABLE_EXCEPTION_CATCHING=0"]
+            if tracking:
+                # The actual tracked source heap allocates a class-piece table;
+                # the immutable PRE and prepared restore each retain a copy.
+                options += ["-sINITIAL_MEMORY=33554432",
+                            "-DMELEE_WEB_CPU_INTERVAL_ENABLED=1", "-I", str(generated)]
+            self.compile_trace(output, ROOT / "tests/gameplay_heap_history_trace.cpp",
+                               options=options)
+        result = subprocess.run([str(self.node), str(output), case], env=self.env,
+                                cwd=self.directory, capture_output=True, text=True, timeout=30)
+        (self.directory / f"history-{case}.log").write_text(result.stdout + result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(marker, result.stdout)
+        self.assertEqual(hashlib.sha256(self.original.read_bytes()).digest(), self.digest)
+
+    def test_original_sdk_history_primitive(self):
+        self.run_history("primitive", "SDK arena history leaf controls: passed")
+
+    def test_original_sdk_and_active_shadow_restore_together(self):
+        self.run_history("joint", "Actual SDK and active shadow paired restore: passed two cycles")
 
     def run_case(self, case):
         result = subprocess.run([str(self.node), str(self.output), case], env=self.env,

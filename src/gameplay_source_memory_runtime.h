@@ -83,6 +83,81 @@ MeleeWebSourceMemorySnapshotStatus melee_web_source_memory_snapshot_restore(
     const MeleeWebSourceMemorySnapshot* snapshot);
 void melee_web_source_memory_snapshot_destroy(MeleeWebSourceMemorySnapshot* snapshot);
 
+/* Prepared shadow-only history for the stable SDK arena owner. The caller
+ * serializes these operations and separately admits/restores arena bytes and
+ * every external borrower. Neither capture nor prepare mutates this owner.
+ * A prepared restore owns its candidate independently of the reusable PRE.
+ * Commit is one-shot and retains displaced storage until prepared_destroy. */
+typedef struct MeleeWebSourceMemoryHistory MeleeWebSourceMemoryHistory;
+typedef struct MeleeWebSourceMemoryHistoryPrepared MeleeWebSourceMemoryHistoryPrepared;
+typedef enum MeleeWebSourceMemoryHistoryStatus {
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_ARGUMENT,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_OWNER,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_INVALID_STATE,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_OBSERVER_REFUSED,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_PRE_CHANGED,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_STALE_PREPARE,
+    MELEE_WEB_SOURCE_MEMORY_HISTORY_ALLOCATION_FAILED,
+} MeleeWebSourceMemoryHistoryStatus;
+typedef struct MeleeWebSourceMemoryHistoryCaptureResult {
+    MeleeWebSourceMemoryHistoryStatus status;
+    MeleeWebSourceMemoryHistory* pre;
+} MeleeWebSourceMemoryHistoryCaptureResult;
+typedef struct MeleeWebSourceMemoryHistoryPrepareResult {
+    MeleeWebSourceMemoryHistoryStatus status;
+    MeleeWebSourceMemoryHistoryPrepared* prepared;
+} MeleeWebSourceMemoryHistoryPrepareResult;
+typedef struct MeleeWebSourceMemoryHistoryObservation {
+    MeleeWebSourceMemoryHistoryStatus status;
+    uint32_t exact_pre;
+    uint64_t pre_revision;
+    uint64_t current_revision;
+    uint64_t pre_watermark;
+    uint64_t current_watermark;
+    uint64_t pre_piece_revision;
+    uint64_t current_piece_revision;
+    uint32_t pre_piece_watermark;
+    uint32_t current_piece_watermark;
+    uint32_t pool_refusal;
+    uint32_t origin_refusal;
+    uint32_t piece_refusal;
+} MeleeWebSourceMemoryHistoryObservation;
+
+MeleeWebSourceMemoryHistoryCaptureResult melee_web_source_memory_history_capture(void);
+/* Validate the selected live owner and its current shape without preparing
+ * a restore. This does not establish PRE survival or authority to commit. */
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_current_admit(
+    const MeleeWebSourceMemoryHistory* pre);
+MeleeWebSourceMemoryHistoryPrepareResult melee_web_source_memory_history_prepare(
+    const MeleeWebSourceMemoryHistory* pre);
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_admit(
+    const MeleeWebSourceMemoryHistoryPrepared* prepared);
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_commit(
+    MeleeWebSourceMemoryHistoryPrepared* prepared)
+#ifdef __cplusplus
+    noexcept
+#endif
+    ;
+/* Private aggregate writer. Requires successful final admit on this object,
+ * followed by no yield, source callback, or shadow/observer mutation. Earlier
+ * admitted companion writers may restore their payload bytes. Commit never
+ * revalidates payloads or allocates and consumes the admitted preparation. */
+MeleeWebSourceMemoryHistoryStatus melee_web_source_memory_history_commit_prevalidated(
+    MeleeWebSourceMemoryHistoryPrepared* prepared)
+#ifdef __cplusplus
+    noexcept
+#endif
+    ;
+/* exact_pre compares the current shadow state, including tracked piece cells,
+ * to immutable PRE. Revisions/watermarks report actual observation fences
+ * separately; successful commit advances revisions and preserves live highs. */
+MeleeWebSourceMemoryHistoryObservation melee_web_source_memory_history_observe(
+    const MeleeWebSourceMemoryHistory* pre);
+void melee_web_source_memory_history_destroy(MeleeWebSourceMemoryHistory* pre);
+void melee_web_source_memory_history_prepared_destroy(
+    MeleeWebSourceMemoryHistoryPrepared* prepared);
+
 /* Payload-only checkpoint for the exact live OSAllocFromHeap payloads tracked
  * by the active source-main-heap owner. This is distinct from the mirror
  * snapshot above: it copies bytes, never rewinds allocator cells or identities,

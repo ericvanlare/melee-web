@@ -27,6 +27,7 @@ struct CpuCaptureDiagnostic {
     CpuComparison comparison{};
     std::array<char,160> message{};
 };
+enum class CpuHistoryStorage { StablePayload, OwnedArena };
 enum class CpuCheckpointSpan : std::uint32_t { OneTick=1, TwoTicks=2, SevenTicks=7 };
 class GameplayCpuCheckpoint final {
 public:
@@ -42,7 +43,7 @@ public:
      * forward incarnations and two corrections within seven actual ticks. */
     static std::unique_ptr<GameplayCpuCheckpoint> capture_history(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
-        CpuCaptureDiagnostic&) noexcept;
+        CpuCaptureDiagnostic&,CpuHistoryStorage=CpuHistoryStorage::StablePayload) noexcept;
     ~GameplayCpuCheckpoint();
     bool begin_record(const GameplayMatchSession&) noexcept;
     bool seal_post(const GameplayMatchSession&) noexcept;
@@ -55,7 +56,8 @@ public:
     GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
     bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
-    bool seal_history_incarnation(const GameplayMatchSession&) noexcept;
+    bool seal_history_incarnation(const GameplayMatchSession&,
+                                  const char** refusal=nullptr) noexcept;
     bool history_endpoint_admit(const GameplayMatchSession&) const noexcept;
     /* Archive a predicted endpoint before PRE restore. This closes only the
      * reusable CPU static bank; ActionStore remains open for correction. */
@@ -108,11 +110,13 @@ private:
     static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable,
-        bool history_mode=false) noexcept;
+        bool history_mode=false,CpuHistoryStorage=CpuHistoryStorage::StablePayload) noexcept;
     const std::uint32_t span_;
     const bool reusable_loop_;
     std::uint64_t motor_token_{};
     bool same_owner(const GameplayMatchSession&) const noexcept;
+    bool history_payload_admit() const noexcept;
+    const char* history_arena_failure() const noexcept;
     using AudioRanges=std::array<MeleeWebAudioOwnedRange,MELEE_WEB_AUDIO_OWNED_RANGE_MAX>;
     bool capture_post_bytes(const GameplayMatchSession&,std::vector<PostBytes>&,AudioRanges&,std::size_t&);
     bool matches_post_bytes(const GameplayMatchSession&,const std::vector<PostBytes>&,const AudioRanges&,std::size_t) noexcept;

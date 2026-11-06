@@ -3,7 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
-  decodeRuntimeMatchHistoryInput,validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
+  decodeRuntimeMatchHistoryInput,decodeRuntimeMatchHistoryPollTicket,
+  decodeRuntimeMatchHistoryEpisodeInputRow,validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
 const HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
@@ -101,6 +102,68 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
   }
   return {module,calls,put,view,allocations,frees,padCalls,startCalls,
     setStartPhase:value=>{nativeStartPhase=value;},writePublication};
+}
+
+function episodeFixture(){
+  const f=fixture(),{module,put,view}=f;
+  const ticketPointer=16384,rowPointer=16512;
+  let current=0,phase=0,incarnation=0,forwardSteps=0,replaySteps=0,restoreCount=0,ownerState=1;
+  let pollSerial=0n,lastPlan=null,enableCalls=0,latestTicketId=0;
+  const raw=Uint8Array.from({length:44},(_,index)=>(index*7+3)&255);
+  const writeMetadata=()=>{
+    put(8,ownerState);put(32,0);put(36,0);put(40,1);
+    put(56,phase);put(64,0);put(68,current);put(72,0);put(76,incarnation);
+    put(80,restoreCount);put(84,0);put(88,forwardSteps);put(92,replaySteps);
+    view.setBigUint64(352,pollSerial,true);put(112,pollSerial?1:0);put(116,0);put(120,0);put(124,0);
+  };
+  const writeTicket=seq=>{
+    const bytes=new Uint8Array(88),data=new DataView(bytes.buffer);
+    data.setUint32(0,1,true);data.setUint32(4,88,true);data.setUint32(8,seq,true);
+    data.setUint32(12,current,true);data.setUint32(16,incarnation,true);
+    data.setUint32(20,0,true);data.setUint32(24,1,true);
+    data.setBigUint64(32,pollSerial,true);bytes.set(raw,40);module.HEAPU8.set(bytes,ticketPointer);
+  };
+  const writeReceipt=(state,plan=raw)=>{
+    const bytes=new Uint8Array(176),data=new DataView(bytes.buffer);
+    data.setUint32(0,1,true);data.setUint32(4,176,true);data.setUint32(8,latestTicketId,true);
+    data.setUint32(12,0,true);data.setUint32(16,1,true);data.setUint32(20,0,true);
+    data.setUint32(24,1,true);data.setUint32(28,state,true);data.setBigUint64(32,pollSerial,true);
+    bytes.set(raw,40);if(state){bytes.set(plan,84);bytes.set(plan,128);}
+    module.HEAPU8.set(bytes,rowPointer);
+  };
+  const request=command=>{
+    f.calls.push(command);const seq=view.getUint32(280,true)+1;put(16,command);put(24,seq);
+    queueMicrotask(()=>{
+      if(command===1){phase=2;}
+      if(command===18){phase=3;incarnation=1;}
+      if(command===12){pollSerial=9007199254740993n+BigInt(seq);latestTicketId=seq;phase=phase===4?4:21;writeTicket(seq);writeReceipt(0);}
+      if(command===13){current++;phase=21;forwardSteps++;writeReceipt(1,lastPlan??raw);}
+      if(command===14){phase=5;put(72,current);}
+      if(command===15){current++;replaySteps++;}
+      if(command===16){phase=12;put(72,current);}
+      if(command===17){phase=21;incarnation++;put(72,0);replaySteps=0;}
+      if(command===10)ownerState=2;
+      writeMetadata();put(16,0);put(20,command);put(28,seq);
+    });
+    return 1;
+  };
+  module[prefix+'episode_enable']=()=>{enableCalls++;return 1;};
+  module[prefix+'ticket_bytes']=()=>88;module[prefix+'ticket_data']=()=>ticketPointer;
+  module[prefix+'input_row_bytes']=()=>176;module[prefix+'input_row_data']=ordinal=>ordinal===0?rowPointer:0;
+  module[prefix+'request']=request;
+  module[prefix+'request_episode_forward']=(ticketId,pointer,size)=>{
+    if(size!==44||ticketId!==latestTicketId)return 0;
+    lastPlan=module.HEAPU8.slice(pointer,pointer+size);
+    return request(13);
+  };
+  module[prefix+'request_episode_replay']=(ticketId,pointer,size)=>{
+    if(size!==44||ticketId!==latestTicketId)return 0;
+    lastPlan=module.HEAPU8.slice(pointer,pointer+size);
+    return request(15);
+  };
+  writeMetadata();
+  return {...f,episodeState:()=>({current,phase,incarnation,forwardSteps,replaySteps,restoreCount,ownerState,
+    pollSerial,lastPlan,enableCalls,ticketPointer,rowPointer})};
 }
 
 const host=Object.freeze({runtime_sha256:'a'.repeat(64),asset_identity_sha256:'b'.repeat(64),
@@ -272,8 +335,89 @@ test('agreed-start exports stay optional until called on an older production mod
   assert.equal(owner.status().ownerState,0);
   assert.throws(()=>owner.startEnable(),/start_enable is unavailable/);
   assert.throws(()=>owner.startPrefix(),/start_state is unavailable/);
+  assert.throws(()=>owner.enableEpisode(),/episode_enable is unavailable/);
+  assert.throws(()=>owner.enableArenaHistory(),/episode_enable is unavailable/);
+  const fresh=fixture({agreedStartExports:false});
+  assert.throws(()=>createRuntimeMatchHistoryController(fresh.module).enableArenaHistory(),/arena_enable is unavailable/);
   assert.deepEqual(f.allocations.map(row=>row.size),[11]);
   assert.deepEqual(f.frees,[]);
+});
+
+test('episode mode uses preallocated 44-byte plans, exact poll tickets and detached receipts',async()=>{
+  const f=episodeFixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  assert.equal(owner.enableEpisode(),true);
+  assert.deepEqual(f.allocations.map(row=>row.size),[11,44]);
+  assert.equal(f.episodeState().enableCalls,1);
+  await owner.command('capture');
+  const allocationsAfterCapture=f.allocations.length;
+  await owner.command('beginEpisode');
+  f.put(56,4); // The native Armed PRE endpoint has been copied.
+  await owner.command('pollTicket');
+  const ticket=owner.ticket();
+  assert.equal(ticket.ticketId,3);
+  assert.equal(ticket.sourceFrame,0);
+  assert.equal(ticket.incarnation,1);
+  assert.equal(ticket.pollSerial,'9007199254740996');
+  const pending=owner.receipt(0);
+  assert.equal(pending.ordinal,0);
+  assert.equal(pending.state,0);
+  assert.deepEqual(pending.raw,ticket.raw);
+  assert(pending.raw.some(Boolean),'state 0 retains actual nonzero PAD before forward');
+  assert.deepEqual(pending.forward,new Uint8Array(44));
+  assert.deepEqual(pending.selected,new Uint8Array(44));
+  const plan=ticket.raw.slice();plan[11]^=0x20;
+  await owner.forwardTicket(ticket.ticketId,plan);
+  assert.deepEqual(f.episodeState().lastPlan,plan,'the controller forwards all four exact PAD rows without rewriting them');
+  assert.equal(f.allocations.length,allocationsAfterCapture,'episode commands allocate no Wasm scratch after PRE capture');
+  const receipt=owner.receipt(0);
+  assert.equal(receipt.ordinal,0);
+  assert.equal(receipt.incarnation,1,'receipt preserves its original poll incarnation');
+  assert.equal(receipt.state,1);
+  const rawBefore=receipt.rawBytes.slice();
+  f.module.HEAPU8.fill(0,f.episodeState().rowPointer,f.episodeState().rowPointer+176);
+  assert.deepEqual(receipt.rawBytes,rawBefore,'the row is copied before any later native call can mutate borrowed storage');
+  assert.throws(()=>owner.remotePad(new Uint8Array(11)),/disabled in episode mode/);
+  await assert.rejects(()=>owner.command('forward'),/disabled in episode mode/);
+  assert.deepEqual(f.calls,[1,18,12,13]);
+  await owner.command('cleanup');
+  assert.deepEqual(f.frees.slice(-2),[f.allocations[1].pointer,f.allocations[0].pointer]);
+});
+
+test('episode receipt decoders preserve uint64 serials and reject malformed ticket and row bindings',()=>{
+  const ticket=new Uint8Array(88),ticketView=new DataView(ticket.buffer);
+  ticketView.setUint32(0,1,true);ticketView.setUint32(4,88,true);ticketView.setUint32(8,7,true);
+  ticketView.setUint32(12,176,true);ticketView.setUint32(16,2,true);ticketView.setUint32(20,0,true);
+  ticketView.setUint32(24,1,true);ticketView.setBigUint64(32,9007199254740993n,true);
+  ticket.set(Uint8Array.from({length:44},(_,index)=>index),40);
+  const decodedTicket=decodeRuntimeMatchHistoryPollTicket(ticket);
+  ticket.fill(0);
+  assert.equal(decodedTicket.pollSerial,'9007199254740993');
+  assert.equal(decodedTicket.ticketId,7);
+  assert.equal(decodedTicket.raw[0],0,'ticket PAD rows are detached copies');
+  const malformedTicket=decodedTicket.rawBytes.slice();new DataView(malformedTicket.buffer).setUint32(28,1,true);
+  assert.throws(()=>decodeRuntimeMatchHistoryPollTicket(malformedTicket),/metadata violation/);
+  const zeroTicketSerial=decodedTicket.rawBytes.slice();
+  new DataView(zeroTicketSerial.buffer).setBigUint64(32,0n,true);
+  assert.throws(()=>decodeRuntimeMatchHistoryPollTicket(zeroTicketSerial),/metadata violation/);
+
+  const row=new Uint8Array(176),view=new DataView(row.buffer);
+  view.setUint32(0,1,true);view.setUint32(4,176,true);view.setUint32(8,7,true);
+  view.setUint32(12,176,true);view.setUint32(16,1,true);view.setUint32(20,0,true);
+  view.setUint32(24,1,true);view.setUint32(28,2,true);view.setBigUint64(32,9007199254740993n,true);
+  const raw=Uint8Array.from({length:44},(_,index)=>(index*13)&255),selected=raw.slice();
+  selected[11]^=0x80;row.set(raw,40);row.set(selected,84);row.set(selected,128);
+  const decodedRow=decodeRuntimeMatchHistoryEpisodeInputRow(row);
+  assert.equal(decodedRow.incarnation,1);assert.equal(decodedRow.pollSerial,'9007199254740993');
+  const zeroRowSerial=row.slice();
+  new DataView(zeroRowSerial.buffer).setBigUint64(32,0n,true);
+  assert.throws(()=>decodeRuntimeMatchHistoryEpisodeInputRow(zeroRowSerial),/metadata violation/);
+  const changedUnused=row.slice();changedUnused[84+22]^=1;
+  assert.throws(()=>decodeRuntimeMatchHistoryEpisodeInputRow(changedUnused),/local or unused PAD port/);
+  const nonzeroEmpty=new Uint8Array(176),emptyView=new DataView(nonzeroEmpty.buffer);
+  [1,176,7,176,1,0,1,0].forEach((value,index)=>emptyView.setUint32(index*4,value,true));
+  emptyView.setBigUint64(32,1n,true);nonzeroEmpty[84]=1;
+  assert.throws(()=>decodeRuntimeMatchHistoryEpisodeInputRow(nonzeroEmpty),/Unconsumed episode ticket/);
 });
 
 test('agreed-start forwards host identities and seed while returning exact native bytes and held-frame receipt',()=>{
@@ -373,20 +517,22 @@ test('agreed-start argument paths refuse allocator churn after match-history cap
   await owner.command('cleanup');
 });
 
-function checksumFixture(phase=6){
+function checksumFixture(phase=6,pre=0){
   const f=fixture();
   const owner=createRuntimeMatchHistoryController(f.module);
-  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.takeOver({sourceFrame:pre,localPort:0,remotePort:1});
   f.put(56,phase); // history.phase
-  f.put(68,1); // history.currentFrame
-  f.put(72,1); // history.sealedEnd
+  f.put(64,pre); // history.preFrame
+  f.put(68,pre+1); // history.currentFrame
+  f.put(72,pre+1); // history.sealedEnd
   f.put(88,1); // history.forwardSteps
   f.put(92,phase===13?1:0); // history.replaySteps
   f.put(96,17); // history.pollSerial, low word
   f.put(112,1); // inputReady
   const pointer=16384;
+  f.view.setUint32(pointer,pre,true);
   f.view.setUint32(pointer+4,3,true);
-  f.view.setUint32(pointer+12,1,true);
+  f.view.setUint32(pointer+12,pre+1,true);
   f.view.setBigUint64(pointer+56,0xfedcba9876543210n,true);
   f.module[prefix+'checksum_data']=()=>pointer;
   f.module[prefix+'checksum_bytes']=()=>64;
@@ -409,6 +555,15 @@ test('checksum copies the exact native CPU endpoint bytes before another native 
     assert.equal(f.allocations.length,allocationCount);
     assert.equal(f.frees.length,0);
   }
+});
+
+test('checksum binds the second window to match input ordinal one and source frame two',()=>{
+  const f=checksumFixture(13,1);
+  const bytes=f.owner.checksum(),record=new DataView(bytes.buffer);
+  assert.equal(record.getUint32(0,true),1);
+  assert.equal(record.getUint32(12,true),2);
+  f.view.setUint32(f.pointer,0,true);
+  assert.throws(()=>f.owner.checksum(),/checksum tick, match scene or source frame differs/);
 });
 
 test('checksum refuses wrong phase, borrowed extent, frame and changed owner status',()=>{
@@ -435,4 +590,103 @@ test('checksum refuses wrong phase, borrowed extent, frame and changed owner sta
   const owner=checksumFixture();
   owner.module[prefix+'checksum_data']=()=>{owner.put(96,18);return owner.pointer;};
   assert.throws(()=>owner.owner.checksum(),/changed its native owner status/);
+});
+
+test('confirmed rebase acknowledges retired END and opens the next capture without resetting sequence',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  const identity=source_frame=>JSON.stringify({...host,source_frame,
+    current_rng:source_frame?'01234567':'fedcba98',selection:{stage:2}});
+  const stringPointer=2048;
+  const publishIdentity=frame=>{
+    f.module.HEAPU8.set(new TextEncoder().encode(identity(frame)+'\0'),stringPointer);
+    return stringPointer;
+  };
+  f.module[prefix+'identity_json']=()=>publishIdentity(0);
+  f.module[prefix+'rebase_identity_json']=()=>publishIdentity(1);
+  let requestedEnd;
+  f.module[prefix+'request_rebase']=end=>{
+    requestedEnd=end;
+    f.put(32,end);f.put(56,0);f.put(64,end);f.put(68,end);f.put(72,0);
+    f.put(88,0);f.put(104,40);f.put(112,0);
+    return f.module[prefix+'request'](11);
+  };
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);
+  await owner.command('capture');
+  assert.throws(()=>owner.identity(host),/before capture/);
+  f.put(56,18);f.put(68,1);f.put(72,1);f.put(88,1);f.put(108,40);f.put(112,1);
+  const fresh=await owner.command('rebase',1);
+  assert.equal(requestedEnd,1);
+  assert.equal(fresh.identity,identity(1));
+  assert.deepEqual([fresh.status.expectedFrame,fresh.status.metadata.currentFrame,
+    fresh.status.completeSequence,fresh.status.lastCompletedCommand],[1,1,2,11]);
+  assert.equal((await owner.command('capture')).completeSequence,3);
+  assert.deepEqual(f.calls,[1,11,1]);
+  assert.equal(owner.journal()[1].identity,identity(1));
+  await owner.command('cleanup');
+});
+
+test('confirmed rebase rejects an unretired capsule before asking the native owner',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  await owner.command('capture');
+  await assert.rejects(owner.command('rebase',1),/actual retired END/);
+  assert.deepEqual(f.calls,[1]);
+  await assert.rejects(owner.command('capture'),/actual retired END/);
+  await owner.command('cleanup');
+  assert.deepEqual(f.calls,[1,10]);
+});
+
+
+test('arena history requires explicit native enablement before capture and keeps legacy mode separate',async()=>{
+  const f=episodeFixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  let arenaCalls=0;
+  f.module[prefix+'arena_enable']=()=>{arenaCalls++;return f.module[prefix+'episode_enable']();};
+  f.module[prefix+'cpu_arena_endpoint_data']=()=>0;
+  f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
+  assert.equal(owner.enableArenaHistory(),true);
+  assert.equal(arenaCalls,1);
+  assert.throws(()=>owner.enableArenaHistory(),/already enabled/);
+  assert.throws(()=>owner.enableEpisode(),/already enabled/);
+  assert.throws(()=>owner.endpoint({arenaHistoryEndpoint:false}),/requires its typed arena/);
+  assert.throws(()=>owner.endpoint({particleCellEndpoint:false}),/requires its typed arena/);
+  await owner.command('capture');
+  assert.throws(()=>owner.enableArenaHistory(),/before PRE capture/);
+  const g=episodeFixture(),legacy=createRuntimeMatchHistoryController(g.module);
+  assert.throws(()=>legacy.endpoint({arenaHistoryEndpoint:true}),/was not enabled/);
+});
+
+test('owned idle preparation retains renderer receipt without changing status polling',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  const calls=[];
+  f.put(116,1);
+  f.module[prefix+'renderer_prepare_json']=command=>{
+    calls.push(command);
+    f.put(116,0);
+    return 2048;
+  };
+  const utf8=f.module.UTF8ToString;
+  f.module.UTF8ToString=pointer=>pointer===2048?JSON.stringify({schema:1,command:5,action:1,
+    before:{cacheStatus:1},after:{cacheStatus:0}}):utf8(pointer);
+  assert.equal(owner.status().gpuPending,1);
+  assert.deepEqual(calls,[]);
+  assert.equal((await owner.command('idle')).lastCompletedCommand,5);
+  assert.deepEqual(calls,[5]);assert.deepEqual(f.calls,[5]);
+  assert.equal(owner.journal()[0].rendererPreparation.flush.after.cacheStatus,0);
+});
+
+test('alternate renderer work retains its receipt on the original idle and cleanup deadlines',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module,{commandTimeoutMs:30});
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  f.put(116,1);
+  let lastCommand=0;
+  f.module[prefix+'renderer_prepare_json']=command=>{lastCommand=command;return 2048;};
+  f.module.UTF8ToString=()=>JSON.stringify({schema:1,command:lastCommand,action:0,
+    before:{pendingStaging:1},after:{pendingStaging:1}});
+  await assert.rejects(owner.command('idle'),/idle exceeded its 30 ms deadline.*pendingStaging/);
+  await assert.rejects(owner.command('cleanup'),/cleanup exceeded its 30 ms deadline.*pendingStaging/);
+  assert.deepEqual(f.calls,[]);
+  assert.equal(owner.journal()[1].rendererPreparation.latest.command,10);
 });

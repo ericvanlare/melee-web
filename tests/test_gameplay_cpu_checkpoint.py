@@ -338,4 +338,12 @@ u64* fixture_bootstrap_mask(void){return &disabled_links;}
              f'-DMELEE_WEB_TEST_CADENCE_SOURCE="{cadence.as_posix()}"'],cpp=False)
         self.assertIn('Actual flow clock cadence CPU restore',output)
 
+    def test_actual_owned_arena_coordinator_preflight_and_commit_order(self):
+        output=self.compile_run('coordinator-arena',[SOURCE/'src/gameplay_cpu_statics.cpp',
+            SOURCE/'src/gameplay_cpu_commit.cpp',SOURCE/'tests/cpu_commit_control.cpp'],
+            ['-fexceptions','-sDISABLE_EXCEPTION_CATCHING=0',
+             '-DMELEE_WEB_MATCH_HISTORY_DIAGNOSTIC=1',
+             '-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1'])
+        self.assertIn('Owned arena coordinator rejects before writes and commits in order',output)
+
 if __name__=='__main__':unittest.main()

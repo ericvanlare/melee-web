@@ -7,6 +7,7 @@
 #include "gameplay_match_flow.h"
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_cpu_statics.hpp"
+#include "gameplay_heap.h"
 #include "slippi_profile/lobj_presentation_cache.h"
 #include "slippi_profile/tobj_presentation_cache.h"
 #include "slippi_profile/particle_presentation.h"
@@ -33,6 +34,10 @@ struct GameplayCpuCommitOwners {
     GameplayActionStoreHistory* action_history{};
     std::uint64_t history_incarnation{};
     std::uint32_t history_end_frame{};
+    const MeleeWebGameplayHeapHistorySnapshot* arena{};
+    MeleeWebSourceMemoryHistory* shadow{};
+    const void* arena_base{};
+    std::size_t arena_bytes{};
 };
 enum class GameplayCpuCommitResult : std::uint32_t {
     Ok=0, MissingOwner, Effect, Action, Audio, Flow, Bootstrap, Context, Payload,
@@ -48,6 +53,7 @@ GameplayCpuCommitResult gameplay_cpu_commit_corrected(const GameplayCpuCommitOwn
 /* Repeatable same-PRE history restore. All capture-time prepared banks are
  * ready before final aggregate admission; selected motor output resets only
  * after every source owner has committed. */
+bool gameplay_cpu_history_audio_disjoint(const GameplayCpuCommitOwners&) noexcept;
 GameplayCpuCommitResult gameplay_cpu_commit_history_pre(
     const GameplayCpuCommitOwners&) noexcept;
 }

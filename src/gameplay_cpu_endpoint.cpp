@@ -3,6 +3,7 @@
 #include "gameplay_cpu_interval.h"
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <initializer_list>
 #include <limits>
 
@@ -235,13 +236,48 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
     if(out.actions.binding_count>UINT32_MAX/2u||out.actions.cache_count>UINT32_MAX/2u)
         return collect_refusal("action-header",out.actions.status);
 
-    out.payload=pre?
+#if defined(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC) && MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
+    if(checkpoint.commit_.arena){
+        if(!history_mode_||(pre&&!checkpoint.history_payload_admit()))
+            return collect_refusal("arena-history-owner");
+        const auto sdk=melee_web_gameplay_heap_history_observe(checkpoint.commit_.arena);
+        const auto shadow=melee_web_source_memory_history_observe(checkpoint.commit_.shadow);
+        const auto base=reinterpret_cast<std::uintptr_t>(checkpoint.commit_.arena_base);
+        if(sdk.status!=MELEE_WEB_GAMEPLAY_HEAP_HISTORY_OK||sdk.arena_base!=base||
+           sdk.arena_bytes!=checkpoint.commit_.arena_bytes||
+           sdk.schema!=1||sdk.bytes!=sizeof(sdk)||!sdk.owner_epoch||sdk.exact_equal>1||
+           (sdk.exact_equal?
+                (sdk.first_difference!=UINT64_MAX||sdk.compared_bytes!=sdk.arena_bytes):
+                (sdk.first_difference>=sdk.arena_bytes||sdk.compared_bytes!=sdk.first_difference+1))||
+           out.history_incarnation>UINT32_MAX)
+            return collect_refusal("arena-history-observe",static_cast<std::uint32_t>(sdk.status));
+        if(shadow.status!=MELEE_WEB_SOURCE_MEMORY_HISTORY_OK||shadow.exact_pre>1)
+            return collect_refusal("arena-shadow-observe",static_cast<std::uint32_t>(shadow.status));
+        if(pre&&!sdk.exact_equal)
+            return collect_refusal("arena-pre-bytes",static_cast<std::uint32_t>(sdk.first_difference));
+        if(pre&&!shadow.exact_pre)return collect_refusal("arena-shadow-pre-bytes");
+        out.arena={1,sizeof(GameplayCpuArenaEndpoint),static_cast<std::uint32_t>(view_),
+            static_cast<std::uint32_t>(provenance_),out.source_frame,
+            static_cast<std::uint32_t>(out.history_incarnation),out.history_restore_count,
+            sdk.exact_equal|(shadow.exact_pre<<1),shadow.pre_piece_watermark,
+            shadow.current_piece_watermark,shadow.pool_refusal,shadow.origin_refusal,shadow.piece_refusal,0,
+            out.history_effect_token,shadow.pre_revision,shadow.current_revision,
+            shadow.pre_watermark,shadow.current_watermark,shadow.pre_piece_revision,
+            shadow.current_piece_revision,sdk.arena_base,sdk.arena_bytes,sdk.compared_bytes,sdk.first_difference};
+    }
+
+#endif
+
+    out.payload=pre&&!out.arena.schema?
         melee_web_source_memory_payload_endpoint_header(checkpoint.commit_.payload):
         melee_web_source_memory_payload_current_endpoint_header(checkpoint.commit_.payload);
     if(out.payload.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK||out.payload.schema!=1||
        out.payload.row_count>UINT32_MAX||out.payload.free_cell_count>UINT32_MAX||
        out.payload.allocated_cell_count>UINT32_MAX)
         return collect_refusal("payload-header",static_cast<std::uint32_t>(out.payload.status));
+    if(out.arena.schema&&(out.payload.topology_revision!=out.arena.current_revision||
+       out.payload.allocation_watermark!=out.arena.current_watermark))
+        return collect_refusal("arena-history-payload-fence");
 
     const auto* flow_snapshot=pre||history_mode_?
         checkpoint.commit_.flow_snapshot:checkpoint.post_flow_;
@@ -342,6 +378,7 @@ bool GameplayCpuEndpointReader::same_batch(const BatchData& a,
        a.history_current_end!=b.history_current_end||
        a.history_restore_count!=b.history_restore_count||
        a.history_effect_token!=b.history_effect_token)return false;
+    if(std::memcmp(&a.arena,&b.arena,sizeof(a.arena)))return false;
     for(std::uint32_t i=0;i<a.audio_count;++i)
         if(!equal_range(a.audio_ranges[i],b.audio_ranges[i]))return false;
     return true;
@@ -569,7 +606,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
         }
         if(kind==Kind::PayloadRow){
             if(index>=data_.payload.row_count)return refusal(Status::InvalidIndex);
-            const auto x=view_==View::Pre?
+            const auto x=view_==View::Pre&&!data_.arena.schema?
                 melee_web_source_memory_payload_endpoint_row(c.commit_.payload,index):
                 melee_web_source_memory_payload_current_endpoint_row(c.commit_.payload,&data_.payload,index);
             if(x.status!=MELEE_WEB_SOURCE_MEMORY_PAYLOAD_SNAPSHOT_OK)
@@ -582,7 +619,7 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
             const bool free=kind==Kind::PayloadFreeCell;
             const auto count=static_cast<std::uint32_t>(free?data_.payload.free_cell_count:data_.payload.allocated_cell_count);
             if(index>=count)return refusal(Status::InvalidIndex);
-            const auto x=view_==View::Pre?
+            const auto x=view_==View::Pre&&!data_.arena.schema?
                 (free?melee_web_source_memory_payload_endpoint_free_cell(c.commit_.payload,index):
                     melee_web_source_memory_payload_endpoint_allocated_cell(c.commit_.payload,index)):
                 (free?melee_web_source_memory_payload_current_endpoint_free_cell(c.commit_.payload,&data_.payload,index):
@@ -689,6 +726,13 @@ GameplayCpuEndpointRecord GameplayCpuEndpointReader::record(
         }
     }
     return refusal(Status::InvalidIndex);
+}
+
+bool GameplayCpuEndpointReader::arena(GameplayCpuArenaEndpoint& out) const noexcept
+{
+    out={};
+    if(!active_||!data_.arena.schema||!history_identity_matches())return false;
+    out=data_.arena;return true;
 }
 
 bool GameplayCpuEndpointReader::revalidate() noexcept

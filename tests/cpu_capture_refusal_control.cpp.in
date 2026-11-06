@@ -293,7 +293,7 @@ class GameplayCpuCheckpoint{public:
 private:
  explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop):span_(span),reusable_loop_(reusable_loop){}
  explicit GameplayCpuCheckpoint(CpuCheckpointSpan span):GameplayCpuCheckpoint(static_cast<std::uint32_t>(span),false){}
- static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool,bool) noexcept;
+ static std::unique_ptr<GameplayCpuCheckpoint> capture_checked(const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,CpuCaptureDiagnostic&,std::uint32_t,bool,bool,CpuHistoryStorage=CpuHistoryStorage::StablePayload) noexcept;
  const std::uint32_t span_;const bool reusable_loop_;
  // This refusal fixture only invokes the legacy capture/capture_span entries.
  // History-only leaves abort if an extracted production branch reaches them.

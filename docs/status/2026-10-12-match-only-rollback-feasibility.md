@@ -1983,11 +1983,84 @@ and the separate default-off control. The full local regression then passed on
 historical TObj compiler graph in its clean unit shard; the CI-only repair configures
 that graph with an explicitly empty source-only asset directory. The unchanged
 TObj component and all 15 focused CI controls pass; assertions, test ownership and
-deadlines are unchanged. Integration and exact-head checks are tracked by
-[PR #363](https://github.com/ericvanlare/melee-web/pull/363) and
-[#362](https://github.com/ericvanlare/melee-web/issues/362). The next functional
-boundary is confirmed retirement and rebase into adjacent correction windows in
-the same live match.
+deadlines are unchanged. [PR #363](https://github.com/ericvanlare/melee-web/pull/363)
+merged as `f817f857` after all 15 checks on `331e3f64` completed with 13 successes
+and two expected skips. The merged and reviewed trees match.
+
+The next milestone, [#364](https://github.com/ericvanlare/melee-web/issues/364),
+now passes two adjacent actual corrections in the same ordinary-runtime match
+and browser-owned relay sockets. Native and harness producer `21e508a0` uses
+confirmed retirement and an exact END-to-fresh-PRE rebase. P1 uses a new actual
+KeyD poll in each window; P2 uses ArrowLeft then ArrowRight. The second prediction
+holds the first actual received P2 sample. Both predictions change the native
+scene-state checksum; both corrected authoritative 44-byte PAD records and all
+64 checksum bytes match the on-time peer. Independent replay confirms strict
+local Armed/Restored PRE equality across all nine domains and 12 particle
+relations in each window.
+
+Rebase preserves the live Owner tuple and all 3,797 reviewed static rows per
+page between selected DRAW_END frame 1 and fresh Capture PRE frame 1. Effect
+and action authority lifetimes are checked separately, without asserting whole
+cross-view endpoint equality. Each page preserves its own audio phase; the pages
+still differ in phase, so cross-peer PCM is unmeasured. Native commands and actual
+input poll serials increase; sockets and match owners stay live throughout.
+Both native owners close successfully and all 23 owned browser/relay/server/capture
+processes are absent. The first host source draft's phase, scope, test-merge and
+continuity defects were repaired before capture and remain retained. The actual
+native translation units, affected private Release build and focused controls pass.
+
+These are two individually confirmed one-tick corrections. The subsequent
+four-tick attempt at native and harness `f8d0db8c` passes its first strict
+Armed/Restored PRE comparison across all nine domains and 12 particle relations,
+corrects to END3, then actually advances tick 3 while remote input remains
+confirmed only through tick 1. It refuses the next END4 seal. Independent review
+confirms that completed prefix and the absence of a second restore or final
+four-PAD/64-byte peer comparison. Diagnostic producer `5778935b` preserves the
+guards and their order and identifies the exact leaf: payload snapshot topology
+changed in the source main heap. Both failed captures, source reviews and
+producer identities are retained; owned browser, relay and server cleanup passes.
+
+The reduced original SDK allocator and active source-shadow control now passes
+allocation/free/reuse and two exact paired restores, while preserving monotonic
+observer identities and rejecting stale preparations before writes. The optional
+owned-arena path keeps the legacy payload guard and strict comparator unchanged.
+Its actual-runtime producer `01805a9c` restores the full 32 MiB arena and source
+shadow exactly at the first correction. All nine raw domains and 12 particle
+relations compare, with two advancing observer counters checked separately by
+the typed native receipt. The late input changes scene state; tick 3 then advances
+while tick 2 remains unconfirmed, and the formerly failing END4 seal and CPU
+endpoint both pass.
+
+The first arena runtime run then stopped at END4 presentation completion:
+the renderer-pending bit stayed set until the unchanged five-second deadline.
+Alpha's native cleanup hit the same wait; beta retired, and owned processes
+closed. The retained result does not identify which renderer owner was pending.
+The added observation/service path records actual busy state and can finish a
+pending cache write only when the exact source and submission owners are idle;
+focused controls preserve the deadline and strict completion gate.
+
+Producer `7eda50d7` completes the full four-tick episode. Both actual restores
+compare the full 32 MiB arena, source shadow, all nine raw domains and 12 particle
+relations under the typed monotonic-fence contract. Each local input is polled
+once; corrections from dirty ticks 1 and 2 reuse the retained tickets. Tick 3
+advances before remote tick 2 is confirmed. Both predictions change scene state;
+all four authoritative 44-byte PAD frames and all 64 final gameplay-checksum
+bytes equal the on-time peer. Independent comparator replay and raw-result review
+pass. Both native owners retire and complete cleanup, sockets drain, and all 19
+owned browser processes are absent.
+
+The successful run performs **no cache flush**. Its observed busy samples show
+staging work with cache already ready, and END4 drains before service. The earlier
+renderer timeout remains unattributed; this is not evidence that the conditional
+cache service fixed it. All earlier payload, bridge-dispatch, compile-target and
+renderer failures remain retained.
+
+This is a local functional four-tick episode, not sustained or full-match
+rollback. Repeated arena rebase, paced forward presentation, public enablement,
+complete profile behavior and acceptance remain open. The structured receipt's
+`continuation_364` owns source, raw result, catalog, review and cleanup identities.
+The full 3,102-test regression passes with 242 skips, and ordinary/private Release
+builds pass at `7eda50d7`. Exact publication-head CI remains pending integration.
 
 ## Stage decision dependencies, issue #333
 
