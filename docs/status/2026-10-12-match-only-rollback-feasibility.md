@@ -2101,6 +2101,24 @@ lag: advancing the confirmed anchor while preserving a speculative suffix remain
 a separate native lifecycle requirement. No deadline, history cap or comparison
 has been weakened to claim continuous play.
 
+Inline dispatch also passes the same eight-tick/four-correction proof. Native
+producer `dfc0acb2` and harness `c8b84e57` are distinct: the harness adds only
+a pure-JavaScript command-journal copy after cleanup. Independent replay verifies
+all restore, input, checksum, presentation, rebase and lifecycle checks. All 19
+owned browser processes are absent. The native command owner executes directly
+through Asyncify-aware calls; it retains exclusive ownership during suspension,
+blocks reentry, and enforces the original deadlines after completion. Sixteen
+renderer-preparation observations include two actual conditional flushes; the
+historical renderer timeout cause remains unproven.
+
+The observed serialized controller durations expose a history-work bottleneck:
+forward steps stay below 1.7 ms and no-draw replay below 1.1 ms, while capture
+ranges from 36–74 ms, seal 19–25 ms and restore 57–69 ms. These are command wall
+durations from this diagnostic, not native-only or foreground cadence evidence.
+The exact samples live in `continuous_366.inline_dispatch_v1`. The next experiment
+attributes those expensive commands before attempting a longer paced run; no
+frame-budget success is inferred.
+
 ## Stage decision dependencies, issue #333
 
 The next incomplete profile revision, `slippi-render-dependencies-v3`, adds two

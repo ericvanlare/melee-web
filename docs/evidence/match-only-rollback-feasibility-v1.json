@@ -13015,7 +13015,7 @@
               "renderer_cache_flushes": 0
             },
             "scope": "Local batch-functional eight ticks with sealed-END presentations, not continuous/paced play, full match, public/Internet or human acceptance. Earlier renderer timeout cause remains unattributed. Full regression and final milestone integration pending further scoped implementation.",
-            "next": "Remove extra native percommandrAF using explicit async-aware inline dispatcher under same owner; parity then measured existing60Hzclock. Sustainedlag separately needs confirmedprefix anchor transfer without drawing oldframe or repolling.",
+            "next": "Attribute costly capture/seal/restore commands with opt-in first-alpha CPU profiles before a paced run. Source validation pairwise overlap checks are a hypothesis, not yet a measured cause. Persistent-lag confirmed anchor transfer remains open.",
             "per_forward_present_v1": {
               "state": "TWO_ARENA_EPISODES_COMPLETE",
               "native_and_harness_producer": "5c28d840c65221b1548199d4a95b82369b84c9a4",
@@ -13098,6 +13098,73 @@
                 "renderer_cache_flushes": 0
               },
               "scope": "One original source draw per forward tick plus corrected final-frame presentations; replay ticks remain no-draw. Serialized functional evidence only, no paced/continuous/fullmatch or Internet acceptance. Two native testfixture failures retained; actualfocused6 controls and privateRelease pass."
+            },
+            "inline_dispatch_v1": {
+              "state": "TWO_ARENA_EPISODES_COMPLETE",
+              "native_producer": "dfc0acb27c046a1cdbf2aa0c4728e456369ab7d8",
+              "harness_producer": "c8b84e57b34ada9b35ea385f3baeda9e497c27f0",
+              "source_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-root-source-review-v1.json",
+                "sha256": "855a59d727113d40de7b4112c87cd52a2341587b3c0a449b0c14e7d620ac205d"
+              },
+              "focused_integration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-integrated-focused-v1.json",
+                "sha256": "69c1973ef292811a1e2e2db7e8918bcc744f3f2c1e92f2d11b8fca5506cb1b08"
+              },
+              "private_release": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-build-v1/result.json",
+                "sha256": "66ebd8747ee66ec4e1171881b2f6fd5c31755463c0f1e26915bcb7a6f91d85d0"
+              },
+              "producer_archive": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-producer-v1/archive.json",
+                "sha256": "044419ed5b3e834b7ec5027fbce72eb8f0a4cf0fc636d6a83553a25a6f18973e"
+              },
+              "linked_configuration": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-inline-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "27dcf69704e0e52a16f21b69414ad02ded8e558c98566cae796895840ffa484b"
+              },
+              "capture_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-root-review-v1.json",
+                "sha256": "d109b32db91f0ca732e594516a9921789d5bbe04514a14769a9bc69c12d9f70e"
+              },
+              "summary": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/result-summary.json",
+                "sha256": "67571e8fa258089346ddb7a913314c532aef3636420df1260bfc4f640ee72de1"
+              },
+              "browser_report": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/browser/result.json",
+                "sha256": "898b7afa6fed8765bbe1af93d5e20676955d9a59ea088f1f2cf1e8fe65b66ebc"
+              },
+              "owner": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/owner.json",
+                "sha256": "4e1eb4c4376fe4840c5c408350e059e836a9ca4f092448e0e45969f1435e294b"
+              },
+              "independent_review": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/independent-result-review.json",
+                "sha256": "ef3d797b840ed323a528d085d11a063ba909a47a1a0bb9f4588b46b9cdfeb82c"
+              },
+              "serialized_command_timings": {
+                "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-inline-v1/command-timings.json",
+                "sha256": "97d67cd4094f0991f14f57815aa66f8c6e5a21f20a4a6d8e6726d0c2ffb0a12c"
+              },
+              "observed": {
+                "exact_pre_restores": 4,
+                "raw_domains": 9,
+                "particle_relations": 12,
+                "all8_actual_PAD_rows_equal": true,
+                "both64B_confirmed_checksums_equal": true,
+                "source_presents": {
+                  "alpha": 12,
+                  "beta": 8
+                },
+                "inline_enable_once_each": true,
+                "native_cleanup": true,
+                "owned_browser_pids_absent": 19,
+                "renderer_preparation_observations": 16,
+                "actual_conditional_flushes": 2
+              },
+              "scope": "Same8tick functional semantics under explicit Asyncify-aware inline dispatch. Timings are serialized controller wall durations, not foreground/native-only or cadence acceptance. Actual conditional cache service now exercised twice; original v3 renderer timeout attribution remains unproven.",
+              "retained_failure": "Old queued rAF fixture lacked defaultfalse inline_dispatch control field; one-line repair independently reviewed, full7 focused methods pass."
             }
           }
         }
