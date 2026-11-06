@@ -4,7 +4,7 @@
 import {collectCpuEndpointInPage} from './tests/cpu_endpoint.mjs';
 
 export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,present:4,
-  idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10});
+  idle:5,restore:6,correct:7,close:8,retire:9,cleanup:10,rebase:11});
 const PREFIX='_melee_web_native_menu_match_history_';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11;
 const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
@@ -135,7 +135,7 @@ export function decodeRuntimeMatchHistoryStatus(bytes){
   metadata.preAudioPhase=data.getUint32(104,true);metadata.currentAudioPhase=data.getUint32(108,true);
   Object.assign(result,{metadata,...fields(data,['inputReady','gpuPending','endpointActive','rendererErrors'],112)});
   if(result.schema!==1||result.bytes!==STATUS_BYTES||result.reserved!==0||result.ownerState>2||
-    result.pendingCommand>10||result.lastCompletedCommand>10||result.completeSequence>result.requestSequence||
+    result.pendingCommand>11||result.lastCompletedCommand>11||result.completeSequence>result.requestSequence||
     result.inputReady>1||result.gpuPending>1||result.endpointActive>1||
     metadata.schema!==1||metadata.bytes!==64||metadata.phase>20||metadata.restoreCount>1||
     metadata.forwardSteps>1||metadata.replaySteps>1)
@@ -174,6 +174,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||module[PREFIX+'input_bytes']()!==INPUT_BYTES)
     throw Error('Private runtime history ABI differs from its controller');
   let busy=false,failed=null,terminal=false,captured=false;
+  let identityText=null;
   const journal=[];
   const read=(pointer,size)=>{
     if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>0xffffffff)throw Error('Native history pointer');
@@ -323,13 +324,12 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     },
     identity(host){
       active();if(captured)throw Error('Runtime history identity must be read before capture');
-      const encoded=startHostArguments(host,'Runtime history identity');
-      const invoke=(index,pointers)=>index===encoded.length
-        ?module[PREFIX+'identity_json'](...pointers)
-        :allocate(encoded[index],pointer=>invoke(index+1,[...pointers,pointer]));
-      const pointer=invoke(0,[]);if(!pointer)throw latch(Error(`Native match identity refused: ${errorText()}`));
-      const text=module.UTF8ToString(pointer),identity=JSON.parse(text);
-      if(START_HOST_FIELDS.some(key=>identity[key]!==host[key]))throw latch(Error('Native match identity did not bind supplied host identities'));
+      const text=startHostCall('identity_json',[],startHostArguments(host,'Runtime history identity'));
+      if(text===null)throw latch(Error(`Native match identity refused: ${errorText()}`));
+      const identity=JSON.parse(text);
+      if(START_HOST_FIELDS.some(key=>identity[key]!==host[key]))
+        throw latch(Error('Native match identity did not bind supplied host identities'));
+      identityText=text;
       return text;
     },
     startEnable(){
@@ -447,7 +447,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         if(!pointer)throw Error('Native runtime history checksum refused its copied CPU endpoint');
         const bytes=read(pointer,size); // Copy borrowed data before another native call.
         const record=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
-        if(record.getUint32(0,true)!==0||record.getUint32(4,true)!==3||
+        if(record.getUint32(0,true)!==history.preFrame||record.getUint32(4,true)!==3||
           record.getUint32(12,true)!==history.currentFrame)
           throw Error('Runtime history checksum tick, match scene or source frame differs');
         if(JSON.stringify(check(status()))!==JSON.stringify(before))
@@ -455,17 +455,31 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         return bytes;
       }catch(error){throw latch(error);}
     },
-    async command(name){
+    async command(name,confirmedEnd){
       const command=MATCH_HISTORY_COMMAND[name];if(!command)throw Error('Unknown runtime history command');
+      if(name==='rebase')u32(confirmedEnd,'Confirmed END frame');
+      else if(confirmedEnd!==undefined)throw Error('Only confirmed rebase takes an END frame');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');
       busy=true;const started=performance.now(),deadline=started+commandTimeoutMs;
       const entry={command,name,started,status:'pending'};journal.push(entry);
+      if(name==='rebase')entry.confirmedEnd=confirmedEnd;
       try{
         const allowFailure=name==='cleanup';
         const before=await wait(value=>value.pendingCommand===0&&
           (!['idle','cleanup'].includes(name)||value.gpuPending===0),deadline,name,allowFailure);
         const next=before.requestSequence+1;
-        requireSuccess('request',command);
+        if(name==='rebase'){
+          const h=before.metadata;
+          if(!captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
+            before.completeSequence!==before.requestSequence||h.phase!==18||
+            h.preFrame!==before.expectedFrame||confirmedEnd!==h.preFrame+1||
+            confirmedEnd!==h.currentFrame||confirmedEnd!==h.sealedEnd||h.forwardSteps!==1)
+            throw Error('Confirmed rebase requires the actual retired END');
+          if(typeof module[PREFIX+'request_rebase']!=='function'||
+            typeof module[PREFIX+'rebase_identity_json']!=='function')
+            throw Error('Private confirmed rebase exports are unavailable');
+          requireSuccess('request_rebase',confirmedEnd);
+        }else requireSuccess('request',command);
         const after=await wait(value=>value.pendingCommand===0&&value.completeSequence===next,deadline,name,allowFailure);
         if(after.requestSequence!==next||after.lastCompletedCommand!==command)
           throw Error('Native command completion sequence mismatch');
@@ -474,7 +488,31 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           releasePadArgument();terminal=true;
         }
         if(name==='capture')captured=true;
-        entry.status='complete';entry.after=after;entry.elapsedMs=performance.now()-started;return after;
+        if(name==='rebase'){
+          const h=after.metadata;
+          if(after.ownerState!==1||after.localPort!==before.localPort||after.remotePort!==before.remotePort||
+            after.expectedFrame!==confirmedEnd||after.inputReady||after.gpuPending||after.endpointActive||
+            h.phase||h.preFrame!==confirmedEnd||h.currentFrame!==confirmedEnd||h.sealedEnd||
+            h.incarnation||h.endpointMask||h.forwardSteps||h.restoreCount||h.replaySteps||h.pollSerial!=='0'||
+            h.preAudioPhase!==before.metadata.currentAudioPhase||h.currentAudioPhase!==h.preAudioPhase)
+            throw Error('Confirmed rebase acknowledgment did not bind fresh PRE');
+          const pointer=module[PREFIX+'rebase_identity_json']();
+          if(!Number.isInteger(pointer)||pointer<=0||pointer>0xffffffff)
+            throw Error('Confirmed rebase has no fresh native identity');
+          const identity=module.UTF8ToString(pointer);
+          const prior=JSON.parse(identityText),fresh=JSON.parse(identity);
+          const {source_frame:priorFrame,current_rng:priorRng,...priorOwner}=prior;
+          const {source_frame:frame,current_rng:rng,...freshOwner}=fresh;
+          if(priorFrame!==before.expectedFrame||!/^[0-9a-f]{8}$/.test(priorRng)||
+            frame!==confirmedEnd||!/^[0-9a-f]{8}$/.test(rng)||!sameJsonValue(priorOwner,freshOwner)||
+            !sameJsonValue(check(status()),after))
+            throw Error('Confirmed rebase changed the bound identity or owner status');
+          identityText=identity;
+          entry.identity=identity;
+          captured=false;
+        }
+        entry.status='complete';entry.after=after;entry.elapsedMs=performance.now()-started;
+        return name==='rebase'?{status:after,identity:entry.identity}:after;
       }catch(error){entry.status='failed';entry.error=String(error);entry.elapsedMs=performance.now()-started;throw latch(error);}
       finally{busy=false;}
     },

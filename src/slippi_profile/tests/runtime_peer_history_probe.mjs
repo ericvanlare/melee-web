@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Page-side bridge for the one-sample peer-history diagnostic. The browser
+// Page-side bridge for the bounded peer-history diagnostic. The browser
 // owns the existing WebSocket peer; all native source work stays with the
 // existing runtime-history controller.
 import {createRuntimeMatchHistoryPeer} from '../runtime_match_history_peer.mjs';
@@ -18,12 +18,12 @@ function bytes(value, label) {
 }
 
 export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
-  sourceIdentityJson, loadedIdentity} = {}) {
+  sourceIdentityJson, loadedIdentity, inputTicks = 1} = {}) {
   if (globalThis.__meleeRuntimePeerHistoryProbe)
     throw Error('Runtime peer-history bridge is already installed');
   const owner = globalThis.__meleeRuntimeMatchHistory;
   if (!owner) throw Error('Existing runtime-history controller is unavailable');
-  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId,
+  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,
     timeoutMs: 5000, sampleTimeoutMs: 5000, sourceIdentityJson, loadedIdentity,
     sourceFrame: 0, validateNativePad: sample => owner.validatePad(sample)});
 
@@ -37,17 +37,19 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         case 'peerPublish': {
           const sample = bytes(value.pad, 'Native local PAD');
           const input = owner.input();
+          const status = owner.status();
           const local = input.raw.subarray(input.localPort * 11, (input.localPort + 1) * 11);
           if (input.inputReady !== 1 || input.correctedReady !== 0 ||
               input.localPort !== value.port || input.pollSerial !== value.pollSerial ||
+              status.metadata.preFrame !== value.tick || status.expectedFrame !== value.tick ||
               sample.length !== local.length || !sample.every((byte, i) => byte === local[i]))
-            throw Error('Peer publication does not bind the actual native forward poll');
+            throw Error('Peer publication does not bind this window\'s actual native forward poll');
           const receipt = await peer.publishLocal({port: value.port, tick: value.tick,
             pollSerial: value.pollSerial, pad: sample});
           return {receipt, snapshot: peer.snapshot()};
         }
         case 'peerWaitRemote': {
-          const receipt = await peer.waitForRemoteSample({timeoutMs: 5000});
+          const receipt = await peer.waitForRemoteSample({tick: value?.tick ?? 0, timeoutMs: 5000});
           return {receipt, snapshot: peer.snapshot()};
         }
         case 'peerClose': {
@@ -56,6 +58,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         }
         case 'status': return owner.status();
         case 'command': return owner.command(value);
+        case 'rebase': return owner.command('rebase', value);
         case 'remotePad': owner.remotePad(bytes(value, 'Remote PAD')); return {accepted: true};
         case 'input': {
           const input = owner.input();

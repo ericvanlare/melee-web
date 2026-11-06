@@ -465,6 +465,13 @@ bool RuntimeMatchHistory::retire_confirmed() noexcept
     return true;
 }
 
+bool RuntimeMatchHistory::can_rebase_confirmed(std::uint32_t end_frame) const noexcept
+{
+    return phase_==RuntimeMatchHistoryPhase::Retired&&!checkpoint_&&!reader_.active()&&
+        failure_==RuntimeMatchHistoryFailure::None&&forward_steps_==1&&
+        end_frame==sealed_end_&&live_owner(end_frame);
+}
+
 bool RuntimeMatchHistory::release_after_match_close() noexcept
 {
     if(!checkpoint_){

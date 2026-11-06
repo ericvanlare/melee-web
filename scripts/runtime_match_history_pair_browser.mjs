@@ -22,15 +22,19 @@ import {compareCpuReferenceParticleEndpoints,CPU_ENDPOINT_PROVENANCE,CPU_ENDPOIN
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
-// SDL two-keyboard layout: KeyD and ArrowLeft map to signed main-stick X.
+// SDL two-keyboard layout: KeyD is P1 right; ArrowLeft/ArrowRight are P2 left/right.
 const P1_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
+const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
-const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase'];
+const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
 const {values}=parseArgs({options:Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),strict:true});
-for(const name of optionNames)if(!values[name])throw Error(`--${name} is required`);
+for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
+values.windows??='1';
+assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
 assert(['held-statics','peer-correction'].includes(values.phase),
   'Supported bounded phases are held-statics and peer-correction');
+if(values.phase==='held-statics')assert.equal(values.windows,'1','Held-statics supports one baseline window');
 assert.match(values['runtime-wasm-sha256'],/^[0-9a-f]{64}$/,'Exact reviewed runtime Wasm SHA-256 is required');
 const baseUrl=new URL(values.url);
 assert.equal(baseUrl.protocol,'http:','The runtime must be served over loopback HTTP');
@@ -149,11 +153,14 @@ for(const binding of diagnosticBindings){
 
 const report={schema:values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
-    'melee-web-runtime-match-history-paired-peer-correction-v1',
+    values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
+      'melee-web-runtime-match-history-paired-peer-correction-v1',
   scope:values.phase==='held-statics'?
     'two independently owned headless browser pages; original CSS/SSS keyboard route; exact raw alpha/beta source card snapshots retained before comparison; same source-selected context and alpha-seeded agreed frame-zero start; terminal owner identity; exact reviewed static rows copied at held frame zero before capture/begin; no forward, present, replay, correction, or rollback claim':
-    'two independently owned headless browser pages; exact shared source card and agreed frame-zero start; browser-owned page WebSocket peers; one alpha speculative actual P1 step using beta held-prefix P2 prediction, beta on-time actual P2 after receiving alpha actual P1, then one alpha typed restore/replay/correction; strict alpha Armed vs Restored PRE and all-64-byte CPU semantic checksum agreement against beta; local nine-domain/particle endpoints retained without cross-peer full endpoint equality',
-  result:'RUNNING',started_at:new Date().toISOString(),phase:values.phase,
+    (values.windows==='2'?
+      'two independently owned headless browser pages; one continuous browser-owned page peer pair and live native match; two adjacent actual one-input windows joined by checked same-match rebase at exact retired END; each window has beta on-time actual P2 and alpha typed restore/replay/correction; strict full Armed vs Restored PRE and all-64-byte CPU checksum agreement within each window; exact selected owner/statics/audio/frame continuity across rebase; no full cross-view END/PRE endpoint equality claim':
+      'two independently owned headless browser pages; exact shared source card and agreed frame-zero start; browser-owned page WebSocket peers; one alpha speculative actual P1 step using beta held-prefix P2 prediction, beta on-time actual P2 after receiving alpha actual P1, then one alpha typed restore/replay/correction; strict alpha Armed vs Restored PRE and all-64-byte CPU semantic checksum agreement against beta; local nine-domain/particle endpoints retained without cross-peer full endpoint equality'),
+  result:'RUNNING',started_at:new Date().toISOString(),phase:values.phase,window_count:Number(values.windows),
   runtime:{url:baseUrl.href,wasm_sha256:actualWasmHash,profile_identity:PROFILE},
   disc:{image_sha256:discImageHash},
   linked_configuration:{path:configPath,sha256:configSha256,policy_path:policyPath,
@@ -592,11 +599,11 @@ async function peerOperation(item,operation,value=null){
     return bridge.call(operation,value);
   },{operation,value});
 }
-function requireHistoryStatus(status,label,{phase,sourceFrame,restoreCount,forwardSteps,replaySteps,gpuIdle,pollSerial}={}){
+function requireHistoryStatus(status,label,{phase,sourceFrame,preFrame=0,restoreCount,forwardSteps,replaySteps,gpuIdle,pollSerial}={}){
   assert(status&&status.ownerState===1&&status.firstFailure===0&&status.pendingCommand===0&&
     status.completeSequence===status.requestSequence&&status.rendererErrors===0&&status.endpointActive===0&&
     status.metadata?.schema===1&&status.metadata.bytes===64&&status.metadata.firstFailure===0&&
-    status.metadata.preFrame===0&&status.expectedFrame===0,
+    status.metadata.preFrame===preFrame&&status.expectedFrame===preFrame,
     `${label} native history owner/status is unhealthy: ${JSON.stringify(status)}`);
   const expected={phase,currentFrame:sourceFrame,restoreCount,forwardSteps,replaySteps,pollSerial};
   for(const [key,value] of Object.entries(expected))if(value!==undefined)
@@ -611,11 +618,13 @@ async function recordHistoryStatus(item,label,expected){
 }
 async function historyCommand(item,name,expected){
   const journal=report.pages[item.role].match_history.commands;
-  const entry={name,before:await recordHistoryStatus(item,`before:${name}`)};
+  const window=expected?.window;
+  const prefix=window?`${window}:`:'';
+  const entry={name,...(window?{window}:{}),before:await recordHistoryStatus(item,`${prefix}before:${name}`,{preFrame:expected?.preFrame})};
   journal.push(entry);
   try{
     entry.after=await peerOperation(item,'command',name);
-    return requireHistoryStatus(entry.after,`${item.role} after:${name}`,expected);
+    return requireHistoryStatus(entry.after,`${item.role} ${prefix}after:${name}`,expected);
   }catch(error){
     entry.error=String(error?.message||error);
     try{entry.failure_status=await peerOperation(item,'status');}
@@ -623,7 +632,29 @@ async function historyCommand(item,name,expected){
     throw error;
   }
 }
-async function retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,phase}){
+async function historyRebase(item,confirmedEnd,{before,after}){
+  const journal=report.pages[item.role].match_history.commands;
+  const prefix=before?.window?`${before.window}:`:'';
+  const entry={name:'rebase',confirmed_end:confirmedEnd,
+    ...(before?.window?{window:before.window}:{}),
+    before:await recordHistoryStatus(item,`${prefix}before:rebase`,before)};
+  journal.push(entry);
+  try{
+    const result=await peerOperation(item,'rebase',confirmedEnd);
+    assert(result&&typeof result.identity==='string'&&result.status,
+      `${item.role} confirmed rebase omitted its fresh status/identity`);
+    entry.identity=result.identity;
+    entry.after=result.status;
+    requireHistoryStatus(entry.after,`${item.role} ${after.window}:after:rebase`,after);
+    return result;
+  }catch(error){
+    entry.error=String(error?.message||error);
+    try{entry.failure_status=await peerOperation(item,'status');}
+    catch(statusError){entry.failure_status_error=String(statusError);}
+    throw error;
+  }
+}
+async function retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,phase,preFrame=0}){
   const wire=await peerOperation(item,'endpoint',{view,provenance,
     expectedSourceFrame:String(sourceFrame),particleCellEndpoint:true});
   const file=`${item.role}-${label}-endpoint.json`,content=JSON.stringify(wire,null,2)+'\n';
@@ -638,7 +669,7 @@ async function retainHistoryEndpoint(item,label,{view,provenance,sourceFrame,pha
   assert.equal(decoded.provenance,provenance,`${item.role} ${label} endpoint provenance differs`);
   assert.equal(decoded.sourceFrame,String(sourceFrame),`${item.role} ${label} endpoint frame differs`);
   await recordHistoryStatus(item,`after-endpoint:${label}`,{
-    phase,sourceFrame,gpuIdle:true});
+    phase,sourceFrame,preFrame,gpuIdle:true});
   return decoded;
 }
 function effectToken(endpoint){
@@ -646,7 +677,31 @@ function effectToken(endpoint){
   assert(row?.fields.length===1&&/^(0|[1-9][0-9]*)$/.test(row.fields[0]),'PRE effect token is missing');
   return row.fields[0];
 }
-function decodeInput(receipt,item,label,{remotePad,forwardRemotePad=remotePad,status,corrected=false,priorPollSerial}){
+function endpointRecord(endpoint,domainName,kindName,index=0){
+  const domain=endpoint.domains.find(row=>row.name===domainName);
+  const record=domain?.records.find(row=>row.kindName===kindName&&row.index===index);
+  assert(record,`Endpoint omitted ${domainName}.${kindName}[${index}]`);
+  return record;
+}
+function ownerFields(endpoint){
+  const row=endpointRecord(endpoint,'Owner','Owner');
+  return Object.fromEntries(row.fieldNames.map((name,index)=>[name,row.fields[index]]));
+}
+function actionEventReceipt(endpoint){
+  const domain=endpoint.domains.find(row=>row.name==='Actions');
+  const header=domain?.records.find(row=>row.kindName==='Header');
+  assert(header,'Endpoint omitted Actions header');
+  const field=header.fieldNames.indexOf('EventCount');
+  assert(field>=0,'Actions header omitted EventCount');
+  return {event_count:header.fields[field],rows:domain.records.filter(row=>row.kindName==='ActionEvent')};
+}
+function stableIdentity(value){
+  const parsed=JSON.parse(value);
+  const {source_frame,current_rng,...owner}=parsed;
+  return {source_frame,current_rng,owner};
+}
+function decodeInput(receipt,item,label,{remotePad,forwardRemotePad=remotePad,status,corrected=false,priorPollSerial,
+  expectedLocalPad}={}){
   const raw=Buffer.from(receipt?.rawBase64||'','base64');
   const forward=Buffer.from(receipt?.forwardBase64||'','base64');
   const correctedBytes=Buffer.from(receipt?.correctedBase64||'','base64');
@@ -664,7 +719,7 @@ function decodeInput(receipt,item,label,{remotePad,forwardRemotePad=remotePad,st
   const localPort=item.role==='alpha'?0:1,remotePort=1-localPort;
   const localPad=raw.subarray(localPort*11,(localPort+1)*11);
   assert.equal(receipt.pollSerial,status.metadata.pollSerial,`${item.role} ${label} PAD poll differs from command receipt`);
-  assert.deepEqual(localPad,item.role==='alpha'?P1_RIGHT:P2_LEFT,
+  assert.deepEqual(localPad,expectedLocalPad??(item.role==='alpha'?P1_RIGHT:P2_LEFT),
     `${item.role} ${label} actual keyboard PAD differs from the source mapping`);
   const expectedForward=overwritePort(raw,remotePort,forwardRemotePad);
   assert(forward.equals(expectedForward),`${item.role} ${label} forward changed bytes outside its expected remote PAD`);
@@ -688,17 +743,18 @@ async function retainHistoryInput(item,label,expected){
   const decoded=decodeInput(receipt,item,label,expected);
   return {receipt,decoded};
 }
-async function retainChecksum(item,label){
+async function retainChecksum(item,label,{tick=0,sourceFrame=tick+1}={}){
   const encoded=await peerOperation(item,'checksum'),raw=Buffer.from(encoded,'base64');
   assert.equal(raw.length,64,`${item.role} ${label} native checksum is not exactly64 bytes`);
   const parsed=parseNetChecksum(raw);
-  assert.equal(parsed.tick,0,`${item.role} ${label} checksum match-input ordinal differs`);
+  assert.equal(parsed.tick,tick,`${item.role} ${label} checksum match-input ordinal differs`);
   assert.equal(parsed.scene,3,`${item.role} ${label} checksum is not the match scene`);
-  assert.equal(parsed.frame,1,`${item.role} ${label} checksum source frame differs`);
+  assert.equal(parsed.frame,sourceFrame,`${item.role} ${label} checksum source frame differs`);
   const file=`${item.role}-${label}-native-checksum.bin`;
   await fs.writeFile(path.join(out,file),raw,{flag:'wx'});
   const retained={file,bytes:raw.length,sha256:sha256(raw),base64:raw.toString('base64'),parsed,
-    provenance:'copied local 64-byte native scene checksum at the checked CPU_END history phase'};
+    provenance:'copied local 64-byte native scene checksum at the checked CPU_END history phase',
+    match_input_tick:tick,source_frame:sourceFrame};
   const pageHistory=report.pages[item.role].match_history;
   pageHistory.checksums[label]=retained;
   return {raw,parsed,retained};
@@ -728,43 +784,269 @@ function byteDifference(left,right){
 }
 async function installPeerHistoryBridge(item,relayUrl,roomId){
   const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
-  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity})=>{
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks})=>{
     const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
-    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity});
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks});
   },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
       new URL('/__melee_diag__/',baseUrl)).href,
-    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host});
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks:Number(values.windows)});
 }
+async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionSource,priorPollSerials,
+  previousDrawEndpoints,windowReport,previousRetirement}){
+  const windowNumber=index+1,window=`window-${windowNumber}`;
+  const preFrame=index,endFrame=index+1,inputTick=index;
+  const label=name=>index===0?name:`${window}-${name}`;
+  const expected=(phase,sourceFrame,{restoreCount=0,forwardSteps=0,replaySteps=0,gpuIdle,
+    pollSerial,preFrame:expectedPreFrame=preFrame}={})=>({window,phase,sourceFrame,
+      preFrame:expectedPreFrame,restoreCount,forwardSteps,replaySteps,gpuIdle,pollSerial});
+  const inputName=label('forward'),captureName=label('capture-pre'),armedName=label('armed-pre');
+  windowReport.pages={alpha:{port:0,endpoints:{},inputs:{},checksums:{}},
+    beta:{port:1,endpoints:{},inputs:{},checksums:{}}};
+  windowReport.prediction={role:'alpha',port:1,pad_base64:predictedP2.toString('base64'),
+    source:predictionSource};
+  const startEvidence=Object.fromEntries([alpha,beta].map(item=>{
+    const history=report.pages[item.role].match_history;
+    return [item.role,{status_count:history.statuses.length,command_count:history.commands.length,
+      endpoint_keys:Object.keys(history.endpoints),input_keys:Object.keys(history.inputs),
+      checksum_keys:Object.keys(history.checksums)}];
+  }));
+  windowReport.evidence_start=startEvidence;
+
+  const captureStatuses=await joinOwned(`${window}-capture-history`,[
+    historyCommand(alpha,'capture',expected(1,preFrame)),
+    historyCommand(beta,'capture',expected(1,preFrame)),
+  ]);
+  const captured=await joinOwned(`${window}-capture-pre-endpoints`,[
+    retainHistoryEndpoint(alpha,captureName,{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:preFrame,preFrame,phase:2}),
+    retainHistoryEndpoint(beta,captureName,{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:preFrame,preFrame,phase:2}),
+  ]);
+  for(const [i,item] of [alpha,beta].entries()){
+    windowReport.pages[item.role].capture_status=captureStatuses[i];
+    windowReport.pages[item.role].endpoints.capture_pre=report.pages[item.role].match_history.endpoints[captureName];
+    assert.equal(effectToken(captured[i]),'0',`${item.role} ${window} Capture PRE must have effect token zero`);
+  }
+
+  if(previousRetirement){
+    for(const [i,item] of [alpha,beta].entries()){
+      const oldEnd=previousDrawEndpoints[i],capture=captured[i];
+      const oldOwner=ownerFields(oldEnd),newOwner=ownerFields(capture);
+      assert.deepEqual(oldOwner,newOwner,`${item.role} owner fields changed from retired END to fresh Capture PRE`);
+      assert.equal(oldOwner.SourceFrame,String(preFrame),`${item.role} retired END source frame differs`);
+      assert.equal(newOwner.SourceFrame,String(preFrame),`${item.role} fresh Capture PRE source frame differs`);
+      const oldStatics=oldEnd.domains.find(domain=>domain.name==='Statics');
+      const newStatics=capture.domains.find(domain=>domain.name==='Statics');
+      assert(oldStatics?.records.length>1&&newStatics?.records.length>1,
+        `${item.role} END or PRE has no reviewed Statics rows`);
+      for(const [index,row] of oldStatics.records.entries()){
+        const next=newStatics.records[index];
+        assert(next&&row.kind===next.kind&&row.kindName===next.kindName&&row.index===next.index&&row.bytesBase64===next.bytesBase64&&
+          row.metadataBytes===next.metadataBytes&&row.borrowedBytes===next.borrowedBytes&&row.count===next.count&&
+          JSON.stringify(row.fieldNames)===JSON.stringify(next.fieldNames)&&JSON.stringify(row.fields)===JSON.stringify(next.fields),
+          `${item.role} exact END-to-Capture PRE Statics record ${index} differs`);
+      }
+      assert.equal(oldStatics.records.length,newStatics.records.length);
+      const retiredToken=effectToken(oldEnd);
+      assert(BigInt(retiredToken)>0n,`${item.role} retired DRAW_END effect token must be nonzero`);
+      const oldActions=actionEventReceipt(oldEnd),newActions=actionEventReceipt(capture);
+      assert.equal(newActions.event_count,'0',`${item.role} fresh Capture PRE ActionEvent count must be zero`);
+      assert.equal(newActions.rows.length,0,`${item.role} fresh Capture PRE retained ActionEvent rows`);
+      windowReport.pages[item.role].end_to_capture_receipts={
+        retired_draw_end_owner_fields:oldOwner,capture_pre_owner_fields:newOwner,
+        retired_draw_end_action_events:{event_count:oldActions.event_count,row_count:oldActions.rows.length,
+          rows_sha256:sha256(Buffer.from(JSON.stringify(oldActions.rows)))},
+        capture_pre_action_events:{event_count:newActions.event_count,row_count:newActions.rows.length},
+        effect_tokens:{retired_draw_end:retiredToken,capture_pre:effectToken(capture)},
+        exact_statics_records_equal:oldStatics.records.length,
+        capture_status:report.pages[item.role].match_history.statuses.at(-1).value,
+      };
+      assert.equal(windowReport.pages[item.role].end_to_capture_receipts.capture_status.metadata.preAudioPhase,
+        previousRetirement[item.role].metadata.currentAudioPhase,
+        `${item.role} fresh Capture PRE audio phase differs from retired END`);
+    }
+  }
+
+  const beginStatuses=await joinOwned(`${window}-begin-history`,[
+    historyCommand(alpha,'begin',expected(3,preFrame)),
+    historyCommand(beta,'begin',expected(3,preFrame)),
+  ]);
+  const armed=await joinOwned(`${window}-armed-pre-endpoints`,[
+    retainHistoryEndpoint(alpha,armedName,{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:preFrame,preFrame,phase:4}),
+    retainHistoryEndpoint(beta,armedName,{view:CPU_ENDPOINT_VIEW.pre,
+      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:preFrame,preFrame,phase:4}),
+  ]);
+  for(const [i,item] of [alpha,beta].entries()){
+    const armedToken=effectToken(armed[i]);
+    assert(BigInt(armedToken)>0n,`${item.role} Armed PRE must own a nonzero effect token`);
+    if(previousDrawEndpoints)
+      assert(BigInt(armedToken)>BigInt(effectToken(previousDrawEndpoints[i])),
+        `${item.role} fresh Armed PRE token must exceed the retired DRAW_END token`);
+    windowReport.pages[item.role].begin_status=beginStatuses[i];
+    windowReport.pages[item.role].endpoints.armed_pre=report.pages[item.role].match_history.endpoints[armedName];
+    windowReport.pages[item.role].effect_tokens={capture_pre:effectToken(captured[i]),
+      armed_pre:armedToken,retired_draw_end:previousDrawEndpoints?effectToken(previousDrawEndpoints[i]):null};
+  }
+
+  await peerOperation(alpha,'remotePad',[...predictedP2]);
+  windowReport.prediction_staged_before_alpha_forward=true;
+  const alphaForwardStatus=await historyCommandWithKey(alpha,'KeyD','forward',
+    expected(5,endFrame,{forwardSteps:1}));
+  const alphaInput=await retainHistoryInput(alpha,inputName,{remotePad:predictedP2,status:alphaForwardStatus,
+    priorPollSerial:priorPollSerials.alpha,expectedLocalPad:P1_RIGHT});
+  const alphaP1=alphaInput.decoded.localPad;
+  const alphaPeerReceipt=await peerOperation(alpha,'peerPublish',{port:0,tick:inputTick,
+    pollSerial:alphaInput.receipt.pollSerial,pad:[...alphaP1]});
+  windowReport.pages.alpha.local_publish=alphaPeerReceipt;
+  windowReport.pages.alpha.inputs.forward=report.pages.alpha.match_history.inputs[inputName];
+  windowReport.pages.alpha.predicted_remote={port:1,pad_base64:predictedP2.toString('base64'),
+    provenance:predictionSource};
+  await retainHistoryEndpoint(alpha,label('predicted-cpu'),{view:CPU_ENDPOINT_VIEW.cpuEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:endFrame,preFrame,phase:6});
+  const alphaPredChecksum=await retainChecksum(alpha,label('predicted-cpu'),{tick:inputTick,sourceFrame:endFrame});
+  windowReport.pages.alpha.endpoints.predicted_cpu=report.pages.alpha.match_history.endpoints[label('predicted-cpu')];
+  windowReport.pages.alpha.checksums.predicted=alphaPredChecksum.retained;
+  await historyCommand(alpha,'present',expected(7,endFrame,{forwardSteps:1}));
+  await historyCommand(alpha,'idle',expected(8,endFrame,{forwardSteps:1,gpuIdle:true}));
+  await retainHistoryEndpoint(alpha,label('predicted-draw'),{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:endFrame,preFrame,phase:9});
+  windowReport.pages.alpha.endpoints.predicted_draw=report.pages.alpha.match_history.endpoints[label('predicted-draw')];
+
+  const alphaRemote=await peerOperation(beta,'peerWaitRemote',{tick:inputTick});
+  windowReport.pages.beta.alpha_actual_received=alphaRemote;
+  const receivedAlpha=Buffer.from(alphaRemote.receipt.pad);
+  assert.deepEqual(receivedAlpha,alphaP1,`${window} beta page peer received a different actual P1 poll`);
+  await peerOperation(beta,'remotePad',[...receivedAlpha]);
+  const betaKey=index===0?'ArrowLeft':'ArrowRight';
+  const betaExpectedPad=index===0?P2_LEFT:P2_RIGHT;
+  const betaForwardStatus=await historyCommandWithKey(beta,betaKey,'forward',
+    expected(5,endFrame,{forwardSteps:1}));
+  const betaInput=await retainHistoryInput(beta,inputName,{remotePad:receivedAlpha,status:betaForwardStatus,
+    priorPollSerial:priorPollSerials.beta,expectedLocalPad:betaExpectedPad});
+  const betaP2=betaInput.decoded.localPad;
+  assert(!predictedP2.equals(betaP2),`${window} wrong-prediction control is vacuous: beta actual P2 equals alpha prediction`);
+  const betaPeerReceipt=await peerOperation(beta,'peerPublish',{port:1,tick:inputTick,
+    pollSerial:betaInput.receipt.pollSerial,pad:[...betaP2]});
+  windowReport.pages.beta.local_publish=betaPeerReceipt;
+  windowReport.pages.beta.inputs.forward=report.pages.beta.match_history.inputs[inputName];
+  windowReport.pages.beta.actual_remote={port:0,pad_base64:receivedAlpha.toString('base64'),
+    provenance:'alpha actual native P1 poll received before beta on-time forward'};
+  windowReport.differing_prediction={predicted_p2_base64:predictedP2.toString('base64'),
+    actual_p2_base64:betaP2.toString('base64'),pad_comparison:byteDifference(predictedP2,betaP2),
+    beta_poll_serial:betaInput.receipt.pollSerial,beta_key:betaKey};
+  await retainHistoryEndpoint(beta,label('on-time-cpu'),{view:CPU_ENDPOINT_VIEW.cpuEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:endFrame,preFrame,phase:6});
+  const betaOnTimeChecksum=await retainChecksum(beta,label('on-time-reference'),{tick:inputTick,sourceFrame:endFrame});
+  windowReport.pages.beta.endpoints.on_time_cpu=report.pages.beta.match_history.endpoints[label('on-time-cpu')];
+  windowReport.pages.beta.checksums.on_time=betaOnTimeChecksum.retained;
+  const wrongPredictionChecksumDifference=checksumDifference(alphaPredChecksum,betaOnTimeChecksum);
+  windowReport.comparisons.wrong_prediction_checksum_bytes=wrongPredictionChecksumDifference;
+  windowReport.comparisons.wrong_prediction_scene_state={alpha:alphaPredChecksum.parsed.scene_state,
+    beta:betaOnTimeChecksum.parsed.scene_state,different:alphaPredChecksum.parsed.scene_state!==betaOnTimeChecksum.parsed.scene_state};
+  assert.notEqual(alphaPredChecksum.parsed.scene_state,betaOnTimeChecksum.parsed.scene_state,
+    `${window} wrong prediction changed input bytes but not the native scene_state checksum`);
+  await historyCommand(beta,'present',expected(7,endFrame,{forwardSteps:1}));
+  await historyCommand(beta,'idle',expected(8,endFrame,{forwardSteps:1,gpuIdle:true}));
+  const betaDraw=await retainHistoryEndpoint(beta,label('on-time-draw'),{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:endFrame,preFrame,phase:9});
+  windowReport.pages.beta.endpoints.on_time_draw=report.pages.beta.match_history.endpoints[label('on-time-draw')];
+
+  const betaActualRemote=await peerOperation(alpha,'peerWaitRemote',{tick:inputTick});
+  windowReport.pages.alpha.beta_actual_received=betaActualRemote;
+  const actualP2=Buffer.from(betaActualRemote.receipt.pad);
+  assert.deepEqual(actualP2,betaP2,`${window} alpha page peer received a different actual beta P2 poll`);
+  await historyCommand(alpha,'restore',expected(10,preFrame,{restoreCount:1,forwardSteps:1,
+    pollSerial:alphaInput.receipt.pollSerial}));
+  const alphaRestored=await retainHistoryEndpoint(alpha,label('restored-pre'),{view:CPU_ENDPOINT_VIEW.pre,
+    provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:preFrame,preFrame,phase:11});
+  const restoredPreComparison=compareCpuReferenceParticleEndpoints(armed[0],alphaRestored);
+  windowReport.comparisons.alpha_armed_vs_restored_pre=restoredPreComparison;
+  assert(restoredPreComparison.equal,`${window} alpha complete Armed PRE differs from its complete Restored PRE`);
+  windowReport.pages.alpha.endpoints.restored_pre=report.pages.alpha.match_history.endpoints[label('restored-pre')];
+  await peerOperation(alpha,'remotePad',[...actualP2]);
+  const correctedStatus=await historyCommand(alpha,'correct',expected(12,endFrame,
+    {restoreCount:1,forwardSteps:1,replaySteps:1,pollSerial:alphaInput.receipt.pollSerial}));
+  const alphaCorrectedInput=await retainHistoryInput(alpha,label('corrected'),{
+    remotePad:actualP2,forwardRemotePad:predictedP2,corrected:true,status:correctedStatus,
+    expectedLocalPad:P1_RIGHT});
+  assert(alphaCorrectedInput.decoded.raw.equals(alphaInput.decoded.raw),
+    `${window} alpha corrected receipt changed the retained raw four-port PAD poll`);
+  const authoritativePadComparison=byteDifference(alphaCorrectedInput.decoded.corrected,betaInput.decoded.forward);
+  windowReport.comparisons.authoritative_44_byte_pad=authoritativePadComparison;
+  assert(authoritativePadComparison.equal,
+    `${window} corrected and beta on-time authoritative PAD differ at ${JSON.stringify(authoritativePadComparison.first_mismatch)}`);
+  windowReport.pages.alpha.inputs.corrected=report.pages.alpha.match_history.inputs[label('corrected')];
+  await retainHistoryEndpoint(alpha,label('corrected-cpu'),{view:CPU_ENDPOINT_VIEW.cpuEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:endFrame,preFrame,phase:13});
+  const alphaCorrectedChecksum=await retainChecksum(alpha,label('corrected-cpu'),{tick:inputTick,sourceFrame:endFrame});
+  windowReport.pages.alpha.endpoints.corrected_cpu=report.pages.alpha.match_history.endpoints[label('corrected-cpu')];
+  windowReport.pages.alpha.checksums.corrected=alphaCorrectedChecksum.retained;
+  const correctedChecksumComparison=checksumDifference(alphaCorrectedChecksum,betaOnTimeChecksum);
+  windowReport.comparisons.corrected_vs_beta_on_time_native_checksum_64=correctedChecksumComparison;
+  assert(correctedChecksumComparison.equal,
+    `${window} corrected native checksum differs from beta on-time in ${correctedChecksumComparison.first_mismatch_channel} at ${JSON.stringify(correctedChecksumComparison.first_mismatch)}`);
+  await historyCommand(alpha,'present',expected(14,endFrame,{restoreCount:1,forwardSteps:1,replaySteps:1}));
+  await historyCommand(alpha,'idle',expected(15,endFrame,{restoreCount:1,forwardSteps:1,replaySteps:1,gpuIdle:true}));
+  const alphaDraw=await retainHistoryEndpoint(alpha,label('corrected-draw'),{view:CPU_ENDPOINT_VIEW.drawEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:endFrame,preFrame,phase:16});
+  windowReport.pages.alpha.endpoints.corrected_draw=report.pages.alpha.match_history.endpoints[label('corrected-draw')];
+  windowReport.pages.alpha.inputs.forward=report.pages.alpha.match_history.inputs[inputName];
+  const [alphaScreenshot,betaScreenshot]=await joinOwned(`${window}-final-screenshots`,[alpha,beta].map(async item=>{
+    const file=index===0?`${item.role}-final-match.png`:`${item.role}-${window}-final-match.png`;
+    const bytes=await item.page.screenshot({path:path.join(out,file),fullPage:false,timeout:4000});
+    return {file,bytes:bytes.length,sha256:sha256(bytes)};
+  }));
+  windowReport.pages.alpha.final_screenshot=alphaScreenshot;
+  windowReport.pages.beta.final_screenshot=betaScreenshot;
+  windowReport.endpoints_retained_per_page={
+    alpha:Object.keys(windowReport.pages.alpha.endpoints),beta:Object.keys(windowReport.pages.beta.endpoints),
+    cross_peer_raw_endpoint_comparison:false};
+  windowReport.checks=[
+    'both page peers exchanged the indexed actual local polls for this window',
+    'beta actual P2 differs from alpha prediction and changes the native scene_state checksum',
+    'alpha Armed PRE equals Restored PRE under the complete existing same-window endpoint comparator',
+    'alpha corrected authoritative 44-byte PAD equals beta on-time PAD',
+    'all 64 alpha corrected native checksum bytes equal beta on-time checksum bytes',
+    'both pages retained raw local nine-domain/particle endpoints and completed source present/idle/DRAW',
+  ];
+  for(const item of [alpha,beta]){
+    assert.equal(item.pageErrors.length,0,`${item.role} browser errors: ${item.pageErrors[0]}`);
+    assert.equal(item.externalRequests.length,0,`${item.role} issued an external request`);
+  }
+  return {pollSerials:{alpha:alphaInput.receipt.pollSerial,beta:betaInput.receipt.pollSerial},
+    receivedBetaPad:actualP2,drawEndpoints:[alphaDraw,betaDraw]};
+}
+
 async function runPeerCorrection(alpha,beta){
   const alphaHeld=report.pages.alpha.route.agreed_start.held;
   const betaHeld=report.pages.beta.route.agreed_start.held;
   const alphaPrior=heldPortPad(alphaHeld,0,'Alpha');
   const betaPrior=heldPortPad(betaHeld,1,'Beta');
-  const predP2=betaPrior.pad;
-  for(const item of [alpha,beta]){
-    report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
-  }
   const peerReport=report.peer_correction={
-    claim:'one actual asymmetric wrong-prediction correction against one on-time peer CPU_END reference',
-    checksum_exchange:'none; both native 64-byte receipts are copied locally and compared by the Node driver',
-    initial_prediction:{role:'alpha',source:'beta actual held-prefix final row, port 1',bytes_base64:predP2.toString('base64'),
-      source_poll_serial:betaPrior.pollSerial},
-    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
-    endpoint_comparison_scope:'all raw nine-domain and particle endpoints are retained per page; only alpha Armed PRE vs Restored PRE is strictly compared within one source owner; no cross-peer endpoint equality claim',
+    claim:Number(values.windows)===2?
+      'two adjacent actual asymmetric wrong-prediction corrections in one continuously owned match and page-peer pair':
+      'one actual asymmetric wrong-prediction correction against one on-time peer CPU_END reference',
+    checksum_exchange:'none; native 64-byte receipts are copied locally and compared by the Node driver',
+    initial_prediction:{role:'alpha',source:'beta actual held-prefix final row, port 1',
+      bytes_base64:betaPrior.pad.toString('base64'),source_poll_serial:betaPrior.pollSerial},
+    pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],windows:[],
+    endpoint_comparison_scope:'all raw nine-domain and particle endpoints are retained per page; strict full endpoint equality is asserted only between Armed and Restored PRE within each window; cross-window comparison uses exact Owner fields, static rows, frame and audio continuity without cross-view endpoint equality',
   };
+  for(const item of [alpha,beta])
+    report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
   const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
     diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));}});
-  const roomId=createRoomId();
-  const relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
+  const roomId=createRoomId(),relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
   peerReport.relay={base:roomRelay.base,port:roomRelay.port,relay_url:relayUrl,room_id:roomId,
     owner_process:roomRelay.ownerProcess,runtime_identity:roomRelay.runtimeIdentity,hashes:roomRelay.hashes,
-    transport:'existing pinned local Worker relay; page peers own the only diagnostic WebSockets'};
+    transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for both windows'};
   await joinOwned('peer-bridge-install',[
     installPeerHistoryBridge(alpha,relayUrl,roomId).then(value=>{alpha.peerInstalled=true;return value;}),
     installPeerHistoryBridge(beta,relayUrl,roomId).then(value=>{beta.peerInstalled=true;return value;}),
   ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
   for(const item of [alpha,beta]){
-    const initial=await recordHistoryStatus(item,'initial',{phase:0,sourceFrame:0,
+    const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
       restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
     assert.equal(initial.localPort,item.role==='alpha'?0:1);
     assert.equal(initial.remotePort,1-initial.localPort);
@@ -775,6 +1057,8 @@ async function runPeerCorrection(alpha,beta){
   peerReport.pages.alpha.peer_start=alphaPeer;peerReport.pages.beta.peer_start=betaPeer;
   assert(alphaPeer.ready&&betaPeer.ready&&alphaPeer.agreement_hash);
   assert.equal(alphaPeer.agreement_hash,betaPeer.agreement_hash);
+  assert.equal(alphaPeer.input_ticks_protocol_only,Number(values.windows));
+  assert.equal(alphaPeer.source_ticks_protocol_only,Number(values.windows)+2);
   for(const item of [alpha,beta]){
     assert.equal(item.websockets.length,1,`${item.role} must own exactly one actual peer WebSocket`);
     assert.equal(item.websockets[0],`${relayUrl}/v1/rooms/${roomId}/socket`,
@@ -782,157 +1066,151 @@ async function runPeerCorrection(alpha,beta){
   }
   peerReport.pages.alpha.websocket=alpha.websockets[0];peerReport.pages.beta.websocket=beta.websockets[0];
 
-  await joinOwned('capture-history',[historyCommand(alpha,'capture',{phase:1,sourceFrame:0,
-    restoreCount:0,forwardSteps:0,replaySteps:0}),historyCommand(beta,'capture',{phase:1,sourceFrame:0,
-    restoreCount:0,forwardSteps:0,replaySteps:0})]);
-  const captured=await joinOwned('capture-pre-endpoints',[
-    retainHistoryEndpoint(alpha,'capture-pre',{view:CPU_ENDPOINT_VIEW.pre,
-      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:2}),
-    retainHistoryEndpoint(beta,'capture-pre',{view:CPU_ENDPOINT_VIEW.pre,
-      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:2})]);
-  await joinOwned('begin-history',[historyCommand(alpha,'begin',{phase:3,sourceFrame:0,
-    restoreCount:0,forwardSteps:0,replaySteps:0}),historyCommand(beta,'begin',{phase:3,sourceFrame:0,
-    restoreCount:0,forwardSteps:0,replaySteps:0})]);
-  const armed=await joinOwned('armed-pre-endpoints',[
-    retainHistoryEndpoint(alpha,'armed-pre',{view:CPU_ENDPOINT_VIEW.pre,
-      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:4}),
-    retainHistoryEndpoint(beta,'armed-pre',{view:CPU_ENDPOINT_VIEW.pre,
-      provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:4})]);
-  for(const [index,item] of [alpha,beta].entries()){
-    const captureToken=effectToken(captured[index]),armedToken=effectToken(armed[index]);
-    peerReport.pages[item.role].effect_token={captured:captureToken,armed:armedToken};
-    assert.equal(captureToken,'0',`${item.role} capture PRE must have the pre-arm effect token`);
-    assert(BigInt(armedToken)>0n,`${item.role} Armed PRE must have an incarnation effect token`);
-  }
-  await peerOperation(alpha,'remotePad',[...predP2]);
-  peerReport.prediction_staged_before_alpha_forward=true;
+  let previousResult=null,previousRetirement=null;
+  const count=Number(values.windows);
+  for(let index=0;index<count;index++){
+    const windowNumber=index+1;
+    const predictedP2=index===0?betaPrior.pad:previousResult.receivedBetaPad;
+    const predictionSource=index===0?
+      'beta actual held-prefix final row, port 1':
+      'latest received actual beta P2 poll from window 1, protocol input tick 0';
+    const priorPollSerials=index===0?
+      {alpha:alphaPrior.pollSerial,beta:betaPrior.pollSerial}:
+      previousResult.pollSerials;
+    const windowReport={window:windowNumber,protocol_input_tick:index,source_pre_frame:index,source_end_frame:index+1,
+      status:'running',comparisons:{},checks:[]};
+    peerReport.windows.push(windowReport);
+    const previousDrawEndpoints=previousResult?.drawEndpoints??null;
+    const result=await runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionSource,priorPollSerials,
+      previousDrawEndpoints,windowReport,previousRetirement});
+    const expected=(item,phase,sourceFrame,{restoreCount=0,forwardSteps=0,replaySteps=0,gpuIdle,
+      pollSerial}={})=>({window:`window-${windowNumber}`,phase,sourceFrame,preFrame:index,
+        restoreCount:item.role==='alpha'?restoreCount:0,forwardSteps,replaySteps:item.role==='alpha'?replaySteps:0,
+        gpuIdle,pollSerial});
+    const endStatuses=await joinOwned(`window-${windowNumber}-close-history`,[
+      historyCommand(alpha,'close',expected(alpha,17,index+1,{restoreCount:1,forwardSteps:1,replaySteps:1})),
+      historyCommand(beta,'close',expected(beta,17,index+1,{forwardSteps:1})),
+    ]);
+    const retired=await joinOwned(`window-${windowNumber}-retire-history`,[
+      historyCommand(alpha,'retire',expected(alpha,18,index+1,{restoreCount:1,forwardSteps:1,replaySteps:1})),
+      historyCommand(beta,'retire',expected(beta,18,index+1,{forwardSteps:1})),
+    ]);
+    for(const [i,item] of [alpha,beta].entries()){
+      const status=retired[i],metadata=status.metadata;
+      assert.equal(status.expectedFrame,index,`${item.role} retired fixed PRE differs`);
+      assert.equal(metadata.preFrame,index,`${item.role} retired PRE frame differs`);
+      assert.equal(metadata.currentFrame,index+1,`${item.role} retired END current frame differs`);
+      assert.equal(metadata.sealedEnd,index+1,`${item.role} retired END seal differs`);
+      assert.equal(metadata.phase,18,`${item.role} did not retire at exact END`);
+      assert.equal(status.gpuPending,0);assert.equal(status.endpointActive,0);
+    }
+    windowReport.close_statuses=endStatuses;
+    windowReport.retirement={alpha:retired[0],beta:retired[1],
+      exact_end_frame:index+1,source_identity_frame_before:index};
+    for(const item of [alpha,beta]){
+      const history=report.pages[item.role].match_history,keys=windowReport.evidence_start[item.role];
+      windowReport.pages[item.role].history_evidence={
+        statuses:history.statuses.slice(keys.status_count),commands:history.commands.slice(keys.command_count),
+        endpoints:Object.fromEntries(Object.entries(history.endpoints).filter(([key])=>!keys.endpoint_keys.includes(key))),
+        inputs:Object.fromEntries(Object.entries(history.inputs).filter(([key])=>!keys.input_keys.includes(key))),
+        checksums:Object.fromEntries(Object.entries(history.checksums).filter(([key])=>!keys.checksum_keys.includes(key))),
+      };
+    }
+    const more=index+1<count;
+    const checkpointFile=`window-${windowNumber}-${more?'retired-before-rebase':'retired-final'}.json`;
+    const checkpointContent=JSON.stringify({schema:'melee-web-runtime-history-window-checkpoint-v1',
+      window:windowNumber,source_pre_frame:index,exact_retired_end_frame:index+1,
+      persisted_before_rebase:more,retirement:windowReport.retirement,pages:windowReport.pages,
+      comparisons:windowReport.comparisons,checks:windowReport.checks},null,2)+'\n';
+    await fs.writeFile(path.join(out,checkpointFile),checkpointContent,{flag:'wx'});
+    windowReport.checkpoint={file:checkpointFile,bytes:Buffer.byteLength(checkpointContent),
+      sha256:sha256(Buffer.from(checkpointContent))};
 
-  const alphaForwardStatus=await historyCommandWithKey(alpha,'KeyD','forward',{
-    phase:5,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
-  const alphaInput=await retainHistoryInput(alpha,'forward',{remotePad:predP2,status:alphaForwardStatus,
-    priorPollSerial:alphaPrior.pollSerial});
-  const alphaP1=alphaInput.decoded.localPad;
-  const alphaPeerReceipt=await peerOperation(alpha,'peerPublish',{port:0,tick:0,
-    pollSerial:alphaInput.receipt.pollSerial,pad:[...alphaP1]});
-  peerReport.pages.alpha.local_publish=alphaPeerReceipt;
-  peerReport.pages.alpha.predicted_remote={port:1,pad_base64:predP2.toString('base64'),
-    provenance:'actual beta held-prefix last raw port-1 sample; used as alpha native prediction'};
-  await retainHistoryEndpoint(alpha,'predicted-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
-      provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:6});
-  const alphaPredChecksum=await retainChecksum(alpha,'predicted-cpu');
-  peerReport.pages.alpha.predicted_cpu={endpoint:report.pages.alpha.match_history.endpoints['predicted-cpu'],
-    checksum:alphaPredChecksum.retained};
-  await historyCommand(alpha,'present',{phase:7,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
-  await historyCommand(alpha,'idle',{phase:8,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0,gpuIdle:true});
-  await retainHistoryEndpoint(alpha,'predicted-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
-    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:9});
-  peerReport.pages.alpha.predicted_draw=report.pages.alpha.match_history.endpoints['predicted-draw'];
-
-  const alphaRemote=await peerOperation(beta,'peerWaitRemote');
-  peerReport.pages.beta.alpha_actual_received=alphaRemote;
-  const receivedAlpha=Buffer.from(alphaRemote.receipt.pad);
-  assert.deepEqual(receivedAlpha,alphaP1,'Beta page peer received a different actual alpha native P1 poll');
-  await peerOperation(beta,'remotePad',[...receivedAlpha]);
-  const betaForwardStatus=await historyCommandWithKey(beta,'ArrowLeft','forward',{
-    phase:5,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
-  const betaInput=await retainHistoryInput(beta,'forward',{remotePad:receivedAlpha,status:betaForwardStatus,
-    priorPollSerial:betaPrior.pollSerial});
-  const betaP2=betaInput.decoded.localPad;
-  assert(!predP2.equals(betaP2),
-    'Actual beta ArrowLeft P2 sample equals alpha prediction; wrong-prediction control is vacuous');
-  const betaPeerReceipt=await peerOperation(beta,'peerPublish',{port:1,tick:0,
-    pollSerial:betaInput.receipt.pollSerial,pad:[...betaP2]});
-  peerReport.pages.beta.local_publish=betaPeerReceipt;
-  peerReport.pages.beta.actual_remote={port:0,pad_base64:receivedAlpha.toString('base64'),
-    provenance:'alpha actual KeyD native P1 poll received before beta on-time forward'};
-  peerReport.differing_prediction={predicted_p2_base64:predP2.toString('base64'),
-    actual_p2_base64:betaP2.toString('base64'),pad_comparison:byteDifference(predP2,betaP2),
-    beta_poll_serial:betaInput.receipt.pollSerial};
-  await retainHistoryEndpoint(beta,'on-time-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
-      provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:6});
-  const betaOnTimeChecksum=await retainChecksum(beta,'on-time-reference');
-  peerReport.pages.beta.on_time_cpu={endpoint:report.pages.beta.match_history.endpoints['on-time-cpu'],
-    checksum:betaOnTimeChecksum.retained};
-  const wrongPredictionChecksumDifference=checksumDifference(alphaPredChecksum,betaOnTimeChecksum);
-  peerReport.comparisons.wrong_prediction_checksum_bytes=wrongPredictionChecksumDifference;
-  peerReport.comparisons.wrong_prediction_scene_state={alpha:alphaPredChecksum.parsed.scene_state,
-    beta:betaOnTimeChecksum.parsed.scene_state,
-    different:alphaPredChecksum.parsed.scene_state!==betaOnTimeChecksum.parsed.scene_state};
-  assert.notEqual(alphaPredChecksum.parsed.scene_state,betaOnTimeChecksum.parsed.scene_state,
-    'Wrong prediction changed input bytes but not the native scene_state checksum');
-  await historyCommand(beta,'present',{phase:7,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0});
-  await historyCommand(beta,'idle',{phase:8,sourceFrame:1,restoreCount:0,forwardSteps:1,replaySteps:0,gpuIdle:true});
-  await retainHistoryEndpoint(beta,'on-time-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
-    provenance:CPU_ENDPOINT_PROVENANCE.reference,sourceFrame:1,phase:9});
-  peerReport.pages.beta.on_time_draw=report.pages.beta.match_history.endpoints['on-time-draw'];
-  const betaActualRemote=await peerOperation(alpha,'peerWaitRemote');
-  peerReport.pages.alpha.beta_actual_received=betaActualRemote;
-  const actualP2=Buffer.from(betaActualRemote.receipt.pad);
-  assert.deepEqual(actualP2,betaP2,'Alpha peer received a different actual beta native P2 poll');
-
-  await historyCommand(alpha,'restore',{phase:10,sourceFrame:0,restoreCount:1,forwardSteps:1,replaySteps:0,
-    pollSerial:alphaInput.receipt.pollSerial});
-  const alphaRestored=await retainHistoryEndpoint(alpha,'restored-pre',{view:CPU_ENDPOINT_VIEW.pre,
-    provenance:CPU_ENDPOINT_PROVENANCE.sharedPre,sourceFrame:0,phase:11});
-  const restoredPreComparison=compareCpuReferenceParticleEndpoints(armed[0],alphaRestored);
-  peerReport.comparisons.alpha_armed_vs_restored_pre=restoredPreComparison;
-  assert(restoredPreComparison.equal,'Alpha complete Armed PRE differs from its complete Restored PRE');
-  await peerOperation(alpha,'remotePad',[...actualP2]);
-  const correctedStatus=await historyCommand(alpha,'correct',{phase:12,sourceFrame:1,
-    restoreCount:1,forwardSteps:1,replaySteps:1,pollSerial:alphaInput.receipt.pollSerial});
-  const alphaCorrectedInput=await retainHistoryInput(alpha,'corrected',{
-    remotePad:actualP2,forwardRemotePad:predP2,corrected:true,status:correctedStatus});
-  assert(alphaCorrectedInput.decoded.raw.equals(alphaInput.decoded.raw),
-    'Alpha corrected receipt changed the retained raw four-port PAD poll');
-  const authoritativePadComparison=byteDifference(alphaCorrectedInput.decoded.corrected,betaInput.decoded.forward);
-  peerReport.comparisons.authoritative_44_byte_pad=authoritativePadComparison;
-  assert(authoritativePadComparison.equal,
-    `Alpha corrected and beta on-time authoritative PAD differ at ${JSON.stringify(authoritativePadComparison.first_mismatch)}`);
-  await retainHistoryEndpoint(alpha,'corrected-cpu',{view:CPU_ENDPOINT_VIEW.cpuEnd,
-      provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:1,phase:13});
-  const alphaCorrectedChecksum=await retainChecksum(alpha,'corrected-cpu');
-  peerReport.pages.alpha.corrected_cpu={endpoint:report.pages.alpha.match_history.endpoints['corrected-cpu'],
-    checksum:alphaCorrectedChecksum.retained};
-  const correctedChecksumComparison=checksumDifference(alphaCorrectedChecksum,betaOnTimeChecksum);
-  peerReport.comparisons.corrected_vs_beta_on_time_native_checksum_64=correctedChecksumComparison;
-  assert(correctedChecksumComparison.equal,
-    `Alpha corrected native checksum differs from beta on-time in ${correctedChecksumComparison.first_mismatch_channel} at ${JSON.stringify(correctedChecksumComparison.first_mismatch)}`);
-  await historyCommand(alpha,'present',{phase:14,sourceFrame:1,restoreCount:1,forwardSteps:1,replaySteps:1});
-  await historyCommand(alpha,'idle',{phase:15,sourceFrame:1,restoreCount:1,forwardSteps:1,replaySteps:1,gpuIdle:true});
-  await retainHistoryEndpoint(alpha,'corrected-draw',{view:CPU_ENDPOINT_VIEW.drawEnd,
-    provenance:CPU_ENDPOINT_PROVENANCE.corrected,sourceFrame:1,phase:16});
-  peerReport.pages.alpha.corrected_draw=report.pages.alpha.match_history.endpoints['corrected-draw'];
-  for(const item of [alpha,beta]){
-    const file=`${item.role}-final-match.png`;
-    const bytes=await item.page.screenshot({path:path.join(out,file),fullPage:false,timeout:4000});
-    peerReport.pages[item.role].final_screenshot={file,bytes:bytes.length,sha256:sha256(bytes)};
+    if(more){
+      const endFrame=index+1;
+      const rebased=await joinOwned(`window-${windowNumber}-confirmed-rebase`,[
+        historyRebase(alpha,endFrame,{before:expected(alpha,18,endFrame,{restoreCount:1,forwardSteps:1,replaySteps:1}),
+          after:{window:`window-${windowNumber+1}`,phase:0,sourceFrame:endFrame,preFrame:endFrame,
+            restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true,pollSerial:'0'}}),
+        historyRebase(beta,endFrame,{before:expected(beta,18,endFrame,{forwardSteps:1}),
+          after:{window:`window-${windowNumber+1}`,phase:0,sourceFrame:endFrame,preFrame:endFrame,
+            restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true,pollSerial:'0'}}),
+      ]);
+      const rebaseIdentities={},identityChecks={};
+      for(const [i,item] of [alpha,beta].entries()){
+        const {identity,status}=rebased[i],oldEnd=retired[i];
+        rebaseIdentities[item.role]=identity;
+        const parsed=stableIdentity(identity),prior=stableIdentity(report.pages[item.role].route.takeover.identity);
+        assert.equal(parsed.source_frame,endFrame,`${item.role} rebased identity frame differs`);
+        assert.match(parsed.current_rng,/^[0-9a-f]{8}$/);
+        assert.deepEqual(parsed.owner,prior.owner,`${item.role} source owner selection changed across rebase`);
+        assert.equal(status.metadata.preAudioPhase,oldEnd.metadata.currentAudioPhase,
+          `${item.role} rebase PRE audio phase differs from retired END`);
+        assert.equal(status.metadata.currentAudioPhase,oldEnd.metadata.currentAudioPhase,
+          `${item.role} rebase current audio phase differs from retired END`);
+        identityChecks[item.role]={source_frame:parsed.source_frame,current_rng:parsed.current_rng,
+          stable_owner_fields_match:true,
+          retired_end_audio_phase:oldEnd.metadata.currentAudioPhase,
+          rebase_pre_audio_phase:status.metadata.preAudioPhase,
+          rebase_current_audio_phase:status.metadata.currentAudioPhase};
+      }
+      assert.equal(rebaseIdentities.alpha,rebaseIdentities.beta,
+        'The two continuing page owners differ in exact refreshed live source identity');
+      windowReport.rebase_boundary={confirmed_end:endFrame,retired:{alpha:retired[0],beta:retired[1]},
+        status:{alpha:rebased[0].status,beta:rebased[1].status},identities:rebaseIdentities,
+        identity_continuity:identityChecks,protocol_peer_kept_open:true,protocol_preroll_replayed:false};
+      previousRetirement=windowReport.retirement;
+    }
+    windowReport.status='complete';
+    previousResult=result;
+    if(index===0){
+      // Keep the one-window report consumers on their established receipt keys.
+      const {alpha:a,beta:b}=windowReport.pages;
+      for(const [role,p] of Object.entries(windowReport.pages)){
+        const {capture_pre,armed_pre}=p.effect_tokens;
+        Object.assign(peerReport.pages[role],{local_publish:p.local_publish,
+          effect_token:{captured:capture_pre,armed:armed_pre}});
+      }
+      Object.assign(peerReport.pages.alpha,{predicted_remote:a.predicted_remote,
+        predicted_cpu:{endpoint:a.endpoints.predicted_cpu,checksum:a.checksums.predicted},
+        predicted_draw:a.endpoints.predicted_draw,beta_actual_received:a.beta_actual_received,
+        corrected_cpu:{endpoint:a.endpoints.corrected_cpu,checksum:a.checksums.corrected},
+        corrected_draw:a.endpoints.corrected_draw});
+      Object.assign(peerReport.pages.beta,{alpha_actual_received:b.alpha_actual_received,
+        actual_remote:b.actual_remote,on_time_cpu:{endpoint:b.endpoints.on_time_cpu,checksum:b.checksums.on_time},
+        on_time_draw:b.endpoints.on_time_draw});
+      peerReport.prediction_staged_before_alpha_forward=true;
+      peerReport.comparisons=windowReport.comparisons;
+      peerReport.local_endpoint_comparison_only=windowReport.comparisons.alpha_armed_vs_restored_pre;
+      peerReport.differing_prediction=windowReport.differing_prediction;
+    }
+    if(index===count-1)for(const item of [alpha,beta])
+      peerReport.pages[item.role].final_screenshot=windowReport.pages[item.role].final_screenshot;
   }
   peerReport.endpoints_retained_per_page={alpha:Object.keys(report.pages.alpha.match_history.endpoints),
     beta:Object.keys(report.pages.beta.match_history.endpoints),cross_peer_raw_endpoint_comparison:false};
-  await joinOwned('close-history',[historyCommand(alpha,'close',{phase:17,sourceFrame:1,
-    restoreCount:1,forwardSteps:1,replaySteps:1}),historyCommand(beta,'close',{phase:17,sourceFrame:1,
-    restoreCount:0,forwardSteps:1,replaySteps:0})]);
-  const retired=await joinOwned('retire-history',[historyCommand(alpha,'retire',{phase:18,sourceFrame:1,
-    restoreCount:1,forwardSteps:1,replaySteps:1}),historyCommand(beta,'retire',{phase:18,sourceFrame:1,
-    restoreCount:0,forwardSteps:1,replaySteps:0})]);
-  peerReport.final_history_retirement={alpha:retired[0],beta:retired[1]};
-  peerReport.checks.push('both actual browser-owned peers exchanged exactly one native-validated local sample',
-    'actual beta P2 differs from alpha held-prefix prediction and changes native scene_state checksum',
-    'alpha complete Armed PRE equals Restored PRE before retained-input correction',
-    'alpha corrected authoritative 44-byte PAD equals beta on-time PAD',
-    'all 64 alpha corrected native checksum bytes equal beta on-time checksum bytes',
-    'both pages retained local raw nine-domain/particle endpoints and completed source present/idle/DRAW/close/retire');
-  peerReport.local_endpoint_comparison_only=restoredPreComparison;
+  const {alpha:finalAlpha,beta:finalBeta}=peerReport.windows.at(-1).retirement;
+  peerReport.final_history_retirement={alpha:finalAlpha,beta:finalBeta};
+  peerReport.checks.push('two actual browser-owned peers exchanged native-validated indexed local samples',
+    'each beta actual P2 differs from alpha prediction and changes native scene_state checksum',
+    'each alpha complete Armed PRE equals Restored PRE before retained-input correction',
+    'each alpha corrected authoritative 44-byte PAD equals beta on-time PAD',
+    'each alpha corrected 64-byte native checksum equals beta on-time checksum',
+    'all nine-domain/particle endpoints retained per window; no full cross-view END/PRE equality claimed');
+  if(count===2)peerReport.checks.push('the same source match, page peer sockets and native owners stayed live across exact END rebase');
   for(const item of [alpha,beta]){
+    assert.deepEqual(item.websockets,[peerReport.pages[item.role].websocket],
+      `${item.role} page peer WebSocket changed across the proof`);
     assert.equal(item.pageErrors.length,0,`${item.role} browser errors: ${item.pageErrors[0]}`);
     assert.equal(item.externalRequests.length,0,`${item.role} issued an external request`);
   }
-  peerReport.status='peer-correction-complete';
-  report.result='PEER_CORRECTION_COMPLETE';
-  addCheck('one asymmetric wrong-prediction peer correction against beta on-time reference',{
-    alpha_local_polls:1,beta_local_polls:1,actual_remote_samples_each:1,
-    wrong_prediction_scene_state_changed:true,corrected_full_64_byte_checksum_equal:true,
-    corrected_authoritative_pad_44_bytes_equal:true,pre_restore_equal:true,
+  peerReport.status=count===2?'two-window-peer-correction-complete':'peer-correction-complete';
+  report.result=count===2?'TWO_WINDOW_PEER_CORRECTION_COMPLETE':'PEER_CORRECTION_COMPLETE';
+  addCheck(count===2?'two adjacent same-match wrong-prediction corrections':'one asymmetric wrong-prediction peer correction',{
+    windows:count,alpha_local_polls:count,beta_local_polls:count,actual_remote_samples_each:count,
+    same_page_peer_pair:true,exact_end_rebase_count:Math.max(0,count-1),
+    wrong_prediction_scene_state_changed:true,pre_restore_equal:true,
+    corrected_full_64_byte_checksum_equal:true,corrected_authoritative_pad_44_bytes_equal:true,
     local_endpoint_sets:{alpha:Object.keys(report.pages.alpha.match_history.endpoints),
       beta:Object.keys(report.pages.beta.match_history.endpoints)}});
 }

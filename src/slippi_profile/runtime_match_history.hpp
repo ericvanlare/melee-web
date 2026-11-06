@@ -20,7 +20,7 @@ namespace melee_web {
  * catalog, poll input, or claim that an Aurora submission is GPU-idle. */
 enum class RuntimeMatchHistoryCommand : std::uint32_t {
     Capture=1, Begin=2, Forward=3, Present=4, AdmitIdle=5, Restore=6,
-    Correct=7, CloseEndpoint=8, Retire=9, Cleanup=10,
+    Correct=7, CloseEndpoint=8, Retire=9, Cleanup=10, RebaseConfirmed=11,
 };
 
 enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
@@ -138,6 +138,7 @@ public:
 
     bool close_selected_endpoint() noexcept;
     bool retire_confirmed() noexcept;
+    bool can_rebase_confirmed(std::uint32_t end_frame) const noexcept;
     /* Failure cleanup retains all capsule leases while the source match is
      * live. Call only after GameplayMatchSession::close(); its independent
      * owner/world retirement proof must succeed before releasing the capsule. */

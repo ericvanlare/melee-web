@@ -373,20 +373,22 @@ test('agreed-start argument paths refuse allocator churn after match-history cap
   await owner.command('cleanup');
 });
 
-function checksumFixture(phase=6){
+function checksumFixture(phase=6,pre=0){
   const f=fixture();
   const owner=createRuntimeMatchHistoryController(f.module);
-  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.takeOver({sourceFrame:pre,localPort:0,remotePort:1});
   f.put(56,phase); // history.phase
-  f.put(68,1); // history.currentFrame
-  f.put(72,1); // history.sealedEnd
+  f.put(64,pre); // history.preFrame
+  f.put(68,pre+1); // history.currentFrame
+  f.put(72,pre+1); // history.sealedEnd
   f.put(88,1); // history.forwardSteps
   f.put(92,phase===13?1:0); // history.replaySteps
   f.put(96,17); // history.pollSerial, low word
   f.put(112,1); // inputReady
   const pointer=16384;
+  f.view.setUint32(pointer,pre,true);
   f.view.setUint32(pointer+4,3,true);
-  f.view.setUint32(pointer+12,1,true);
+  f.view.setUint32(pointer+12,pre+1,true);
   f.view.setBigUint64(pointer+56,0xfedcba9876543210n,true);
   f.module[prefix+'checksum_data']=()=>pointer;
   f.module[prefix+'checksum_bytes']=()=>64;
@@ -409,6 +411,15 @@ test('checksum copies the exact native CPU endpoint bytes before another native 
     assert.equal(f.allocations.length,allocationCount);
     assert.equal(f.frees.length,0);
   }
+});
+
+test('checksum binds the second window to match input ordinal one and source frame two',()=>{
+  const f=checksumFixture(13,1);
+  const bytes=f.owner.checksum(),record=new DataView(bytes.buffer);
+  assert.equal(record.getUint32(0,true),1);
+  assert.equal(record.getUint32(12,true),2);
+  f.view.setUint32(f.pointer,0,true);
+  assert.throws(()=>f.owner.checksum(),/checksum tick, match scene or source frame differs/);
 });
 
 test('checksum refuses wrong phase, borrowed extent, frame and changed owner status',()=>{
@@ -435,4 +446,49 @@ test('checksum refuses wrong phase, borrowed extent, frame and changed owner sta
   const owner=checksumFixture();
   owner.module[prefix+'checksum_data']=()=>{owner.put(96,18);return owner.pointer;};
   assert.throws(()=>owner.owner.checksum(),/changed its native owner status/);
+});
+
+test('confirmed rebase acknowledges retired END and opens the next capture without resetting sequence',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  const identity=source_frame=>JSON.stringify({...host,source_frame,
+    current_rng:source_frame?'01234567':'fedcba98',selection:{stage:2}});
+  const stringPointer=2048;
+  const publishIdentity=frame=>{
+    f.module.HEAPU8.set(new TextEncoder().encode(identity(frame)+'\0'),stringPointer);
+    return stringPointer;
+  };
+  f.module[prefix+'identity_json']=()=>publishIdentity(0);
+  f.module[prefix+'rebase_identity_json']=()=>publishIdentity(1);
+  let requestedEnd;
+  f.module[prefix+'request_rebase']=end=>{
+    requestedEnd=end;
+    f.put(32,end);f.put(56,0);f.put(64,end);f.put(68,end);f.put(72,0);
+    f.put(88,0);f.put(104,40);f.put(112,0);
+    return f.module[prefix+'request'](11);
+  };
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);
+  await owner.command('capture');
+  assert.throws(()=>owner.identity(host),/before capture/);
+  f.put(56,18);f.put(68,1);f.put(72,1);f.put(88,1);f.put(108,40);f.put(112,1);
+  const fresh=await owner.command('rebase',1);
+  assert.equal(requestedEnd,1);
+  assert.equal(fresh.identity,identity(1));
+  assert.deepEqual([fresh.status.expectedFrame,fresh.status.metadata.currentFrame,
+    fresh.status.completeSequence,fresh.status.lastCompletedCommand],[1,1,2,11]);
+  assert.equal((await owner.command('capture')).completeSequence,3);
+  assert.deepEqual(f.calls,[1,11,1]);
+  assert.equal(owner.journal()[1].identity,identity(1));
+  await owner.command('cleanup');
+});
+
+test('confirmed rebase rejects an unretired capsule before asking the native owner',async()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  await owner.command('capture');
+  await assert.rejects(owner.command('rebase',1),/actual retired END/);
+  assert.deepEqual(f.calls,[1]);
+  await assert.rejects(owner.command('capture'),/actual retired END/);
+  await owner.command('cleanup');
+  assert.deepEqual(f.calls,[1,10]);
 });

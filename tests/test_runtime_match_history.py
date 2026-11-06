@@ -35,8 +35,11 @@ class RuntimeMatchHistoryHostControls(OwnedWorkspaceTests):
             return history[begin:history.index(end, begin)]
 
         refusal = section('bool history_refuse(', 'bool history_runtime_idle() noexcept;')
-        request = section('int melee_web_native_menu_match_history_request(',
-                          'const MatchHistoryStatus* melee_web_native_menu_match_history_status(')
+        request = '\n'.join([
+            section('int history_request(', '} // namespace'),
+            section('int melee_web_native_menu_match_history_request(',
+                    'const char* melee_web_native_menu_match_history_rebase_identity_json('),
+        ])
         self.assertIn('(void)emscripten_request_animation_frame(history_dispatch,nullptr);', request)
         self.assertNotIn('EMSCRIPTEN_RESULT_SUCCESS', request)
 
@@ -56,6 +59,7 @@ struct Capsule { bool endpoint_active() const { return false; } };
 struct MatchHistoryControl {
   MatchHistoryStatus status{};
   bool dispatching=false;
+  uint32_t requested_rebase_end=0;
   Capsule* capsule=nullptr;
   std::array<char,512> error{};
 };
@@ -63,6 +67,7 @@ MatchHistoryControl match_history{};
 bool match_history_terminal=true, match_history_in_tick=false;
 using Callback = EM_BOOL (*)(double,void*);
 int request_handle=0, request_calls=0, dispatch_calls=0;
+uint32_t dispatched_rebase_end=0;
 Callback queued_callback=nullptr;
 void* queued_data=nullptr;
 EM_BOOL history_dispatch(double,void*);
@@ -78,6 +83,8 @@ EM_BOOL history_dispatch(double,void*) {
   auto& status=match_history.status;
   const auto command=status.pending_command;
   if (!command || match_history.dispatching) return EM_FALSE;
+  if(command==11)dispatched_rebase_end=match_history.requested_rebase_end;
+  match_history.requested_rebase_end=0;
   status.last_completed_command=command;
   status.complete_seq=status.request_seq;
   status.pending_command=0;
@@ -90,6 +97,7 @@ void reset(int handle) {
   match_history_in_tick=false;
   request_handle=handle;
   request_calls=dispatch_calls=0;
+  dispatched_rebase_end=0;
   queued_callback=nullptr;
   queued_data=nullptr;
 }
@@ -104,14 +112,26 @@ int main() {
     assert(dispatch_calls==1 && request_calls==1);
     assert(match_history.status.last_completed_command==4);
     assert(match_history.status.complete_seq==1 && match_history.status.pending_command==0);
+    assert(dispatched_rebase_end==0);
+
+    constexpr uint32_t end=42;
+    assert(melee_web_native_menu_match_history_request_rebase(end)==1);
+    assert(request_calls==2 && queued_callback==history_dispatch && dispatch_calls==1);
+    assert(match_history.status.request_seq==2 && match_history.status.pending_command==11);
+    assert(match_history.status.first_failure==0 && match_history.requested_rebase_end==end);
+    queued_callback(2.0,queued_data);
+    assert(dispatch_calls==2 && request_calls==2 && dispatched_rebase_end==end);
+    assert(match_history.status.last_completed_command==11);
+    assert(match_history.status.complete_seq==2 && match_history.status.pending_command==0);
   }
   reset(37);
   assert(melee_web_native_menu_match_history_request(11)==0);
   const std::string first_error=match_history.error.data();
-  assert(match_history.status.first_failure==1 && !first_error.empty());
+  assert(match_history.status.first_failure==1 && first_error=="Confirmed rebase requires an explicit END frame");
   assert(match_history.status.request_seq==0 && match_history.status.pending_command==0);
   assert(request_calls==0);
   assert(melee_web_native_menu_match_history_request(4)==0);
+  assert(melee_web_native_menu_match_history_request_rebase(42)==0);
   assert(match_history.status.first_failure==1 && match_history.error.data()==first_error);
   assert(match_history.status.request_seq==0 && match_history.status.pending_command==0);
   assert(request_calls==0);

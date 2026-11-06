@@ -8,6 +8,9 @@ import {
   createRuntimeMatchHistoryPeer,
   RUNTIME_MATCH_HISTORY_PEER_PROFILE,
   RUNTIME_MATCH_HISTORY_PEER_SCOPE,
+  RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 
@@ -132,11 +135,11 @@ function createEndpointBus() {
 }
 
 function makePeer(bus, role, {sourceFrame = 120, sourceJson = identityText(sourceFrame),
-  identity = loadedIdentity, validateNativePad = () => true, timeoutMs = 1000,
+  identity = loadedIdentity, validateNativePad = () => true, inputTicks = 1, timeoutMs = 1000,
   sampleTimeoutMs = timeoutMs} = {}) {
   return createRuntimeMatchHistoryPeer({
     role, relayUrl: 'ws://local.test/room', roomId: 'R'.repeat(24), timeoutMs, sampleTimeoutMs,
-    sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame,
+    sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks,
     validateNativePad, createEndpoint: bus.createEndpoint,
   });
 }
@@ -295,7 +298,7 @@ test('local refusal is nonpublishing, sample deadlines are finite, and a success
 
     const accepted = await alpha.publishLocal({port: 0, tick: 0, pollSerial: 3, pad: validPad(7)});
     await assert.rejects(alpha.publishLocal({port: 0, tick: 0, pollSerial: 4, pad: validPad(7)}),
-      /only one local PAD publication/);
+      /contiguous index order/);
     assert.deepEqual(alpha.snapshot().local_contribution.pad, accepted.pad);
   } finally {
     await Promise.allSettled([alpha.close(), beta.close()]);
@@ -458,6 +461,110 @@ test('production bridge uses page WebSocket owner and has no Node or native/game
   assert.doesNotMatch(source, /pushIndexed|melee_web_net_push_indexed|Module\.ccall/);
   assert.equal(RUNTIME_MATCH_HISTORY_PEER_PROFILE,
     'slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20');
+});
+
+test('explicit two-window peer keeps two indexed native polls on the same page socket', async () => {
+  assert.equal(RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS, 1);
+  assert.equal(RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS, 3);
+  assert.equal(RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS, 2);
+  const bus = createEndpointBus(), validatorCalls = {alpha: [], beta: []};
+  const make = role => makePeer(bus, role, {inputTicks: 2,
+    validateNativePad(bytes, details) {
+      validatorCalls[role].push({bytes: [...bytes], ...details});
+      return bytes.length === 11 && details.pollSerial !== '0';
+    },
+  });
+  const alpha = make('alpha'), beta = make('beta');
+  try {
+    const [startedAlpha, startedBeta] = await Promise.all([alpha.start(), beta.start()]);
+    for (const started of [startedAlpha, startedBeta]) {
+      assert.equal(started.input_ticks_protocol_only, 2);
+      assert.equal(started.source_ticks_protocol_only, 4);
+      assert.deepEqual(started.protocol_only_frames.map(row => row.protocol_source_tick), [0, 1]);
+      assert(started.protocol_only_frames.every(row => row.protocol_preroll_neutral &&
+        row.not_for_gameplay && row.match_source_frame === null));
+    }
+    assert.equal(startedAlpha.scope, 'melee-web-runtime-two-window-history-peer-v1');
+    assert.equal(startedAlpha.agreement_hash, startedBeta.agreement_hash);
+
+    const accepted = [];
+    for (const tick of [0, 1]) {
+      const alphaPad = validPad(11 + tick), betaPad = validPad(71 + tick);
+      const [alphaLocal, betaLocal] = await Promise.all([
+        alpha.publishLocal({port: 0, tick, pollSerial: String(41 + tick), pad: alphaPad}),
+        beta.publishLocal({port: 1, tick, pollSerial: String(51 + tick), pad: betaPad}),
+      ]);
+      assert.equal(alphaLocal.protocol_input_tick, tick);
+      assert.equal(betaLocal.protocol_input_tick, tick);
+      const [alphaRemote, betaRemote] = await Promise.all([
+        alpha.waitForRemoteSample({tick}), beta.waitForRemoteSample({tick}),
+      ]);
+      assert.deepEqual(alphaRemote.pad, [...betaPad]);
+      assert.deepEqual(betaRemote.pad, [...alphaPad]);
+      accepted.push({tick, alphaPad, betaPad});
+    }
+    assert.deepEqual(validatorCalls.alpha.map(row => [row.tick, row.pollSerial]), [[0, '41'], [1, '42']]);
+    assert.deepEqual(validatorCalls.beta.map(row => [row.tick, row.pollSerial]), [[0, '51'], [1, '52']]);
+    for (const [peer, localPort] of [[alpha, 0], [beta, 1]]) {
+      const snapshot = peer.snapshot();
+      assert.equal(snapshot.socket_owner, 'browser-page');
+      assert.equal(snapshot.socket_ready, true);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row => row.protocol_source_tick), [0, 1, 2, 3]);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row => row.protocol_input_tick), [null, null, 0, 1]);
+      assert(snapshot.protocol_only_frames.every(row => row.not_for_gameplay && row.match_source_frame === null));
+      assert.deepEqual(snapshot.local_contributions.map(row => row.protocol_input_tick), [0, 1]);
+      assert.deepEqual(snapshot.remote_contributions.map(row => row.protocol_input_tick), [0, 1]);
+      for (const row of accepted) {
+        const local = localPort === 0 ? row.alphaPad : row.betaPad;
+        const remote = localPort === 0 ? row.betaPad : row.alphaPad;
+        assert.equal(snapshot.protocol_only_frames[row.tick + 2].bytes_hex,
+          frameBytesHex({localPort, local, remote}));
+      }
+    }
+  } finally {
+    await Promise.allSettled([alpha.close(), beta.close()]);
+  }
+});
+
+test('default peer remains one input and refuses a second input index', async () => {
+  const bus = createEndpointBus(), alpha = makePeer(bus, 'alpha'), beta = makePeer(bus, 'beta');
+  try {
+    const [snapshot] = await Promise.all([alpha.start(), beta.start()]);
+    assert.equal(snapshot.scope, RUNTIME_MATCH_HISTORY_PEER_SCOPE);
+    assert.equal(snapshot.input_ticks_protocol_only, 1);
+    assert.equal(snapshot.source_ticks_protocol_only, 3);
+    await assert.rejects(alpha.publishLocal({port: 0, tick: 1, pollSerial: '61', pad: validPad(61)}),
+      /contiguous index order/);
+  } finally {
+    await Promise.allSettled([alpha.close(), beta.close()]);
+  }
+});
+
+test('two-input peer refuses skipped, duplicate, third and out-of-bound remote indexes', async () => {
+  const bus = createEndpointBus(), calls = [];
+  const alpha = makePeer(bus, 'alpha', {inputTicks: 2,
+    validateNativePad(bytes, details) { calls.push(details); return bytes.length === 11; },
+  });
+  const beta = makePeer(bus, 'beta', {inputTicks: 2});
+  try {
+    await Promise.all([alpha.start(), beta.start()]);
+    for (const tick of [1, 2])
+      await assert.rejects(alpha.publishLocal({port: 0, tick, pollSerial: String(70 + tick), pad: validPad(70)}),
+        /contiguous index order/);
+    assert.equal(calls.length, 0, 'skipped and third indexes never reach native PAD validation');
+    await alpha.publishLocal({port: 0, tick: 0, pollSerial: '80', pad: validPad(80)});
+    await assert.rejects(alpha.publishLocal({port: 0, tick: 0, pollSerial: '81', pad: validPad(81)}),
+      /contiguous index order/);
+
+    const invalid = statePacket();
+    invalid.unacknowledged = [{tick: RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
+      pad: Buffer.from(validPad(90)).toString('base64')}];
+    await assert.rejects(bus.inject('alpha', invalid), /remote input tick/);
+    assert.equal(alpha.snapshot().terminal?.kind, 'protocol');
+    assert.equal(alpha.remoteSnapshot(1), null);
+  } finally {
+    await Promise.allSettled([alpha.close(), beta.close()]);
+  }
 });
 
 function deferredForTest() {

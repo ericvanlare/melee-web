@@ -85,9 +85,11 @@ struct MatchHistoryControl {
  MeleeWebMenuHost* host_owner{};
  uint64_t asset_owner{};
  uint64_t submitted_frame{};
+ uint32_t requested_rebase_end{};
  std::array<uint8_t,11> remote{};
  bool remote_ready{},dispatching{},identity_ready{};
  std::string identity;
+ std::array<std::string,4> identity_host;
  melee_web::GameplayCpuEndpointRecord record{};
  SlippiParticleCellEndpointHeader particle_header{};
  SlippiParticleCellEndpointRow particle_row{};
@@ -744,6 +746,55 @@ void history_copy_input() noexcept {
  for(unsigned k=0;k<3;k++)if(const auto* row=c.capsule->retained_input(k))
   for(unsigned p=0;p<4;p++)history_encode_pad(arrays[k]+p*11,row[p]);
 }
+std::unique_ptr<melee_web::GameplayCpuStatics> history_configure_statics(MatchHistoryControl& c) {
+  const melee_web::CpuIntervalSpan forbidden[]={{&c,sizeof(c)},{c.configured_rows.data(),c.configured_rows.size()*sizeof(melee_web::CpuStaticRow)},
+   {&match_history_terminal,sizeof(match_history_terminal)},{&match_history_in_tick,sizeof(match_history_in_tick)},
+   {&match_history_renderer_errors,sizeof(match_history_renderer_errors)},
+   {&match_history_pcm_frames,sizeof(match_history_pcm_frames)},{&audio_phase,sizeof(audio_phase)},
+   {&menu_clock,sizeof(menu_clock)},{&audio_clock,sizeof(audio_clock)},{pcm.data(),sizeof(pcm)}};
+  return melee_web::GameplayCpuStatics::configure(c.configured_rows,
+   {reinterpret_cast<uintptr_t>(&__global_base),reinterpret_cast<uintptr_t>(&__data_end)},forbidden);
+}
+
+bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ using Result=melee_web::RuntimeMatchHistoryGateResult;
+ if(!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
+    c.capsule->pre_frame()!=c.status.expected_frame||
+    end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||!c.capsule->can_rebase_confirmed(end)||
+    history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
+  return history_refuse("Confirmed rebase requires the actual retired match END");
+
+ auto next_statics=history_configure_statics(c);
+ if(!next_statics)return history_refuse("Confirmed rebase could not configure the immutable statics table");
+ const auto& host=c.identity_host;
+ auto next_identity=melee_web::slippi_profile::serialize_live_match_identity(
+  *match,{host[0],host[1],host[2],host[3]});
+ if(!c.capsule->can_rebase_confirmed(end)||
+    history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
+  return history_refuse("Confirmed rebase lost the retired match END");
+
+ // The host must copy the retired window's receipts before requesting rebase.
+ // This transition never calls source tick, PAD poll, present, or audio.
+ c.capsule.reset();
+ c.statics=std::move(next_statics);
+ c.identity=std::move(next_identity);
+ c.status.expected_frame=end;
+ c.status.history={};
+ c.status.history.pre_frame=c.status.history.current_frame=end;
+ c.status.history.pre_audio_phase=c.status.history.current_audio_phase=audio_phase;
+ c.status.input_ready=0;
+ c.input={};
+ c.record={};
+ c.particle_header={};
+ c.particle_row={};
+ c.motor={};
+ c.motor_commit={};
+ c.checksum={};
+ match_history_pcm_frames=0;
+ return true;
+}
+
 EM_BOOL history_dispatch(double,void*) {
  auto& c=match_history;
  const auto command=c.status.pending_command;
@@ -761,7 +812,7 @@ EM_BOOL history_dispatch(double,void*) {
   }else if(!c.status.first_failure&&match&&match.get()==c.match_owner){
    switch(command){
    case 1:{
-    if(c.capsule||!c.statics||!c.identity_ready){history_refuse("Capture requires identity and one reviewed statics configuration");break;}
+    if(c.capsule||!c.statics||!c.identity_ready||match->source_frames()!=c.status.expected_frame){history_refuse("Capture requires a frame-bound identity and reviewed statics configuration");break;}
     melee_web::CpuCaptureDiagnostic diagnostic{};
     c.capsule=RuntimeMatchHistory::capture(*match,std::move(c.statics),diagnostic,
       history_boundary,history_present,history_audio_step,audio_phase,nullptr);
@@ -789,6 +840,7 @@ EM_BOOL history_dispatch(double,void*) {
    case 9:
     if(c.capsule){if(const auto* motor=c.capsule->motor_evidence())c.motor=*motor;okay=c.capsule->retire_confirmed();
      if(okay){if(const auto* receipt=melee_web_cpu_interval_motor_commit_receipt())c.motor_commit=*receipt;else okay=false;}}break;
+   case 11:okay=history_rebase_confirmed(c,c.requested_rebase_end);break;
    default:break;
    }
   }
@@ -796,9 +848,21 @@ EM_BOOL history_dispatch(double,void*) {
  catch(...){history_refuse("Terminal dispatch threw an unknown exception");}
  if(!okay)history_refuse("Terminal match history command refused");
  history_sync();history_copy_input();
+ c.requested_rebase_end=0;
  c.status.last_completed_command=command;c.status.complete_seq=c.status.request_seq;c.status.pending_command=0;
  c.dispatching=false;
  return EM_FALSE;
+}
+int history_request(unsigned command,uint32_t end_frame) {
+ auto& c=match_history;
+ if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
+    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>11||
+    (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
+ c.requested_rebase_end=end_frame;
+ ++c.status.request_seq;c.status.pending_command=command;
+ // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
+ (void)emscripten_request_animation_frame(history_dispatch,nullptr);
+ return 1;
 }
 } // namespace
 
@@ -950,17 +1014,11 @@ int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,
 int melee_web_native_menu_match_history_configure(const melee_web::CpuStaticRow* rows,uint32_t count) {
  auto& c=match_history;
  try {
-  if(!match_history_terminal||c.status.first_failure||c.capsule||c.statics||c.dispatching||!rows||!count||c.status.pending_command)return history_refuse("Statics configuration phase refused");
+  if(!match_history_terminal||c.status.first_failure||c.capsule||c.statics||!c.configured_rows.empty()||c.dispatching||!rows||!count||c.status.pending_command)return history_refuse("Statics configuration phase refused");
   const uintptr_t begin=reinterpret_cast<uintptr_t>(rows),end=begin+uint64_t(count)*sizeof(*rows);
   if(end>emscripten_get_heap_size()||end<=begin)return history_refuse("Statics configuration input range refused");
   c.configured_rows.assign(rows,rows+count);
-  const melee_web::CpuIntervalSpan forbidden[]={{&c,sizeof(c)},{c.configured_rows.data(),c.configured_rows.size()*sizeof(*rows)},
-   {&match_history_terminal,sizeof(match_history_terminal)},{&match_history_in_tick,sizeof(match_history_in_tick)},
-   {&match_history_renderer_errors,sizeof(match_history_renderer_errors)},
-   {&match_history_pcm_frames,sizeof(match_history_pcm_frames)},{&audio_phase,sizeof(audio_phase)},
-   {&menu_clock,sizeof(menu_clock)},{&audio_clock,sizeof(audio_clock)},{pcm.data(),sizeof(pcm)}};
-  c.statics=melee_web::GameplayCpuStatics::configure(c.configured_rows,
-   {reinterpret_cast<uintptr_t>(&__global_base),reinterpret_cast<uintptr_t>(&__data_end)},forbidden);
+  c.statics=history_configure_statics(c);
   if(!c.statics)return history_refuse("Reviewed statics table refused native bounds/forbidden ranges");
   return 1;
  }catch(const std::exception& e){return history_refuse(e.what());}
@@ -974,14 +1032,21 @@ int melee_web_native_menu_match_history_remote_pad(const uint8_t* bytes,unsigned
  std::copy_n(bytes,11,c.remote.data());c.remote_ready=true;return 1;
 }
 int melee_web_native_menu_match_history_request(unsigned command) {
- auto& c=match_history;
- if(!match_history_terminal||c.status.owner_state!=1||match_history_in_tick||c.dispatching||c.status.pending_command||
-    (command!=10&&c.capsule&&c.capsule->endpoint_active())||command<1||command>10||
-    (c.status.first_failure&&command!=10)||c.status.request_seq==UINT32_MAX)return history_refuse("Terminal request admission refused");
- ++c.status.request_seq;c.status.pending_command=command;
- // Emscripten returns the browser's opaque rAF handle, not EMSCRIPTEN_RESULT.
- (void)emscripten_request_animation_frame(history_dispatch,nullptr);
- return 1;
+ if(command==11)return history_refuse("Confirmed rebase requires an explicit END frame");
+ return history_request(command,0);
+}
+int melee_web_native_menu_match_history_request_rebase(uint32_t end_frame) {
+ return history_request(11,end_frame);
+}
+const char* melee_web_native_menu_match_history_rebase_identity_json(){
+ const auto& c=match_history;
+ if(!match_history_terminal||c.status.owner_state!=1||c.status.first_failure||
+    !history_start_export_idle()||c.status.last_completed_command!=11||
+    c.capsule||!c.statics||!c.identity_ready||!match||
+    history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::PresentComplete,
+      c.status.expected_frame,nullptr)!=melee_web::RuntimeMatchHistoryGateResult::Admitted)
+  return nullptr;
+ return c.identity.c_str();
 }
 const MatchHistoryStatus* melee_web_native_menu_match_history_status(){
  // Direct polling during an Asyncify suspension reads only fixed transport.
@@ -1008,9 +1073,15 @@ const char* melee_web_native_menu_match_history_identity_json(const char* runtim
     throw std::runtime_error("Identity string extent refused");
    return std::string_view(p,n);
   };
-  c.identity=melee_web::slippi_profile::serialize_live_match_identity(*match,
-   {bounded(runtime,64),bounded(assets,64),bounded(save,64),
-    bounded(profile,sizeof(SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID)-1)});
+  std::array<std::string,4> supplied{
+   std::string(bounded(runtime,64)),std::string(bounded(assets,64)),
+   std::string(bounded(save,64)),std::string(bounded(profile,sizeof(SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID)-1))};
+  if(c.identity_ready&&c.identity_host!=supplied)
+   throw std::runtime_error("Terminal identity host agreement changed");
+  auto identity=melee_web::slippi_profile::serialize_live_match_identity(
+   *match,{supplied[0],supplied[1],supplied[2],supplied[3]});
+  c.identity_host=std::move(supplied);
+  c.identity=std::move(identity);
   c.identity_ready=true;return c.identity.c_str();
  }catch(const std::exception& e){history_refuse(e.what());return nullptr;}
 }
@@ -1080,11 +1151,11 @@ const void* melee_web_native_menu_match_history_checksum_data(){
   return nullptr;
  const auto* pads=c.capsule->retained_input(corrected?2:1);
  if(!pads)return nullptr;
- // Tick zero is the single match-input ordinal of this private capsule.
- // Scene three selects the existing match projection, never the menu/ring path.
+ // The actual pre-frame is the match-local ordinal of this consumed input.
+ // Scene three selects the existing match projection, independent of transport preroll.
  MeleeWebNetChecksumRecord observed{};
- melee_web_net_checksum_compute(0,3,pads,nullptr,&observed);
- if(observed.frame!=frame||!(observed.flags&MELEE_WEB_NET_HASHED_FIGHTERS)||
+ melee_web_net_checksum_compute(pre,3,pads,nullptr,&observed);
+ if(observed.tick!=pre||observed.frame!=frame||!(observed.flags&MELEE_WEB_NET_HASHED_FIGHTERS)||
     c.capsule->phase()!=phase||
     history_boundary(*match,Gate::EndpointComplete,frame,nullptr)!=Result::Admitted)
   return nullptr;
