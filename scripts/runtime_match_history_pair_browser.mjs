@@ -1712,6 +1712,13 @@ finally{
         report.cleanup_failures.push(`${item.role} native/source cleanup: ${String(error?.message||error)}`);
       }
       await retainNativeLog(item,'after-cleanup');
+      if(inlineDispatch&&item.takenOver){
+        try{
+          pageReport.controller_journal=await item.page.evaluate(()=>
+            globalThis.__meleeRuntimeMatchHistory.journal());
+          assert(Array.isArray(pageReport.controller_journal),'Controller journal was not retained');
+        }catch(error){report.cleanup_failures.push(`${item.role} controller journal: ${String(error)}`);}
+      }
       item.driver?.dispose?.();
       pageReport.browser_errors=item.pageErrors;
       pageReport.websockets=item.websockets;pageReport.external_requests=item.externalRequests;
