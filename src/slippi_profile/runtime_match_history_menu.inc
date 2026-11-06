@@ -844,6 +844,14 @@ std::unique_ptr<melee_web::GameplayCpuStatics> history_configure_statics(MatchHi
 bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  using Gate=melee_web::RuntimeMatchHistoryGatePoint;
  using Result=melee_web::RuntimeMatchHistoryGateResult;
+ const bool had_prefix_handoff=c.prefix_handoff.active();
+ const auto prefix_suffix_complete=[&]{
+  return !had_prefix_handoff||
+      (c.prefix_handoff.active()&&
+       c.prefix_handoff.suffix_cursor()==c.prefix_handoff.suffix_count());
+ };
+ if(!prefix_suffix_complete())
+  return history_refuse("Confirmed rebase requires every retained prefix suffix ticket to be forwarded");
  if(c.episode_enabled!=c.arena_enabled||!c.capsule||!c.identity_ready||c.statics||c.remote_ready||
     c.capsule->pre_frame()!=c.status.expected_frame||
     end>UINT32_MAX-MELEE_WEB_CPU_MOTOR_MAX_SPAN||!c.capsule->can_rebase_confirmed(end)||
@@ -855,7 +863,7 @@ bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  const auto& host=c.identity_host;
  auto next_identity=melee_web::slippi_profile::serialize_live_match_identity(
   *match,{host[0],host[1],host[2],host[3]});
- if(!c.capsule->can_rebase_confirmed(end)||
+ if(!prefix_suffix_complete()||!c.capsule->can_rebase_confirmed(end)||
     history_boundary(*match,Gate::PresentComplete,end,nullptr)!=Result::Admitted)
   return history_refuse("Confirmed rebase lost the retired match END");
 
@@ -878,6 +886,10 @@ bool history_rebase_confirmed(MatchHistoryControl& c,uint32_t end) {
  c.motor_commit={};
  c.checksum={};
  match_history_pcm_frames=0;
+ if(had_prefix_handoff){
+  c.prefix_handoff.clear();
+  c.prefix_handoff_json={};
+ }
  return true;
 }
 

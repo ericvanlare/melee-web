@@ -431,7 +431,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
          after.metadata.incarnation!==handoff.oldIncarnation))||
       (handoff.rebaseRequestSequence!==0&&after.expectedFrame!==handoff.confirmedFrame)||
       row.sourceFrame!==handoff.confirmedFrame+ordinal||
-      row.incarnation!==handoff.oldIncarnation||row.localPort!==handoff.localPort||
+      row.localPort!==handoff.localPort||
       row.remotePort!==handoff.remotePort||row.state===0)
       throw latch(Error('Confirmed-prefix origin row differs from its immutable old suffix owner'));
     row.ordinal=row.sourceFrame-handoff.oldPreFrame;
@@ -821,7 +821,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(!rowPointer)throw Error('Confirmed-prefix C−1 source-boundary row is unavailable');
           const sourceRow=decodeRuntimeMatchHistoryEpisodeInputRow(read(rowPointer,INPUT_ROW_BYTES));
           if(sourceRow.sourceFrame!==prefixHandoff.confirmedFrame-1||sourceRow.state!==2||
-            sourceRow.incarnation!==prefixHandoff.oldIncarnation||
+            sourceRow.incarnation>prefixHandoff.oldIncarnation||
             sourceRow.localPort!==prefixHandoff.localPort||sourceRow.remotePort!==prefixHandoff.remotePort||
             !sameJsonValue(check(status()),before))
             throw Error('Confirmed-prefix checksum requires the exact old-incarnation selected C−1 input row');
@@ -894,7 +894,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const prefixCommands=new Set(['finishPrefix','closePrefix','retirePrefix',
         'rebaseConfirmedPrefix','adoptNextPrefixTicket']);
       const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
-      let confirmedEnd,ticketId,planBytes,transitionHandoff=null;
+      let confirmedEnd,ticketId,planBytes,transitionHandoff=null,prefixHandoffComplete=false;
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')confirmedEnd=argument;
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
         u32(confirmedEnd,name==='finishPrefix'?'Confirmed prefix frame':'Confirmed END frame');
@@ -919,6 +919,13 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(unclaimedPrefixTicket&&name!=='cleanup')
         throw Error('Adopted prefix ticket must be copied before another command');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');
+      if(name==='rebase'&&confirmedPrefixActive){
+        const handoff=readPrefixHandoff();
+        if(!handoff.rebaseRequestSequence||handoff.suffixCursor!==handoff.suffixCount||
+          adoptedPrefixTicket)
+          throw Error('Whole-END rebase requires the exhausted confirmed-prefix handoff');
+        prefixHandoffComplete=true;
+      }
       busy=true;const started=performance.now(),deadline=started+commandTimeoutMs;
       const entry={command,name,started,status:'pending'};journal.push(entry);
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
@@ -1207,6 +1214,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           identityText=identity;
           entry.identity=identity;
           captured=false;
+          if(prefixHandoffComplete){
+            const handoffExport=module[PREFIX+'prefix_handoff_json'];
+            const originSize=module[PREFIX+'prefix_origin_row_bytes'];
+            if(typeof handoffExport!=='function'||handoffExport()!==0||
+              typeof originSize!=='function'||originSize()!==0||!sameJsonValue(check(status()),after))
+              throw Error('Whole-END rebase did not clear its exhausted confirmed-prefix handoff');
+            confirmedPrefixActive=false;
+            adoptedPrefixTicket=null;
+            unclaimedPrefixTicket=false;
+          }
         }
         if(name==='rebaseConfirmedPrefix'){
           const h=after.metadata;

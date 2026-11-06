@@ -291,6 +291,53 @@ export class MatchInputTimeline {
     return plan;
   }
 
+  /** Build a full-PRE replay plan split at an actual remote confirmation edge. */
+  planConfirmedPrefix({preFrame, confirmedEnd} = {}) {
+    this.#assertActive();
+    if (this.#outstanding) throw Error('An input plan is already outstanding');
+    safeTick(preFrame, 'Confirmed-prefix PRE frame');
+    safeTick(confirmedEnd, 'Confirmed-prefix end frame');
+    const frontier = nextTick(this.#simulatedThrough);
+    const confirmedFrontier = nextTick(this.#remoteContiguousThrough);
+    if (frontier === null || confirmedFrontier === null || preFrame < this.#historyFloor() ||
+        preFrame >= confirmedEnd || confirmedEnd !== confirmedFrontier || confirmedEnd >= frontier ||
+        frontier - preFrame > ROLLBACK_MAX_PREDICTION_TICKS ||
+        (this.#dirtyFrom !== null && this.#dirtyFrom < preFrame))
+      throw Error('Confirmed-prefix interval must lie inside the retained, live, confirmed input frontier');
+
+    const through = this.#simulatedThrough;
+    const frames = [], resolved = [];
+    for (let tick = preFrame; tick < confirmedEnd; ++tick) {
+      if (!this.#remoteInputs.has(tick))
+        throw Error(`Actual remote PAD is missing from confirmed-prefix tick ${tick}`);
+      if (tick === confirmedEnd - 1) break;
+    }
+    let speculativeTicks = 0;
+    for (let tick = preFrame; tick <= through; ++tick) {
+      const localPad = this.#localInputs.get(tick);
+      if (!localPad || !this.#executedInputs.has(tick))
+        throw Error(`Retained local or executed input is missing from confirmed-prefix tick ${tick}`);
+      const remotePad = this.#resolveRemote(tick, this.#remoteInputs);
+      const actual = this.#remoteInputs.has(tick);
+      const speculative = tick > this.#remoteContiguousThrough;
+      const record = Object.freeze({tick, local_pad: publicPad(localPad),
+        remote_pad: publicPad(remotePad), remote_source: actual ? 'actual' : 'last_known_prediction',
+        speculative, frame: makeFrame(this.#localPort, this.#remotePort, localPad, remotePad)});
+      frames.push(record);
+      resolved.push({tick, remotePad});
+      if (speculative) ++speculativeTicks;
+      if (tick === through) break;
+    }
+    if (frames.length !== frontier - preFrame || speculativeTicks !== frontier - confirmedEnd)
+      throw Error('Confirmed-prefix frame extent differs from its exact source interval');
+    const plan = this.#createPlan({kind: 'confirmed-prefix', from: preFrame, through,
+      confirmed_end: confirmedEnd, frames: Object.freeze(frames), speculativeTicks});
+    this.#outstanding.confirmedEnd = confirmedEnd;
+    this.#outstanding.frontier = frontier;
+    this.#outstanding.resolved = resolved;
+    return plan;
+  }
+
   /** Acknowledge successful adapter replay; this does not restore or verify game state. */
   commitReplay(plan) {
     this.#assertActive();
@@ -300,6 +347,34 @@ export class MatchInputTimeline {
     for (const {tick, remotePad} of this.#outstanding.resolved) {
       const localPad = this.#localInputs.get(tick);
       if (!localPad) throw Error(`Original local PAD is missing from replay tick ${tick}`);
+      this.#executedInputs.set(tick, {localPad, remotePad});
+    }
+    this.#dirtyFrom = null;
+    this.#outstanding = null;
+    ++this.#revision;
+    this.#trimHistory();
+    return this.status();
+  }
+
+  /** Acknowledge a completed prefix handoff and its replayed retained suffix. */
+  commitConfirmedPrefix(plan) {
+    this.#assertActive();
+    this.#assertCurrentPlan(plan, 'confirmed-prefix');
+    const frontier = nextTick(this.#simulatedThrough);
+    const confirmedFrontier = nextTick(this.#remoteContiguousThrough);
+    const outstanding = this.#outstanding;
+    if (frontier === null || plan.from < this.#historyFloor() ||
+        plan.from >= plan.confirmed_end || plan.through !== this.#simulatedThrough ||
+        plan.confirmed_end !== outstanding.confirmedEnd || frontier !== outstanding.frontier ||
+        confirmedFrontier !== plan.confirmed_end || plan.confirmed_end >= frontier ||
+        (this.#dirtyFrom !== null && this.#dirtyFrom < plan.from) ||
+        outstanding.resolved?.length !== frontier - plan.from)
+      throw Error('Confirmed-prefix plan no longer matches its retained source frontier');
+    for (const {tick} of outstanding.resolved)
+      if (!this.#localInputs.has(tick))
+        throw Error(`Original local PAD is missing from confirmed-prefix tick ${tick}`);
+    for (const {tick, remotePad} of outstanding.resolved) {
+      const localPad = this.#localInputs.get(tick);
       this.#executedInputs.set(tick, {localPad, remotePad});
     }
     this.#dirtyFrom = null;
@@ -364,6 +439,7 @@ export class MatchInputTimeline {
       ...(fields.tick === undefined ? {} : {tick: fields.tick}),
       ...(fields.from === undefined ? {} : {from: fields.from}),
       ...(fields.through === undefined ? {} : {through: fields.through}),
+      ...(fields.confirmed_end === undefined ? {} : {confirmed_end: fields.confirmed_end}),
       ...(fields.frame === undefined ? {} : {frame: fields.frame}),
       ...(fields.frames === undefined ? {} : {frames: fields.frames}),
       speculative_ticks: fields.speculativeTicks,
