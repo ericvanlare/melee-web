@@ -743,11 +743,6 @@ async function runPeerCorrection(alpha,beta){
   const predP2=betaPrior.pad;
   for(const item of [alpha,beta]){
     report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
-    const initial=await recordHistoryStatus(item,'initial',{phase:0,sourceFrame:0,
-      restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
-    assert.equal(initial.localPort,item.role==='alpha'?0:1);
-    assert.equal(initial.remotePort,1-initial.localPort);
-    assert.equal(initial.inputReady,0);
   }
   const peerReport=report.peer_correction={
     claim:'one actual asymmetric wrong-prediction correction against one on-time peer CPU_END reference',
@@ -768,6 +763,13 @@ async function runPeerCorrection(alpha,beta){
     installPeerHistoryBridge(alpha,relayUrl,roomId).then(value=>{alpha.peerInstalled=true;return value;}),
     installPeerHistoryBridge(beta,relayUrl,roomId).then(value=>{beta.peerInstalled=true;return value;}),
   ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
+  for(const item of [alpha,beta]){
+    const initial=await recordHistoryStatus(item,'initial',{phase:0,sourceFrame:0,
+      restoreCount:0,forwardSteps:0,replaySteps:0,gpuIdle:true});
+    assert.equal(initial.localPort,item.role==='alpha'?0:1);
+    assert.equal(initial.remotePort,1-initial.localPort);
+    assert.equal(initial.inputReady,0);
+  }
   const [alphaPeer,betaPeer]=await joinOwned('peer-start',[
     peerOperation(alpha,'peerStart'),peerOperation(beta,'peerStart')]);
   peerReport.pages.alpha.peer_start=alphaPeer;peerReport.pages.beta.peer_start=betaPeer;
