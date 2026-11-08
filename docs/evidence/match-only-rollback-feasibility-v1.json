@@ -16624,5 +16624,279 @@
       "review": "Independent source, linked-package, raw-browser and reduced-harness controls passed.",
       "integration": "Publication-head CI and reviewed current-main integration receipts are tracked by the milestone PR linked from issue #378."
     }
+  },
+  "shared_lobby_selections_380": {
+    "issue": 380,
+    "pr": 381,
+    "status": "HOSTED_SHARED_CHOICES_FULL_ROUTE_FUNCTIONAL_PASS_ACCEPTANCE_OPEN",
+    "retained_run": "shared-lobby-selections-20261108-133356-546beaf3",
+    "runtime_source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250",
+    "harness_source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250",
+    "deployment": {
+      "deployment_id": "4bf33fdd-347d-4da7-8f61-d4dae8182ce0",
+      "source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250",
+      "immutable_url": "https://4bf33fdd.webmelee-staging.pages.dev",
+      "stable_url": "https://webmelee-staging.pages.dev",
+      "manifest_sha256": "da266eaca3a1597d63092a415507765bbceefe1003567bdbedf9fff6083155f1"
+    },
+    "result": "FULL_MATCH_UI_PASS",
+    "scope": "Independent original CSS P1 choices; host-only original SSS; guest original CSS continuation to agreed native match; complete Mario/FD public-relay route. Menus and Results remain local. No other fighter/stage or full-profile admission.",
+    "shared_choices": {
+      "choices": {
+        "alpha": {
+          "character": 8,
+          "costume": 1
+        },
+        "beta": {
+          "character": 8,
+          "costume": 2
+        }
+      },
+      "host_phase": 3,
+      "guest_phase": 2,
+      "guest_start_state": 1,
+      "guest_menu_actions": [
+        "Guest local P1 X: choose own costume",
+        "P1 original CSS Start"
+      ],
+      "constructed_identity_and_actual_startup_pad": "exact equal",
+      "host_stage": 32
+    },
+    "terminal": {
+      "source_frame": 1131,
+      "last_input_ordinal": 1244,
+      "matched_checksum_bytes": 64,
+      "checksum_hex": "dc04000003000000110c5bfa6b040000090000003d00000013122a15779d8c9066cbc8a5398ec45023cdbef4929bd22f0cdb0295250e1461b1ef4dc00f0a8e68",
+      "agreement_hash": "e912ddfb593b3c1c38a2e6bfad377b2dec37939269154bb9eb1b37045a1b2745",
+      "native_prepublication_winner": -1,
+      "original_results_winner": 1
+    },
+    "peers": {
+      "alpha": {
+        "actual_polls": 1245,
+        "retained_corrections": 1,
+        "correction_spans": [
+          1
+        ],
+        "host_network_wait_ms": 10305.095010757446,
+        "native_excluded_wait_ms": 10154.915009498596,
+        "source_boundary_failures": [],
+        "H1_retained_records": 0,
+        "retention": {
+          "limit": 64,
+          "dropped": {
+            "events": 11839,
+            "presentations": 1182,
+            "polls": 1181,
+            "callbacks": 865,
+            "admissions": 509,
+            "rebases": 125
+          }
+        }
+      },
+      "beta": {
+        "actual_polls": 1245,
+        "retained_corrections": 9,
+        "correction_spans": [
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6,
+          6
+        ],
+        "host_network_wait_ms": 10431.684995651245,
+        "native_excluded_wait_ms": 10175.779996871948,
+        "source_boundary_failures": [],
+        "H1_retained_records": 0,
+        "retention": {
+          "limit": 64,
+          "dropped": {
+            "events": 12771,
+            "presentations": 1190,
+            "polls": 1181,
+            "callbacks": 898,
+            "admissions": 530,
+            "rebases": 124
+          }
+        }
+      }
+    },
+    "package": {
+      "wasm_sha256": "0ca06035d3703d1cabb1db3e4be1c351a70c4163a8b3882d954b348a1499888d",
+      "linked_table_sha256": "8f36498397786ae5920ad2e968a4a5c6f5f5f362f1fbc6f8a1c00918dd19fdf0",
+      "linked_receipt_sha256": "a3d253e28cf25da93cc6ed25825b457019bc2e88052f84be1025cfecd248ffbc",
+      "policy_sha256": "fb44c0a5e3d82db09665459499c2a69222ce4ea952db49a8e758ddb0a2e5fd95",
+      "rows": 3795,
+      "frozen_offline_audio": "Unchanged guard-v1 runtime and manifest; independently checked package-v1, strict frozen-base packaging retained in package-v3."
+    },
+    "cleanup": {
+      "browser_and_owned_server_absence": true,
+      "outer_process_and_CDP_result": "pass",
+      "normal_ui_leave": true,
+      "staging_worker": "Left deployed; owned sockets closed. Provider-wide idle/usage unmeasured."
+    },
+    "known_limits": [
+      "Mario/Final Destination only; distinct costumes exercise independent choice ownership.",
+      "Authored browser Gamepad fixture; physical-controller, human/two-machine and audible-output checks unrun.",
+      "64-entry journals retain selected evidence; do not claim full-session state/PAD comparison.",
+      "No fresh RTT probe or input-delay tuning; host/network wait measurements do not establish cadence.",
+      "Guest displays preparation overlay while waiting for host; visual scene continuity remains separate.",
+      "Broader combat/profile, fighter/stage rollback, sustained performance and acceptance remain open."
+    ],
+    "retained_failures": [
+      {
+        "path": "build-staging-v1.log",
+        "source_sha": "196d22baa3ab02a973e0e97497df485b8d83febd",
+        "reason": "Unresolved transition hook namespace; fixed by enclosing namespace wrapper."
+      },
+      {
+        "path": "local-start-choices-v1",
+        "source_sha": "7970906a193129efccddbb8ffa47b58a445172b4",
+        "reason": "Strict held proof refused; local proof not retained in report; normal cleanup passed."
+      },
+      {
+        "path": "local-start-choices-v2",
+        "source_sha": "482962a6358061d92d474929da7e6d8357301fd6",
+        "reason": "Observation-only reducer: live identity/RNG and all compared prefix/PAD fields equal except initial resident transfer drains alpha1/beta0. Guest CSS audio continuation leaked into match preparation; fixed with ordinary phase5 audio policy."
+      },
+      {
+        "path": "focused-protocol-v2-failed.log",
+        "reason": "Retained reduced fixture/schema assertion failures before focused controls passed."
+      }
+    ],
+    "validation": {
+      "source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250",
+      "focused": {
+        "result": "PASS",
+        "tests": 87,
+        "source_sha": "196d22baa3ab02a973e0e97497df485b8d83febd"
+      },
+      "full_regression": {
+        "result": "PASS",
+        "tests": 3146,
+        "skips": 244,
+        "elapsed_seconds": 749.9633457660675
+      },
+      "staging_release": {
+        "result": "PASS",
+        "source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250"
+      },
+      "ordinary_release": {
+        "result": "PASS",
+        "source_sha": "d091a2ce91480e7516dcafd69b6fbc83b0745250"
+      },
+      "review": "Independent native/protocol/cleanup, guest audio handoff, package and raw result reviews passed.",
+      "integration": "Final publication-head CI and reviewed current-main merge receipts tracked in PR #381."
+    },
+    "artifacts": [
+      {
+        "path": "local-start-choices-v1/browser/result.json",
+        "sha256": "ebe1ee0e347e59715fb7790bd719a86a88708385791dd5ebaee781637b5d49d0"
+      },
+      {
+        "path": "local-start-choices-v1/owner-report.json",
+        "sha256": "731b200c3d2aed446f41190d8099ab2055d57b38a3059afd13944eaea185eca8"
+      },
+      {
+        "path": "local-start-choices-v2/browser/result.json",
+        "sha256": "c924e4cd2c6b670796584936099c213a1292a4baf8e9c370a12307cf0cb8f042"
+      },
+      {
+        "path": "local-start-choices-v2-held-difference.json",
+        "sha256": "74c139ac0c072e33f27290a87ab34e8d52df6fd9e9a4e1ff18747b62a726cdb9"
+      },
+      {
+        "path": "local-start-choices-v3/browser/result.json",
+        "sha256": "65187e58f3e1791a9b6515cbefde525cf2340d70ed841ba59ff817e7a15fdb0b"
+      },
+      {
+        "path": "local-start-choices-v3/owner-report.json",
+        "sha256": "652dbf328229ccf7a9c245c774bdabd181ddc8e44943874bcac04cf04da815b5"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/inputs.json",
+        "sha256": "1b1e58fca40aefdf2918cec913559ccd95693c77e8da74a5faa16a0a4a4872d0"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/browser/result.json",
+        "sha256": "f3029372aa222075dca6e8d1d76162c776320e7a88d1a358789103ec653cf3cb"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/owner-report.json",
+        "sha256": "c7d691bb478f820206e937abb2931869cf707202afea41cf548d3e13742de28f"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/browser/alpha-match-final-diagnostics.json",
+        "sha256": "fa92bc580472c10f605b7ccd3257765a4e48e29644c1b9fc936fcb941b6a52c8"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/browser/beta-match-final-diagnostics.json",
+        "sha256": "5e7d42663482f9eef6154b58b5cb569fb61aad093e41a73530937346907d0fba"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/browser/alpha-after-leave-diagnostics.json",
+        "sha256": "c53580bad8186f1187d698a5ad0e6f58e1052bd5b0c579b8ea83355f91fd6ded"
+      },
+      {
+        "path": "hosted-fullmatch-choices-v1/browser/beta-after-leave-diagnostics.json",
+        "sha256": "2a81dd665e5fe3b693e1b47cf5f263cdfd49c502841493a46ee8b149420a2449"
+      },
+      {
+        "path": "raw-review-v1.json",
+        "sha256": "33f6065ecf7c25bf46e0e7bef99b2f6e5713ebbc4ffd1d9085a1c2b37f9b2889"
+      },
+      {
+        "path": "raw-review-v1.md",
+        "sha256": "440f1853a1612569d5bd7f8ee56fb59778e74e0391fcddc26f49a7571d89bd62"
+      },
+      {
+        "path": "package-review-v1.json",
+        "sha256": "54bda5679e488e5dd0c8b3a11457df84a5cc591ff70e3b514c3a34e9e10bd90a"
+      },
+      {
+        "path": "package-choices-v3/site.manifest.json",
+        "sha256": "da266eaca3a1597d63092a415507765bbceefe1003567bdbedf9fff6083155f1"
+      },
+      {
+        "path": "package-choices-v3/linked/linked-statics-receipt.json",
+        "sha256": "a3d253e28cf25da93cc6ed25825b457019bc2e88052f84be1025cfecd248ffbc"
+      },
+      {
+        "path": "deployment-choices-v3/verified.json",
+        "sha256": "69c815a8fe43ef2f6119f647a011092990e6cf25e70b7ad36c47bf8e4b0c76e7"
+      },
+      {
+        "path": "deployment-choices-v3/pages-http.json",
+        "sha256": "35a1cdf04b2842463e80b2c4e3c14a828c0d59b54afdb5840c6871007406de74"
+      },
+      {
+        "path": "deployment-choices-v3/immutable-http.json",
+        "sha256": "5f09b299770db8fb9cff36cdcc96e62238fb185721395b4d1625c8d70fbc8572"
+      },
+      {
+        "path": "build-staging-v4.json",
+        "sha256": "d030046c386eabc26a168eb533936a39892a76c3e3b4af3762bdcc0b2f41faf9"
+      },
+      {
+        "path": "validation-v1-full-regression.json",
+        "sha256": "f62fbe94a56761720bcebf27abc0a48abfb489be8ad86145320ed8d00f9b7595"
+      },
+      {
+        "path": "validation-v1-full-regression.log",
+        "sha256": "f2a2f21dda692d9fb715d2225db2517865ee38b4b8d0bedcbf511eaeca77fa30"
+      },
+      {
+        "path": "validation-v1-ordinary-release.json",
+        "sha256": "09ad11866821f056a1237d5f76eb05cc0b7398e4c24da9a3347f717bde1601ca"
+      },
+      {
+        "path": "validation-v1-ordinary-release.log",
+        "sha256": "715fe4da4ee68814fe9e36075bd0a9797bd89aa350276b38930131b7b4f60bc8"
+      }
+    ]
   }
 }

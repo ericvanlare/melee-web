@@ -52,6 +52,16 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-11-08 — Owner: independent player choices and host stage ownership
+
+**Author:** Owner decision, implementation response.
+
+**Ask:** Each player chooses their own character; the host chooses the stage, with the lobby syncing choices automatically.
+
+**Status:** Adopted. The one-shot lobby composes each peer’s own original CSS choice into the native match context and gives only the host stage authority. The guest uses the received stage at its checked CSS continuation. Original menus and Results remain local; exact match/startup input comparisons stay required. This interface change does not itself broaden fighter or stage rollback admission.
+
+**Links:** [#380](https://github.com/ericvanlare/melee-web/issues/380), [PR #381](https://github.com/ericvanlare/melee-web/pull/381), [current scoped receipt](status/2026-10-12-match-only-rollback-feasibility.md), [online roadmap](ROADMAP.md#track-a-match-only-rollback-online).
+
 ### 2026-11-08 — Owner feedback: coordinate the room before match start
 
 **Author:** Owner feedback, implementation response.

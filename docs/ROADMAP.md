@@ -43,19 +43,19 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
-**Current player-test boundary — [#378](https://github.com/ericvanlare/melee-web/issues/378).**
-The owner-reported room join with incompatible stage choices is covered by shared
-lobby progress/readiness, a constrained Mario/Final Destination room and native
-guest input routing. The hosted public-relay regression completes the original
-local-menu/match/Results/CSS route and normal disconnect; scoped evidence,
-retained failures and exact identities are in the
-[rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md).
-A reviewed source-refill reservation keeps the existing native checkpoint and
-timing guards. Human/two-machine, broader combat/profile and performance checks
-remain open. Keep native ownership of selections, construction and outcome;
-menus and Results remain local. Preserve the completed witness without another
-capture absent a changed hypothesis. Vanilla remains offline-only. Official-service
-cross-play stays parked indefinitely; no official-service traffic is in scope.
+**Current player-test boundary — [#380](https://github.com/ericvanlare/melee-web/issues/380).**
+Each player owns their original CSS character/costume choice; the host alone
+selects the stage in original SSS. The lobby exchanges these choices and the guest
+prepares the same agreed native match without repeating stage selection. This
+retains the experimental Mario/Final Destination admission. The hosted
+public-relay regression completes the local-menu/match/Results/CSS route and
+normal disconnect; scoped evidence, retained failures and exact identities are
+in the [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md).
+Native selection, construction, actual startup inputs and outcome checks remain
+strict. Menus and Results stay local. Broader fighter/stage rollback coverage,
+human/two-machine, combat/profile and performance checks remain open. Reuse the
+completed witness; capture again only for a changed hypothesis. Vanilla remains
+offline-only; official-service cross-play stays parked indefinitely.
 
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
