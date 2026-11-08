@@ -313,7 +313,7 @@ async function openRoom(nextRole,roomId){
     createEndpoint:setup.createMatchEndpoint});
   await bridge.call('peerStart');healthy();
   loop=createRuntimeMatchSessionLoop({owner:controller,peer:bridge,role,streaming:true,
-    inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,matchFinal:true,networkBackpressure:true,
+    inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,matchFinal:true,networkBackpressure:true,reserveHpsTick:true,
     onState:summary=>{report.progress=summary;}});
   prepareWork=loop.prepare();await prepareWork;healthy();
   $('report').disabled=true;

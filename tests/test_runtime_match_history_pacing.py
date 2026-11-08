@@ -179,6 +179,7 @@ MatchOwner match{};
 MatchHistoryControl match_history{};
 bool match_history_terminal=true,match_history_in_tick=false;
 bool runtime_idle=true,renderer_idle=true,boundary_admitted=true;
+bool hps_pending=false;
 unsigned boundary_calls=0,refusal_calls=0;
 Gate last_boundary_gate=Gate::CapturePre;
 double now_ms=0,boundary_advance_ms=0;
@@ -197,6 +198,9 @@ bool history_start_export_idle() noexcept {
   return runtime_idle&&!match_history_in_tick&&!match_history.dispatching&&
          !match_history.status.pending_command;
 }
+bool history_interior_hps_authorized(const Match&,Gate point,uint32_t expected) noexcept {
+  return hps_pending&&point==Gate::InteriorPresentComplete&&expected==session.frame;
+}
 Result history_boundary(const Match& owner,Gate point,uint32_t expected,void*) noexcept {
   ++boundary_calls;
   last_boundary_gate=point;
@@ -212,7 +216,9 @@ EM_BOOL history_dispatch(double,void*) noexcept {return EM_FALSE;}
 EM_BOOL emscripten_request_animation_frame(EM_BOOL(*)(double,void*),void*) noexcept {return 0;}
 @WAIT_HELPERS@
 @START@
+#define MELEE_WEB_ROLLBACK_STAGING 1
 @SAMPLE@
+#undef MELEE_WEB_ROLLBACK_STAGING
 @REQUEST@
 void reset_fixture(double time=0) {
   match_history=MatchHistoryControl{};
@@ -224,6 +230,7 @@ void reset_fixture(double time=0) {
   match_history_terminal=true;
   match_history_in_tick=false;
   runtime_idle=renderer_idle=boundary_admitted=true;
+  hps_pending=false;
   boundary_calls=refusal_calls=match_handle_accesses=match_dereferences=0;
   now_ms=time;boundary_advance_ms=0;
   menu_clock.reset();
@@ -360,9 +367,23 @@ int main() {
   reset_fixture(6000.0);
   assert(melee_web_native_menu_match_history_pacing_start()==1);
   set_wait_recording_state(1,static_cast<uint32_t>(Phase::EpisodeRecording));
+  const double before_refill_query=menu_clock.pending_ticks();
+  assert(melee_web_native_menu_match_history_refill_boundary(1)==1);
+  hps_pending=true;
+  assert(melee_web_native_menu_match_history_refill_boundary(1)==2);
+  assert(last_boundary_gate==Gate::InteriorPresentComplete);
+  assert(melee_web_native_menu_match_history_refill_boundary(2)==0);
+  boundary_admitted=false;
+  assert(melee_web_native_menu_match_history_refill_boundary(1)==0);
+  boundary_admitted=true;
+  assert(menu_clock.pending_ticks()==before_refill_query&&!match_history.status.first_failure);
   assert(melee_web_native_menu_match_history_pacing_wait_begin(2,0)==1);
+  assert(melee_web_native_menu_match_history_refill_boundary(1)==0);
   now_ms+=10.0;
   assert(melee_web_native_menu_match_history_pacing_wait_end(2,0)==1);
+  hps_pending=false;
+  set_wait_recording_state(7,static_cast<uint32_t>(Phase::EpisodeRecording));
+  assert(melee_web_native_menu_match_history_refill_boundary(7)==1);
 
   reset_fixture(6100.0);
   assert(melee_web_native_menu_match_history_pacing_start()==1);

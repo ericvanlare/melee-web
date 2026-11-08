@@ -88,7 +88,7 @@ export async function waitForLateRemotePairAndResume({tick,sourcePoll,
 
 export function createRuntimeMatchSessionLoop({owner, peer, role,
   inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,lateClassPiece=false,
-  matchFinal=false,networkBackpressure=false,streaming=false,onState=()=>{}}={}){
+  matchFinal=false,networkBackpressure=false,streaming=false,reserveHpsTick=false,onState=()=>{}}={}){
   if(!owner||!peer||!['alpha','beta'].includes(role)||
       (!streaming&&![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
         RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS].includes(inputTicks)) ||
@@ -106,6 +106,9 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
     throw Error('Streaming session requires confirmed ending and bounded capacity');
   const stockoutScenario=respawn||stockoutMatch;
   const lateTicks=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:lateClassPiece?[26]:[];
+  if(typeof reserveHpsTick!=='boolean'||(reserveHpsTick&&
+      (!streaming||lateTicks.length||typeof owner.sourceRefillBoundary!=='function')))
+    throw Error('An owned audio refill reservation requires the live streaming owner without scripted late inputs');
   const lateKeys=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const lateEvents=new Map(lateTicks.map(tick=>[tick,{
     scenario:{target_source_tick:tick,anchor:null,keyboard_change:null,held_packet:null,
@@ -156,6 +159,7 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
       }});
     }
   }
+  if(reserveHpsTick)report.hps_refills={quiet_rebases:0,source_ticks:0,recent:[]};
   let callbackSerial=0,pollCount=0;
   const recordPoll = (row, ordinal) => {
     if(streaming&&ordinal!==pollCount)throw Error('Source poll ordinal is not contiguous');
@@ -769,7 +773,7 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
       started=true;report.startedAt=performance.now();
       try{
         owner.pacingStart();
-        let continueCallback=false,callback=null;
+        let continueCallback=false,callback=null,refillTick=null;
         for(;;){
           if(lateAborted)throw cancelled('Late class-piece scenario was aborted by its external owner');
           if(!continueCallback){
@@ -787,9 +791,29 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
             await finishSelectedTerminal();
             break;
           }
-          await admitAvailable();
+          const beforeAdmission=reserveHpsTick?state().metadata:null;
+          const ownedRefillPending=reserveHpsTick&&!selectedTerminal&&
+            beforeAdmission.currentFrame>beforeAdmission.preFrame&&
+            owner.sourceRefillBoundary(beforeAdmission.currentFrame)==='owned-pending';
+          if(refillTick!==null&&
+              (ownedRefillPending||beforeAdmission.currentFrame!==refillTick.source_frame+1))
+            throw Error('Owned audio refill did not settle on the next source tick');
+          const settledRefill=refillTick;
+          if(!ownedRefillPending){
+            refillTick=null;
+            await admitAvailable();
+          }
           let inputs=await timeline(),current=state().metadata;
           const frame=current.currentFrame,confirmed=inputs.remote_contiguous_through+1;
+          if(settledRefill)Object.assign(settledRefill,{settled_frame:frame,remote_next_after:remoteNext,
+            dirty_from_after_admission:inputs.dirty_from});
+          const span=frame-current.preFrame;
+          // A pending resident refill completes only in the next normal audio
+          // render. Keep receipts in the transport until that source tick is
+          // finished so a late packet cannot force a seal at the busy endpoint.
+          if(ownedRefillPending&&(span<1||span>=7||frame>=targetFrame-1||
+              inputs.dirty_from!==null||frame-inputs.remote_contiguous_through>7))
+            throw Error('Owned audio refill has no clean source tick within the rollback window');
           if(selectedTerminal){
             if(confirmed<(current.phase===29?selectedTerminal.selectedOrdinal:inputs.simulated_through+1)){
               beginNetworkWait('terminal-confirmation',{source_frame:frame,
@@ -905,7 +929,7 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
               throw Error('Respawn source run lost its actual P1 platform-exit input');
             report.result=respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
-          const fullWindow=frame-current.preFrame===7;
+          const fullWindow=span===7||(reserveHpsTick&&!ownedRefillPending&&span===6);
           const cleanRebase=streaming||lateEvents.size>0
             ? (fullWindow||atLateAnchor)&&confirmed>=frame&&current.preFrame<frame
             : fullWindow&&confirmed>current.preFrame;
@@ -920,6 +944,8 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
             if(callback.reconciliations===1)continue;
             callback.reconciliations++;
             await reconcile(inputs);
+            if(reserveHpsTick&&cleanRebase&&span===6&&state().metadata.preFrame===frame)
+              report.hps_refills.quiet_rebases++;
             const remaining=owner.pacingSample(0);
             callback.lastWorkAt=performance.now();
             continueCallback=(remaining.pendingSteps>0||frame===targetFrame)&&callback.grants<8;
@@ -927,10 +953,10 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
           }
           // Remote samples ahead of local execution are retained by the existing
           // transport/timeline; only actual simulated inputs can become anchors.
-          if(frame===targetFrame||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
+          if(frame===targetFrame||span>=7||fullWindow||frame-inputs.remote_contiguous_through>7){
             beginNetworkWait('source-input',{source_frame:frame});
             report.events.push({operation:'network-wait',frame,confirmed});
-            const requiredThrough=frame===targetFrame||frame-current.preFrame>=7?frame-1:frame-7;
+            const requiredThrough=frame===targetFrame||span>=7||fullWindow?frame-1:frame-7;
             if(remoteNext<=requiredThrough)await waitForRequiredInput('source-input',remoteNext,requiredThrough);
             continue;
           }
@@ -957,6 +983,14 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
           // this owner admits them only between complete source operations.
           const actual=frame<=inputs.remote_contiguous_through;
           const forwarded=await call('episodeForward',{tick:frame,ticketId:polled.ticket.ticketId,actual});
+          if(ownedRefillPending){
+            if(forwarded.terminal)throw Error('Owned audio refill crossed the terminal source boundary');
+            refillTick={source_frame:frame,pre_frame:current.preFrame,remote_next_before:remoteNext};
+            const refills=report.hps_refills;
+            refills.source_ticks++;
+            if(refills.recent.length===16)refills.recent.shift();
+            refills.recent.push(refillTick);
+          }
           retainRows([forwarded]);
           if(forwarded.terminal){
             if(!fullMatch)throw Error('Unexpected ending outside the full-match scenario');

@@ -121,13 +121,132 @@ struct NoVisitCollector {size_t calls=0;};
 static int count_only_stream_range(const MeleeWebAudioStreamOwnedRange*,void* context){
  ++static_cast<NoVisitCollector*>(context)->calls;return 1;
 }
+struct BoundHpsInterval {
+ MeleeWebAudio* audio;
+ std::unique_ptr<MeleeWebAudioStreamSnapshot,StreamSnapshotDeleter> snapshot;
+ uint64_t token=0;
+ bool bound=false;
+ ~BoundHpsInterval(){
+  if(bound)melee_web_audio_stream_snapshot_end_interval(audio,snapshot.get(),token);
+  if(token)melee_web_cpu_interval_end(token);
+ }
+ void arm(char* error,size_t size){
+  CHECK(melee_web_audio_stream_prepare_snapshot(audio,error,size));
+  MeleeWebAudioStreamSnapshot* captured=nullptr;
+  CHECK(melee_web_audio_stream_snapshot_capture(audio,&captured,error,size)&&captured);
+  snapshot.reset(captured);
+  token=melee_web_cpu_interval_begin();CHECK(token);
+  bound=melee_web_audio_stream_snapshot_bind_interval(audio,snapshot.get(),token,error,size)!=0;
+  CHECK(bound);
+ }
+};
+static unsigned hps_source_cadence(const std::vector<uint8_t>& main,
+ const std::vector<uint8_t>& mario,const std::vector<uint8_t>& sem,
+ const std::vector<uint8_t>& coef,const std::vector<uint8_t>& hps,unsigned expected_refill=0){
+ melee_web::GameplayAudioBank bank(sem,{main,mario},coef);
+ MeleeWebAudio* const audio=bank.get();
+ melee_web::GameplayAudioStream stream(audio,"/audio/sp_end.hps",hps);
+ BoundHpsInterval interval{audio,{}};
+ CHECK(lbAudioAx_80023F28(78)==0);
+ CHECK(std::string(melee_web_audio_stream_path(audio))=="/audio/sp_end.hps");
+ char error[256]{};
+ std::array<float,1068> pcm{};
+ uint64_t samples=0;
+ unsigned phase=0,first_refill=0,previous_refill=0,pending_ticks=0,adjacent=0,minimum_gap=UINT32_MAX;
+ const unsigned arm_frame=expected_refill?expected_refill-7:0;
+ const unsigned stop=expected_refill?expected_refill+1:6000;
+ MeleeWebAudioStreamProbeRequest prior{};
+ for(unsigned frame=1;frame<=stop;frame++){
+  const uint64_t before=samples;
+  CHECK(melee_web_audio_stream_probe_begin(audio));
+  StreamProbeGuard probe{audio};
+  phase+=32000;
+  const unsigned count=phase/60;phase%=60;
+  CHECK(count==533||count==534);
+  if(!melee_web_audio_render(audio,pcm.data(),count,error,sizeof(error)))throw std::runtime_error(error);
+  samples+=count;
+  CHECK(samples==uint64_t(frame)*32000/60);
+  MeleeWebAudioStreamProbeBoundary boundary{};
+  CHECK(melee_web_audio_stream_probe_boundary(audio,&boundary)&&!boundary.pumping);
+  uint32_t completed=0,revisited=0;
+  CHECK(melee_web_audio_stream_progress(audio,&completed,&revisited));
+  if(!interval.bound&&(expected_refill?frame==arm_frame:
+     completed>=3&&!boundary.pending_requests&&!boundary.source_loading)){
+   CHECK(!boundary.pending_requests&&!boundary.source_loading);
+   interval.arm(error,sizeof(error));
+  }
+  if(!interval.bound)continue;
+  CHECK(melee_web_cpu_interval_admit(interval.token));
+  if(prior.id){
+   uint32_t size=0,overflow=0;
+   CHECK(melee_web_audio_stream_probe_event_count(audio,&size,&overflow)&&!overflow);
+   unsigned order=0;
+   for(uint32_t i=0;i<size;i++){
+    MeleeWebAudioStreamProbeEvent event{};
+    CHECK(melee_web_audio_stream_probe_event(audio,i,&event));
+    if(event.slot!=prior.slot||event.file!=prior.file||event.block_offset!=prior.block_offset)continue;
+    if(order==0&&event.kind==MELEE_WEB_AUDIO_STREAM_PROBE_SELECTED&&event.id==prior.id&&event.type==0x21)++order;
+    else if(order==1&&event.kind==MELEE_WEB_AUDIO_STREAM_PROBE_CALLBACK&&event.id==prior.id&&event.type==0x21)++order;
+    else if(order==2&&event.kind==MELEE_WEB_AUDIO_STREAM_PROBE_SELECTED&&event.type==0x23)++order;
+    else if(order==3&&event.kind==MELEE_WEB_AUDIO_STREAM_PROBE_SLOT_REPLACED&&event.type==0x23)++order;
+    else if(order==4&&event.kind==MELEE_WEB_AUDIO_STREAM_PROBE_CALLBACK&&event.type==0x23)++order;
+   }
+   CHECK(order==5);
+   printf("HPS_SOURCE_COMPLETION {\"frame\":%u,\"sample_begin\":%llu,\"sample_end\":%llu,\"first_block_sample\":%llu,\"header_id\":%u,\"slot\":%u,\"block\":%u,\"source_loading\":%u,\"revisited\":%u}\n",
+    frame,(unsigned long long)before,(unsigned long long)samples,
+    (unsigned long long)((before+159)/160*160),prior.id,prior.slot,prior.block_offset,boundary.source_loading,revisited);
+   prior={};
+  }
+  const bool pending=boundary.pending_requests||boundary.source_loading;
+  if(!pending){
+   CHECK(melee_web_audio_stream_snapshot_admit(audio,interval.snapshot.get(),interval.token,error,sizeof(error)));
+   continue;
+  }
+  CHECK(boundary.pending_requests==1&&boundary.source_loading);
+  MeleeWebAudioStreamProbeSlot occupied{};
+  CHECK(melee_web_audio_stream_probe_next_refill(audio,&prior,&occupied)==1&&prior.type==0x21);
+  CHECK(melee_web_audio_stream_snapshot_pending_admit(audio,interval.snapshot.get(),interval.token));
+  CHECK(!melee_web_audio_stream_snapshot_pending_admit(audio,interval.snapshot.get(),interval.token+1));
+  CHECK(!melee_web_audio_stream_snapshot_admit(audio,interval.snapshot.get(),interval.token,error,sizeof(error)));
+  if(previous_refill){
+   const unsigned gap=frame-previous_refill;
+   if(gap<minimum_gap)minimum_gap=gap;
+   if(gap==1)++adjacent;
+  }
+  previous_refill=frame;
+  if(!first_refill)first_refill=frame;
+  ++pending_ticks;
+  printf("HPS_SOURCE_PENDING {\"frame\":%u,\"sample_begin\":%llu,\"sample_end\":%llu,\"header_id\":%u,\"type\":%u,\"file\":%u,\"slot\":%u,\"block\":%u,\"callback\":\"0x%llx\",\"owner_token_valid\":true,\"strict_snapshot_refused\":true,\"revisited\":%u}\n",
+   frame,(unsigned long long)before,(unsigned long long)samples,prior.id,prior.type,prior.file,
+   prior.slot,prior.block_offset,(unsigned long long)prior.callback,revisited);
+ }
+ uint32_t completed=0,revisited=0;
+ CHECK(melee_web_audio_stream_progress(audio,&completed,&revisited));
+ CHECK(first_refill>7);
+ if(expected_refill){
+  CHECK(first_refill==expected_refill&&pending_ticks==1&&!prior.id);
+  printf("HPS_SOURCE_SPAN7 {\"pre_frame\":%u,\"endpoint_frame\":%u,\"span\":7,\"next_frame\":%u}\n",
+   arm_frame,expected_refill,stop);
+ }else{
+  CHECK(completed>50&&revisited>0&&pending_ticks>1);
+  printf("HPS_SOURCE_SCAN {\"frames\":%u,\"samples\":%llu,\"completed\":%u,\"revisited\":%u,\"pending_ticks\":%u,\"adjacent_pending_pairs\":%u,\"minimum_pending_gap\":%u,\"last_tick_pending\":%s}\n",
+   stop,(unsigned long long)samples,completed,revisited,pending_ticks,adjacent,minimum_gap,prior.id?"true":"false");
+ }
+ return first_refill;
+}
 int main(int argc,char** argv){try{
  const bool first_refill_probe=argc==7&&std::strcmp(argv[1],"--first-refill-probe")==0;
  const bool stream_interval_leaf=argc==7&&std::strcmp(argv[1],"--stream-interval-leaf")==0;
  const bool stream_snapshot_leaf=argc==7&&std::strcmp(argv[1],"--stream-snapshot-leaf")==0;
- CHECK(first_refill_probe||stream_snapshot_leaf||stream_interval_leaf||argc==6||argc==7||argc==9);
- const int input_at=(first_refill_probe||stream_snapshot_leaf||stream_interval_leaf)?2:1;
+ const bool source_cadence_leaf=argc==7&&std::strcmp(argv[1],"--source-cadence-leaf")==0;
+ CHECK(first_refill_probe||stream_snapshot_leaf||stream_interval_leaf||source_cadence_leaf||argc==6||argc==7||argc==9);
+ const int input_at=(first_refill_probe||stream_snapshot_leaf||stream_interval_leaf||source_cadence_leaf)?2:1;
  auto main=read(argv[input_at]),mario=read(argv[input_at+1]),sem=read(argv[input_at+2]),coef=read(argv[input_at+3]),hps=read(argv[input_at+4]);uint64_t first_hash=0;
+ if(source_cadence_leaf){
+  const unsigned refill=hps_source_cadence(main,mario,sem,coef,hps);
+  hps_source_cadence(main,mario,sem,coef,hps,refill);
+  return 0;
+ }
  if(first_refill_probe){
   melee_web::GameplayAudioBank bank(sem,{main,mario},coef);melee_web::GameplayAudioStream stream(bank.get(),"/audio/sp_end.hps",hps);
   CHECK(melee_web_audio_stream_probe_begin(bank.get()));StreamProbeGuard probe_guard{bank.get()};

@@ -992,6 +992,7 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_native_menu_match_history_pacing_wait_begin
     _melee_web_native_menu_match_history_pacing_wait_end
     _melee_web_native_menu_match_history_pacing_wait_json
+    _melee_web_native_menu_match_history_refill_boundary
     _melee_web_native_menu_match_history_request
     _melee_web_native_menu_match_history_request_rebase
     _melee_web_native_menu_match_history_request_prefix_finish

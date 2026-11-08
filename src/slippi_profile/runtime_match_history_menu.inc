@@ -2038,6 +2038,19 @@ int melee_web_native_menu_match_history_pacing_wait_end(unsigned kind,
 const char* melee_web_native_menu_match_history_pacing_wait_json(){
  return match_history.pacing_wait_json[0]?match_history.pacing_wait_json.data():nullptr;
 }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+unsigned melee_web_native_menu_match_history_refill_boundary(uint32_t expected){
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ auto& c=match_history;
+ Gate point{};uint32_t frame=0;
+ // This is a read of the same presented recording owner used for a
+ // full-frontier wait. It neither pumps the stream nor charges the clock.
+ if(!expected||c.pacing_wait.active||
+    !history_pacing_wait_boundary(c,2u,expected-1u,point,frame)||frame!=expected)
+  return 0;
+ return history_interior_hps_authorized(*match,point,frame)?2u:1u;
+}
+#endif
 unsigned melee_web_native_menu_match_history_pacing_sample_bytes(){
  return sizeof(MatchHistoryPacingSample);
 }
