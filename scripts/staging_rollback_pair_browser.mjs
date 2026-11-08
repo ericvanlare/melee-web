@@ -728,15 +728,18 @@ async function walkOff(item, initial) {
   const event = {key, label: `P1 walk off from ${stockBefore} stocks`, port: 0,
     down: 'Playwright page keyboard', initial};
   item.inputEvents.push(event);
-  await item.page.locator('#canvas').focus({timeout: remaining()});
+  const actionDeadline = Math.min(deadline, Date.now() + MATCH_STATE_TIMEOUT_MS);
+  await item.page.locator('#canvas').focus({timeout: remaining(actionDeadline)});
   try {
     await bracketLive(item, `${event.label} keydown`, () =>
-      withinBound(() => item.page.keyboard.down(key), deadline));
+      withinBound(() => item.page.keyboard.down(key), actionDeadline));
+    // A held action can cross an owned network wait without a native PAD
+    // poll. Charge the real receipt and stock outcome to the same action bound.
     event.receipt = await bracketLive(item, `${event.label} PAD observation`, () =>
       withinBound(() => item.page.evaluate(sourceInputObserved, {
         afterSample, port: 0, stickX, observerBusy: OBSERVER_BUSY,
-        observationMs: SOURCE_KEY_TIMEOUT_MS - 25,
-      }), Math.min(deadline, Date.now() + SOURCE_KEY_TIMEOUT_MS)));
+        observationMs: remaining(actionDeadline) - 25,
+      }), actionDeadline));
     assert(event.receipt && event.receipt.sample > afterSample, `${event.label} lacked an actual PAD receipt`);
     const ending = await waitSnapshot(item, value => {
       if (stockBefore === 1 && value.result === 'MATCH_FINAL_COMPLETE') return true;
@@ -745,7 +748,7 @@ async function walkOff(item, initial) {
       const stocks = sample.players[0].stocks;
       assert(stocks === stockBefore || stocks === stockBefore - 1, 'P1 source stock loss skipped a stock');
       return stockBefore === 1 ? sample.ending === true && stocks === 0 : stocks === stockBefore - 1;
-    }, `${event.label} source outcome`, {source: true, timeoutMs: MATCH_STATE_TIMEOUT_MS});
+    }, `${event.label} source outcome`, {source: true, bound: actionDeadline});
     event.outcome = stockSample(ending) ?? {frame: frameOf(ending), result: ending.result, phase: ending.phase};
     return event.outcome;
   } finally {
