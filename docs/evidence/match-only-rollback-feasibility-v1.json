@@ -15029,20 +15029,21 @@
             },
             "issue_373_complete_match_v1": {
               "issue": 373,
-              "status": "second-public-attempt retained; remote wait repair works in observed interval; first magnifier draw-state drift under source reduction",
-              "scope": "Experimental private profile functional attempt; no full-match/public rollback success or complete profile/acceptance claim.",
+              "status": "Public v8 functional route reached local Results/CSS; final full regression and ordinary Release validation passed on the exact validation head.",
+              "scope": "Bounded experimental-profile headless two-page public-relay function through Results/CSS; not player-facing Host/Join, complete Slippi profile, human/two-machine, or foreground-performance acceptance. No official-service traffic occurred; official Slippi cross-play remains parked indefinitely by owner decision.",
               "producer": {
-                "native": "ba55fca8d3250e900ca8b81443f3e7ab062cbcdf",
-                "harness": "ba55fca8d3250e900ca8b81443f3e7ab062cbcdf",
+                "native": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "harness": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
                 "frontend": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
                 "archive": {
-                  "path": "runtime373-complete-match-producer-v1/archive.json",
-                  "sha256": "350d21d379eeb03d06a239ff0c20ca04c0cc8011dcc71729c758f7d7062125b5"
+                  "path": "runtime373-complete-match-producer-v8/archive.json",
+                  "sha256": "79fb0d66a0540ecf378fb5992a20b00a1930b37ed9c3e97d55f37a77c6ba8fa9"
                 }
               },
               "private_release_build": {
-                "path": "runtime373-complete-match-build-v1/result.json",
-                "sha256": "d0226fbfee5b181e985c4dc72476d5e6447da37abcf32d8713e37295470d517a"
+                "path": "runtime373-complete-match-build-v8/result.json",
+                "sha256": "bdb74de6f0881e4dc6383925b167927e3d3d932677d0d9d2b7a57a750bd1641f",
+                "wasm_sha256": "db383e5a7ae64683769d50fbb5b4a7e92ddf56f59d5127d9777c7b32a53cc6c1"
               },
               "public_prerequisite": {
                 "provider": {
@@ -15228,7 +15229,7 @@
                   "scope": "Observed early public corrections and source-time network backpressure; no complete-match/Results/profile/performance acceptance."
                 }
               ],
-              "next": "Reduce exact magnifier packed-state writer and all remaining readers before a bounded repair. Keep complete source row in strict comparisons; no sealed-byte recopy, exclusion, arithmetic/input/RNG/order/guard/cap change. The separate stock-cycle-success return defect is source-fixed but was not reached by v2.",
+              "next": "Issue #375 is the next execution boundary: replace the diagnostic Node-supplied shared start and scripted dual-page control with page-owned actual menu selections and versioned peer agreement through the staging Host/Join UI. Native ownership and mismatch refusal remain required.",
               "network_wait_repair": {
                 "source_head": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
                 "source_review": {
@@ -15381,6 +15382,210 @@
                 "freeze_sha256": "c413d3a2ca8cf288d50381a4863ac848df6a88613792eeac13886f1f780991ba",
                 "scope": "Actual extracted Results draw + prepared ftLib hook + production fighter owner with modeled provenance/scene/GX leaves reproduces SIGTRAP before repair and passes repeated ordinary draws/restored carry afterward. Existing projection scope only; no native source arithmetic/order or guard changes. Fighter2 and particle1 focused controls plus actual TU syntax pass. Failed fixture/signal evidence retained.",
                 "next": "Reviewed fresh v8 producer and unchanged-bounds complete route"
+              },
+              "public_v8": {
+                "source_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "harness_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "frontend_head": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
+                "result": "PACED_3600_MATCH_FINAL_COMPLETE",
+                "elapsed_ms": 61449,
+                "capture_summary": {
+                  "path": "runtime-peer-complete-match-public-v8/result-summary.json",
+                  "sha256": "8e1015d85cbae3100273b603b01d579d4c0fd8ed4b6caf0f0c2f6bcddd721b08"
+                },
+                "browser_report": {
+                  "path": "runtime-peer-complete-match-public-v8/browser/result.json",
+                  "sha256": "d62fa4443b3c8f4c535db14d716903dd4506900b523139d0acd8ee9d6e38f985"
+                },
+                "owner_report": {
+                  "path": "runtime-peer-complete-match-public-v8/owner.json",
+                  "sha256": "fcf0d4a5d70c012c0380fa315832cdcb9623ed93faf5215f71b6e758e942dd54"
+                },
+                "independent_review": {
+                  "path": "runtime-peer-complete-match-public-v8/independent-result-review.json",
+                  "sha256": "704d723619493de1c30b6e3e195ea1b7e0817d11e1cb8f2bfa125550ef50d584"
+                },
+                "source_review": {
+                  "path": "runtime373-integrated-source-review-v8.json",
+                  "sha256": "fa1448d77ef417d0d81ff2a38679d0febd28d56837cc9040ca8c848784b16fd5"
+                },
+                "linked_catalog": {
+                  "path": "runtime373-complete-match-catalog-v8/final-linked-configuration-v1.json",
+                  "sha256": "142f1d3ba6d6711dd794747e0ba147b23be8a68da55c9128fd3ef6f496b12e14"
+                },
+                "served_manifest": {
+                  "path": "runtime373-served-complete-match-v8/repaired-manifest.json",
+                  "sha256": "13c708a1f7695d690baff94ea1ecf68a7b12d949ff4bdfb7bdc732ad0157b74b"
+                },
+                "provider_preflight": {
+                  "path": "runtime373-public-provider-readonly-v1/provider-binding-preflight.json",
+                  "sha256": "6b1da5709f3e83e48d89bcb3859c528e7b4ee0b04c8a23282b3d8b33af7e21ab",
+                  "live_provider_query": false
+                },
+                "public_rtt": {
+                  "path": "runtime373-public-rtt-v1/report.json",
+                  "sha256": "e6d22337323db4987699dd3ab03eb37ebd862afc1d72c6f8ca19ecdd09b94352",
+                  "independent_review_sha256": "644eaf6d6a0be19dbc20ed1725100d7831c3578335da1a19dfd7b809e4ff2d36",
+                  "scope": "Separate WSS transport probe, not gameplay latency or source cadence."
+                },
+                "runtime_wasm_sha256": "db383e5a7ae64683769d50fbb5b4a7e92ddf56f59d5127d9777c7b32a53cc6c1",
+                "native_source_state_sha256": "996f0991196488b8a4988cd892309d9af61c81d1280f2781839429000bf95d43",
+                "native_map_sha256": "901efb19333579236fe58a5ad0d57421ba17b681d6b53ee013a96fc5eb6fb314",
+                "relay": {
+                  "wss": "wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev",
+                  "external_worker_owned": false,
+                  "mutated": false,
+                  "idle_status": "unknown; not queried",
+                  "expected_peer_sockets_closed": true
+                },
+                "actual_inputs": {
+                  "capacity_ticks": 3600,
+                  "each_peer": 1237,
+                  "authoritative_pad_record_bytes": 44,
+                  "identical_rows": 1237,
+                  "mismatches": 0,
+                  "alpha_fully_confirmed_corrections": 3,
+                  "beta_fully_confirmed_corrections": 10,
+                  "prediction_bound_ticks": 7,
+                  "history_bound_rows": 8,
+                  "late_p2_pulses": {
+                    "26": "ArrowRight",
+                    "226": "ArrowLeft",
+                    "426": "ArrowRight"
+                  },
+                  "following_rows_neutral": true
+                },
+                "terminal": {
+                  "source_frame": 1123,
+                  "consumed_ordinal": 1237,
+                  "last_input_ordinal": 1236,
+                  "checksum_bytes": 64,
+                  "checksum_sha256": "5af8bb65a6f461beda25f450e08d1491cf69b9c979986992baa6559d90c5e313",
+                  "wire_outcome": 2,
+                  "wire_preclose_winner": -1,
+                  "wire_ack_equal": true,
+                  "published_outcome": 2,
+                  "source_published_winner": 1,
+                  "published_winner_checked_locally_after_source_publication": true
+                },
+                "results_css": {
+                  "both_peers_confirmed_source_ports": [
+                    0,
+                    1
+                  ],
+                  "source_trace_rows_each": 407,
+                  "prize_return": "not exercised",
+                  "both_css_phase": 1,
+                  "both_css_running": 1,
+                  "door_values_each": 40
+                },
+                "stock_cycle": {
+                  "p1_transitions": [
+                    4,
+                    3,
+                    2,
+                    1
+                  ],
+                  "grounded_respawns": 3,
+                  "p2_stocks_at_published_result": 4
+                },
+                "wait_and_clock": {
+                  "host_alpha": {
+                    "count": 335,
+                    "elapsed_ms": 10718.19,
+                    "released_late_input_waits": 6,
+                    "released_late_elapsed_ms": 42.755
+                  },
+                  "host_beta": {
+                    "count": 511,
+                    "elapsed_ms": 10756.225
+                  },
+                  "native_alpha_backpressure_excluded_ms": 10598.56,
+                  "native_beta_backpressure_excluded_ms": 10580.56,
+                  "native_clock_samples": {
+                    "alpha": 4501,
+                    "beta": 4619
+                  },
+                  "native_clock_stalls": {
+                    "alpha": 0,
+                    "beta": 0
+                  },
+                  "threshold_ticks": 8,
+                  "separate_rtt_summary": "prior public WSS probe median approximately 41\u201342 ms and p95 approximately 128 ms; not gameplay latency"
+                },
+                "h1": {
+                  "recorder_exports_retained": true,
+                  "timing_incidents": 0,
+                  "projection": "missing; native clock records were not projected as H1 events"
+                },
+                "cleanup": {
+                  "owner_cleanup_passed": true,
+                  "owned_browser_pids_absent": 19,
+                  "owned_browser_pids_remaining": 0,
+                  "browser_and_server_groups_absent": true,
+                  "native_owner_state_after_finish": 2
+                },
+                "scope": "Bounded experimental-profile functional capture; it does not provide the player-facing start UI or satisfy broader acceptance."
+              },
+              "fixture_repair_v1": {
+                "source_commit": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                "review": {
+                  "path": "runtime373-v8-fixture-repair-reviewed-v1.json",
+                  "sha256": "00207477719f97ce555b33087ef4d8b23a39473ae4ab9a5da1d287d0b7738de3"
+                },
+                "focused_freeze_sha256": "bd01c7cd81b9452858a39f501e685f1f828229a10d3cb10145402f4abe5c9bc7",
+                "patch_sha256": "96a7565026c1cfbf902b2dc04ced8ca32c2affdad380cffe164e6c31b12d81b6",
+                "files": [
+                  "tests/test_gameplay_cpu_checkpoint.py",
+                  "tests/gameplay_cpu_endpoint_admitted_control.cpp",
+                  "src/slippi_profile/tests/test_effect_matrix.py"
+                ],
+                "focused_controls": "All three pass; exact logs and failed scratch retained in the focused freeze."
+              },
+              "validation_after_capture": {
+                "initial_full_regression": {
+                  "source_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                  "result": "failed_three_stale_fixture_contracts",
+                  "tests": 3117,
+                  "skipped": 242,
+                  "exit_code": 1,
+                  "result_path": "runtime373-integration-validation-v7/full-regression-result.json",
+                  "result_sha256": "500269f8dde6dcf165f5eb4d8f994cb664a0f8b10efccc0f504e3add40711b03",
+                  "log_path": "runtime373-integration-validation-v7/full-regression.log",
+                  "log_sha256": "7a65fbbcc30b1f9b6e93487ad0039cd8a6a2df74e57230afb968c41ed8957890",
+                  "stale_fixture_tests": [
+                    "test_gameplay_cpu_checkpoint.GameplayCpuCheckpointControls.test_actual_cpu_runner_and_existing_census_node_contracts",
+                    "test_gameplay_cpu_endpoint.GameplayCpuEndpointControls.test_actual_admitted_nine_domain_batches",
+                    "test_slippi_profile_controls_discovery.SlippiEffectMatrixTests.test_only_live_raw_and_normalized_match_paths_use_current_private_hook"
+                  ]
+                },
+                "reviewed_fixture_repair": {
+                  "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                  "result": "focused_pass",
+                  "integration_validation_v8": "PASS",
+                  "wrapper_sha256": "4269a1ed8652d8cb943e2d87ed7ce31f7f5f2ef7b3379cc32befb3d50ccc2613",
+                  "full_regression": {
+                    "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                    "status": "PASS",
+                    "tests": 3117,
+                    "skipped": 242,
+                    "elapsed_s": 717.4575650421903,
+                    "exit_code": 0,
+                    "result_path": "runtime373-integration-validation-v8/full-regression-result.json",
+                    "result_sha256": "54d854cf909a84fff6639291e72049d46b37b04027b68f8334ddf7b803def087",
+                    "log_path": "runtime373-integration-validation-v8/full-regression.log",
+                    "log_sha256": "c0ffd7c9e80f87dbf0b6e7e84fe6eed493ab77ad245f6921a173191b3928ceff"
+                  },
+                  "ordinary_release_build": {
+                    "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                    "status": "PASS",
+                    "elapsed_s": 21.66430554073304,
+                    "exit_code": 0,
+                    "result_path": "runtime373-integration-validation-v8/ordinary-release-result.json",
+                    "result_sha256": "9cbe69bee6d88076167c061890c75fdd6bd33be68dd4574289964bdeca933ad9",
+                    "log_sha256": "8dd298e8a58edf432d301e06c1d280c474e6f0cb8a86e773ac0f09e75c668844"
+                  }
+                }
               }
             }
           }

@@ -43,21 +43,23 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
-**Current execution — [#373](https://github.com/ericvanlare/melee-web/issues/373).**
-The owner has directed autonomous work toward working rollback and parked the
-next Stadium experiment. [#372](https://github.com/ericvanlare/melee-web/issues/372)
-merged in [#374](https://github.com/ericvanlare/melee-web/pull/374), establishing
-finite local corrections through stock loss and respawn in the experimental
-profile. The [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
-owns its exact scope and retained failures. The next milestone is a complete
-four-stock Mario/Final Destination match through our deployed relay, with actual
-inputs, confirmed original outcome, local Results/CSS and clean disconnect.
-Preserve the last live checkpoint while an ending is speculative; keep input
-traversal ordinals distinct from the original source frame during the ending
-tail. This remains functional experimental-profile work, with the complete
-profile, player-facing integration and acceptance gates still open. Reuse the
-merged [#356 input timeline](status/2026-10-28-match-input-timeline.md) and existing
-runtime owners. Keep full validation and integration at the milestone boundary.
+**Current execution — [#375](https://github.com/ericvanlare/melee-web/issues/375).**
+The bounded #373 public diagnostic now completes the four-stock Mario/Final
+Destination route through matched terminal checksum/outcome, original local
+Results and CSS. Its [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
+pins the v8 capture and retained failures; it is not a player-facing route. The
+diagnostic still supplies shared start coordination from Node and scripts both
+pages. The #375 milestone connects this work to the staging Host/Join UI: each
+page must offer its actual source-owned selection and agree on a versioned start
+context over the existing room transport. Native code must retain ownership of
+selection, match construction and outcome; mismatches refuse before play.
+Results remain local. Keep Vanilla offline-only and the experimental profile
+separate from the ordinary player. Reuse the merged
+[#356 input timeline](status/2026-10-28-match-input-timeline.md) and existing
+runtime owners. This is functional staging integration, not complete Slippi,
+human/two-machine or foreground-performance acceptance. Official-service
+cross-play remains parked indefinitely by owner decision; no official-service
+traffic is in scope.
 
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
