@@ -3,7 +3,9 @@
 // owns the existing WebSocket peer; all native source work stays with the
 // existing runtime-history controller.
 import {createRuntimeMatchHistoryPeer, RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
+  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS, RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS}
+  from '../runtime_match_history_peer.mjs';
 import {MatchInputTimeline, ROLLBACK_MAX_PREDICTION_TICKS}
   from '../../../scripts/net_rollback_input_timeline.mjs';
 
@@ -22,7 +24,7 @@ function bytes(value, label) {
 
 export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   sourceIdentityJson, loadedIdentity, inputTicks = 1, initialRemotePad,
-  deferredLocalTick = null, deferredLocalTicks} = {}) {
+  deferredLocalTick = null, deferredLocalTicks, matchFinal = false} = {}) {
   if (globalThis.__meleeRuntimePeerHistoryProbe)
     throw Error('Runtime peer-history bridge is already installed');
   const owner = globalThis.__meleeRuntimeMatchHistory;
@@ -31,8 +33,10 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
       (inputTicks !== RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ||
        !Number.isSafeInteger(deferredLocalTick) || deferredLocalTick < 0 || deferredLocalTick >= inputTicks))
     throw Error('Deferred peer publication requires one explicit in-range tick of the paced-120 session');
+  if (inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS && matchFinal !== true)
+    throw Error('The 3600-input full-match peer requires final-checksum agreement');
   const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,deferredLocalTick,deferredLocalTicks,
-    timeoutMs: 5000, sampleTimeoutMs: 5000, sourceIdentityJson, loadedIdentity,
+    timeoutMs: 5000, sampleTimeoutMs: 5000, sourceIdentityJson, loadedIdentity, matchFinal,
     sourceFrame: 0, validateNativePad: sample => owner.validatePad(sample)});
 
   // The transport may receive while native work is in flight. It retains its
@@ -41,7 +45,9 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   const deferred = new Set(deferredLocalTicks ?? (deferredLocalTick === null ? [] : [deferredLocalTick]));
   const localPort = role === 'alpha' ? 0 : 1;
   const arenaHistoryScope = inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ||
-    inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS || inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
+    inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ||
+    inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ||
+    inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS;
   const timelineLookaheadTicks = inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
     ? RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
     : RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
@@ -78,6 +84,9 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   // Immutable first-forward receipts bind original native polls across later
   // capsules. Current capsule rows separately record each replay selection.
   const actualOrigins = new Map();
+  const appliedInputs = new Map();
+  const terminalTailApplied = new Map();
+  let pendingTerminalReplay = null, terminalTailPublished = null;
   const retireOriginsBefore = frame => {
     for (const tick of actualOrigins.keys()) if (tick < frame) actualOrigins.delete(tick);
   };
@@ -168,14 +177,32 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
           const status = await owner.forwardTicket(ticket.ticketId, frame);
           const applied = owner.receipt(ordinal);
           requireApplied(ticket, applied, frame, 1);
-          if (!same(applied.forward, frame) || status.metadata.currentFrame !== value.tick+1)
-            throw Error('Episode source forward did not consume the exact ticket at the expected frame');
+          const terminal=status.metadata.phase===29;
+          if (!same(applied.forward, frame) ||
+              (terminal?status.metadata.currentFrame!==value.tick:
+                status.metadata.currentFrame!==value.tick+1))
+            throw Error('Episode source forward did not consume the exact ticket at its actual source boundary');
+          let terminalReceipt=null;
+          if(terminal){
+            terminalReceipt=owner.terminalReceipt();
+            const selectedOrdinal=status.metadata.preFrame+status.metadata.forwardSteps;
+            if(terminalReceipt.flags!==3||terminalReceipt.selectedOrdinal!==selectedOrdinal||
+               terminalReceipt.selectedSourceFrame!==value.tick||terminalReceipt.ticketId!==ticket.ticketId||
+               terminalReceipt.pollSerial!==ticket.pollSerial||terminalReceipt.localPort!==localPort||
+               terminalReceipt.remotePort!==1-localPort||terminalReceipt.selectedOrdinal!==value.tick+1)
+              throw Error('Native first terminal receipt does not bind its exact actual source poll and ordinal');
+          }
           if (actualOrigins.has(value.tick)) throw Error('Actual first-forward receipt already exists');
           actualOrigins.set(value.tick, applied);
-          return {status, row: publicRow(applied), plan, timeline: timeline.commitForward(plan)};
+          appliedInputs.set(value.tick,frame.slice());
+          return {status, row: publicRow(applied), plan, terminal:terminalReceipt,
+            timeline: timeline.commitForward(plan)};
         }
         case 'episodeReplay': {
           const plan = timeline.planReplay();
+          if(matchFinal&&(plan.speculative_ticks!==0||
+              timeline.status().remote_contiguous_through<plan.through))
+            throw Error('Full-match replay requires actual remote input through its old frontier');
           if (plan.kind !== 'replay' || plan.from !== value.dirty || plan.through !== value.through ||
               plan.speculative_ticks !== value.speculative || plan.frames.length !== plan.through-plan.from+1)
             throw Error('Episode replay plan differs from the required dirty suffix');
@@ -195,8 +222,25 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             const status = await owner.replayTicket(original.ticketId, frame);
             const applied = owner.receipt(ordinal);
             requireApplied(original, applied, frame, 2);
-            if (!same(applied.forward, original.forward) || status.metadata.currentFrame !== tick+1)
-              throw Error('Episode replay changed its original forward receipt or missed its frame');
+            if (!same(applied.forward, original.forward))
+              throw Error('Episode replay changed its original forward receipt');
+            appliedInputs.set(tick,frame.slice());
+            if(status.metadata.phase===11&&status.metadata.currentFrame===tick){
+              if(!matchFinal||!planned)
+                throw Error('Terminal replay selected an ending outside its changed actual suffix');
+              const receipt=owner.terminalReceipt();
+              const selectedOrdinal=pre+status.metadata.replaySteps;
+              if(receipt.flags!==3||receipt.selectedOrdinal!==selectedOrdinal||
+                 receipt.selectedSourceFrame!==tick||receipt.ticketId!==original.ticketId||
+                 receipt.pollSerial!==original.pollSerial||receipt.localPort!==localPort||
+                 receipt.remotePort!==1-localPort||selectedOrdinal!==tick+1)
+                throw Error('Replay terminal receipt does not bind its selected retained source row');
+              pendingTerminalReplay={plan,pre,frontier:plan.through+1,terminal:receipt};
+              rows.push({status,row:publicRow(applied),unchangedPrefix:planned===null,terminal:true});
+              return {status,rows,plan,terminal:receipt,timeline:timeline.status()};
+            }
+            if(status.metadata.currentFrame!==tick+1)
+              throw Error('Episode replay did not reach its expected source frame');
             rows.push({status, row: publicRow(applied), unchangedPrefix: planned === null});
           }
           const status = await owner.command('finishReplay');
@@ -237,6 +281,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             requireApplied(original, applied, frame, 2);
             if (!same(applied.forward, original.forward) || status.metadata.currentFrame !== tick+1)
               throw Error('Confirmed-prefix execution changed original input or missed its source frame');
+            appliedInputs.set(tick,frame.slice());
             pendingPrefix.rows.push({status, row: publicRow(applied),
               unchangedPrefix: state.dirty_from === null || tick < state.dirty_from});
           }
@@ -280,6 +325,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             requireApplied(ticket, applied, frame, 1);
             if (!same(applied.forward, frame) || status.metadata.currentFrame !== tick+1)
               throw Error('Retained suffix failed exact source execution');
+            appliedInputs.set(tick,frame.slice());
             rows.push({adopted, status, origin: publicRow(origin), row: publicRow(applied)});
           }
           const handoff = owner.prefixHandoff();
@@ -289,6 +335,214 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
           retireOriginsBefore(c);
           pendingPrefix = null;
           return {status, rows, handoff, timeline: committed};
+        }
+        case 'episodeTerminalSealReplay': {
+          if(!matchFinal||!pendingTerminalReplay||!timeline.status().plan_outstanding)
+            throw Error('Terminal replay seal requires its outstanding actual replay plan');
+          const {terminal}=pendingTerminalReplay;
+          return await owner.command('finishPrefix',terminal.selectedSourceFrame);
+        }
+        case 'episodeTerminalBegin': {
+          if(!matchFinal||!arenaEnabled||pendingPrefix)
+            throw Error('Terminal tail requires the active arena match without another handoff');
+          const status=owner.status(),state=timeline.status();
+          const receipt=owner.terminalReceipt();
+          const selectedOrdinal=receipt.selectedOrdinal;
+          const retainedPlan=pendingTerminalReplay;
+          if(status.ownerState!==1||status.metadata.phase!==35||status.lastCompletedCommand!==9||
+             receipt.flags!==3||!Number.isSafeInteger(selectedOrdinal)||selectedOrdinal<=0||
+             receipt.selectedSourceFrame!==status.metadata.currentFrame||
+             (retainedPlan?
+               (!state.plan_outstanding||state.simulated_through!==retainedPlan.plan.through||
+                state.remote_contiguous_through<retainedPlan.plan.through||
+                retainedPlan.frontier!==retainedPlan.plan.through+1||
+                retainedPlan.plan.kind!=='replay'||
+                retainedPlan.plan.frames.some(row=>row.tick>=selectedOrdinal&&
+                  (row.remote_source!=='actual'||row.speculative))):
+               (state.simulated_through!==selectedOrdinal-1||state.confirmed_through!==selectedOrdinal-1||
+                state.dirty_from!==null||state.plan_outstanding))||
+             state.terminal||state.disposed)
+            throw Error('Terminal tail requires the exact retired selected terminal traversal');
+          const actual=actualOrigins.get(receipt.selectedSourceFrame);
+          if(!actual||actual.sourceFrame!==status.metadata.currentFrame||
+             actual.ticketId!==receipt.ticketId||actual.pollSerial!==receipt.pollSerial||
+             actual.localPort!==receipt.localPort||actual.remotePort!==receipt.remotePort||actual.state<1)
+            throw Error('Terminal selection has no retained actual first-forward poll receipt');
+          const begun=await owner.terminalTailBegin(selectedOrdinal);
+          const descriptor=owner.terminalTailDescriptor();
+          if(descriptor.selectedOrdinal!==selectedOrdinal||descriptor.sourceFrame!==status.metadata.currentFrame||
+             descriptor.selectedTicketId!==actual.ticketId||descriptor.selectedPollSerial!==actual.pollSerial||
+             descriptor.localPort!==localPort||descriptor.remotePort!==1-localPort||
+             descriptor.suffixCount!==(retainedPlan?retainedPlan.frontier-selectedOrdinal:0))
+            throw Error('Native terminal-tail descriptor differs from its actual selected poll');
+          if(retainedPlan&&descriptor.suffixCount===0){
+            if(selectedOrdinal!==retainedPlan.frontier)
+              throw Error('Terminal replay plan cannot commit before its old frontier');
+            const committed=timeline.commitReplay(retainedPlan.plan);
+            pendingTerminalReplay=null;
+            return {status:begun,descriptor,timeline:committed,selected:publicRow(actual),
+              retained_suffix_complete:true};
+          }
+          return {status:begun,descriptor,timeline:timeline.status(),selected:publicRow(actual)};
+        }
+        case 'episodeTerminalTailTicket': {
+          if(!matchFinal||owner.status().metadata.phase!==36||pendingPrefix||
+             owner.terminalTailDescriptor().consumedOrdinal>=inputTicks)
+            throw Error('Terminal-tail ticket requires its active owner and remaining input capacity');
+          const status=await owner.requestTerminalTailTicket();
+          const descriptor=owner.terminalTailDescriptor();
+          const ticket=owner.terminalTailTicket();
+          if(status.metadata.phase!==37||ticket.inputOrdinal!==descriptor.consumedOrdinal||
+             ticket.sourceFrame!==descriptor.sourceFrame||ticket.localPort!==localPort||
+             ticket.remotePort!==1-localPort||ticket.requestSequence!==status.completeSequence||
+             (ticket.flags===0&&BigInt(ticket.pollSerial)<=lastPollSerial))
+            throw Error('Terminal-tail ticket does not bind the cumulative ordinal and actual native poll');
+          return {status,descriptor,ticket:{...ticket,rawPad:[...ticket.rawPad],
+            appliedPad:[...ticket.appliedPad]}};
+        }
+        case 'episodeTerminalTailPublish': {
+          const status=owner.status(),ticket=owner.terminalTailTicket();
+          const tick=ticket.inputOrdinal,localPad=padAt(ticket.rawPad,localPort);
+          if(!matchFinal||status.metadata.phase!==37||terminalTailPublished||pendingTerminalReplay||
+             ticket.flags!==0||ticket.ticketId!==ticket.requestSequence||
+             ticket.requestSequence!==status.completeSequence||ticket.originTicketId||
+             ticket.originSourceFrame||ticket.originIncarnation||BigInt(ticket.pollSerial)<=lastPollSerial)
+            throw Error('Terminal-tail actual poll publication lost its owner or poll order');
+          const receipt=await peer.publishLocal({port:localPort,tick,pollSerial:ticket.pollSerial,
+            pad:localPad,deferSend:false});
+          if(receipt.protocol_input_tick!==tick||receipt.poll_serial!==ticket.pollSerial||
+             !same(Uint8Array.from(receipt.pad),localPad))
+            throw Error('Terminal-tail local publication differs from its actual native poll');
+          terminalTailPublished={tick,requestSequence:ticket.requestSequence,pollSerial:ticket.pollSerial};
+          lastPollSerial=BigInt(ticket.pollSerial);
+          return receipt;
+        }
+        case 'episodeTerminalTailForward': {
+          if(!arenaEnabled||pendingPrefix)
+            throw Error('Terminal-tail forward requires the active arena terminal owner');
+          const descriptor=owner.terminalTailDescriptor(),ticket=owner.terminalTailTicket();
+          const tick=ticket.inputOrdinal;
+          if(ticket.sourceFrame!==descriptor.sourceFrame||tick!==descriptor.consumedOrdinal||
+             ticket.localPort!==localPort||ticket.remotePort!==1-localPort||
+             ticket.requestSequence!==owner.status().completeSequence)
+            throw Error('Terminal-tail forward lost its exact distinct source/tick cursor');
+          const localPad=padAt(ticket.rawPad,localPort);
+          let plan,frame,retainedSuffixPlan=null;
+          if(pendingTerminalReplay&&tick<pendingTerminalReplay.frontier){
+            retainedSuffixPlan=pendingTerminalReplay;
+            if(ticket.flags!==1)
+              throw Error('Retained terminal replay suffix requires its original adopted ticket');
+            plan=retainedSuffixPlan.plan.frames.find(row=>row.tick===tick);
+            const remote=peer.remoteSnapshot(tick);
+            const local=peer.snapshot().local_contributions.find(row=>row.protocol_input_tick===tick);
+            const origin=actualOrigins.get(tick);
+            if(!plan||plan.remote_source!=='actual'||plan.speculative||!remote||
+               remote.protocol_input_tick!==tick||remote.remote_port!==1-localPort||
+               remote.accepted_by!=='lockstep-protocol'||!local||!origin||
+               origin.ticketId!==ticket.originTicketId||origin.sourceFrame!==ticket.originSourceFrame||
+               origin.incarnation!==ticket.originIncarnation||origin.pollSerial!==ticket.pollSerial||
+               !same(origin.raw,ticket.rawPad)||local.local_port!==localPort||local.poll_serial!==ticket.pollSerial||
+               !same(Uint8Array.from(local.pad),localPad))
+              throw Error('Retained terminal suffix lost its exact already-confirmed peer rows');
+            frame=Uint8Array.from(plan.frame);
+            if(!same(padAt(frame,localPort),localPad)||
+               !same(padAt(frame,1-localPort),Uint8Array.from(remote.pad)))
+              throw Error('Retained terminal suffix replay plan differs from its immutable peer inputs');
+          }else{
+            if(pendingTerminalReplay||ticket.flags===1)
+              throw Error('Terminal suffix adoption ended before the retained old frontier');
+            if(terminalTailPublished?.tick!==tick||
+               terminalTailPublished.requestSequence!==ticket.requestSequence||
+               terminalTailPublished.pollSerial!==ticket.pollSerial)
+              throw Error('Terminal-tail forward requires its single actual local publication');
+            if(!peer.remoteSnapshot(tick))return {waiting:true,tick};
+            while(timeline.status().remote_contiguous_through<tick){
+              const remoteTick=timeline.status().remote_contiguous_through+1;
+              const receipt=peer.remoteSnapshot(remoteTick);
+              if(receipt?.protocol_input_tick!==remoteTick||receipt.remote_port!==1-localPort||
+                 receipt.accepted_by!=='lockstep-protocol')
+                throw Error('Terminal-tail frame requires the exact indexed remote PAD receipt');
+              const accepted=timeline.acceptRemote(remoteTick,receipt.pad);
+              if(accepted.status!=='accepted')
+                throw Error('Terminal-tail remote PAD timeline admission refused');
+              if(timeline.status().dirty_from!==null)
+                throw Error(`Terminal-tail actual PAD changed an executed input at ${timeline.status().dirty_from}`);
+            }
+            const localAdmission=timeline.recordLocal(tick,localPad);
+            if(!['accepted','duplicate'].includes(localAdmission.status))
+              throw Error('Terminal-tail local PAD timeline admission refused');
+            plan=timeline.planForward();
+            if(plan.kind!=='forward'||plan.tick!==tick||plan.remote_source!=='actual'||plan.speculative_ticks!==0)
+              throw Error('Terminal-tail source step requires the actual two-peer PAD row');
+            frame=Uint8Array.from(plan.frame);
+          }
+          owner.terminalTailSetRemotePad(padAt(frame,1-localPort));
+          const status=await owner.forwardTerminalTailTicket();
+          const applied=owner.terminalTailTicket(),after=owner.terminalTailDescriptor();
+          if(status.metadata.phase!==38||status.metadata.currentFrame!==descriptor.sourceFrame||
+             applied.inputOrdinal!==tick||applied.sourceFrame!==descriptor.sourceFrame||
+             !same(applied.appliedPad,frame)||after.consumedOrdinal!==tick+1||
+             after.sourceFrame!==descriptor.sourceFrame)
+            throw Error('Native terminal-tail traversal changed source frame or exact applied PAD');
+          let committed;
+          if(retainedSuffixPlan){
+            if(after.suffixCursor===after.suffixCount){
+              if(tick+1!==retainedSuffixPlan.frontier||
+                 after.consumedOrdinal!==retainedSuffixPlan.frontier)
+                throw Error('Native terminal suffix did not consume the retained replay plan to its old frontier');
+              committed=timeline.commitReplay(retainedSuffixPlan.plan);
+              pendingTerminalReplay=null;
+            }else{
+              if(tick+1>=retainedSuffixPlan.frontier)
+                throw Error('Native terminal suffix has an unconsumed replay-plan row at its frontier');
+              committed=timeline.status();
+            }
+          }else{
+            committed=timeline.commitForward(plan);
+            terminalTailPublished=null;
+            if(committed.simulated_through!==tick||committed.dirty_from!==null)
+              throw Error('Terminal-tail timeline acknowledgment lost its cumulative input ordinal');
+          }
+          appliedInputs.set(tick,frame.slice());
+          terminalTailApplied.set(tick,frame.slice());
+          return {status,ticket:{...applied,rawPad:[...applied.rawPad],appliedPad:[...applied.appliedPad]},
+            remoteReceipt:peer.remoteSnapshot(tick),plan,timeline:committed,descriptor:after};
+        }
+        case 'episodeTerminalTailPresent': {
+          const status=await owner.presentTerminalTail();
+          const presentation=owner.presentation();
+          if(status.metadata.phase!==39||presentation.command!==29||
+             presentation.sourceFrameAfter!==status.metadata.currentFrame)
+            throw Error('Terminal-tail present did not retain its actual source draw receipt');
+          const idle=await owner.command('idle');
+          const descriptor=owner.terminalTailDescriptor();
+          if(![36,40].includes(idle.metadata.phase)||idle.metadata.currentFrame!==descriptor.sourceFrame||
+             idle.gpuPending||idle.endpointActive)
+            throw Error('Terminal-tail idle failed its exact native present completion boundary');
+          return {status,idle,presentation,descriptor,complete:idle.metadata.phase===40};
+        }
+        case 'episodeTerminalFinish': {
+          const final=owner.terminalTailFinal(),receipt=final.receipt,ticket=final.ticket;
+          const tick=receipt.lastInputOrdinal,descriptor=owner.terminalTailDescriptor();
+          const timelineState=timeline.status(),frame=terminalTailApplied.get(tick);
+          const peerState=peer.snapshot();
+          const local=peerState.local_contributions.find(row=>row.protocol_input_tick===tick);
+          const remote=peerState.remote_contributions.find(row=>row.protocol_input_tick===tick);
+          if(receipt.consumedOrdinal!==tick+1||descriptor.consumedOrdinal!==tick+1||
+             descriptor.sourceFrame!==receipt.sourceFrame||timelineState.simulated_through!==tick||
+             timelineState.remote_contiguous_through<tick||timelineState.dirty_from!==null||
+             timelineState.plan_outstanding||terminalTailPublished||pendingTerminalReplay||!frame||!local||!remote||
+             !same(Uint8Array.from(local.pad),padAt(ticket.rawPad,localPort))||
+             !same(Uint8Array.from(remote.pad),padAt(ticket.appliedPad,1-localPort))||
+             !same(ticket.appliedPad,frame))
+            throw Error('Native final receipt lacks the exact applied PAD and actual peer rows at its final ordinal');
+          const agreement=await peer.publishMatchFinal({inputOrdinal:tick,sourceFrame:receipt.sourceFrame,
+            outcome:receipt.outcome,winner:receipt.winner,checksum:final.checksum});
+          const status=await owner.finishTerminalTail(agreement);
+          if(status.ownerState!==2||status.metadata.phase!==41||status.lastCompletedCommand!==30)
+            throw Error('Native terminal-tail finish did not return control to the original Results flow');
+          return {status,receipt,checksum:[...final.checksum],agreement,
+            timeline:timeline.status(),peer:peer.snapshot()};
         }
         case 'episodeTimeline': return timeline.status();
         default: throw Error(`Unknown episode operation ${operation}`);

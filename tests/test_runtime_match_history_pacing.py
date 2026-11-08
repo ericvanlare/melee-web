@@ -64,6 +64,7 @@ struct Capsule {
   Phase phase_=Phase::Armed;
   uint32_t frame_=0,pre_=0,forward_=0,poll_=0,restore_=0;
   bool endpoint_=false,ticket_ok=true;
+  uint32_t tail_cursor=0,tail_count=0;
   Phase phase() const {return phase_;}
   uint32_t current_frame() const {return frame_;}
   uint32_t pre_frame() const {return pre_;}
@@ -72,6 +73,11 @@ struct Capsule {
   uint32_t restore_count() const {return restore_;}
   bool endpoint_active() const {return endpoint_;}
   bool can_admit_poll_ticket(uint32_t,unsigned,unsigned) const {return ticket_ok;}
+  bool can_admit_terminal_tail_poll_ticket(uint32_t,unsigned,unsigned) const {
+    return ticket_ok&&tail_cursor==tail_count;
+  }
+  uint32_t terminal_tail_suffix_cursor()const {return tail_cursor;}
+  uint32_t terminal_tail_suffix_count()const {return tail_count;}
 };
 struct PrefixHandoff {
   bool enabled=false;
@@ -100,6 +106,7 @@ struct MatchHistoryControl {
   Match* match_owner=nullptr;
   bool dispatching=false,identity_ready=true,episode_enabled=true,arena_enabled=true;
   bool pacing_started=false,pacing_failed=false;
+  bool terminal_tail_handoff_ready=false;
   PrefixHandoff prefix_handoff{};
   MatchHistoryPacingSample pacing{};
   std::array<char,256> error{};
@@ -191,6 +198,40 @@ int main() {
   receipt=melee_web_native_menu_match_history_pacing_sample(1);
   assert(receipt&&receipt->steps==1&&receipt->pending_steps==2);
   assert(menu_clock.pending_ticks()>1.9&&menu_clock.pending_ticks()<2.2);
+
+  // The original ending source frame can stay fixed. Fresh actual inputs still
+  // spend the same clock's due steps; retained corrective suffix rows do not.
+  reset_fixture(2500.0);
+  assert(melee_web_native_menu_match_history_pacing_start()==1);
+  capsule.phase_=Phase::TerminalTailReady;capsule.frame_=session.frame=600;
+  capsule.tail_count=2;
+  match_history.terminal_tail_handoff_ready=true;
+  match_history.status.last_completed_command=26;
+  now_ms+=50.0;
+  receipt=melee_web_native_menu_match_history_pacing_sample(1);
+  assert(receipt&&receipt->phase==36&&receipt->current_frame==600);
+  assert(receipt->steps==0&&receipt->pending_steps==3);
+  capsule.tail_cursor=2;match_history.status.last_completed_command=5;
+  now_ms+=1.0;
+  receipt=melee_web_native_menu_match_history_pacing_sample(1);
+  assert(receipt&&receipt->steps==1&&receipt->current_frame==600&&receipt->pending_steps==2);
+  assert(last_boundary_gate==Gate::TerminalTailPoll);
+  const auto tail_debt=menu_clock.pending_ticks();
+  assert(tail_debt>1.9&&tail_debt<2.2);
+  capsule.ticket_ok=false;now_ms+=1.0;
+  assert(melee_web_native_menu_match_history_pacing_sample(0)==nullptr);
+  assert(menu_clock.pending_ticks()==tail_debt);
+
+  reset_fixture(2700.0);
+  assert(melee_web_native_menu_match_history_pacing_start()==1);
+  capsule.phase_=Phase::TerminalTailReady;capsule.frame_=session.frame=600;
+  match_history.terminal_tail_handoff_ready=true;
+  match_history.status.last_completed_command=26;
+  now_ms+=150.0;
+  receipt=melee_web_native_menu_match_history_pacing_sample(1);
+  assert(receipt&&receipt->stalled&&receipt->stall_reason==
+      static_cast<uint32_t>(melee_web::FixedTickClock::StallReason::Debt));
+  assert(match_history.pacing_failed&&match_history.status.first_failure==1);
 
   // More than eight due ticks produces one terminal debt receipt; later queries
   // return it without touching the owner or restarting the internally reset clock.

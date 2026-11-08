@@ -23,9 +23,9 @@ enum class GameplayCpuEndpointStatus : std::uint32_t {
     Ok=0, Invalid=1, WrongPhase=2, OwnerRefused=3, LeafRefused=4,
     InvalidIndex=5, Overflow=6, Incomplete=7
 };
-enum class GameplayCpuEndpointView : std::uint32_t { Pre=1, CpuEnd=2, DrawEnd=3 };
+enum class GameplayCpuEndpointView : std::uint32_t { Pre=1, CpuEnd=2, DrawEnd=3, TerminalEnd=4 };
 enum class GameplayCpuEndpointProvenance : std::uint32_t {
-    SharedPre=1, Reference=2, Corrected=3
+    SharedPre=1, Reference=2, Corrected=3, Terminal=4
 };
 enum class GameplayCpuEndpointDomain : std::uint32_t {
     Owner=1, Effects=2, Actions=3, Payload=4, Flow=5,
@@ -167,7 +167,7 @@ private:
         std::uint32_t audio_count{};
         std::uint32_t source_frame{};
         std::uint32_t history_phase{},history_pre_frame{},history_current_end{},
-                      history_restore_count{};
+                      history_current_source_frame{},history_terminal{},history_restore_count{};
         std::uint64_t history_incarnation{},history_effect_token{};
     };
     bool collect(BatchData&) const noexcept;

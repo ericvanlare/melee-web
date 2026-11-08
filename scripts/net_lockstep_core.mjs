@@ -78,6 +78,58 @@ function integer(value, max, label) {
   return value;
 }
 
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  promise.catch(() => {});
+  return {promise, resolve, reject};
+}
+
+function exactPacketKeys(packet, keys, label) {
+  if (!packet || typeof packet !== 'object' || Array.isArray(packet) ||
+      Object.keys(packet).sort().join(',') !== [...keys].sort().join(','))
+    throw Error(`Invalid lockstep ${label} fields`);
+}
+
+// MatchOutcome in melee/gm/forward.h; gameplay_match_rules.c publishes a
+// single active slot only for timeout or elimination, otherwise -1.
+export function validateMatchFinalOutcome(outcome, winner) {
+  if (!Number.isInteger(outcome) || outcome < 1 || outcome > 9 ||
+      !Number.isInteger(winner) || winner < -1 || winner > 3 ||
+      (winner !== -1 && outcome !== 1 && outcome !== 2))
+    throw Error('Final checksum requires an exact native outcome and winner');
+}
+
+function sameMatchFinal(left, right) {
+  return !!left && !!right && left.scope === right.scope &&
+    left.agreementHash === right.agreementHash &&
+    left.inputOrdinal === right.inputOrdinal && left.sourceFrame === right.sourceFrame &&
+    left.outcome === right.outcome && left.winner === right.winner &&
+    equalBytes(left.checksum, right.checksum);
+}
+
+function finalMismatchDetails(local, remote) {
+  const reason = local.inputOrdinal !== remote.inputOrdinal
+    ? 'final consumed input ordinal differs'
+    : local.sourceFrame !== remote.sourceFrame
+      ? 'final source frame differs'
+      : local.outcome !== remote.outcome
+        ? 'final native outcome differs'
+        : local.winner !== remote.winner
+          ? 'final native winner differs'
+          : 'final native checksum bytes differ';
+  const channel = equalBytes(local.checksum, remote.checksum)
+    ? null : mismatchChannel(local.checksum, remote.checksum);
+  return {reason, input_ordinal: local.inputOrdinal, remote_input_ordinal: remote.inputOrdinal,
+    source_frame: local.sourceFrame, remote_source_frame: remote.sourceFrame,
+    outcome: local.outcome, remote_outcome: remote.outcome,
+    winner: local.winner, remote_winner: remote.winner,
+    ...(channel === null ? {} : {channel})};
+}
+
 function decodeSample(text) {
   if (typeof text !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(text))
     throw Error('Invalid lockstep PAD sample encoding');
@@ -180,6 +232,18 @@ export class LockstepPeer {
     this.receiveQueueBytes = 0;
     this.receiveOverflowError = null;
     this.receiveOverflowPromise = null;
+    this.matchFinalEnabled = false;
+    this.localMatchFinal = null;
+    this.remoteMatchFinal = null;
+    this.localMatchFinalSendStarted = false;
+    this.localMatchFinalSendSettled = false;
+    this.localMatchFinalAckSendSettled = false;
+    this.localMatchFinalAckSend = null;
+    this.matchFinalAckRetryPending = false;
+    this.remoteMatchFinalAck = null;
+    this.matchFinalCompletion = deferred();
+    this.matchFinalSendQueue = Promise.resolve();
+    this.matchFinalDriveQueued = false;
   }
 
   attach(sendRaw) { this.sendRaw = sendRaw; }
@@ -192,6 +256,9 @@ export class LockstepPeer {
   async start(agreement) {
     if (this.startAttempted) throw Error('Lockstep start identity was already sent');
     this.startAttempted = true;
+    if (agreement?.match_final !== undefined && agreement.match_final !== 1)
+      throw Error('Lockstep match_final capability must be exactly 1 when present');
+    this.matchFinalEnabled = agreement?.match_final === 1;
     const hello = {
       type: 'hello', version: LOCKSTEP_VERSION, role: this.role,
       local_port: this.localPort, remote_port: this.remotePort,
@@ -267,6 +334,10 @@ export class LockstepPeer {
           packet.role === this.remoteRole &&
           ['desync', 'disconnect', 'protocol', 'startIdentity'].includes(packet.kind))
         return await this.fail(packet.kind, packet.details ?? {}, {notify: false});
+      if (packet?.type === 'match_final' || packet?.type === 'match_final_ack') {
+        if (!this.ready) throw Error('final checksum arrived before peer identity agreement');
+        return await this.#receiveMatchFinal(packet);
+      }
       if (!this.ready) throw Error('state arrived before peer identity agreement');
       if (packet?.type !== 'state' || packet.version !== LOCKSTEP_VERSION ||
           packet.role !== this.remoteRole) throw Error('invalid state packet identity');
@@ -302,6 +373,8 @@ export class LockstepPeer {
 
   async addLocalInputs(entries, {repeat = false, deferSend = false, nativeOverrides = []} = {}) {
     this.#assertReady();
+    if (this.localMatchFinal)
+      throw Error('Lockstep final checksum was published; new local PAD publication is closed');
     if (!Array.isArray(entries) || !entries.length || entries.length > LOCKSTEP_MAX_BATCH)
       throw Error(`Lockstep local input batches must contain 1..${LOCKSTEP_MAX_BATCH} contributions`);
     const seen = new Set();
@@ -352,8 +425,49 @@ export class LockstepPeer {
     await this.#compareReadyChecksums();
   }
 
+  async publishMatchFinal({inputOrdinal, sourceFrame, checksum, outcome, winner} = {}) {
+    this.#assertReady();
+    if (!this.matchFinalEnabled)
+      throw Error('Lockstep match_final capability was not agreed');
+    inputOrdinal = integer(inputOrdinal, this.inputTicks - 1, 'final input ordinal');
+    sourceFrame = integer(sourceFrame, 0xffffffff, 'final source frame');
+    validateMatchFinalOutcome(outcome, winner);
+    const value = bytesFrom(checksum, 'Final native checksum');
+    if (value.length !== NET_RECORD_BYTES || recordTick(value) !== inputOrdinal ||
+        viewOf(value).getUint32(12, true) !== sourceFrame)
+      throw Error('Final native checksum does not match its actual input ordinal and source frame');
+    if (this.localContiguousInput < inputOrdinal || this.remoteContiguousInput < inputOrdinal)
+      throw Error('Final checksum requires actual local and remote PAD prefixes through its ordinal');
+    const final = Object.freeze({scope: this.localHello.agreement.scope,
+      agreementHash: this.agreementHash, inputOrdinal, sourceFrame, outcome, winner, checksum: value});
+    if (this.localMatchFinal && !sameMatchFinal(this.localMatchFinal, final)) {
+      await this.fail('protocol', {reason: 'conflicting local final checksum publication',
+        input_ordinal: inputOrdinal, source_frame: sourceFrame});
+      throw Error('Conflicting local final checksum publication');
+    }
+    this.localMatchFinal ??= final;
+    const packet = this.#matchFinalPacket('match_final', this.role, this.localMatchFinal);
+    const send = this.matchFinalSendQueue.then(async () => {
+      this.localMatchFinalSendStarted = true;
+      await this.#sendMatchFinalObject(packet);
+      this.localMatchFinalSendSettled = true;
+      await this.#driveMatchFinal();
+    });
+    this.matchFinalSendQueue = send.catch(() => {});
+    try { await send; }
+    catch (error) {
+      if (!this.terminal)
+        await this.fail('protocol', {reason: `final checksum send failed: ${String(error?.message || error)}`});
+      throw error;
+    }
+    if (this.terminal) throw Error(`Lockstep final checksum ended with ${this.terminal.kind}`);
+    return this.matchFinalCompletion.promise;
+  }
+
   async setNativeProgress(cursor, {flushFinal = false} = {}) {
     this.#assertReady();
+    if (this.localMatchFinal)
+      throw Error('Lockstep final checksum was published; native progress is closed');
     integer(cursor, this.sourceTicks, 'native cursor');
     const through = flushFinal ? this.sourceTicks - 1 : cursor - LOCKSTEP_DELAY - 1;
     if (through > this.delayedChecksumThrough) {
@@ -467,7 +581,129 @@ export class LockstepPeer {
       this.admittedSequence = next.packet.sequence;
     }
     await this.#pumpFrames();
+    if (this.matchFinalEnabled) this.#queueMatchFinalDrive();
     if (changed) return this.#sendState({context: 'inbound_state_ack'});
+  }
+
+  #matchFinalPacket(type, role, final) {
+    return {type, version: LOCKSTEP_VERSION, role, scope: final.scope,
+      agreement_hash: final.agreementHash, input_ordinal: final.inputOrdinal,
+      source_frame: final.sourceFrame, outcome: final.outcome, winner: final.winner,
+      checksum: encodeBase64(final.checksum)};
+  }
+
+  #decodeMatchFinalPacket(packet, type) {
+    exactPacketKeys(packet, ['type', 'version', 'role', 'scope', 'agreement_hash',
+      'input_ordinal', 'source_frame', 'outcome', 'winner', 'checksum'], 'final checksum');
+    if (packet.type !== type || packet.version !== LOCKSTEP_VERSION ||
+        packet.role !== this.remoteRole || packet.scope !== this.localHello.agreement.scope ||
+        packet.agreement_hash !== this.agreementHash)
+      throw Error('Final checksum identity, scope, role, or agreement differs');
+    const inputOrdinal = integer(packet.input_ordinal, this.inputTicks - 1, 'final input ordinal');
+    const sourceFrame = integer(packet.source_frame, 0xffffffff, 'final source frame');
+    const {outcome, winner} = packet;
+    validateMatchFinalOutcome(outcome, winner);
+    if (typeof packet.checksum !== 'string' ||
+        !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(packet.checksum))
+      throw Error('Invalid final checksum encoding');
+    let checksum;
+    try { checksum = decodeBase64(packet.checksum); }
+    catch { throw Error('Invalid final checksum encoding'); }
+    if (checksum.length !== NET_RECORD_BYTES || encodeBase64(checksum) !== packet.checksum ||
+        recordTick(checksum) !== inputOrdinal || viewOf(checksum).getUint32(12, true) !== sourceFrame)
+      throw Error('Final checksum record does not match its actual input ordinal and source frame');
+    return Object.freeze({scope: packet.scope, agreementHash: packet.agreement_hash,
+      inputOrdinal, sourceFrame, outcome, winner, checksum});
+  }
+
+  async #receiveMatchFinal(packet) {
+    if (!this.matchFinalEnabled)
+      throw Error('Final checksum packet arrived without the agreed match_final capability');
+    const isAck = packet.type === 'match_final_ack';
+    const decoded = this.#decodeMatchFinalPacket(packet, isAck ? 'match_final_ack' : 'match_final');
+    if (isAck) {
+      if (!this.localMatchFinalSendStarted || !this.localMatchFinal || !this.remoteMatchFinal)
+        throw Error('Final checksum ACK arrived before local send start or remote final record');
+      if (!sameMatchFinal(this.localMatchFinal, decoded))
+        throw Error('Final checksum ACK does not echo the exact matched record');
+      if (this.remoteMatchFinalAck && !sameMatchFinal(this.remoteMatchFinalAck, decoded))
+        throw Error('Conflicting final checksum ACK retransmission');
+      this.remoteMatchFinalAck ??= decoded;
+      this.#completeMatchFinalIfReady();
+      return;
+    }
+    if (this.remoteMatchFinal) {
+      if (!sameMatchFinal(this.remoteMatchFinal, decoded))
+        throw Error('Conflicting final checksum retransmission');
+      this.matchFinalAckRetryPending = true;
+    }
+    this.remoteMatchFinal ??= decoded;
+    if (this.localMatchFinal && !sameMatchFinal(this.localMatchFinal, this.remoteMatchFinal)) {
+      await this.fail('desync', finalMismatchDetails(this.localMatchFinal, this.remoteMatchFinal));
+      return;
+    }
+    this.#queueMatchFinalDrive();
+  }
+
+  #queueMatchFinalDrive() {
+    if (!this.matchFinalEnabled || this.matchFinalDriveQueued || this.terminal) return;
+    this.matchFinalDriveQueued = true;
+    queueMicrotask(() => {
+      this.matchFinalDriveQueued = false;
+      this.#driveMatchFinal().catch(error => {
+        if (!this.terminal) return this.fail('protocol', {
+          reason: `final checksum acknowledgement failed: ${String(error?.message || error)}`}).catch(() => {});
+      });
+    });
+  }
+
+  async #driveMatchFinal() {
+    if (!this.matchFinalEnabled || this.terminal || !this.localMatchFinal ||
+        !this.localMatchFinalSendSettled || !this.remoteMatchFinal) return;
+    if (this.localContiguousInput < this.localMatchFinal.inputOrdinal ||
+        this.remoteContiguousInput < this.localMatchFinal.inputOrdinal) return;
+    if (!sameMatchFinal(this.localMatchFinal, this.remoteMatchFinal)) {
+      await this.fail('desync', finalMismatchDetails(this.localMatchFinal, this.remoteMatchFinal));
+      return;
+    }
+    if (!this.localMatchFinalAckSendSettled || this.matchFinalAckRetryPending) {
+      if (this.localMatchFinalAckSend) return;
+      this.matchFinalAckRetryPending = false;
+      const packet = this.#matchFinalPacket('match_final_ack', this.role, this.remoteMatchFinal);
+      const send = this.#sendMatchFinalObject(packet).then(() => {
+        this.localMatchFinalAckSendSettled = true;
+        this.#completeMatchFinalIfReady();
+      }).catch(async error => {
+        if (!this.terminal)
+          await this.fail('protocol', {reason: `final checksum ACK send failed: ${String(error?.message || error)}`});
+        throw error;
+      });
+      this.localMatchFinalAckSend = send;
+      send.finally(() => {
+        if (this.localMatchFinalAckSend === send) this.localMatchFinalAckSend = null;
+        if (this.matchFinalAckRetryPending) this.#queueMatchFinalDrive();
+      }).catch(() => {});
+      await send;
+    }
+  }
+
+  #completeMatchFinalIfReady() {
+    if (this.terminal || !this.localMatchFinal || !this.remoteMatchFinal ||
+        !sameMatchFinal(this.localMatchFinal, this.remoteMatchFinal) ||
+        !this.localMatchFinalSendSettled || !this.localMatchFinalAckSendSettled ||
+        !this.remoteMatchFinalAck) return;
+    this.matchFinalCompletion.resolve(Object.freeze({input_ordinal: this.localMatchFinal.inputOrdinal,
+      source_frame: this.localMatchFinal.sourceFrame, agreement_hash: this.agreementHash,
+      role: this.role, outcome: this.localMatchFinal.outcome,
+      winner: this.localMatchFinal.winner, matched_bytes: NET_RECORD_BYTES}));
+  }
+
+  async #sendMatchFinalObject(packet) {
+    if (this.terminal) throw Error(`Lockstep peer already ended with ${this.terminal.kind}`);
+    const sendRaw = this.sendRaw;
+    if (typeof sendRaw !== 'function') throw Error('Lockstep final checksum has no attached transport');
+    await sendRaw(JSON.stringify(packet));
+    if (this.terminal) throw Error(`Lockstep peer ended with ${this.terminal.kind} during final checksum send`);
   }
 
   async #applyState(packet) {
@@ -593,6 +829,7 @@ export class LockstepPeer {
   async fail(kind, details = {}, {notify = true} = {}) {
     if (this.terminal) return;
     this.terminal = {kind, ...details};
+    this.matchFinalCompletion.reject(Error(`Lockstep peer reached ${kind} before final checksum agreement`));
     let callbackError = null;
     try { await this.onTerminal(this.terminal, this); }
     catch (error) { callbackError = error; }

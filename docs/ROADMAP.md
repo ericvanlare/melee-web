@@ -43,15 +43,21 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
-**October 28 priority:** The owner has directed autonomous work toward working
-rollback and parked the next Stadium experiment. The browser restore boundary
-in #341 remains open; previously rejected renderer-owner and UCF reference
-follow-ups remain frozen. [#356](https://github.com/ericvanlare/melee-web/issues/356)
-advances the independent bounded match input timeline, reusing the existing PAD
-format and synchronous source-only fixture. Its
-[scoped correction evidence](status/2026-10-28-match-input-timeline.md) does not
-admit a live restore adapter or satisfy A3/A4. Keep integration and full
-validation at the milestone boundary.
+**Current execution — [#373](https://github.com/ericvanlare/melee-web/issues/373).**
+The owner has directed autonomous work toward working rollback and parked the
+next Stadium experiment. [#372](https://github.com/ericvanlare/melee-web/issues/372)
+merged in [#374](https://github.com/ericvanlare/melee-web/pull/374), establishing
+finite local corrections through stock loss and respawn in the experimental
+profile. The [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
+owns its exact scope and retained failures. The next milestone is a complete
+four-stock Mario/Final Destination match through our deployed relay, with actual
+inputs, confirmed original outcome, local Results/CSS and clean disconnect.
+Preserve the last live checkpoint while an ending is speculative; keep input
+traversal ordinals distinct from the original source frame during the ending
+tail. This remains functional experimental-profile work, with the complete
+profile, player-facing integration and acceptance gates still open. Reuse the
+merged [#356 input timeline](status/2026-10-28-match-input-timeline.md) and existing
+runtime owners. Keep full validation and integration at the milestone boundary.
 
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**
@@ -165,8 +171,8 @@ renderer ownership and drawn corrective ticks are no longer the active path.
 Resume them only for a demonstrated dependency the no-draw model cannot remove,
 with the evidence and reasoning posted on #158 before implementation.
 
-The next coherent milestone combines render-to-simulation dependency fixes with
-a no-draw synctest. Start with the actual fighter dynamics/matrix producer and
+The profile dependency milestone combines render-to-simulation fixes with
+a no-draw synctest. Its behavioral scope includes the actual fighter dynamics/matrix producer and
 the offscreen/magnifier damage path; inventory other draw writes and consumers.
 Implement the profile behavior in our own C under `src/slippi_profile/`, alongside
 its tests and per-behavior patch mapping, under GPL-3.0-or-later. The separate
@@ -184,9 +190,9 @@ Only a reviewed pass opens a longer correction-budget measurement. The existing
 [rollback boundary](status/2026-10-12-match-only-rollback-feasibility.md) owns all
 historical measurements and the current scope; no whole-session claim follows.
 
-**October 22 execution sprint — [#341](https://github.com/ericvanlare/melee-web/issues/341).**
-The next boundary is restoration of the same browser instance that owns the
-rendered match. The existing restored Node comparison does not satisfy it.
+**October 22 design boundary — [#341](https://github.com/ericvanlare/melee-web/issues/341).**
+This boundary requires restoration of the same browser instance that owns the
+rendered match. A restored Node comparison does not satisfy it.
 First close source globals, arena and non-arena owners, then compare a drawn
 interval with identical no-draw corrections and a real present frame. Extend a
 proved boundary to movement, hit, KO and respawn cases and measure capture,

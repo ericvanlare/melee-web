@@ -4,8 +4,8 @@
 
 export const CPU_ENDPOINT_RECORD_BYTES = 312;
 export const CPU_ENDPOINT_SCHEMA = 1;
-export const CPU_ENDPOINT_VIEW = Object.freeze({pre: 1, cpuEnd: 2, drawEnd: 3});
-export const CPU_ENDPOINT_PROVENANCE = Object.freeze({sharedPre: 1, reference: 2, corrected: 3});
+export const CPU_ENDPOINT_VIEW = Object.freeze({pre: 1, cpuEnd: 2, drawEnd: 3, terminalEnd: 4});
+export const CPU_ENDPOINT_PROVENANCE = Object.freeze({sharedPre: 1, reference: 2, corrected: 3, terminal: 4});
 export const CPU_ENDPOINT_STATUS = Object.freeze({
   ok: 0, invalid: 1, wrongPhase: 2, ownerRefused: 3, leafRefused: 4,
   invalidIndex: 5, overflow: 6, incomplete: 7,
@@ -311,8 +311,10 @@ export function collectCpuEndpointInPage(request, binding = undefined) {
   const includeArenaHistory = request.arenaHistoryEndpoint === true;
   if(includeArenaHistory&&(!includeParticleCells||binding?.runtime!=='match-history'))
     failPage('arena-history endpoint requires the particle sidecar and explicit match-history runtime binding');
-  if (![1,2,3].includes(view) || ![1,2,3].includes(provenance) ||
-      ((view === 1) !== (provenance === 1)))
+  if (![1,2,3,4].includes(view) || ![1,2,3,4].includes(provenance) ||
+      ((view === 1) !== (provenance === 1))||
+      ((view === 4) !== (provenance === 4))||
+      (view===4&&binding?.runtime!=='match-history'))
     failPage('view/provenance request is invalid');
   let expectedSourceFrame;
   if (request.expectedSourceFrame !== undefined) {
@@ -814,6 +816,10 @@ export function compareCpuEndpoints(left, right) {
     const pair = [left.provenance, right.provenance];
     if (!(pair[0] === CPU_ENDPOINT_PROVENANCE.reference && pair[1] === CPU_ENDPOINT_PROVENANCE.corrected))
       fail('CPU/DRAW comparison requires Reference then Corrected');
+  } else if(view===CPU_ENDPOINT_VIEW.terminalEnd){
+    if(left.provenance!==CPU_ENDPOINT_PROVENANCE.terminal||
+       right.provenance!==CPU_ENDPOINT_PROVENANCE.terminal)
+      fail('Terminal END comparison requires Terminal provenance on both instances');
   } else fail(`unknown comparison view ${view}`);
   if (left.sourceFrame !== right.sourceFrame) fail('source-frame stamps differ');
   if (left.domains.length !== 9 || right.domains.length !== 9) fail('all nine domains are required');
@@ -834,11 +840,13 @@ export function compareCpuEndpoints(left, right) {
 /** Host-side envelope validation shared by production comparison and controls. */
 export function validateCpuEndpointEnvelope(value) {
   if (!value || value.schema !== CPU_ENDPOINT_SCHEMA || value.recordBytes !== CPU_ENDPOINT_RECORD_BYTES ||
-      value.revalidated !== true || ![1, 2, 3].includes(value.view) ||
-      ![1, 2, 3].includes(value.provenance) || !Array.isArray(value.domains) || value.domains.length !== 9)
+      value.revalidated !== true || ![1, 2, 3, 4].includes(value.view) ||
+      ![1, 2, 3, 4].includes(value.provenance) || !Array.isArray(value.domains) || value.domains.length !== 9)
     fail('envelope header/schema/refinalization invalid');
   if ((value.view === CPU_ENDPOINT_VIEW.pre) !== (value.provenance === CPU_ENDPOINT_PROVENANCE.sharedPre))
     fail('envelope view/provenance combination invalid');
+  if ((value.view === CPU_ENDPOINT_VIEW.terminalEnd) !== (value.provenance === CPU_ENDPOINT_PROVENANCE.terminal))
+    fail('envelope terminal view/provenance combination invalid');
   canonicalU64(value.sourceFrame, 'sourceFrame');
   const exactKeys = (object, keys, name) => {
     if (!object || Object.keys(object).sort().join(',') !== [...keys].sort().join(','))
@@ -1188,6 +1196,9 @@ function compareEndpointWithLocalParticleSerial(left,right,{allowReferenceRefere
     if(!correctedPair&&!referencePair)
       fail(allowReferenceReference?'CPU/DRAW comparison requires Reference/Reference or Reference/Corrected':
         'CPU/DRAW comparison requires Reference then Corrected');
+  }else if(a.view===CPU_ENDPOINT_VIEW.terminalEnd){
+    if(a.provenance!==CPU_ENDPOINT_PROVENANCE.terminal||b.provenance!==CPU_ENDPOINT_PROVENANCE.terminal)
+      fail('Terminal END comparison requires Terminal provenance on both instances');
   }else fail(`unknown comparison view ${a.view}`);
   if(a.sourceFrame!==b.sourceFrame)fail('source-frame stamps differ');
   for(let di=0;di<9;di++){
@@ -1206,7 +1217,7 @@ function compareEndpointWithLocalParticleSerial(left,right,{allowReferenceRefere
 export function decodeCpuParticleEndpointResult(value) {
   if(!value||value.schema!==CPU_PARTICLE_ENDPOINT_SCHEMA||value.rawSchema!==CPU_ENDPOINT_SCHEMA||
      value.recordBytes!==CPU_ENDPOINT_RECORD_BYTES||value.revalidated!==true||
-     ![1,2,3].includes(value.view)||![1,2,3].includes(value.provenance)||
+     ![1,2,3,4].includes(value.view)||![1,2,3,4].includes(value.provenance)||
      !Array.isArray(value.domains)||value.domains.length!==9)
     fail('particle envelope header/schema/refinalization invalid');
   const keys=['schema','rawSchema','recordBytes','view','provenance','sourceFrame','revalidated','domains','particleCells'];

@@ -158,10 +158,14 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
         const bool confirmed_prefix=view_==View::CpuEnd&&
             provenance_==Provenance::Corrected&&
             checkpoint.phase_==Phase::HistoryConfirmedPrefixSealed;
+        const bool terminal_end=view_==View::TerminalEnd&&
+            provenance_==Provenance::Terminal&&
+            (checkpoint.phase_==Phase::HistoryTerminalSealed||
+             checkpoint.phase_==Phase::HistoryTerminalPrefixSealed);
         if(!checkpoint.history_mode_||
            (pre&&provenance_!=Provenance::SharedPre)||
            (!pre&&provenance_==Provenance::SharedPre)||
-           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end||confirmed_prefix))
+           !(captured_pre||armed_pre||restored_pre||predicted_end||corrected_end||confirmed_prefix||terminal_end))
             return collect_refusal("history-phase");
         if(!checkpoint.same_owner(*session_)||
            !session_->diagnostic_source_files_quiescent()||
@@ -193,6 +197,8 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
         out.history_incarnation=checkpoint.history_incarnation_;
         out.history_pre_frame=static_cast<std::uint32_t>(checkpoint.owner_.frame);
         out.history_current_end=checkpoint.history_end_frame_;
+        out.history_current_source_frame=checkpoint.history_end_source_frame_;
+        out.history_terminal=terminal_end?1u:0u;
         out.history_restore_count=checkpoint.history_restore_count_;
         out.history_effect_token=checkpoint.commit_.effect_token;
     }
@@ -207,7 +213,7 @@ bool GameplayCpuEndpointReader::collect(BatchData& out) const noexcept
 
     out.source_frame=session_->source_frames();
     const auto expected_frame=history_mode_?
-        (pre?checkpoint.owner_.frame:checkpoint.history_end_frame_):
+        (pre?checkpoint.owner_.frame:checkpoint.history_end_source_frame_):
         (pre?checkpoint.owner_.frame:checkpoint.post_frame_);
     if(out.source_frame!=expected_frame)return collect_refusal("frame");
 
@@ -389,6 +395,8 @@ bool GameplayCpuEndpointReader::same_batch(const BatchData& a,
        a.history_incarnation!=b.history_incarnation||
        a.history_pre_frame!=b.history_pre_frame||
        a.history_current_end!=b.history_current_end||
+       a.history_current_source_frame!=b.history_current_source_frame||
+       a.history_terminal!=b.history_terminal||
        a.history_restore_count!=b.history_restore_count||
        a.history_effect_token!=b.history_effect_token)return false;
     if(std::memcmp(&a.arena,&b.arena,sizeof(a.arena)))return false;
@@ -406,6 +414,7 @@ bool GameplayCpuEndpointReader::history_identity_matches() const noexcept
         c.history_incarnation_==data_.history_incarnation&&
         static_cast<std::uint32_t>(c.owner_.frame)==data_.history_pre_frame&&
         c.history_end_frame_==data_.history_current_end&&
+        c.history_end_source_frame_==data_.history_current_source_frame&&
         c.history_restore_count_==data_.history_restore_count&&
         c.commit_.effect_token==data_.history_effect_token&&
         session_->source_frames()==data_.source_frame;
@@ -435,7 +444,7 @@ bool GameplayCpuEndpointReader::begin_history(const GameplayMatchSession& sessio
     if(active_){status_=Status::Incomplete;return false;}
     session_=nullptr;checkpoint_=nullptr;data_={};history_mode_=false;
     status_=Status::Invalid;
-    if(view!=View::Pre&&view!=View::CpuEnd&&view!=View::DrawEnd)return false;
+    if(view!=View::Pre&&view!=View::CpuEnd&&view!=View::DrawEnd&&view!=View::TerminalEnd)return false;
     if((view==View::Pre&&provenance!=Provenance::SharedPre)||
        (view!=View::Pre&&provenance==Provenance::SharedPre)){
         status_=Status::WrongPhase;return false;

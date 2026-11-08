@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Page-owned two-input peer transport for the private ordinary-runtime
 // retained-history diagnostic. This module has no native/game input path.
-import {LockstepPeer, LOCKSTEP_VERSION, lockstepConstants} from '../../scripts/net_lockstep_core.mjs';
+import {LockstepPeer, LOCKSTEP_VERSION, lockstepConstants, parseNetChecksum, validateMatchFinalOutcome}
+  from '../../scripts/net_lockstep_core.mjs';
 import {createRoomRelayPeerEndpoint} from '../../scripts/net_lockstep_websocket_relay.mjs';
 
 export const RUNTIME_MATCH_HISTORY_PEER_SCOPE = 'melee-web-runtime-one-sample-history-peer-v1';
@@ -15,6 +16,7 @@ export const RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS = 4;
 export const RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS = 8;
 export const RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS = 120;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS = 600;
+export const RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS = 3600;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS = Object.freeze([26, 226, 426]);
 export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS =
   Object.freeze(['ArrowRight', 'ArrowLeft', 'ArrowRight']);
@@ -22,9 +24,12 @@ const REBASE_SCOPE = 'melee-web-runtime-two-episode-arena-history-peer-v1';
 const PACED_SCOPE = 'melee-web-runtime-paced-120-inputs-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE =
   'melee-web-runtime-paced-600-respawn-history-peer-v1';
+export const RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE =
+  'melee-web-runtime-match-final-3600-history-peer-v1';
 const SUPPORTED_INPUT_TICKS = [1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS];
+  RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS];
 const EPISODE_SCOPE = 'melee-web-runtime-four-tick-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS = 5000;
 const PAD_BYTES = 11;
@@ -149,13 +154,19 @@ function validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame)
  * against the source serializer output; this function does not establish their
  * provenance. */
 export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
-  loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS} = {}) {
+  loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
+  matchFinal = false} = {}) {
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, eight, 120, or 600 indexed input samples');
+    'Runtime history peer supports one, two, four, eight, 120, 600, or 3600 indexed input samples');
+  requireCondition(typeof matchFinal === 'boolean',
+    'Runtime history match_final opt-in must be a boolean');
+  requireCondition(inputTicks !== RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS || matchFinal,
+    'The fixed 3600-input full-match scope requires match_final opt-in');
   validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame);
   return Object.freeze({
     protocol: 'melee-web-local-lockstep-a2-v1',
-    scope: inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE :
+    scope: inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE :
+      inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ? PACED_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ? REBASE_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS ? EPISODE_SCOPE :
@@ -168,6 +179,7 @@ export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
     save_profile_sha256: loadedIdentity.save_profile_sha256,
     profile_identity: loadedIdentity.profile_identity,
     source_match_identity_json: sourceIdentityJson,
+    ...(matchFinal ? {match_final: 1} : {}),
   });
 }
 
@@ -196,6 +208,7 @@ function withDeadline(promise, timeoutMs, label) {
 export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs = RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS,
   sampleTimeoutMs = timeoutMs, sourceIdentityJson, loadedIdentity, sourceFrame,
   inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
+  matchFinal = false,
   deferredLocalTick = null,
   deferredLocalTicks: deferredLocalTicksOption = null,
   validateNativePad, createEndpoint = createRoomRelayPeerEndpoint} = {}) {
@@ -213,16 +226,19 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     'Runtime history peer requires the existing room relay endpoint factory');
 
   requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
-    'Runtime history peer supports one, two, four, eight, 120, or 600 indexed input samples');
+    'Runtime history peer supports one, two, four, eight, 120, 600, or 3600 indexed input samples');
+  requireCondition(typeof matchFinal === 'boolean',
+    'Runtime history match_final opt-in must be a boolean');
   requireCondition(deferredLocalTicksOption === null || deferredLocalTick === null,
     'Runtime history peer cannot mix single and multiple deferred tick options');
   let configuredDeferredTicks;
   if (deferredLocalTicksOption !== null) {
-    requireCondition(inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS &&
+    requireCondition((inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ||
+      inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS) &&
       Array.isArray(deferredLocalTicksOption) &&
       deferredLocalTicksOption.length === RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS.length &&
       deferredLocalTicksOption.every((tick, index) => tick === RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS[index]),
-    'Runtime history peer 600-input deferral requires the fixed ticks 26, 226, and 426');
+    'Runtime history respawn/full-match deferral requires the fixed ticks 26, 226, and 426');
     configuredDeferredTicks = new Set(deferredLocalTicksOption);
   } else if (deferredLocalTick !== null) {
     requireCondition(Number.isSafeInteger(deferredLocalTick) && deferredLocalTick >= 0 &&
@@ -231,7 +247,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     configuredDeferredTicks = new Set([deferredLocalTick]);
   } else configuredDeferredTicks = new Set();
   const sourceTicks = inputTicks + 2;
-  const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame, inputTicks});
+  const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame,
+    inputTicks, matchFinal});
   const localPort = role === 'alpha' ? 0 : 1;
   const remotePort = role === 'alpha' ? 1 : 0;
   const remoteRole = role === 'alpha' ? 'beta' : 'alpha';
@@ -246,6 +263,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   const deferredLocalReleasePending = new Set();
   const localPublishPending = new Set();
   const remoteWaiters = new Set();
+  let matchFinalPublished = false;
 
   const wakeRemoteWaiters = () => {
     for (const waiter of [...remoteWaiters]) waiter.wake();
@@ -401,6 +419,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   async function publishLocal({port, tick, pollSerial, pad, deferSend = false} = {}) {
     throwIfFailed();
+    requireCondition(!matchFinalPublished,
+      'Runtime history final checksum was published; new local PAD publication is closed');
     requireCondition(typeof deferSend === 'boolean',
       'Runtime history local PAD deferSend must be an explicit boolean');
     requireCondition(deferSend === configuredDeferredTicks.has(tick),
@@ -448,6 +468,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   async function releaseDeferredLocal(tick) {
     throwIfFailed();
+    requireCondition(!matchFinalPublished,
+      'Runtime history final checksum was published; deferred PAD release is closed');
     requireCondition(!closed && peer?.ready,
       'Runtime history deferred local PAD requires a ready, open peer');
     tick = inputTick(tick);
@@ -518,6 +540,60 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     }
   }
 
+  async function publishMatchFinal({inputOrdinal, sourceFrame: finalSourceFrame, checksum, outcome, winner} = {}) {
+    throwIfFailed();
+    requireCondition(matchFinal && agreement.match_final === 1,
+      'Runtime history match_final capability was not opted into');
+    requireCondition(!closed && peer?.ready,
+      'Runtime history final checksum requires a ready, open peer');
+    inputOrdinal = inputTick(inputOrdinal);
+    requireCondition(Number.isSafeInteger(finalSourceFrame) && finalSourceFrame >= 0 &&
+      finalSourceFrame <= 0xffffffff,
+    'Runtime history final source frame must be an unsigned 32-bit integer');
+    requireCondition(localPublishPending.size === 0,
+      'Runtime history final checksum cannot overtake a pending local PAD publication');
+    for (let tick = 0; tick <= inputOrdinal; ++tick) {
+      requireCondition(localReceipts.has(tick) && remoteReceipts.has(tick),
+        `Runtime history final checksum requires actual local and remote PAD receipts through ${inputOrdinal}`);
+      requireCondition(!deferredLocalTicks.has(tick),
+        `Runtime history final checksum cannot include unreleased deferred PAD tick ${tick}`);
+    }
+    let bytes;
+    try {
+      if (checksum instanceof Uint8Array) bytes = new Uint8Array(checksum);
+      else if (checksum instanceof ArrayBuffer) bytes = new Uint8Array(checksum.slice(0));
+      else if (ArrayBuffer.isView(checksum) && checksum.BYTES_PER_ELEMENT === 1)
+        bytes = new Uint8Array(checksum.buffer, checksum.byteOffset, checksum.byteLength).slice();
+      else if (Array.isArray(checksum) && checksum.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255))
+        bytes = Uint8Array.from(checksum);
+      else throw Error('Final native checksum must be an explicit byte view');
+      requireCondition(bytes.length === 64,
+        'Final native checksum must contain exactly 64 bytes');
+      const decoded = parseNetChecksum(bytes);
+      requireCondition(decoded.tick === inputOrdinal && decoded.frame === finalSourceFrame,
+        'Final native checksum tick and frame must match the actual consumed input and source frame');
+    } catch (error) { throw Error(`Runtime history final checksum was refused: ${String(error?.message || error)}`, {cause:error}); }
+    validateMatchFinalOutcome(outcome, winner);
+    matchFinalPublished = true;
+    try {
+      const result = await withDeadline(peer.publishMatchFinal({inputOrdinal,
+        sourceFrame: finalSourceFrame, checksum: bytes, outcome, winner}), timeoutMs,
+      'Runtime history final checksum agreement');
+      throwIfFailed();
+      return Object.freeze({accepted_by:'lockstep-match-final', role,
+        input_ordinal:result.input_ordinal, source_frame:result.source_frame,
+        agreement_hash:result.agreement_hash, outcome:result.outcome,
+        winner:result.winner, matched_bytes:result.matched_bytes});
+    } catch (error) {
+      latch(error);
+      if (!peer.terminal) {
+        try { await peer.fail('protocol', {reason:`final checksum agreement failed: ${String(error?.message || error)}`}); }
+        catch (terminalError) { latch(terminalError); }
+      }
+      throw failure;
+    }
+  }
+
   function snapshot() {
     return Object.freeze({
       schema: 'melee-web-runtime-match-history-peer-snapshot-v1',
@@ -577,7 +653,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     return closeOperation;
   }
 
-  return Object.freeze({start, publishLocal, releaseDeferredLocal, remoteSnapshot, waitForRemoteSample, snapshot, close,
+  return Object.freeze({start, publishLocal, releaseDeferredLocal, remoteSnapshot, waitForRemoteSample,
+    publishMatchFinal, snapshot, close,
     get failure() { return failure; }, get closed() { return closed; }});
 }
 
