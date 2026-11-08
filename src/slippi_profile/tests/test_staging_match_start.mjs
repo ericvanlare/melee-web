@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createServer} from 'node:http';
 import {createHash} from 'node:crypto';
-import {createStagingMatchStart, stagingHeldIdentity, validateStagingLobbyState} from '../staging_match_start.mjs';
+import {createStagingMatchStart, stagingHeldIdentity, validateStagingLobbyState,
+  validateStagingOwnedChoice, validateStagingOwnedStage} from '../staging_match_start.mjs';
 
 const identity = {runtime_sha256:'a'.repeat(64), asset_identity_sha256:'b'.repeat(64),
   save_profile_sha256:'c'.repeat(64), profile_identity:'experimental-test-profile'};
@@ -25,7 +26,8 @@ function held({poll = 10, submission = 20, pad = '00'.repeat(44)} = {}) {
     live_identity:JSON.parse(live)});
   return {identity:live,prefix,publication};
 }
-function peers({selectionChange, agreementChange, prefixChange, heldNever = false} = {}) {
+function peers({offerChange, agreementChange, prefixChange, choiceNever = false,
+  hostStageNever = false, heldNever = false} = {}) {
   const ends = {}, traffic = [], calls = {alpha:[],beta:[]}, failures = [], lobby = {alpha:[],beta:[]};
   let resolveReady;
   const ready = new Promise(resolve => { resolveReady=resolve; });
@@ -52,16 +54,32 @@ function peers({selectionChange, agreementChange, prefixChange, heldNever = fals
     return endpoint;
   };
   const owners={};
+  const choices={alpha:{character:8,costume:0},beta:{character:8,costume:1}};
+  const bound={};
+  const offerFor=(role,stage=32)=>{
+    const seed=role==='alpha'?'00000011':'00000022';
+    const selection={random_seed:seed,start:{players:[
+      {ckind:bound[role]?.alpha.character??8,color:bound[role]?.alpha.costume??0},
+      {ckind:bound[role]?.beta.character??8,color:bound[role]?.beta.costume??1}],
+    rules:{stage_kind:stage}}};
+    if(role==='beta'&&offerChange)offerChange(selection);
+    return JSON.stringify({schema:'melee-web-runtime-match-start-offer-v1',...identity,
+      local_menu_rng_seed_provenance:seed,selection});
+  };
   for (const role of ['alpha','beta']) {
     const seed=role==='alpha'?'00000011':'00000022';
-    const selection={random_seed:seed,players:[{character:8,port:0},{character:8,port:1}],stage:32,stocks:4};
-    if (role==='beta') selectionChange?.(selection);
     const native = {
-      offer() { calls[role].push('offer'); return JSON.stringify({
-        schema:'melee-web-runtime-match-start-offer-v1',...identity,
-        local_menu_rng_seed_provenance:seed,selection}); },
+      choice() { calls[role].push('choice');
+        if(choiceNever===true||choiceNever===role)return new Promise(()=>{});
+        return {...choices[role]}; },
+      selectChoices(value) { calls[role].push('selectChoices');bound[role]=structuredClone(value); },
+      hostStage() { calls[role].push('hostStage');
+        if(role==='alpha'&&hostStageNever)return new Promise(()=>{});
+        return offerFor(role); },
+      applyStage(value) { calls[role].push(['applyStage',value]); },
+      offer() { calls[role].push('offer');return role==='alpha'?offerFor(role):offerFor(role); },
       agreement(value) { calls[role].push(['agreement',value]);
-        return JSON.stringify({nativeAgreement:{...selection,random_seed:value},
+        return JSON.stringify({nativeAgreement:{...bound[role],random_seed:value},
           ...(role==='beta' && agreementChange ? {unexpected:true} : {})}); },
       commit(value,text) { calls[role].push(['commit',value,text]); },
       held() { calls[role].push('held');
@@ -78,34 +96,54 @@ function peers({selectionChange, agreementChange, prefixChange, heldNever = fals
 
 test('local menu choices and progress reach both peers before either commits',async()=>{
   const f=peers();
-  const css={phase:'css',characters:[8,8],colors:[0,0],stage:null};
-  const sss={phase:'sss',characters:[8,8],colors:[0,0],stage:31};
+  const css={phase:'css',choice:{character:8,costume:0},stage:null};
+  const guestCss={phase:'css',choice:{character:8,costume:1},stage:null};
   await f.owners.alpha.publishLobby(css);
-  await f.owners.beta.publishLobby(sss);
+  await f.owners.beta.publishLobby(guestCss);
   await Promise.all(Object.values(f.ends).map(e=>e.drainInbound()));
   for(const role of ['alpha','beta']){
-    assert(f.lobby[role].some(e=>e.role==='alpha'&&e.state.phase==='css'));
-    assert(f.lobby[role].some(e=>e.role==='beta'&&e.state.stage===31));
+    assert(f.lobby[role].some(e=>e.role==='alpha'&&e.state.choice.costume===0));
+    assert(f.lobby[role].some(e=>e.role==='beta'&&e.state.choice.costume===1));
     assert.equal(f.calls[role].length,0,'a cursor observation must not commit or create a match');
   }
   await f.owners.alpha.publishLobby(css);
   assert.equal(f.traffic.length,2,'unchanged observations should not flood the room');
-  await f.owners.beta.publishLobby({...sss,stage:32});
-  await f.ends.alpha.drainInbound();
-  assert.equal(f.lobby.alpha.at(-1).revision,2);
-  assert.equal(f.lobby.alpha.at(-1).state.stage,32);
+  await assert.rejects(f.owners.beta.publishLobby({...guestCss,stage:32}),
+    /Only the host may own the stage selection/);
+  await f.owners.alpha.publishLobby({...css,choice:{character:8,costume:1}});
+  await f.ends.beta.drainInbound();
+  assert.equal(f.lobby.beta.at(-1).revision,2);
+  assert.equal(f.lobby.beta.at(-1).state.choice.costume,1);
   await Promise.all(Object.values(f.owners).map(o=>o.negotiate()));
-  await assert.rejects(f.owners.alpha.publishLobby(css),/followed match agreement/);
+  await assert.rejects(f.owners.alpha.publishLobby(css),/frozen local choice/);
   await Promise.all(Object.values(f.owners).map(o=>o.close()));
 });
 
+test('owned character choices are one exact character and costume pair',()=>{
+  assert.deepEqual(validateStagingOwnedChoice({character:8,costume:1}),
+    {character:8,costume:1});
+  for(const value of [null,{}, {character:8}, {character:8,costume:1,stage:32},
+    {character:-1,costume:0}, {character:8,costume:256}, {character:8.5,costume:0}])
+    assert.throws(()=>validateStagingOwnedChoice(value),/Invalid owned character choice/);
+});
+
+test('only alpha may own a stage choice; beta must send no stage',()=>{
+  assert.equal(validateStagingOwnedStage('alpha',32),32);
+  assert.equal(validateStagingOwnedStage('alpha',null),null);
+  assert.equal(validateStagingOwnedStage('beta',null),null);
+  assert.throws(()=>validateStagingOwnedStage('beta',32),/Only the host may own/);
+  assert.throws(()=>validateStagingOwnedStage('alpha',256),/Invalid host stage choice/);
+  assert.throws(()=>validateStagingOwnedStage('gamma',null),/Unknown room role/);
+});
+
 test('lobby updates reject malformed, replayed and unknown-version packets',async()=>{
-  for(const value of [{phase:'css',characters:[8,8],colors:[0,0],stage:null,extra:true},
-    {phase:'playing',characters:[8,8],colors:[0,0],stage:32},{phase:'css',characters:[8],colors:[0,0],stage:null},
-    {phase:'sss',characters:[8,8],colors:[0,0],stage:Infinity}])
-    assert.throws(()=>validateStagingLobbyState(value),/Invalid shared lobby state/);
+  for(const [role,value] of [['alpha',{phase:'css',choice:{character:8,costume:0},stage:null,extra:true}],
+    ['alpha',{phase:'playing',choice:{character:8,costume:0},stage:null}],
+    ['beta',{phase:'css',choice:{character:8,costume:0},stage:32}],
+    ['beta',{phase:'sss',choice:{character:8,costume:0},stage:Infinity}]])
+    assert.throws(()=>validateStagingLobbyState(value,role),/Invalid shared lobby state|Only the host may own/);
   const f=peers();
-  await f.owners.alpha.publishLobby({phase:'css',characters:[8,8],colors:[0,0],stage:null});
+  await f.owners.alpha.publishLobby({phase:'css',choice:{character:8,costume:0},stage:null});
   await f.ends.beta.drainInbound();
   assert.throws(()=>f.ends.beta.options.onMessage(f.traffic[0].text),/Invalid shared lobby revision/);
   await Promise.all(Object.values(f.owners).map(o=>o.close()));
@@ -115,22 +153,54 @@ test('lobby updates reject malformed, replayed and unknown-version packets',asyn
   await Promise.all(Object.values(old.owners).map(o=>o.close()));
 });
 
-test('peer held proof closes inbound lobby updates before local negotiation completes',async()=>{
-  const f=peers({heldNever:'beta'});
-  await f.owners.alpha.publishLobby({phase:'css',characters:[8,8],colors:[0,0],stage:null});
+test('stale choice/stage revisions and guest stage packets cannot advance setup',async()=>{
+  const stale=peers({choiceNever:true});
+  const choicePacket={schema:'melee-web-staging-match-session-v3',role:'beta',channel:'setup',
+    stage:'choice',payload:JSON.stringify({schema:'melee-web-staging-choice-v1',revision:0,
+      provenance:'native-closed-css-p1-v1',character:8,costume:1})};
+  assert.throws(()=>stale.ends.alpha.options.onMessage(JSON.stringify(choicePacket)),
+    /Invalid frozen character choice/);
+  await Promise.all(Object.values(stale.owners).map(owner=>owner.close()));
+
+  const wrongOwner=peers({choiceNever:true});
+  const guestStage={schema:'melee-web-staging-match-session-v3',role:'beta',channel:'setup',
+    stage:'stage',payload:JSON.stringify({schema:'melee-web-staging-host-stage-v1',revision:1,stage:32})};
+  assert.throws(()=>wrongOwner.ends.alpha.options.onMessage(JSON.stringify(guestStage)),
+    /Duplicate or out-of-order setup packet/);
+  await Promise.all(Object.values(wrongOwner.owners).map(owner=>owner.close()));
+
+  const staleHostStage=peers({choiceNever:true});
+  const hostChoice={schema:'melee-web-staging-match-session-v3',role:'alpha',channel:'setup',
+    stage:'choice',payload:JSON.stringify({schema:'melee-web-staging-choice-v1',revision:1,
+      provenance:'native-closed-css-p1-v1',character:8,costume:0})};
+  staleHostStage.ends.beta.options.onMessage(JSON.stringify(hostChoice));
+  const stagePacket={schema:'melee-web-staging-match-session-v3',role:'alpha',channel:'setup',
+    stage:'stage',payload:JSON.stringify({schema:'melee-web-staging-host-stage-v1',revision:2,stage:32})};
+  assert.throws(()=>staleHostStage.ends.beta.options.onMessage(JSON.stringify(stagePacket)),
+    /Invalid host stage choice/);
+  await Promise.all(Object.values(staleHostStage.owners).map(owner=>owner.close()));
+});
+
+test('a peer can keep publishing its own choice while the other is already locked',async()=>{
+  const f=peers({choiceNever:'beta'});
+  await f.owners.alpha.publishLobby({phase:'css',choice:{character:8,costume:0},stage:null});
   const pending=Promise.allSettled(Object.values(f.owners).map(owner=>owner.negotiate()));
   const deadline=performance.now()+1000;
   try{
-    while(!f.traffic.some(({role,text})=>role==='alpha'&&JSON.parse(text).stage==='held')){
-      assert(performance.now()<deadline,'host held proof never reached the relay');
+    while(!f.traffic.some(({role,text})=>role==='alpha'&&JSON.parse(text).stage==='choice')){
+      assert(performance.now()<deadline,'host choice never reached the relay');
       await new Promise(resolve=>setTimeout(resolve,0));
     }
-    await f.ends.beta.drainInbound();
-    assert(f.calls.beta.includes('held'));
-    const next=JSON.parse(f.traffic[0].text);
-    next.stage=2;
-    assert.throws(()=>f.ends.beta.options.onMessage(JSON.stringify(next)),/Invalid shared lobby revision/);
-    assert.equal(f.lobby.beta.length,1);
+    assert(f.owners.beta.publishLobby,
+      'the guest must retain lobby publication while its own source choice is pending');
+    await f.owners.beta.publishLobby({phase:'css',choice:null,stage:null});
+    await f.owners.beta.publishLobby({phase:'css',choice:{character:8,costume:1},stage:null});
+    await f.ends.alpha.drainInbound();
+    assert(f.lobby.alpha.some(entry=>entry.role==='beta'&&entry.state.choice===null),
+      'unselected source progress must not be treated as a failed or frozen choice');
+    assert(f.lobby.alpha.some(entry=>entry.role==='beta'&&entry.state.choice?.costume===1));
+    assert.equal(f.calls.beta.includes('selectChoices'),false,
+      'a received host choice must not freeze the guest before its own native CSS confirmation');
   }finally{
     await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
     await pending;
@@ -143,15 +213,26 @@ test('page peers agree exact native context with host source seed and preserve s
   assert.equal(results[0].seed,17); assert.equal(results[1].seed,17);
   assert.equal(results[0].agreement,results[1].agreement);
   assert.equal(results[0].heldProof,results[1].heldProof);
+  assert.deepEqual(results[0].choices,{alpha:{character:8,costume:0},beta:{character:8,costume:1}});
+  assert.equal(results[0].hostStage,32);
   assert.deepEqual(results.map(row=>row.localPort),[0,1]);
-  for (const role of ['alpha','beta'])
-    assert.deepEqual(f.calls[role].map(row=>Array.isArray(row)?row[0]:row),['offer','agreement','commit','held']);
-  assert.equal(f.traffic.length,6);
+  assert.deepEqual(f.calls.alpha.map(row=>Array.isArray(row)?row[0]:row),
+    ['choice','selectChoices','hostStage','offer','agreement','commit','held']);
+  assert.deepEqual(f.calls.beta.map(row=>Array.isArray(row)?row[0]:row),
+    ['choice','selectChoices','applyStage','offer','agreement','commit','held']);
+  assert.equal(f.traffic.length,10);
+  const setupPackets=f.traffic.filter(row=>JSON.parse(row.text).channel==='setup')
+    .map(row=>[row.role,JSON.parse(row.text).stage]);
+  assert.deepEqual(setupPackets.slice(0,4),[
+    ['alpha','choice'],['beta','choice'],['alpha','stage'],['beta','stage_ack']]);
+  for(const role of ['alpha','beta'])
+    assert.deepEqual(setupPackets.filter(row=>row[0]===role).map(row=>row[1]),
+      ['choice',...(role==='alpha'?['stage']:['stage_ack']),'offer','agreement','held']);
   await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
 });
 
 test('selection or native candidate mismatch cannot commit either match',async()=>{
-  for (const options of [{selectionChange:value=>{value.stage=31;}},{agreementChange:true}]) {
+  for (const options of [{offerChange:value=>{value.start.players[1].color=0;}},{agreementChange:true}]) {
     const f=peers(options);
     const results=await Promise.allSettled(Object.values(f.owners).map(owner=>owner.negotiate()));
     assert(results.every(row=>row.status==='rejected'));
@@ -223,13 +304,26 @@ test('attached setup delegates close but ignores only explicit matched-final dis
   }
 });
 
-test('disconnect while waiting for native readiness cancels setup without a later takeover',async()=>{
-  const f=peers({heldNever:true});
+test('local close while waiting for a frozen choice cancels setup without a later takeover',async()=>{
+  const f=peers({choiceNever:true});
   const pending=Object.values(f.owners).map(owner=>owner.negotiate());
-  while (!Object.values(f.calls).every(rows=>rows.includes('held'))) await new Promise(resolve=>setTimeout(resolve,0));
+  while (!Object.values(f.calls).every(rows=>rows.includes('choice'))) await new Promise(resolve=>setTimeout(resolve,0));
   await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
   const result=await Promise.allSettled(pending);
   assert(result.every(row=>row.status==='rejected' && /Room closed/.test(row.reason.message)));
+  assert.deepEqual(f.failures,[],'an intentional local close is not a setup failure');
+});
+
+test('local close during host-stage wait aborts both peers without reporting a real failure',async()=>{
+  const f=peers({hostStageNever:true});
+  const pending=Object.values(f.owners).map(owner=>owner.negotiate());
+  while(!f.calls.alpha.includes('hostStage')||!f.calls.beta.includes('selectChoices'))
+    await new Promise(resolve=>setTimeout(resolve,0));
+  await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
+  const result=await Promise.allSettled(pending);
+  assert(result.every(row=>row.status==='rejected'&&/Room closed/.test(row.reason.message)));
+  assert.deepEqual(f.failures,[],'an intentional local close is not a transport/native failure');
+  assert(Object.values(f.ends).every(endpoint=>endpoint.closed));
 });
 
 test('actual room endpoint drains a server disconnect without waiting on its own callback',async()=>{
@@ -252,7 +346,8 @@ test('actual room endpoint drains a server disconnect without waiting on its own
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const owners=['alpha','beta'].map(role=>createStagingMatchStart({role,
     url:`ws://127.0.0.1:${server.address().port}`,roomId:'actual-endpoint-control-room',identity,
-    timeoutMs:1000,native:{offer:()=>new Promise(()=>{}),agreement(){},commit(){},held(){}}}));
+    timeoutMs:1000,native:{choice:()=>new Promise(()=>{}),selectChoices(){},hostStage(){},applyStage(){},
+      offer:()=>new Promise(()=>{}),agreement(){},commit(){},held(){}}}));
   const pending=owners.map(owner=>owner.negotiate());
   try{
     await bothJoined;

@@ -83,6 +83,9 @@ void match_history_before_close() noexcept;
 void match_history_after_match_close();
 bool history_start_is_enabled() noexcept;
 bool history_start_offer_waiting() noexcept;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+bool history_start_online_menu_transition(int previous_scene, int phase);
+#endif
 bool history_start_capture_offer(const MeleeWebMenuMatchSelection&);
 bool history_start_asset_match_pending() noexcept;
 void history_start_finish_asset_match();
@@ -2393,6 +2396,9 @@ void close(){
  if(prize){prize->close();prize.reset();}
  if(world){
   if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;pending_opening_state=-1;}
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+  if(host)check(melee_web_menu_host_online_release_guest_css(host,error,sizeof(error)),error);
+#endif
   if(world_exposed)world->close();else world->close_prepared();
   world.reset();world_exposed=false;
  }
@@ -3068,6 +3074,10 @@ void advance(){
      pending_menu_source_scene:melee_web_menu_host_source_scene(host);
  pending_menu_source_scene=0;
  if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+ if(history_start_online_menu_transition(previous_source_scene,
+                                         melee_web_menu_host_phase(host)))return;
+#endif
  const int route_target=melee_web_menu_host_route_target_mode(host);
  if(previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_TITLE&&
     route_target!=GM_OPENING_MV)pending_opening_state=-1;

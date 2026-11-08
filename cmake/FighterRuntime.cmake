@@ -972,6 +972,10 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_net_validate_pad
     _melee_web_sss_observe_input_gate
     _melee_web_native_menu_match_history_start_enable
+    _melee_web_native_menu_match_history_start_lobby_enable
+    _melee_web_native_menu_match_history_start_choice_json
+    _melee_web_native_menu_match_history_start_select_choices
+    _melee_web_native_menu_match_history_start_select_stage
     _melee_web_native_menu_match_history_start_state
     _melee_web_native_menu_match_history_start_offer_json
     _melee_web_native_menu_match_history_start_agreement_json

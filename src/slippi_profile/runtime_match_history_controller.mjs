@@ -1221,15 +1221,58 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       check(status());
       return true;
     },
-    startEnable(){
-      startPreflight('start_enable',{inspectState:true});
-      if(startExport('start_enable')()!==1)startRefusal('start_enable');
+    startEnable(role){
+      const name=role===undefined?'start_enable':'start_lobby_enable';
+      if(role!==undefined&&role!=='alpha'&&role!=='beta')
+        throw Error('Online shared selection requires the alpha or beta role');
+      startPreflight(name,{inspectState:true});
+      const result=role===undefined?startExport(name)():startExport(name)(role==='alpha'?1:2);
+      if(result!==1)startRefusal(name);
       const state=readStartState();
       if(state!==1)throw latch(Error(`Native agreed-start enable completed in state ${state}, expected 1`));
       return state;
     },
     startState(){
       return readStartState();
+    },
+    startChoice(){
+      const name='start_choice_json';
+      startPreflight(name);
+      const pointer=startExport(name)();
+      if(!pointer){
+        check(status());
+        return null;
+      }
+      try{
+        const choice=JSON.parse(startTextResult(name,pointer));
+        if(!hasExactKeys(choice,['character','costume']))
+          throw Error('Native online choice has unexpected fields');
+        u32(choice.character,'Native online character');
+        u32(choice.costume,'Native online costume');
+        return Object.freeze(choice);
+      }catch(error){throw latch(error);}
+    },
+    startSelectChoices(alpha,beta){
+      const name='start_select_choices';
+      for(const choice of [alpha,beta]){
+        if(!hasExactKeys(choice,['character','costume']))
+          throw Error('Online choice requires a character and costume');
+        u32(choice.character,'Online character');
+        u32(choice.costume,'Online costume');
+      }
+      startPreflight(name);
+      if(startExport(name)(alpha.character,alpha.costume,beta.character,beta.costume)!==1)
+        startRefusal(name);
+      check(status());
+      return true;
+    },
+    startSelectStage(stage){
+      const name='start_select_stage';
+      u32(stage,'Online host stage');
+      startPreflight(name);
+      if(startExport(name)(stage)!==1)startRefusal(name);
+      check(status());
+      return true;
     },
     startOffer(host){
       startPreflight('start_offer_json',{argumentsAllocated:true,inspectState:true});

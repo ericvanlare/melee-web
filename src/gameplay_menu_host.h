@@ -330,6 +330,13 @@ int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost*);
 int melee_web_menu_host_route_target_state(const MeleeWebMenuHost*);
 /* Reads the separate configuration produced by the original VS-entry rules
  * and player preparation after CSS/SSS OnExit. */
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+int melee_web_menu_host_online_hold_guest_css(MeleeWebMenuHost*, char*, size_t);
+int melee_web_menu_host_online_choice(const MeleeWebMenuHost*, int*, int*, char*, size_t);
+int melee_web_menu_host_online_compose(MeleeWebMenuHost*, const int[2],
+                                       const int[2], int, char*, size_t);
+int melee_web_menu_host_online_release_guest_css(MeleeWebMenuHost*, char*, size_t);
+#endif
 int melee_web_menu_host_selection(const MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t);
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 /* Private development checkpoint: arms one fresh VS menu owner and reads its
