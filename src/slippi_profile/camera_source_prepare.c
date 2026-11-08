@@ -46,6 +46,7 @@ static int selected_main(HSD_GObj* main)
     return matches == 1 && previous == HSD_GObj_804D7820[link];
 }
 int slippi_camera_source_prepare(uint64_t world, uint64_t token,
+                                 HSD_GObj** main_camera_out,
                                  char* error, size_t error_size)
 {
     HSD_GObj* main = NULL; HSD_CObj* copy = NULL; HSD_CObj* camera;
@@ -53,6 +54,7 @@ int slippi_camera_source_prepare(uint64_t world, uint64_t token,
     unsigned suppressed = 0; int mode = -1, stage = -1;
     MeleeWebSourceMemoryContext context = {0};
     MeleeWebSourceMemoryAllocation inverse = {0};
+    if (main_camera_out) *main_camera_out = NULL;
     /* Warm source/draw order and its first-use inverse allocation stay original.
      * Only an explicitly armed private CPU interval requests this preparation. */
     if (!token && !melee_web_cpu_interval_active()) return 1;
@@ -87,6 +89,7 @@ int slippi_camera_source_prepare(uint64_t world, uint64_t token,
     Camera_8002A4AC(main);
     HSD_CObjSetupViewingMtx(camera);
     (void) HSD_CObjGetInvViewingMtxPtrDirect(camera);
+    if (main_camera_out) *main_camera_out = main;
     if (error && error_size) error[0] = '\0';
     return 1;
 }

@@ -280,8 +280,73 @@ bool GameplayCpuCheckpoint::begin_history_incarnation(
     return true;
 }
 
+bool GameplayCpuCheckpoint::history_bind_terminal_cursor(
+    const GameplayMatchSession& session,const std::uint64_t* ticks,
+    std::uint32_t ticks_bytes,std::uint64_t world_generation,
+    std::uint64_t pre_completed_tick) noexcept
+{
+    if(!history_mode_||!commit_.arena||history_terminal_bound_||
+       phase_!=Phase::HistoryReady||!same_owner(session)||
+       !session.diagnostic_source_files_quiescent()||
+       session.source_frames()!=owner_.frame||!ticks||
+       ticks_bytes!=sizeof(std::uint64_t)||world_generation!=owner_.world||
+       world_generation!=melee_web_gameplay_generation()||
+       !owner_.context_epoch||*ticks!=pre_completed_tick)
+        return false;
+    const auto live=melee_web_gameplay_bootstrap_cpu_storage();
+    if(live.ticks!=ticks||live.ticks_bytes!=ticks_bytes)return false;
+    history_terminal_ticks_=ticks;
+    history_terminal_pre_tick_=pre_completed_tick;
+    history_terminal_world_generation_=world_generation;
+    history_terminal_context_epoch_=owner_.context_epoch;
+    history_terminal_bound_=true;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::history_terminal_cursor_admit(
+    const GameplayMatchSession& session,std::uint64_t completed_tick,
+    std::uint32_t input_ordinal,std::uint32_t source_frame,
+    bool ending,bool complete) const noexcept
+{
+    if(!history_mode_||!commit_.arena||!history_terminal_bound_||
+       !same_owner(session)||session.source_frames()!=source_frame||
+       owner_.context_epoch!=history_terminal_context_epoch_||
+       owner_.world!=history_terminal_world_generation_||
+       melee_web_gameplay_generation()!=history_terminal_world_generation_||
+       !history_terminal_ticks_||*history_terminal_ticks_!=completed_tick||
+       session.ending()!=ending||session.complete()!=complete||complete&&!ending||
+       completed_tick<history_terminal_pre_tick_||
+       completed_tick-history_terminal_pre_tick_>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       input_ordinal<owner_.frame||
+       input_ordinal-owner_.frame!=completed_tick-history_terminal_pre_tick_)
+        return false;
+    if(ending){
+        // Original VS keeps the last live frame through its terminal cursor;
+        // the distinct input ordinal includes the final stock-out traversal.
+        return input_ordinal>0u&&source_frame==input_ordinal-1u;
+    }
+    return source_frame==input_ordinal;
+}
+
 bool GameplayCpuCheckpoint::seal_history_incarnation(
     const GameplayMatchSession& session,const char** refusal) noexcept {
+    return seal_history_incarnation_impl(session,session.source_frames(),
+        session.source_frames(),0,false,refusal);
+}
+
+bool GameplayCpuCheckpoint::seal_history_terminal_incarnation(
+    const GameplayMatchSession& session,std::uint64_t completed_tick,
+    std::uint32_t input_ordinal,std::uint32_t source_frame,
+    const char** refusal) noexcept
+{
+    return seal_history_incarnation_impl(session,source_frame,input_ordinal,
+        completed_tick,true,refusal);
+}
+
+bool GameplayCpuCheckpoint::seal_history_incarnation_impl(
+    const GameplayMatchSession& session,std::uint32_t actual_source,
+    std::uint32_t selected_ordinal,std::uint64_t completed_tick,
+    bool terminal,const char** refusal) noexcept {
     comparison_={};
     if(refusal)*refusal=nullptr;
     const auto fail_seal=[&](CpuComparisonDomain domain,const char* text,
@@ -297,7 +362,12 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
     const auto refused=[&](CpuComparisonDomain domain,const char* text,std::uint32_t detail=0){
         return fail_seal(domain,text,detail,true);
     };
-    const auto actual_end=session.source_frames();
+    const auto actual_end=actual_source;
+    if(session.source_frames()!=actual_source||
+       (terminal&&!history_terminal_cursor_admit(session,completed_tick,
+          selected_ordinal,actual_source,true,false))||
+       (!terminal&&actual_end!=selected_ordinal))
+        return refused(CpuComparisonDomain::Owner,"History selected source/tick endpoint refused");
     if(!session.diagnostic_source_files_quiescent())
         return refused(CpuComparisonDomain::Owner,"History seal source files are not quiescent");
     if(!slippi_lobj_anchor_admit(commit_.lobj_anchor))
@@ -326,10 +396,11 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
             return refused(CpuComparisonDomain::Payload,"History seal payload snapshot refused",
                            static_cast<std::uint32_t>(payload));
     }
-    if(actual_end<=history_start_frame_||actual_end<=owner_.frame||
-       actual_end-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN)
-        return refused(CpuComparisonDomain::Owner,"History seal END is outside the retained frame span");
-    if(!melee_web_cpu_interval_motor_history_seal(commit_.effect_token,history_incarnation_,actual_end)){
+    if(selected_ordinal<=history_start_frame_||selected_ordinal<=owner_.frame||
+       selected_ordinal-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       (terminal?actual_end<owner_.frame:actual_end<=history_start_frame_))
+        return refused(CpuComparisonDomain::Owner,"History seal END is outside the retained traversal span");
+    if(!melee_web_cpu_interval_motor_history_seal(commit_.effect_token,history_incarnation_,selected_ordinal)){
         const auto* motor=melee_web_cpu_interval_motor_evidence();
         return refused(CpuComparisonDomain::Effects,"History seal motor journal refused",
                        motor?motor->failure:0);
@@ -337,13 +408,14 @@ bool GameplayCpuCheckpoint::seal_history_incarnation(
     if(!history_actions_||!history_actions_->seal_incarnation(history_incarnation_))
         return refused(CpuComparisonDomain::Actions,"History seal action store refused",
                        history_actions_?history_actions_->active_failure():0);
-    if(!statics_->history_seal_endpoint(history_incarnation_,actual_end))
+    if(!statics_->history_seal_endpoint(history_incarnation_,selected_ordinal))
         return refused(CpuComparisonDomain::Statics,"History seal statics endpoint refused",
                        static_cast<std::uint32_t>(statics_->endpoint_header().status));
-    history_end_frame_=actual_end;
+    history_end_frame_=selected_ordinal;
+    history_end_source_frame_=actual_end;
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;
-    phase_=Phase::HistorySealed;
+    phase_=terminal?Phase::HistoryTerminalSealed:Phase::HistorySealed;
     return true;
 }
 
@@ -402,9 +474,16 @@ bool GameplayCpuCheckpoint::history_endpoint_admit(
     const GameplayMatchSession& session,MeleeWebSourcePayloadEndpointHeader* arena_payload) const noexcept {
     const bool selected=phase_==Phase::HistorySealed||
                         phase_==Phase::HistoryCorrectedSealed||
-                        phase_==Phase::HistoryConfirmedPrefixSealed;
+                        phase_==Phase::HistoryConfirmedPrefixSealed||
+                        phase_==Phase::HistoryTerminalSealed||
+                        phase_==Phase::HistoryTerminalPrefixSealed;
+    const bool terminal=phase_==Phase::HistoryTerminalSealed||
+                        phase_==Phase::HistoryTerminalPrefixSealed;
     return history_mode_&&selected&&same_owner(session)&&
-        session.source_frames()==history_end_frame_&&
+        session.source_frames()==history_end_source_frame_&&
+        (!terminal||(history_terminal_bound_&&history_terminal_ticks_&&
+         history_terminal_cursor_admit(session,*history_terminal_ticks_,history_end_frame_,
+             history_end_source_frame_,true,false)))&&
         history_end_frame_>owner_.frame&&
         history_end_frame_-owner_.frame<=MELEE_WEB_CPU_MOTOR_MAX_SPAN&&
         session.diagnostic_source_files_quiescent()&&
@@ -428,7 +507,8 @@ bool GameplayCpuCheckpoint::history_endpoint_admit(
 
 bool GameplayCpuCheckpoint::archive_history_endpoint(
     const GameplayMatchSession& session) noexcept {
-    if(phase_!=Phase::HistorySealed||!history_endpoint_admit(session)||
+    if((phase_!=Phase::HistorySealed&&phase_!=Phase::HistoryTerminalSealed)||
+       !history_endpoint_admit(session)||
        history_endpoint_archived_||history_endpoint_closed_)return false;
     if(!statics_->history_close_endpoint(history_incarnation_,history_end_frame_)){
         disarm();phase_=Phase::Failed;return false;
@@ -461,9 +541,10 @@ bool GameplayCpuCheckpoint::close_history_endpoint(
 
 GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
     const GameplayMatchSession& session,char* refusal,std::size_t refusal_bytes) noexcept {
-    if(!history_mode_||phase_!=Phase::HistorySealed||!history_endpoint_archived_||
+    if(!history_mode_||(phase_!=Phase::HistorySealed&&phase_!=Phase::HistoryTerminalSealed)||
+       !history_endpoint_archived_||
        history_endpoint_closed_||
-       !same_owner(session)||session.source_frames()!=history_end_frame_||
+       !same_owner(session)||session.source_frames()!=history_end_source_frame_||
        !session.diagnostic_source_files_quiescent()||
        (commit_.arena&&!history_payload_admit())||
        !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot))
@@ -482,6 +563,7 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
         phase_=Phase::Failed;return GameplayCpuCommitResult::UnexpectedWriterFailure;
     }
     history_restore_end_=history_end_frame_;
+    history_restore_source_frame_=history_end_source_frame_;
     ++history_restore_count_;
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;
@@ -492,7 +574,10 @@ GameplayCpuCommitResult GameplayCpuCheckpoint::restore_history_pre(
 bool GameplayCpuCheckpoint::finish_history_replay(
     const GameplayMatchSession& session) noexcept {
     if(!history_mode_||phase_!=Phase::HistoryCorrecting||!same_owner(session)||
-       session.source_frames()!=history_restore_end_||
+       (history_terminal_bound_?
+         (!history_terminal_ticks_||!history_terminal_cursor_admit(session,*history_terminal_ticks_,
+             history_restore_end_,session.source_frames(),false,false)):
+         session.source_frames()!=history_restore_source_frame_)||
        !session.diagnostic_source_files_quiescent()||
        !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
        !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
@@ -511,6 +596,7 @@ bool GameplayCpuCheckpoint::finish_history_replay(
         disarm();phase_=Phase::Failed;return false;
     }
     history_end_frame_=history_restore_end_;
+    history_end_source_frame_=session.source_frames();
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;
     phase_=Phase::HistoryCorrectedSealed;
@@ -544,9 +630,81 @@ bool GameplayCpuCheckpoint::finish_history_confirmed_prefix(
         disarm();phase_=Phase::Failed;return false;
     }
     history_end_frame_=confirmed_end;
+    history_end_source_frame_=confirmed_end;
     history_endpoint_archived_=false;
     history_endpoint_closed_=false;
     phase_=Phase::HistoryConfirmedPrefixSealed;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::finish_history_terminal_replay(
+    const GameplayMatchSession& session,std::uint64_t completed_tick,
+    std::uint32_t input_ordinal,std::uint32_t source_frame) noexcept
+{
+    if(!history_mode_||!commit_.arena||phase_!=Phase::HistoryCorrecting||
+       !same_owner(session)||session.source_frames()!=source_frame||
+       input_ordinal<=owner_.frame||input_ordinal>history_restore_end_||
+       history_restore_end_<=owner_.frame||
+       history_restore_end_-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       !history_terminal_cursor_admit(session,completed_tick,input_ordinal,
+                                      source_frame,true,false)||
+       !session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_cpu_interval_admit(commit_.effect_token)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
+       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
+       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
+       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
+       !history_payload_admit()||!history_actions_||history_actions_->active_failure()!=0||
+       !melee_web_cpu_interval_motor_history_replay_finish(
+            commit_.effect_token,history_incarnation_,input_ordinal)||
+       !history_actions_->seal_corrected_incarnation(history_incarnation_)||
+       !statics_->history_seal_endpoint(history_incarnation_,input_ordinal)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_end_frame_=input_ordinal;
+    history_end_source_frame_=source_frame;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryTerminalSealed;
+    return true;
+}
+
+bool GameplayCpuCheckpoint::finish_history_confirmed_terminal(
+    const GameplayMatchSession& session,std::uint64_t completed_tick,
+    std::uint32_t terminal_ordinal,std::uint32_t source_frame) noexcept
+{
+    if(!history_mode_||!commit_.arena||phase_!=Phase::HistoryCorrecting||
+       !same_owner(session)||session.source_frames()!=source_frame||
+       terminal_ordinal<=owner_.frame||terminal_ordinal>=history_restore_end_||
+       history_restore_end_<=owner_.frame||
+       history_restore_end_-owner_.frame>MELEE_WEB_CPU_MOTOR_MAX_SPAN||
+       !history_terminal_cursor_admit(session,completed_tick,terminal_ordinal,
+                                      source_frame,true,false)||
+       !session.diagnostic_source_files_quiescent()||
+       !slippi_lobj_anchor_admit(commit_.lobj_anchor)||
+       !slippi_tobj_anchor_admit(commit_.tobj_anchor)||
+       !slippi_particle_presentation_anchor_admit(commit_.particle_anchor)||
+       !melee_web_cpu_interval_admit(commit_.effect_token)||
+       !melee_web_audio_snapshot_admit(owner_.audio,commit_.audio_snapshot)||
+       !melee_web_match_flow_cpu_snapshot_admit(owner_.flow,commit_.flow_snapshot,nullptr,0)||
+       !melee_web_gameplay_bootstrap_snapshot_admit(commit_.bootstrap,nullptr,0)||
+       !melee_web_match_context_snapshot_admit(owner_.context,commit_.context_snapshot,nullptr,0)||
+       !history_payload_admit()||!history_actions_||history_actions_->active_failure()!=0||
+       !melee_web_cpu_interval_motor_history_finish_confirmed_prefix(
+            commit_.effect_token,history_incarnation_,terminal_ordinal)||
+       !history_actions_->seal_corrected_incarnation(history_incarnation_)||
+       !statics_->history_seal_confirmed_prefix(
+            history_incarnation_,history_restore_count_,terminal_ordinal)){
+        disarm();phase_=Phase::Failed;return false;
+    }
+    history_end_frame_=terminal_ordinal;
+    history_end_source_frame_=source_frame;
+    history_endpoint_archived_=false;
+    history_endpoint_closed_=false;
+    phase_=Phase::HistoryTerminalPrefixSealed;
     return true;
 }
 

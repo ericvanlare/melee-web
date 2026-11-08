@@ -88,6 +88,7 @@ bool history_start_asset_match_pending() noexcept;
 void history_start_finish_asset_match();
 bool history_start_ordinary_callback();
 bool history_start_ready_hold_pending() noexcept;
+void tick();
 struct MatchHistoryOrdinaryCallback {
  bool owned=!match_history_in_tick;
  MatchHistoryOrdinaryCallback(){if(owned)match_history_in_tick=true;}

@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
   decodeRuntimeMatchHistoryInput,decodeRuntimeMatchHistoryPollTicket,
   decodeRuntimeMatchHistoryEpisodeInputRow,decodeRuntimeMatchHistoryPrefixHandoff,
+  decodeRuntimeMatchHistoryTerminalReceipt,decodeRuntimeMatchHistoryTerminalTail,
+  decodeRuntimeMatchHistoryTerminalFinal,
   validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
@@ -1481,4 +1483,139 @@ test('queue waiter teardown ignores a hostile nonconfigurable foreign accessor a
     try{await owner.command('cleanup');}catch(_){}
     globalWindow.restore();
   }
+});
+
+test('terminal receipt separates empty, historical and selected traversal from source frame',()=>{
+  const bytes=new Uint8Array(104),view=new DataView(bytes.buffer);
+  const put=(index,value)=>view.setUint32(index*4,value,true);
+  const wide=(offset,value)=>view.setBigUint64(offset,value,true);
+  put(0,1);put(1,104);
+  assert.equal(decodeRuntimeMatchHistoryTerminalReceipt(bytes).flags,0);
+  put(3,1);
+  assert.throws(()=>decodeRuntimeMatchHistoryTerminalReceipt(bytes),/Empty/);
+  put(2,1);put(4,40);put(6,40);put(8,42);put(9,41);
+  wide(56,9007199254740993n);wide(72,9007199254740995n);wide(80,7n);wide(88,4n);
+  assert.equal(decodeRuntimeMatchHistoryTerminalReceipt(bytes).firstOrdinal,42);
+  put(2,3);put(5,40);put(7,41);put(10,77);put(12,1);
+  wide(64,9007199254740994n);wide(96,9007199254740996n);
+  const selected=decodeRuntimeMatchHistoryTerminalReceipt(bytes);
+  assert.equal(selected.selectedOrdinal,41);
+  assert.equal(selected.selectedSourceFrame,40);
+  assert.equal(selected.selectedCompletedTick,'9007199254740994');
+  put(5,41);
+  assert.throws(()=>decodeRuntimeMatchHistoryTerminalReceipt(bytes),/cursor/);
+  put(2,2);
+  assert.throws(()=>decodeRuntimeMatchHistoryTerminalReceipt(bytes),/flags/);
+});
+
+test('frozen replay binds the selected native ticket and finishes through terminal cmd20',async()=>{
+  const f=confirmedPrefixFixture(),{module}=f,owner=createRuntimeMatchHistoryController(module);
+  owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
+  owner.identity(host);owner.enableArenaHistory();
+  await owner.command('capture');
+  f.setPhase(11,{currentFrame:0,sealedEnd:4,incarnation:1,restoreCount:1,
+    forwardSteps:4,replaySteps:0,pollSerial:991n,inputReady:1});
+  const {raw,bytes}=f.rows[0],row=bytes.slice(),rowView=new DataView(row.buffer);
+  rowView.setUint32(12,0,true);rowView.setUint32(28,2,true);
+  module.HEAPU8.set(row,17408);
+  module[prefix+'input_row_data']=ordinal=>ordinal===0?17408:0;
+  const terminal=new Uint8Array(104),view=new DataView(terminal.buffer);
+  [1,104,3,1,0,0,0,1,1,0,700,0,1,0].forEach((value,index)=>view.setUint32(index*4,value,true));
+  [30n,31n,31n,41n,9n,rowView.getBigUint64(32,true)]
+    .forEach((value,index)=>view.setBigUint64(56+index*8,value,true));
+  module.HEAPU8.set(terminal,17664);
+  module[prefix+'terminal_receipt_bytes']=()=>104;
+  module[prefix+'terminal_receipt_data']=()=>17664;
+  const complete=(command,phase,extra={})=>{
+    const next=f.state.requestSequence+1;
+    f.calls.push(command);
+    f.setPhase(phase,{requestSequence:next,completeSequence:next,lastCommand:command,...extra});
+    return 1;
+  };
+  module[prefix+'request_episode_replay']=id=>{
+    assert.equal(id,700);
+    return complete(15,11,{replaySteps:1});
+  };
+  module[prefix+'request_prefix_finish']=frame=>{
+    assert.equal(frame,0,'authored frame may equal PRE on the first terminal traversal');
+    return complete(20,31,{sealedEnd:0});
+  };
+  module[prefix+'prefix_handoff_json']=()=>assert.fail('terminal cmd20 has no ordinary prefix handoff');
+  // Real retained ticket IDs precede the replay command sequence.
+  f.setPhase(11,{requestSequence:701,completeSequence:701});
+  const replay=await owner.replayTicket(700,raw);
+  assert.equal(replay.metadata.currentFrame,0);
+  assert.equal(owner.terminalReceipt().selectedOrdinal,1);
+  const finish=await owner.command('finishPrefix',0);
+  assert.equal(finish.metadata.phase,31);
+  module[prefix+'request']=command=>{
+    if(command===19)return complete(command,30);
+    assert.equal(command,5);
+    return complete(command,33);
+  };
+  const presented=await owner.command('recordingPresent');
+  assert.equal(presented.metadata.phase,30);
+  const idle=await owner.command('idle');
+  assert.equal(idle.metadata.phase,33);
+  assert.equal(idle.metadata.currentFrame,0);
+  assert.equal(idle.metadata.forwardSteps,4,'retained suffix remains available');
+  assert.deepEqual(f.calls,[1,15,20,19,5]);
+});
+
+test('terminal tail and final records preserve independent first and selected anchors',()=>{
+  for(const [firstOrdinal,selectedOrdinal] of [[44,42],[42,44]]){
+    const consumedOrdinal=155,anchor=9007199254741000n;
+    const tick=ordinal=>(anchor+BigInt(ordinal)).toString();
+    const sourceFrame=selectedOrdinal-1;
+    const common={requestSequence:130,firstSourceFrame:firstOrdinal-1,firstOrdinal,
+      firstCompletedTick:tick(firstOrdinal),selectedSourceFrame:sourceFrame,selectedOrdinal,
+      selectedCompletedTick:tick(selectedOrdinal),sourceFrame,consumedOrdinal,
+      completedTick:tick(consumedOrdinal),localPort:0,remotePort:1,worldGeneration:'10',contextEpoch:'9'};
+    const tail={...common,schema:'melee-web-runtime-terminal-tail-v1',preSourceFrame:40,preOrdinal:40,
+      preCompletedTick:tick(40),selectedTicketId:71,selectedPollSerial:'72',incarnation:1,
+      suffixCount:1,suffixCursor:1};
+    const final={...common,schema:'melee-web-runtime-terminal-final-v1',lastInputOrdinal:154,
+      ticketId:129,pollSerial:'130',outcome:2,winner:1,randomSeed:7,presentationSerial:'155',
+      submission:'160',checksumTick:154,checksumFrame:sourceFrame};
+    assert.equal(decodeRuntimeMatchHistoryTerminalTail(JSON.stringify(tail)).firstOrdinal,firstOrdinal);
+    assert.equal(decodeRuntimeMatchHistoryTerminalFinal(JSON.stringify(final)).selectedOrdinal,selectedOrdinal);
+    assert.throws(()=>decodeRuntimeMatchHistoryTerminalTail(JSON.stringify({...tail,
+      preCompletedTick:tick(41)})),/PRE anchor/);
+    assert.throws(()=>decodeRuntimeMatchHistoryTerminalFinal(JSON.stringify({...final,
+      firstCompletedTick:tick(firstOrdinal+1)})),/selected anchor/);
+  }
+});
+
+test('paced network wait binds the missing row and keeps the original fractional debt',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();await owner.command('capture');f.put(56,21);
+  module[prefix+'pacing_start']=()=>1;owner.pacingStart();
+  const pointer=24576;
+  let active=0,excludedMs=0,totalExcludedMs=0,pendingTicks=2.375;
+  const calls=[];
+  module[prefix+'pacing_wait_begin']=(kind,tick)=>{
+    calls.push(['begin',kind,tick]);active=1;excludedMs=0;return 1;
+  };
+  module[prefix+'pacing_wait_end']=(kind,tick)=>{
+    calls.push(['end',kind,tick]);active=0;excludedMs=113.5;totalExcludedMs+=excludedMs;return 1;
+  };
+  module[prefix+'pacing_wait_json']=()=>{
+    module.HEAPU8.set(new TextEncoder().encode(JSON.stringify({schema:1,active,kind:1,
+      inputOrdinal:6,sourceFrame:0,phase:21,requestSequence:1,excludedMs,totalExcludedMs,
+      pendingTicks})+'\0'),pointer);
+    return pointer;
+  };
+  assert.equal(owner.pacingWaitBegin(1,6).pendingTicks,2.375);
+  await assert.rejects(owner.command('recordingPresent'),/owned network wait/);
+  assert.throws(()=>owner.pacingSample(1),/owned network wait/);
+  assert.throws(()=>owner.pacingWaitEnd(1,7),/exact active native pacing owner/);
+  const ended=owner.pacingWaitEnd(1,6);
+  assert.equal(ended.excludedMs,113.5);
+  assert.equal(ended.pendingTicks,2.375);
+  assert.deepEqual(calls,[['begin',1,6],['end',1,6]]);
+  owner.pacingWaitBegin(1,6);
+  pendingTicks=0;
+  assert.throws(()=>owner.pacingWaitEnd(1,6),/changed owner, duration, or debt/);
 });

@@ -11,16 +11,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
-import {createRoomId} from './net_lockstep_websocket_relay.mjs';
+import {createRoomId,validateRoomRelayBaseUrl} from './net_lockstep_websocket_relay.mjs';
 import {parseNetChecksum} from './net_lockstep_core.mjs';
 import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
-  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS}
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS,
+  RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS}
   from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
+import {resolveRoomRelayMode} from './a3_public_relay_preflight.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions,loadBrowserTools} from './browser_tools.mjs';
 import {createRuntimeMatchAdmission} from './runtime_match_history_admission.mjs';
+import {observeRuntimeOwner} from '../tests/runtime_owner_observation.mjs';
+import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
+import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
 import {validateCpuRestoreConfiguration} from '../src/slippi_profile/tests/cpu_restore_runner.mjs';
 import {compareCpuReferenceParticleEndpoints,CPU_ENDPOINT_PROVENANCE,CPU_ENDPOINT_VIEW,
   decodeCpuParticleEndpointResult} from '../src/slippi_profile/tests/cpu_endpoint.mjs';
@@ -37,21 +42,24 @@ const P1_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
-const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows'];
+const optionNames=['url','disc','out','playwright','runtime-wasm-sha256','linked-config','manifest','map','phase','windows','relay-url','relay-preflight'];
 const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[name,{type:'string'}])),
   'runtime-incidents':{type:'boolean',default:false},
   'arena-history':{type:'boolean',default:false},'present-forward':{type:'boolean',default:false},
   'inline-dispatch':{type:'boolean',default:false},'profile-history':{type:'boolean',default:false}},strict:true});
-for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
+for(const name of optionNames.filter(name=>!['windows','relay-url','relay-preflight'].includes(name)))
+  if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn','paced-3600-match-final'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 const repeatPrefix=values.phase==='repeated-confirmed-prefix';
 const pacedLatePiece=values.phase==='paced-120-late-piece';
 const pacedRespawn=values.phase==='paced-600-respawn';
-const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs'||pacedLatePiece||pacedRespawn;
-const pacedInputTicks=pacedRespawn?RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS:
+const pacedFullMatch=values.phase==='paced-3600-match-final';
+const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs'||pacedLatePiece||pacedRespawn||pacedFullMatch;
+const pacedInputTicks=pacedFullMatch?RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS:
+  pacedRespawn?RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS:
   values.phase==='paced-120-inputs'||pacedLatePiece?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
   RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
 const paced120=pacedInputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
@@ -59,9 +67,9 @@ const confirmedPrefix=values.phase==='confirmed-prefix'||repeatPrefix;
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),'--arena-history requires an arena episode');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn','paced-3600-match-final'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn','paced-3600-match-final'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
@@ -78,6 +86,24 @@ assert(['127.0.0.1','localhost','[::1]'].includes(baseUrl.hostname),'The runtime
 if(values.phase!=='held-statics')
   assert(['http://127.0.0.1:8787','http://localhost:8787'].includes(baseUrl.origin),
     'Peer correction needs a loopback runtime origin allowed by the pinned Worker on port 8787');
+let relayPreflightInput;
+let relayPreflightSha256=null;
+if(values['relay-preflight']!==undefined){
+  const preflightBytes=await fs.readFile(path.resolve(values['relay-preflight']));
+  assert(preflightBytes.length>0&&preflightBytes.length<=65536,
+    '--relay-preflight must be a nonempty JSON file no larger than 64 KiB');
+  try{relayPreflightInput=JSON.parse(preflightBytes.toString('utf8'));}
+  catch(error){throw Error('--relay-preflight is not valid JSON: '+String(error?.message||error));}
+  relayPreflightSha256=createHash('sha256').update(preflightBytes).digest('hex');
+}
+const relayMode=resolveRoomRelayMode({relayUrl:values['relay-url'],preflight:relayPreflightInput,
+  clientOrigin:baseUrl.origin});
+assert(relayMode.mode==='local'||values.phase!=='held-statics',
+  'External relay mode requires a phase that opens browser-owned peer sockets');
+const externalRelayPreflight=relayMode.mode==='external'?{
+  file:path.basename(path.resolve(values['relay-preflight'])),sha256:relayPreflightSha256,
+  binding:relayMode,independent_live_provider_verification:false,
+}:null;
 const discPath=path.resolve(values.disc),out=path.resolve(values.out);
 for(const file of [discPath,values['linked-config'],values.manifest,values.map])await fs.access(path.resolve(file));
 try{await fs.access(out);throw Error(`Refusing to overwrite evidence directory ${out}`);}
@@ -87,6 +113,47 @@ await fs.mkdir(out,{recursive:true});
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
 const hashFile=async file=>{
   const digest=createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');
+};
+const peerRelayOwnerAdapter=async({relayMode,roomId,producer,evidenceDir,diagnostic,
+  startLocalWorker,preflight})=>{
+  if(relayMode.mode==='external'){
+    const expectedSocketUrl=`${validateRoomRelayBaseUrl(relayMode.endpoint.url)}/v1/rooms/${roomId}/socket`;
+    const cleanupReceipt=items=>{
+      const byRole=items.map(item=>{
+        const observed=[...(item.websockets??[])];
+        const matching=observed.filter(url=>url===expectedSocketUrl);
+        const unexpected=observed.filter(url=>url!==expectedSocketUrl);
+        return {role:item.role,expected_url:expectedSocketUrl,
+          expected_socket_observed_count:matching.length,
+          missing_expected_socket:matching.length===0,
+          duplicate_expected_sockets:matching.length>1,
+          peer_close_acknowledged:item.peerClosed===true,
+          expected_socket_closed:matching.length===1&&item.peerClosed===true,
+          other_observed_urls:unexpected};
+      });
+      const requiredRoles=['alpha','beta'];
+      const rolesComplete=byRole.length===requiredRoles.length&&
+        requiredRoles.every(role=>byRole.filter(row=>row.role===role).length===1);
+      const allExpectedPeerSocketsClosed=rolesComplete&&byRole.every(row=>row.expected_socket_closed&&
+        row.other_observed_urls.length===0);
+      return {external_worker:{owned:false,mutated:false,dispose_requested:false,
+        idle_status:'unknown; external service state was not queried'},
+        expected_browser_peer_sockets:byRole,
+        all_expected_browser_peer_sockets_closed:allExpectedPeerSocketsClosed};
+    };
+    return {owner:null,relayUrl:relayMode.endpoint.url,roomId,
+      cleanupReceipt,
+      report:{mode:'external',base:null,port:null,relay_url:relayMode.endpoint.url,room_id:roomId,
+        external_worker:{owned:false,mutated:false,dispose_requested:false,
+          lifecycle:'external service; harness will not stop or dispose it',idle_status:'unknown'},
+        preflight,transport:'existing pinned external Worker relay; one browser-page WebSocket per peer for the diagnostic'}};
+  }
+  const owner=await startLocalWorker({producer,evidenceDir,diagnostic});
+  const relayUrl=`ws://127.0.0.1:${owner.port}`;
+  return {owner,relayUrl,roomId,cleanupReceipt:null,
+    report:{base:owner.base,port:owner.port,relay_url:relayUrl,room_id:roomId,
+      owner_process:owner.ownerProcess,runtime_identity:owner.runtimeIdentity,hashes:owner.hashes,
+      transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for the diagnostic'}};
 };
 const configPath=path.resolve(values['linked-config']),manifestPath=path.resolve(values.manifest),mapPath=path.resolve(values.map);
 const config=JSON.parse(await fs.readFile(configPath,'utf8'));
@@ -263,7 +330,7 @@ function noteMissingIncident(evidence,step,error){
   (evidence.missing_evidence??=[]).push({step,message:String(error?.message??error)});
 }
 const addCheck=(name,details=null)=>report.checks.push({name,details});
-const owned=[];let resultError=null,relayRuntime=null;
+const owned=[];let resultError=null,relayRuntime=null,externalRelayCleanupReceipt=null;
 // All launched operations must settle before cleanup can inspect their owners.
 async function joinOwned(label,operations){
   let firstFailure=null;
@@ -931,14 +998,15 @@ function byteDifference(left,right){
   }
   return {equal:count===0,bytes_left:left.length,bytes_right:right.length,different_byte_count:count,first_mismatch:first};
 }
-async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad,deferredLocalTick=null,deferredLocalTicks){
+async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad,
+  deferredLocalTick=null,deferredLocalTicks,matchFinal=false){
   const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
-  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks})=>{
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks,matchFinal})=>{
     const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
-    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks});
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks,matchFinal});
   },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
       new URL('/__melee_diag__/',baseUrl)).href,
-    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks});
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks,matchFinal});
 }
 function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus,{endView='DRAW_END'}={}){
   assert.equal(oldEnd.view,endView==='CPU_END'?CPU_ENDPOINT_VIEW.cpuEnd:CPU_ENDPOINT_VIEW.drawEnd);
@@ -1173,18 +1241,23 @@ async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionS
     receivedBetaPad:actualP2,drawEndpoints:[alphaDraw,betaDraw]};
 }
 
-async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads,deferredLocalTick=null,deferredLocalTicks){
+async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads,
+  deferredLocalTick=null,deferredLocalTicks,matchFinal=false){
   for(const item of [alpha,beta])
     report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
-  const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
-    diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));}});
-  const roomId=createRoomId(),relayUrl=`ws://127.0.0.1:${roomRelay.port}`;
-  peerReport.relay={base:roomRelay.base,port:roomRelay.port,relay_url:relayUrl,room_id:roomId,
-    owner_process:roomRelay.ownerProcess,runtime_identity:roomRelay.runtimeIdentity,hashes:roomRelay.hashes,
-    transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for the diagnostic'};
+  const relay=await peerRelayOwnerAdapter({relayMode,roomId:createRoomId(),
+    producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
+    diagnostic:message=>{(peerReport.relay_diagnostics??=[]).push(String(message));},
+    startLocalWorker:startRoomRelayRuntime,preflight:externalRelayPreflight});
+  relayRuntime=relay.owner;
+  externalRelayCleanupReceipt=relay.cleanupReceipt;
+  const {roomId,relayUrl}=relay;
+  peerReport.relay=relay.report;
   await joinOwned('peer-bridge-install',[
-    installPeerHistoryBridge(alpha,relayUrl,roomId,inputTicks,initialRemotePads?.alpha).then(value=>{alpha.peerInstalled=true;return value;}),
-    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta,deferredLocalTick,deferredLocalTicks).then(value=>{beta.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(alpha,relayUrl,roomId,inputTicks,initialRemotePads?.alpha,
+      null,undefined,matchFinal).then(value=>{alpha.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta,
+      deferredLocalTick,deferredLocalTicks,matchFinal).then(value=>{beta.peerInstalled=true;return value;}),
   ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
   for(const item of [alpha,beta]){
     const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
@@ -1511,34 +1584,40 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
 async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const items=[alpha,beta],targetFrame=inputTicks,paced120=inputTicks===120;
   const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
-  const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:latePiece?[26]:[];
-  const lateKeys=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
+  const fullMatch=inputTicks===RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS;
+  const stockoutScenario=respawn||fullMatch;
+  const networkBackpressure=fullMatch&&relayMode.mode==='external';
+  const lateTicks=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:latePiece?[26]:[];
+  const lateKeys=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const neutral=Buffer.alloc(11);
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
-  if(!respawn)assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
+  if(!stockoutScenario)assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
     'Both scripted first local inputs must differ from the actual held-prefix prediction');
-  const proof=report.peer_correction={claim:respawn?'bounded 600-input paced local trace, RIGHT/LEFT/RIGHT late inputs, P1 platform exit and stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
+  const proof=report.peer_correction={claim:fullMatch?'fixed 3600-input whole-match capacity, three actual late P2 corrections, repeated P1 stock losses, native terminal tail and final wire agreement':respawn?'bounded 600-input paced local trace, RIGHT/LEFT/RIGHT late inputs, P1 platform exit and stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
       'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
     scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
-    checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
+    checksum_exchange:fullMatch?'exact native terminal 64-byte checksum and pre-close outcome acknowledged on wire; published winner compared locally at Results':
+      'none; full native confirmed post-draw checksum compared locally',
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
     ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
       key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{}),
-    ...(respawn?{late_corrections:[],respawn_recovery:null}:{})};
-  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},latePiece?26:null,respawn?lateTicks:undefined);
+    ...(respawn?{late_corrections:[],respawn_recovery:null}:{}),
+    ...(fullMatch?{late_corrections:[],full_match_stockouts:null,network_wait:{},native_network_wait:{}}: {})};
+  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},
+    latePiece?26:null,stockoutScenario?lateTicks:undefined,fullMatch);
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
-    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece})=>{
+    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece,fullMatch,networkBackpressure})=>{
       const {installRuntimePacedHistoryProbe}=await import(moduleUrl);
-      installRuntimePacedHistoryProbe({role,inputTicks,lateClassPiece:latePiece});
+      installRuntimePacedHistoryProbe({role,inputTicks,lateClassPiece:latePiece,matchFinal:fullMatch,networkBackpressure});
       return globalThis.__meleeRuntimePacedHistory.prepare();
-    },{moduleUrl,role:item.role,inputTicks,latePiece});
+    },{moduleUrl,role:item.role,inputTicks,latePiece,fullMatch,networkBackpressure});
   }));
   for(const item of items){
     await item.page.locator('#canvas').focus();
     assert.equal(await item.page.evaluate(()=>document.activeElement?.id),'canvas');
-    if(!respawn){
+    if(!stockoutScenario){
       item.keyToRelease=item.role==='alpha'?'KeyD':'ArrowLeft';
       await item.page.keyboard.down(item.keyToRelease);
     }
@@ -1579,13 +1658,107 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         }
       };
       const beta=items.find(item=>item.role==='beta'),alpha=items.find(item=>item.role==='alpha');
+      const driveFullMatchStockCycles=async()=>{
+        const initial=await awaitGate(alpha.page.evaluate(()=>
+          globalThis.__meleeRuntimePacedHistory.waitForFullMatchWalkStart()),
+        'Full-match initial P1 walk-off sample');
+        assert.equal(initial.kind,'post-present-idle');
+        assert(initial.frame>=28);
+        assert.deepEqual(initial.players.map(player=>player.stocks),[4,4]);
+        const outwardKey=player=>{
+          if(!Number.isFinite(player?.x)||![-1,1].includes(player?.facing_direction))
+            throw Error('P1 walk-off direction requires actual finite source position and facing');
+          return player.x<0?'KeyA':player.x>0?'KeyD':
+            player.facing_direction===-1?'KeyA':'KeyD';
+        };
+        const padForKey=key=>key==='KeyA'?P1_LEFT:P1_RIGHT;
+        const startWalk=async(stock,sample)=>{
+          const key=outwardKey(sample.players[0]);
+          await alpha.page.keyboard.down(key);alpha.keyToRelease=key;
+          if(stock===4)await alpha.page.evaluate(()=>
+            globalThis.__meleeRuntimePacedHistory.resumeFullMatchWalkStart());
+          else await alpha.page.evaluate(value=>
+            globalThis.__meleeRuntimePacedHistory.resumeFullMatchGroundedRespawn(value),stock);
+          return {stock_before:stock,key,first_source_tick:sample.frame,
+            source_pad:[...padForKey(key)]};
+        };
+        proof.full_match_stockouts={initial_walk_start:initial,walks:[],platform_exits:[],cycles:[],
+          final_walkoff:null,terminal_entry:'pending-native-terminal-cursor'};
+        let currentWalk=await startWalk(4,initial);
+        for(const stockBefore of [4,3,2]){
+          const loss=await awaitGate(alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.waitForFullMatchStockLoss(stock),stockBefore),
+          `P1 actual ${stockBefore}-to-${stockBefore-1} stock change`);
+          assert.equal(loss.sample?.kind,'post-present-idle');
+          assert.equal(loss.sample.players[0].stocks,stockBefore-1);
+          assert.equal(loss.sample.players[1].stocks,4);
+          assert.equal(loss.poll?.localPort,0);assert.equal(loss.poll?.remotePort,1);
+          assert.equal(loss.poll?.sourceFrame,loss.sample.frame-1);
+          assert.deepEqual(Buffer.from(loss.poll.raw).subarray(0,11),padForKey(currentWalk.key),
+            'Stock decrement did not follow the retained actual held-key P1 poll');
+          const walk={...currentWalk,last_source_tick:loss.poll.sourceFrame,
+            loss_sample:loss.sample,loss_poll:{sourceFrame:loss.poll.sourceFrame,
+              ticketId:loss.poll.ticketId,pollSerial:loss.poll.pollSerial,
+              actual_local_pad:[...Buffer.from(loss.poll.raw).subarray(0,11)]}};
+          proof.full_match_stockouts.walks.push(walk);
+          await alpha.page.keyboard.up(currentWalk.key);alpha.keyToRelease=null;
+          await alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.resumeFullMatchStockLoss(stock),stockBefore);
+
+          const stockAfter=stockBefore-1;
+          const platform=await awaitGate(alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.waitForFullMatchPlatform(stock),stockAfter),
+          `P1 ${stockAfter}-stock RebirthWait platform sample`);
+          const p1=platform.players?.[0];
+          assert.equal(platform.kind,'post-present-idle');
+          assert(p1&&p1.stocks===stockAfter&&p1.motion===13&&p1.groundAir===1,
+            'P1 stock recovery requires the actual airborne RebirthWait platform state');
+          assert(Number.isFinite(p1.facing_direction)&&[-1,1].includes(p1.facing_direction)&&
+            Number.isFinite(p1.x)&&Number.isFinite(p1.y),
+          'P1 platform exit requires actual finite facing and position');
+          const exitKey=p1.facing_direction===-1?'KeyA':'KeyD';
+          const exitPad=p1.facing_direction===-1?P1_LEFT:P1_RIGHT;
+          await alpha.page.keyboard.down(exitKey);alpha.keyToRelease=exitKey;
+          await alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.resumeFullMatchPlatform(stock),stockAfter);
+          const exit=await awaitGate(alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.waitForFullMatchPlatformExit(stock),stockAfter),
+          `P1 ${stockAfter}-stock one-poll platform exit`);
+          assert.equal(exit.sample?.frame,platform.frame+1);
+          assert.equal(exit.poll?.sourceFrame,platform.frame);
+          assert.equal(exit.poll?.localPort,0);assert.equal(exit.poll?.remotePort,1);
+          assert.deepEqual(Buffer.from(exit.poll.raw).subarray(0,11),exitPad,
+            'P1 platform exit did not use one actual facing-directed input poll');
+          await alpha.page.keyboard.up(exitKey);alpha.keyToRelease=null;
+          await alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.resumeFullMatchPlatformExit(stock),stockAfter);
+          const grounded=await awaitGate(alpha.page.evaluate(stock=>
+            globalThis.__meleeRuntimePacedHistory.waitForFullMatchGroundedRespawn(stock),stockAfter),
+          `P1 ${stockAfter}-stock grounded Wait14 respawn`);
+          assert.equal(grounded.kind,'post-present-idle');
+          assert(grounded.players?.[0]?.stocks===stockAfter&&grounded.players[0].motion===14&&
+            grounded.players[0].groundAir===0,
+          'P1 next walk-off requires the actual grounded Wait14 respawn');
+          proof.full_match_stockouts.platform_exits.push({stock_after:stockAfter,
+            platform_sample:platform,exit_key:exitKey,exit_pad:[...exitPad],
+            input_poll:{sourceFrame:exit.poll.sourceFrame,ticketId:exit.poll.ticketId,
+              pollSerial:exit.poll.pollSerial,actual_local_pad:[...Buffer.from(exit.poll.raw).subarray(0,11)]},
+            completed_frontier:exit.sample.frame,keyup_before_source_tick:exit.sample.frame});
+          proof.full_match_stockouts.cycles.push({stock_before:stockBefore,stock_after:stockAfter,
+            loss,platform,exit,grounded});
+          currentWalk=await startWalk(stockAfter,grounded);
+        }
+        proof.full_match_stockouts.final_walkoff={...currentWalk,
+          stock_after_third_respawn:1,terminal_entry:'pending-native-terminal-cursor'};
+        return null;
+      };
       for(const tick of lateTicks){
-        const event=respawn?{target_source_tick:tick}:proof.late_class_piece;
+        const event=stockoutScenario?{target_source_tick:tick}:proof.late_class_piece;
         const lateIndex=lateTicks.indexOf(tick);
-        const inputKey=respawn?lateKeys[lateIndex]:'ArrowRight';
+        const inputKey=stockoutScenario?lateKeys[lateIndex]:'ArrowRight';
         const expectedBetaPad=inputKey==='ArrowLeft'?P2_LEFT:P2_RIGHT;
-        if(respawn)event.expected_key=inputKey;
-        if(respawn)proof.late_corrections.push(event);
+        if(stockoutScenario)event.expected_key=inputKey;
+        if(stockoutScenario)proof.late_corrections.push(event);
         event.coordination??=[];
         const inputGate=await timedCoordination(event,'beta-input-gate',()=>awaitGate(
           beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange(t),tick),
@@ -1600,7 +1773,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
           beta.page.evaluate(args=>{
             const api=globalThis.__meleeRuntimePacedHistory;
             const change=api.noteLateKeyChange(args);api.resumeLateKeyChange(args.tick);return change;
-          },{tick,from:respawn?null:'ArrowLeft',to:inputKey}));
+          },{tick,from:stockoutScenario?null:'ArrowLeft',to:inputKey}));
         event.keyboard_change=keyboardChange;
         const [betaReleaseGate,alphaFrontier]=await Promise.all([
           timedCoordination(event,'beta-packet-gate',()=>awaitGate(
@@ -1637,19 +1810,27 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         event.beta_release_gate=betaReleaseGate;
         event.alpha_frontier=alphaFrontier;
         event.beta_native_poll=betaEvidence.poll;
-        if(respawn)await timedCoordination(event,'beta-release-key',async()=>{
+        if(stockoutScenario)await timedCoordination(event,'beta-release-key',async()=>{
           await beta.page.keyboard.up(inputKey);beta.keyToRelease=null;
         });
-        const alphaReceiptTask=timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
+        const receiveAlpha=released=>timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
           alpha.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.waitLateRemotePairAndResume(args),{
-            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:respawn}),
+            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:stockoutScenario,released}),
           'Late target and following-neutral receipts'));
-        const betaReleaseTask=timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
+        const releaseBeta=()=>timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
           beta.page.evaluate(async tick=>{
             const api=globalThis.__meleeRuntimePacedHistory;
             const released=await api.releaseLatePacket(tick);api.resumeLatePacket(tick);return released;
           },tick),'Late beta packet release and source resume'));
-        const [received,released]=await Promise.all([alphaReceiptTask,betaReleaseTask]);
+        let received,released;
+        if(networkBackpressure){
+          // Deliberate hold, keyboard and release coordination remain charged.
+          released=await releaseBeta();
+          received=await receiveAlpha(released);
+          event.post_release_network_waits=received.networkWaits;
+        }else{
+          [received,released]=await Promise.all([receiveAlpha(null),releaseBeta()]);
+        }
         const remote=received.target;
         assert.deepEqual(Buffer.from(remote.pad),Buffer.from(betaEvidence.poll.raw).subarray(11,22),
           'Released peer packet differs from the actual beta poll');
@@ -1657,7 +1838,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         assert.equal(remote.sender_role,'beta');
         assert.equal(remote.remote_port,1);
         assert.equal(released.poll_serial,betaEvidence.poll.pollSerial);
-        if(respawn){
+        if(stockoutScenario){
           assert.deepEqual(Buffer.from(received.followingNeutral.pad),neutral);
           event.following_remote_receipt=received.followingNeutral;
         }
@@ -1719,6 +1900,11 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
             signalWalkFailure({walkError});
             return {walkError};
           });
+        }else if(fullMatch&&tick===lateTicks[0]){
+          walkStopTask=driveFullMatchStockCycles().catch(walkError=>{
+            signalWalkFailure({walkError});
+            return {walkError};
+          });
         }
       }
       const walkResult=await walkStopTask;
@@ -1750,13 +1936,92 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const [a,b]=items.map(item=>proof.pages[item.role].paced);
   for(const item of items){
     const run=proof.pages[item.role].paced;
-    assert.equal(run.result,respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
-    assert.equal(run.input_ticks,targetFrame);
-    assert.equal(run.polls.length,targetFrame);
-    assert.deepEqual(run.polls.map(row=>row.sourceFrame),Array.from({length:targetFrame},(_,tick)=>tick));
-    assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,targetFrame);
+    const consumedTicks=fullMatch?run.input_ticks:targetFrame;
+    assert.equal(run.result,fullMatch?'PACED_3600_MATCH_FINAL_COMPLETE':
+      respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE',
+      `${item.role}: ${JSON.stringify(run.failure)}`);
+    if(fullMatch){
+      assert.equal(run.input_capacity_ticks,targetFrame);
+      const networkWait=run.network_wait;
+      assert(networkWait&&Number.isSafeInteger(networkWait.count)&&networkWait.count>=0&&
+        Number.isFinite(networkWait.elapsed_ms)&&networkWait.elapsed_ms>=0&&
+        networkWait.by_kind&&typeof networkWait.by_kind==='object'&&!Array.isArray(networkWait.by_kind),
+      `${item.role} full match lacks its host-observed network-wait summary`);
+      for(const [kind,wait] of Object.entries(networkWait.by_kind))
+        assert(Number.isSafeInteger(wait.count)&&wait.count>=0&&
+          Number.isFinite(wait.elapsed_ms)&&wait.elapsed_ms>=0,
+        `${item.role} has malformed ${kind} network-wait measurements`);
+      proof.network_wait[item.role]={count:networkWait.count,elapsed_ms:networkWait.elapsed_ms,
+        by_kind:structuredClone(networkWait.by_kind)};
+      const nativeWait=run.native_network_wait;
+      assert(Array.isArray(nativeWait)&&nativeWait.length%2===0&&
+        nativeWait.every((row,index)=>row.active===(index%2===0?1:0)));
+      assert(networkBackpressure||nativeWait.length===0);
+      proof.native_network_wait[item.role]={count:nativeWait.length/2,
+        excluded_ms:nativeWait.at(-1)?.totalExcludedMs??0,
+        scope:'admitted source-time backpressure; excluded wall time is not cadence evidence'};
+      assert(Number.isSafeInteger(consumedTicks)&&consumedTicks>0&&consumedTicks<=targetFrame,
+        'Full match must finish within its fixed 3600-input capacity');
+      const final=run.terminal_final?.receipt;
+      assert(final,'Full match lacks its copied native terminal-final receipt');
+      assert.equal(final.consumedOrdinal,consumedTicks);
+      assert.equal(final.lastInputOrdinal,consumedTicks-1);
+      assert.equal(final.outcome,2,'Native source did not report the expected stock-elimination outcome');
+      assert.equal(final.winner,-1,'Pre-close winner must remain unpublished until original VS exit');
+      assert(Number.isInteger(final.randomSeed)&&final.randomSeed>=0&&final.randomSeed<=0xffffffff,
+        'Native terminal receipt is missing its exact source random seed');
+      assert.equal(run.finalOwner?.ownerState,2);
+      assert.equal(run.finalOwner?.metadata?.phase,41);
+      assert.equal(run.finalOwner?.lastCompletedCommand,30);
+      assert.equal(run.finalTimeline?.simulated_through,consumedTicks-1);
+      assert.equal(run.finalTimeline?.remote_contiguous_through,consumedTicks-1);
+      assert.equal(run.finalTimeline?.confirmed_through,consumedTicks-1);
+      assert.equal(run.finalTimeline?.dirty_from,null);
+      assert.equal(run.finalTimeline?.plan_outstanding,false);
+      assert.equal(run.finalChecksum?.bytes?.length,64);
+      assert.deepEqual(run.finalChecksum.bytes,run.terminal_final.checksum);
+      assert.equal(run.finalChecksum.tick,final.lastInputOrdinal);
+      assert.equal(run.finalChecksum.frame,final.sourceFrame);
+      assert.equal(final.checksumTick,final.lastInputOrdinal);
+      assert.equal(final.checksumFrame,final.sourceFrame);
+      const agreement=run.terminal_final.agreement;
+      assert.equal(agreement.accepted_by,'lockstep-match-final');
+      assert.equal(agreement.input_ordinal,final.lastInputOrdinal);
+      assert.equal(agreement.source_frame,final.sourceFrame);
+      assert.equal(agreement.outcome,final.outcome);
+      assert.equal(agreement.winner,final.winner);
+      assert.equal(agreement.matched_bytes,64);
+      assert.match(agreement.agreement_hash,/^[0-9a-f]{64}$/);
+      assert.equal(run.authoritativeInputs.length,consumedTicks);
+      assert(run.authoritativeInputs.every((row,index)=>row.tick===index&&row.bytes.length===44));
+      assert.equal(run.polls.length,consumedTicks);
+      assert.deepEqual(run.polls.map(row=>row.inputOrdinal??row.sourceFrame),
+        Array.from({length:consumedTicks},(_,tick)=>tick));
+      assert(run.polls.every((row,tick)=>row.sourceFrame===
+        (row.inputOrdinal===undefined?tick:final.sourceFrame)));
+    }else{
+      assert.equal(run.input_ticks,targetFrame);
+      assert.equal(run.polls.length,targetFrame);
+      assert.deepEqual(run.polls.map(row=>row.sourceFrame),Array.from({length:targetFrame},(_,tick)=>tick));
+    }
+    assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,consumedTicks);
     for(const row of run.polls){
-      const expectedPad=respawn
+      const inputTick=row.inputOrdinal??row.sourceFrame;
+      const expectedPad=fullMatch
+        ?item.role==='beta'?(lateTicks.includes(inputTick)
+            ?(lateKeys[lateTicks.indexOf(inputTick)]==='ArrowLeft'?P2_LEFT:P2_RIGHT):neutral)
+          :(()=>{
+            const stockouts=proof.full_match_stockouts;
+            const walk=stockouts.walks.find(value=>inputTick>=value.first_source_tick&&
+              inputTick<=value.last_source_tick);
+            if(walk)return Buffer.from(walk.source_pad);
+            const exit=stockouts.platform_exits.find(value=>inputTick===value.input_poll.sourceFrame);
+            if(exit)return Buffer.from(exit.exit_pad);
+            const finalWalk=stockouts.final_walkoff;
+            if(finalWalk&&inputTick>=finalWalk.first_source_tick)return Buffer.from(finalWalk.source_pad);
+            return neutral;
+          })()
+        :respawn
         ? item.role==='beta'?(lateTicks.includes(row.sourceFrame)
             ?(lateKeys[lateTicks.indexOf(row.sourceFrame)]==='ArrowLeft'?P2_LEFT:P2_RIGHT):neutral)
           :row.sourceFrame===proof.respawn_recovery?.source_tick
@@ -1769,37 +2034,57 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         expectedPad);
     }
     assert(run.clock.length>8&&run.clock.every(row=>!row.stalled));
-    assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),targetFrame);
+    assert.equal(run.clock.reduce((sum,row)=>sum+row.steps,0),
+      consumedTicks);
     assert(run.callbacks.length>0&&run.callbacks.every(row=>row.grants<=8&&row.reconciliations<=1));
     assert(run.corrections.every(row=>row.frontier-row.pre<=7),
       'Paced correction crossed the existing seven-source-tick native window');
-    assert.equal(run.callbacks.reduce((sum,row)=>sum+row.grants,0),targetFrame);
-    assert.equal(run.finalOwner.metadata.currentFrame,targetFrame);
-    assert.equal(run.finalTimeline.simulated_through,targetFrame-1);
-    assert.equal(run.finalTimeline.remote_contiguous_through,targetFrame-1);
-    assert.equal(run.finalTimeline.confirmed_through,targetFrame-1);
+    assert.equal(run.callbacks.reduce((sum,row)=>sum+row.grants,0),
+      consumedTicks);
+    assert.equal(run.finalOwner.metadata.currentFrame,fullMatch?
+      run.terminal_final.receipt.sourceFrame:targetFrame);
+    assert.equal(run.finalTimeline.simulated_through,consumedTicks-1);
+    assert.equal(run.finalTimeline.remote_contiguous_through,consumedTicks-1);
+    assert.equal(run.finalTimeline.confirmed_through,consumedTicks-1);
     assert.equal(run.finalTimeline.dirty_from,null);
     assert.equal(run.finalTimeline.max_prediction_ticks,7);
     assert.equal(run.finalTimeline.max_history_ticks,8);
     assert.equal(run.finalTimeline.max_lookahead_ticks,8);
-    assert.equal(run.finalOwner.metadata.phase,18);
+    assert.equal(run.finalOwner.metadata.phase,fullMatch?41:18);
+    if(!fullMatch)assert.equal(run.finalOwner.ownerState,1);
     assert.equal(run.admissions.every(row=>row.scope==='native-typed-admission-only'&&row.rawRowsPublished===false),true);
-    assert.equal(run.authoritativeInputs.length,targetFrame);
+    assert.equal(run.authoritativeInputs.length,consumedTicks);
     assert(run.authoritativeInputs.every(row=>row.bytes.length===44));
-    assert.equal(run.presentations.filter(row=>row.kind==='forward').length,targetFrame);
-    assert.equal(run.presentations.length,targetFrame+run.corrections.length);
-    assert(run.presentations.every((row,index)=>index===0||
-      row.receipt.sourceFrameAfter>=run.presentations[index-1].receipt.sourceFrameAfter));
+    if(fullMatch){
+      const tails=run.terminal_bridge.rows;
+      const freshTail=tails.filter(row=>row.ticket.flags===0).length;
+      const tailDraws=run.presentations.filter(row=>row.kind==='terminal-tail');
+      const originalDraws=run.presentations.filter(row=>row.kind==='forward'||row.kind==='terminal-forward');
+      assert.equal(originalDraws.length,consumedTicks-freshTail);
+      assert.equal(tailDraws.length,tails.length);
+      assert.deepEqual(tailDraws.map(row=>row.inputOrdinal),tails.map(row=>row.ticket.inputOrdinal));
+      assert(tailDraws.every(row=>row.receipt.command===29&&
+        row.receipt.sourceFrameAfter===run.terminal_final.receipt.sourceFrame));
+      assert.equal(run.presentations.length,originalDraws.length+tailDraws.length+run.corrections.length);
+      assert(run.presentations.every((row,index)=>index===0||
+        BigInt(row.receipt.presentationSerial)===BigInt(run.presentations[index-1].receipt.presentationSerial)+1n));
+    }else{
+      assert.equal(run.presentations.filter(row=>row.kind==='forward').length,targetFrame);
+      assert.equal(run.presentations.filter(row=>row.kind==='terminal-tail').length,0);
+      assert.equal(run.presentations.length,targetFrame+run.corrections.length);
+      assert(run.presentations.every((row,index)=>index===0||
+        row.receipt.sourceFrameAfter>=run.presentations[index-1].receipt.sourceFrameAfter));
+    }
     assert.equal(item.pageErrors.length,0);
   }
   assert.equal(releaseErrors.length,0,`Owned keyboard release failed: ${JSON.stringify(releaseErrors)}`);
   assert(a.corrections.some(row=>row.dirty!==null)||b.corrections.some(row=>row.dirty!==null),
     'Paced run must actually correct a wrong prediction');
   for(const tick of lateTicks){
-    const event=respawn?proof.late_corrections.find(row=>row.target_source_tick===tick):proof.late_class_piece;
+    const event=stockoutScenario?proof.late_corrections.find(row=>row.target_source_tick===tick):proof.late_class_piece;
     const correction=a.corrections.find(row=>row.dirty===tick);
     assert(correction,'Alpha did not record the actual late prediction correction');
-    const presentedChecksum=(respawn?a.late_corrections.find(row=>row.target_source_tick===tick):a.late_class_piece).presented_checksum;
+    const presentedChecksum=(stockoutScenario?a.late_corrections.find(row=>row.target_source_tick===tick):a.late_class_piece).presented_checksum;
     assert.equal(presentedChecksum?.status,'captured');
     assert.deepEqual([presentedChecksum.pre_frame,presentedChecksum.frontier],
       [correction.pre,correction.frontier]);
@@ -1812,7 +2097,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     assert.equal(correction.frontier,event.alpha_frontier.frontier);
     assert(correction.confirmed>tick);
     assert.equal(correction.restore_status.metadata.restoreCount>=1,true);
-    if(respawn){
+    if(stockoutScenario){
       assert.equal(correction.kind,'fully-confirmed-correction');
       assert.equal(correction.confirmed,tick+2);
       assert(a.presentations.some(row=>row.kind==='corrected-frontier'&&row.receipt.sourceFrameAfter===tick+2));
@@ -1821,8 +2106,8 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     const replayed=rows?.find(entry=>(entry.row??entry).sourceFrame===tick)?.row??
       rows?.find(entry=>(entry.row??entry).sourceFrame===tick);
     assert(replayed,'Late correction did not return the native late source row');
-    const correctedPad=respawn&&lateKeys[lateTicks.indexOf(tick)]==='ArrowLeft'?P2_LEFT:P2_RIGHT;
-    assert.deepEqual(Buffer.from(replayed.forward).subarray(11,22),respawn?neutral:P2_LEFT,
+    const correctedPad=stockoutScenario&&lateKeys[lateTicks.indexOf(tick)]==='ArrowLeft'?P2_LEFT:P2_RIGHT;
+    assert.deepEqual(Buffer.from(replayed.forward).subarray(11,22),stockoutScenario?neutral:P2_LEFT,
       'Late tick forward PAD does not show the real earlier prediction');
     assert.deepEqual(Buffer.from(replayed.selected).subarray(11,22),correctedPad,
       'Late tick corrected selection does not show the actual late beta PAD');
@@ -1830,9 +2115,73 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     event.alpha_correction={kind:correction.kind,pre:correction.pre,
       frontier:correction.frontier,confirmed:correction.confirmed,dirty:correction.dirty,
       restore_count:correction.restore_status.metadata.restoreCount,
-      [respawn?'forward_remote_pad':'tick26_forward_remote_pad']:[...replayed.forward.slice(11,22)],
-      [respawn?'corrected_remote_pad':'tick26_corrected_remote_pad']:[...replayed.selected.slice(11,22)],
+      [stockoutScenario?'forward_remote_pad':'tick26_forward_remote_pad']:[...replayed.forward.slice(11,22)],
+      [stockoutScenario?'corrected_remote_pad':'tick26_corrected_remote_pad']:[...replayed.selected.slice(11,22)],
       changed_piece_restoration_claim:'requires matched retained-producer control'};
+  }
+  if(fullMatch){
+    const stockouts=proof.full_match_stockouts;
+    assert(stockouts?.initial_walk_start?.kind==='post-present-idle'&&
+      stockouts.initial_walk_start.players?.[0]?.stocks===4&&
+      stockouts.initial_walk_start.players?.[1]?.stocks===4,
+    'Full match did not begin P1 walk-off from an observed four-stock frame');
+    const nativeCycles=a.stock_cycles;
+    assert.equal(nativeCycles.length,3,'Native source observations must retain all three P1 stock cycles');
+    assert.equal(stockouts.cycles.length,3,'Browser owner lost one of the three observed P1 stock cycles');
+    const platformPad=sample=>sample.players[0].facing_direction===-1?P1_LEFT:P1_RIGHT;
+    for(const stockBefore of [4,3,2]){
+      const cycle=nativeCycles.find(value=>value.stock_before===stockBefore);
+      const browserCycle=stockouts.cycles.find(value=>value.stock_before===stockBefore);
+      assert(cycle&&browserCycle,`Missing actual P1 ${stockBefore}-to-${stockBefore-1} stock cycle`);
+      const stockAfter=stockBefore-1;
+      assert.equal(cycle.stock_after,stockAfter);
+      const loss=cycle.stock_loss;
+      assert(loss?.kind==='post-present-idle'&&loss.players?.[0]?.stocks===stockAfter&&
+        loss.players?.[1]?.stocks===4,
+      `P1 ${stockBefore}-to-${stockAfter} loss lacks an actual native post-idle observation`);
+      const walk=stockouts.walks.find(value=>value.stock_before===stockBefore);
+      assert(walk&&walk.last_source_tick===loss.frame-1,
+        `P1 ${stockBefore}-to-${stockAfter} loss did not follow its retained walk input`);
+      const lossPoll=a.polls.find(value=>value.sourceFrame===loss.frame-1);
+      assert(lossPoll&&lossPoll.pollSerial===cycle.stock_loss_poll?.pollSerial&&
+        lossPoll.ticketId===cycle.stock_loss_poll?.ticketId,
+      `P1 ${stockBefore}-to-${stockAfter} loss lost its exact once-polled native ticket`);
+      assert.deepEqual(Buffer.from(lossPoll.raw).subarray(0,11),Buffer.from(walk.source_pad),
+        `P1 ${stockBefore}-to-${stockAfter} loss did not follow the actual held walk direction`);
+      const platform=cycle.platform_sample;
+      assert(platform?.kind==='post-present-idle'&&platform.players?.[0]?.stocks===stockAfter&&
+        platform.players[0].motion===13&&platform.players[0].groundAir===1,
+      `P1 ${stockAfter}-stock cycle lacks an actual airborne RebirthWait platform sample`);
+      assert.deepEqual(platform.players[0],browserCycle.platform.players[0],
+        `P1 ${stockAfter}-stock browser gate differs from the native retained platform sample`);
+      const exit=cycle.platform_exit;
+      assert(exit?.sample?.kind==='post-present-idle'&&exit.sample.frame===platform.frame+1&&
+        exit.sample.players?.[0]?.stocks===stockAfter&&exit.sample.players[0].motion===29&&
+        exit.sample.players[0].groundAir===1,
+      `P1 ${stockAfter}-stock platform exit did not enter airborne Fall one actual source frame later`);
+      const exitPoll=a.polls.find(value=>value.sourceFrame===platform.frame);
+      assert(exitPoll&&exitPoll.pollSerial===exit.poll?.pollSerial&&
+        exitPoll.ticketId===exit.poll?.ticketId&&exitPoll.localPort===0&&exitPoll.remotePort===1,
+      `P1 ${stockAfter}-stock platform exit lost its actual facing-directed poll`);
+      assert.deepEqual(Buffer.from(exitPoll.raw).subarray(0,11),platformPad(platform),
+        `P1 ${stockAfter}-stock platform exit PAD does not match observed facing`);
+      const followingPoll=a.polls.find(value=>value.sourceFrame===exit.sample.frame);
+      assert(followingPoll,`P1 ${stockAfter}-stock platform exit has no following actual input poll`);
+      assert.deepEqual(Buffer.from(followingPoll.raw).subarray(0,11),neutral,
+        `P1 ${stockAfter}-stock exit key was not released before the following poll`);
+      const grounded=cycle.grounded_respawn;
+      assert(grounded?.kind==='post-present-idle'&&grounded.frame>exit.sample.frame&&
+        grounded.players?.[0]?.stocks===stockAfter&&grounded.players[0].motion===14&&
+        grounded.players[0].groundAir===0,
+      `P1 ${stockAfter}-stock cycle lacks an actual grounded Wait14 respawn`);
+      assert.deepEqual(grounded,browserCycle.grounded,
+        `P1 ${stockAfter}-stock browser gate differs from the native grounded observation`);
+    }
+    assert.equal(a.final_walkoff_stock?.stocks,1,
+      'The final walk-off must start from P1’s actual one-stock grounded respawn');
+    assert.equal(a.final_walkoff_stock?.grounded_sample?.players?.[0]?.motion,14);
+    assert.equal(a.final_walkoff_stock?.grounded_sample?.players?.[0]?.groundAir,0);
+    proof.full_match_stockouts.native_cycles=nativeCycles;
   }
   if(respawn){
     const byFrame=run=>new Map(run.stock_samples.map(sample=>[sample.frame,sample]));
@@ -1886,16 +2235,112 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       'Final native stock observation lost the same live respawned match');
     proof.stock_respawn={baseline,loss,respawn:respawned,following_inputs:targetFrame-respawned[0].frame};
   }
-  proof.comparisons[`end${targetFrame}`]=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
+  const finalComparison=fullMatch?'terminal-final':`end${targetFrame}`;
+  proof.comparisons[finalComparison]=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
   assert.equal(a.finalChecksum.bytes.length,64);assert.equal(b.finalChecksum.bytes.length,64);
-  assert(proof.comparisons[`end${targetFrame}`].equal,'Paced confirmed post-draw checksums differ');
+  assert(proof.comparisons[finalComparison].equal,'Paced confirmed post-draw checksums differ');
+  assert.equal(a.authoritativeInputs.length,b.authoritativeInputs.length);
   proof.comparisons.authoritative_pad=a.authoritativeInputs.map((row,index)=>({tick:row.tick,
     ...byteDifference(Buffer.from(row.bytes),Buffer.from(b.authoritativeInputs[index].bytes))}));
   assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
-  proof.status=respawn?'paced-600-respawn-complete':latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
-  report.result=respawn?'PACED_600_RESPAWN_COMPLETE':latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
+  if(fullMatch){
+    const [alphaFinal,betaFinal]=[a.terminal_final,b.terminal_final];
+    for(const field of ['consumedOrdinal','lastInputOrdinal','sourceFrame','outcome','winner','randomSeed'])
+      assert.equal(alphaFinal.receipt[field],betaFinal.receipt[field],
+        `Peers completed different native terminal receipts at ${field}`);
+    for(const field of ['input_ordinal','source_frame','outcome','winner','agreement_hash','matched_bytes'])
+      assert.equal(alphaFinal.agreement[field],betaFinal.agreement[field],
+        `Peers reported different final wire agreement at ${field}`);
+    assert.deepEqual(Buffer.from(alphaFinal.checksum),Buffer.from(betaFinal.checksum),
+      'Peers completed with different canonical 64-byte terminal checksums');
+    proof.input_capacity_ticks=targetFrame;
+    proof.input_ticks=alphaFinal.receipt.consumedOrdinal;
+    proof.terminal_final={alpha:alphaFinal,beta:betaFinal,
+      checksum_equal:true,wire_agreement_hash:alphaFinal.agreement.agreement_hash};
+  }
+  proof.status=fullMatch?'paced-3600-match-final-complete':respawn?'paced-600-respawn-complete':latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
+  report.result=fullMatch?'PACED_3600_MATCH_FINAL_COMPLETE':respawn?'PACED_600_RESPAWN_COMPLETE':latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
+  if(fullMatch)addCheck('native terminal outcome and exact final wire agreement matched on both peers',
+    {outcome:a.terminal_final.receipt.outcome,winner_publication:'pending original VS exit',
+      input_ordinal:a.terminal_final.receipt.lastInputOrdinal,
+      source_frame:a.terminal_final.receipt.sourceFrame,
+      matched_bytes:a.terminal_final.agreement.matched_bytes,
+      agreement_hash:a.terminal_final.agreement.agreement_hash,
+      stock_cycles:proof.full_match_stockouts.native_cycles.length,
+      network_wait:proof.network_wait,native_network_wait:proof.native_network_wait});
   if(latePiece)addCheck('actual tick-26 late input, deferred packet release, bounded native restore and final-120 checksum agreement',
     {changed_piece_restoration:'requires matched retained-producer control'});
+}
+
+function validatePublishedFullMatchResult(role,snapshot,final){
+  const match=snapshot.match;
+  assert.equal(snapshot.state?.phase,8,`${role} published result requires original Results`);
+  assert.equal(match?.leg,'vs');
+  assert.equal(match.complete,true);
+  assert.deepEqual(match.observed_player_source_slots,[0,1]);
+  assert.equal(match.players?.length,2);
+  assert(match.players.every(player=>player.human===true));
+  assert.equal(match.frame,final.sourceFrame);
+  assert.equal(match.outcome,final.outcome);
+  assert.equal(final.outcome,2);
+  assert.deepEqual(match.terminal,{outcome:2,winners:[1]},
+    `${role} original VS exit did not publish P2 source slot 1 as the winner`);
+  return match.terminal;
+}
+
+async function readFullMatchResultsEntry(item,deadlineAt,final){
+  const readyHandle=await item.page.waitForFunction(()=>{
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    return Module._melee_web_native_menu_phase()===8&&
+      typeof Module._melee_web_native_menu_results_pad_trace==='function';
+  },null,{timeout:Math.max(1,deadlineAt-Date.now())});
+  const ready=await readyHandle.jsonValue();await readyHandle.dispose();
+  if(ready.error)throw Error(`${item.role} did not enter original Results: ${ready.error}`);
+  const snapshot=await observeRuntimeOwner(item.page,{},'published-original-match-result',
+    {includeMatch:true});
+  if(snapshot.state?.error)throw Error(`${item.role} original Results entry: ${snapshot.state.error}`);
+  const published=validatePublishedFullMatchResult(item.role,snapshot,final);
+  return {role:item.role,published,observation:snapshot.match};
+}
+
+async function finishFullMatchResultsToCss(item,deadlineAt){
+  const retention={},observations=[];
+  const observeSample=async label=>{
+    const snapshot=await observeRuntimeOwner(item.page,retention,label,
+      {includeMatch:false,includeResultsTrace:true});
+    if(snapshot.state?.error)throw Error(`${item.role} ${label}: ${snapshot.state.error}`);
+    observations.push({label,phase:snapshot.state?.phase??null,
+      running:snapshot.state?.running??null,message:snapshot.state?.message??null,
+      retainedResultsRows:snapshot.trace?.retained??null});
+    return {host:snapshot.state,trace:snapshot.trace};
+  };
+  const press=async key=>{
+    if(!['Enter','End'].includes(key))throw Error('Full-match Results permits only the actual Enter and End keys');
+    return item.driver.pressChord([key],{holdMs:160,releaseMs:150});
+  };
+  const confirmation=await confirmTwoHumanResults({deadlineAt,sourcePorts:[0,1],
+    observeSample,press:()=>press('Enter'),pressSecond:()=>press('End'),
+    wait:milliseconds=>item.page.waitForTimeout(milliseconds)});
+  let prizeReturn=null;
+  if(confirmation.original_exit.host_phase===9)
+    prizeReturn=await returnFromCompetitivePrize({deadlineAt,sourcePorts:[0,1],observeSample,
+      press:()=>press('Enter'),wait:milliseconds=>item.page.waitForTimeout(milliseconds)});
+  const remaining=Math.max(1,deadlineAt-Date.now());
+  const cssHandle=await item.page.waitForFunction(()=>{
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    if(Module._melee_web_native_menu_phase()!==1||Module._melee_web_native_menu_running()!==1||
+       typeof window.menuObserveCssSetup!=='function')return false;
+    const setup=window.menuObserveCssSetup();
+    return setup?{phase:1,running:1,doors:setup.doors}:false;
+  },null,{timeout:remaining});
+  const css=await cssHandle.jsonValue();await cssHandle.dispose();
+  if(css.error)throw Error(`${item.role} Results-to-CSS route failed: ${css.error}`);
+  assert.equal(css.phase,1,`${item.role} did not return to original CSS`);
+  assert.equal(css.running,1,`${item.role} CSS owner is not active`);
+  assert.equal(css.doors?.length,40,`${item.role} original CSS lacks the authored 40-door setup`);
+  return {role:item.role,confirmation,prizeReturn,css,observations};
 }
 
 async function runConfirmedPrefixTransfer(alpha,beta){
@@ -2449,6 +2894,26 @@ try{
       first_mismatch:report.static_comparison.first_mismatch});
     report.result='BASELINE_DIAGNOSTIC_COMPLETE';
   }
+  if(pacedFullMatch){
+    const resultsDeadline=Date.now()+45000;
+    const entries=await joinOwned('original-results-published-match-end',[alpha,beta].map(item=>
+      readFullMatchResultsEntry(item,resultsDeadline,
+        report.peer_correction.terminal_final[item.role].receipt)));
+    report.peer_correction.published_match_end=entries;
+    assert.deepEqual(entries[0].published,entries[1].published,
+      'Peers published different original MatchEnd outcomes or ordered winners');
+    addCheck('both peers published the same original MatchEnd at Results entry',
+      {outcome:entries[0].published.outcome,winners:entries[0].published.winners,
+        scope:'local comparison after confirmed pre-close wire agreement'});
+    const returned=await joinOwned('original-results-css-return',[alpha,beta].map(item=>
+      finishFullMatchResultsToCss(item,resultsDeadline)));
+    report.peer_correction.results_css=returned;
+    addCheck('both completed peers returned through original Results to active 40-door CSS',
+      {peers:returned.map(row=>({role:row.role,phase:row.css.phase,
+        running:row.css.running,doors:row.css.doors.length,
+        results_exit_phase:row.confirmation.original_exit.host_phase,
+        prize_returned:!!row.prizeReturn}))});
+  }
 }catch(error){
   resultError=error;report.result='FAIL';
   report.failure={name:error?.name||'Error',message:String(error?.message||error),stack:error?.stack||null};
@@ -2489,7 +2954,7 @@ finally{
         });
         if(actualOwner.statusError&&actualOwner.controllerPresent)
           throw Error(`Cannot determine terminal owner state for cleanup: ${actualOwner.statusError}`);
-        if(item.takenOver||actualOwner.state===1){
+        if(actualOwner.state===1){
           item.takenOver=true;
           const clean=await item.page.evaluate(()=>globalThis.__meleeRuntimeMatchHistory.command('cleanup'));
           item.nativeCleanupSucceeded=clean.ownerState===2&&clean.gpuPending===0;
@@ -2497,7 +2962,9 @@ finally{
           if(!item.nativeCleanupSucceeded)throw Error(`Native terminal cleanup refused: ${JSON.stringify(clean)}`);
           pageReport.cleanup.native_owner='retired';
         }else if(actualOwner.runtimePresent&&item.driver){
-          await item.driver.unload();pageReport.cleanup.native_owner='ordinary-unload-before-takeover';
+          await item.driver.unload();
+          pageReport.cleanup.native_owner=actualOwner.state===2&&item.takenOver
+            ?'ordinary-unload-after-retired-history':'ordinary-unload-before-takeover';
         }else pageReport.cleanup.native_owner='no native source owner active';
       }catch(error){
         pageReport.cleanup.native_owner=`failed: ${String(error?.message||error)}`;
@@ -2543,6 +3010,15 @@ finally{
   if(relayRuntime)try{
     report.peer_correction.relay.cleanup=await relayRuntime.close(!resultError&&!report.cleanup_failures.length);
   }catch(error){report.cleanup_failures.push(`Relay cleanup: ${String(error)}`);}
+  else if(externalRelayCleanupReceipt&&report.peer_correction?.relay?.mode==='external'){
+    const cleanup=externalRelayCleanupReceipt(owned.map(item=>({
+      role:item.role,websockets:item.websockets,
+      peerClosed:report.pages[item.role].cleanup.peer?.closed===true,
+    })));
+    report.peer_correction.relay.cleanup=cleanup;
+    if(!resultError&&!cleanup.all_expected_browser_peer_sockets_closed)
+      report.cleanup_failures.push('Public relay cleanup lacks both exact room socket closures');
+  }
   const inventories=Object.entries(report.pages).flatMap(([role,pageReport])=>
     (pageReport.browser_process_info??[]).map(row=>({...row,owner_role:role})));
   report.browser_process_info=inventories;

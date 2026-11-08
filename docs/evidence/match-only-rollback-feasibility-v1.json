@@ -15026,6 +15026,567 @@
                   "sha256": "7c8d66468587ceeb11ab0bb62d19770a223ae0e11911af62952319db7d601128"
                 }
               ]
+            },
+            "issue_373_complete_match_v1": {
+              "issue": 373,
+              "status": "Public v8 functional route reached local Results/CSS; final full regression and ordinary Release validation passed on the exact validation head.",
+              "scope": "Bounded experimental-profile headless two-page public-relay function through Results/CSS; not player-facing Host/Join, complete Slippi profile, human/two-machine, or foreground-performance acceptance. No official-service traffic occurred; official Slippi cross-play remains parked indefinitely by owner decision.",
+              "producer": {
+                "native": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "harness": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "frontend": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
+                "archive": {
+                  "path": "runtime373-complete-match-producer-v8/archive.json",
+                  "sha256": "79fb0d66a0540ecf378fb5992a20b00a1930b37ed9c3e97d55f37a77c6ba8fa9"
+                }
+              },
+              "private_release_build": {
+                "path": "runtime373-complete-match-build-v8/result.json",
+                "sha256": "bdb74de6f0881e4dc6383925b167927e3d3d932677d0d9d2b7a57a750bd1641f",
+                "wasm_sha256": "db383e5a7ae64683769d50fbb5b4a7e92ddf56f59d5127d9777c7b32a53cc6c1"
+              },
+              "public_prerequisite": {
+                "provider": {
+                  "path": "runtime373-public-provider-readonly-v1/provider-binding-preflight.json",
+                  "sha256": "6b1da5709f3e83e48d89bcb3859c528e7b4ee0b04c8a23282b3d8b33af7e21ab"
+                },
+                "rtt": {
+                  "path": "runtime373-public-rtt-v1/report.json",
+                  "sha256": "e6d22337323db4987699dd3ab03eb37ebd862afc1d72c6f8ca19ecdd09b94352"
+                },
+                "rtt_review": {
+                  "path": "runtime373-public-rtt-v1/independent-result-review.json",
+                  "sha256": "644eaf6d6a0be19dbc20ed1725100d7831c3578335da1a19dfd7b809e4ff2d36"
+                },
+                "scope": "Actual two-browser outbound WSS echo and allowed/forbidden origin observations, not gameplay or two-machine latency. No deployment/config changes. Worker remains deployed; owned sockets closed, global service idle/usage unmeasured."
+              },
+              "retained_attempts": [
+                {
+                  "run": "runtime-peer-complete-match-public-v1",
+                  "summary": {
+                    "path": "runtime-peer-complete-match-public-v1/result-summary.json",
+                    "sha256": "7068279d755bf26eb0585b9f79151aaba4a2d89bae8b40fab9bcfddb83d845a2"
+                  },
+                  "browser": {
+                    "path": "runtime-peer-complete-match-public-v1/browser/result.json",
+                    "sha256": "6a2f7db25c5bd8eef95802541573b60bab0e79ce606df9ccd0bbca5e2bdc9231"
+                  },
+                  "owner": {
+                    "path": "runtime-peer-complete-match-public-v1/owner.json",
+                    "sha256": "9649e6d944a9b3df9d574990a5e0a49afb7c887f78ca7fa6494832e08caf6c86"
+                  },
+                  "review": {
+                    "path": "runtime-peer-complete-match-public-v1/independent-result-review.json",
+                    "sha256": "d7489bf50bc01cc8e12fb210bd970ea46fab15b8559154a6c6fffc8b853055a6"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "beta at source frame21: original pacing debt9 exceeds threshold8 after actual network wait; alpha abort at source frame28; no correction or stock cycle completed.",
+                  "observed": {
+                    "alpha": {
+                      "actual_polls": 28,
+                      "corrections": 0,
+                      "network_wait": {
+                        "count": 3,
+                        "elapsed_ms": 117.10500001907349,
+                        "by_kind": {
+                          "source-input": {
+                            "count": 3,
+                            "elapsed_ms": 117.10500001907349
+                          }
+                        },
+                        "events": [
+                          {
+                            "kind": "source-input",
+                            "source_frame": 7,
+                            "started_at_ms": 15730.889999866486,
+                            "elapsed_ms": 7.565000057220459,
+                            "interrupted": false
+                          },
+                          {
+                            "kind": "source-input",
+                            "source_frame": 14,
+                            "started_at_ms": 15840.259999752045,
+                            "elapsed_ms": 15.135000228881836,
+                            "interrupted": false
+                          },
+                          {
+                            "kind": "source-input",
+                            "source_frame": 21,
+                            "required_input_through": 20,
+                            "started_at_ms": 15962.605000019073,
+                            "elapsed_ms": 94.40499973297119,
+                            "interrupted": false
+                          }
+                        ]
+                      }
+                    },
+                    "beta": {
+                      "actual_polls": 21,
+                      "corrections": 0,
+                      "network_wait": {
+                        "count": 3,
+                        "elapsed_ms": 150.23000049591064,
+                        "by_kind": {
+                          "source-input": {
+                            "count": 3,
+                            "elapsed_ms": 150.23000049591064
+                          }
+                        },
+                        "events": [
+                          {
+                            "kind": "source-input",
+                            "source_frame": 7,
+                            "started_at_ms": 9342.33999967575,
+                            "elapsed_ms": 31.850000381469727,
+                            "interrupted": false
+                          },
+                          {
+                            "kind": "source-input",
+                            "source_frame": 14,
+                            "started_at_ms": 9457.424999713898,
+                            "elapsed_ms": 16.769999980926514,
+                            "interrupted": false
+                          },
+                          {
+                            "kind": "source-input",
+                            "source_frame": 21,
+                            "required_input_through": 20,
+                            "started_at_ms": 9574.094999790192,
+                            "elapsed_ms": 101.6100001335144,
+                            "interrupted": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "cleanup": "Native peers closed; outer owner cleanup passes;20 recorded browser PIDs absent; original server/capture groups retired.",
+                  "h1_scope": "Native clock journal retained; no existing-recorder timing incident was projected. Do not call missing H1 projection an H1 pass."
+                },
+                {
+                  "run": "runtime-peer-complete-match-public-v2",
+                  "native_producer": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                  "harness_producer": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                  "summary": {
+                    "path": "runtime-peer-complete-match-public-v2/result-summary.json",
+                    "sha256": "14dc48ec89a8ccef38d39c801ea1863aba24e99368951d7cf5424b03186a4703"
+                  },
+                  "browser": {
+                    "path": "runtime-peer-complete-match-public-v2/browser/result.json",
+                    "sha256": "71aaa8ac8655f9c0f2d14e3ac5d8ead2d854dfdb8385d39b0160a9f6d74aee9a"
+                  },
+                  "owner": {
+                    "path": "runtime-peer-complete-match-public-v2/owner.json",
+                    "sha256": "1a3a8aa097b108d690b585aeec0acd31e0b9cf5b4276009ac2718471c04f0d4a"
+                  },
+                  "review": {
+                    "path": "runtime-peer-complete-match-public-v2/independent-result-review.json",
+                    "sha256": "58a00b4b2166d8c2a75cc7d4a53329581b521b824f875dce1853b25eb5d39fa2"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "beta PRE133 toF140 dirtyinput139; strict statics-close row2919 address0x004d1e08 byte32 sealed0d live0c. Catalog binds ifMagnify_804A1DE0; player0 is_offscreen bit clears during source draw. Alpha later times out awaiting input140 atF147.",
+                  "observed": {
+                    "alpha_polls": 147,
+                    "beta_polls": 140,
+                    "alpha_completed_correction": [
+                      21,
+                      28,
+                      26
+                    ],
+                    "beta_completed_correction": [
+                      28,
+                      35,
+                      28
+                    ],
+                    "beta_failing_correction": [
+                      133,
+                      140,
+                      139
+                    ],
+                    "alpha_stock_loss_sample": 139,
+                    "native_clock_stalls": 0,
+                    "max_debt_ticks": {
+                      "alpha": 7.1183,
+                      "beta": 6.6211
+                    },
+                    "completed_native_wait_pairs": 48,
+                    "exact_debt_unchanged_for_all_pairs": true,
+                    "excluded_wait_ms": {
+                      "alpha": 236.24499988555908,
+                      "beta": 245.83999967575073
+                    },
+                    "unmatched_alpha_wait_begin": {
+                      "source_frame": 147,
+                      "input_ordinal": 140,
+                      "not_booked_as_excluded": true
+                    },
+                    "input_delay_policy": {
+                      "gameplay_input_delay_ticks": 0,
+                      "protocol_preroll_frames": 2,
+                      "scope": "Two protocol-only neutral envelope frames are not consumed as game input; actual native local PAD is used at its same gameplay ordinal. Seven-tick prediction bound unchanged."
+                    }
+                  },
+                  "cleanup": "Owner cleanup passes;19 recorded browser PIDs absent; source/archive/provider/surface pins unchanged.",
+                  "scope": "Observed early public corrections and source-time network backpressure; no complete-match/Results/profile/performance acceptance."
+                }
+              ],
+              "next": "Issue #375 is the next execution boundary: replace the diagnostic Node-supplied shared start and scripted dual-page control with page-owned actual menu selections and versioned peer agreement through the staging Host/Join UI. Native ownership and mismatch refusal remain required.",
+              "network_wait_repair": {
+                "source_head": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                "source_review": {
+                  "path": "runtime373-integrated-source-review-v2.json",
+                  "sha256": "89cf6f406ae23ca580abebf30bdebce2cfa924ddced112cfd4e7fde88873256b"
+                },
+                "native_focused": {
+                  "path": "runtime373-network-wait-focused-v1/independent-review.json",
+                  "sha256": "6b9471241bd8ff3c5dfbbcd891da06965a58c5747babd4da284f6e81ab250cab"
+                },
+                "host_focused": {
+                  "path": "runtime373-network-wait-host-v1/freeze.json",
+                  "sha256": "ac495465762f94dcddf9e81d961c500886d22fcb9a7e5cc097cf0fb618fc42fb"
+                },
+                "private_build": {
+                  "path": "runtime373-complete-match-build-v2/result.json",
+                  "sha256": "e5e05bfd43850a229b48ce16aa572601e98debbd794c5b5473f5e51eb42e32d0"
+                },
+                "retained_fixture_failures": [
+                  "work/runtime-match-history-pacing-humgig1g",
+                  "work/runtime-match-history-pacing-ni2f1ifi"
+                ]
+              },
+              "stock_driver_repair": {
+                "review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-stock-driver-review-v1/review.json",
+                "review_sha256": "2d04865d88490e49d1135ae9b642ca4ee83ec6136ad15b0fb69b4aa72398c3d1",
+                "result": "PASS focused actual-function orchestration control; full public gameplay pending",
+                "scope": "Mock gates verify three-cycle helper scope, key/resume sequence, null success and refusal guards. No gameplay state generated."
+              },
+              "magnifier_partial_retained": {
+                "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-partial-luna-v1/freeze.json",
+                "sha256": "935ed6966740f97a159378b07e274c9ee6977b19c08c96f7fd97a215582d6135",
+                "result": "PARTIAL_NOT_BUILDABLE_TRANSFER_TO_SOL",
+                "failure": "Corrupt source overlay at line2976; no canonical source or tests from this candidate. Exact nine source files and original corrupt patch preserved.",
+                "next": "Escalated minimal composition/authentication repair and actual-source focused controls before build or capture."
+              },
+              "magnifier_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-handoff-v3/freeze.json",
+                "freeze_sha256": "ffac61137d14c52ac8fe0c62e3eaa80ae15d45f8dc310d1e47666eb85618d97e",
+                "runtime_focused_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-runtime-focused-v1/result.json",
+                "runtime_focused_sha256": "ec73ab98d99cb0608f051e9c0f381ca589be281d093bf6e258d7c3a7d6ad1680",
+                "checks": "Four focused source controls; seven affected actual compile-command syntax; 21 runtime-history controls PASS. No new build/capture yet.",
+                "scope": "Private owner source-order repair. Modeled ownership fixtures are not live whole-session evidence. Full magnifier row retained; no game arithmetic, source input, RNG, history/cap/timing guard change.",
+                "next": "Clean private Release build/archive/catalog and one bounded public complete-match capture."
+              },
+              "public_v3": {
+                "source_head": "3abed173ae73d000842646ff7995e292d371a28e",
+                "result": "FAIL terminal-tail descriptor after successful first tail idle; magnifier boundary and three stock/respawn cycles traversed",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v3/result-summary.json",
+                "summary_sha256": "db718e92054099e48da96859651864f92488d09fd74cbce29d5c0b037d00a483",
+                "raw_report_sha256": "3667dc2deb78241d227932b6dc50aa4ec6d66c06e8b081fc8878d3c899fba3aa",
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 21,
+                "polls_each": 1125,
+                "source_frame_at_refusal": 1123,
+                "source_failure": "Descriptor numeric command guard rejected normal idle5 after tail presentation29; both native owners had failure0.",
+                "scope": "Original ending reached; no final outcome/wire checksum/Results completion. Independent raw review retained.",
+                "independent_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v3/independent-result-review.json",
+                "independent_review_sha256": "5b717849dcb74fa125dbda68db1c5361430539f2f2e023d43bc4531e68c4da05"
+              },
+              "terminal_descriptor_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-terminal-descriptor-repair-v1/freeze.json",
+                "freeze_sha256": "b8ea77cdbe4d0e88b0d36cd23abfc3bfad91377d06a87585bb6964fecdc94fda",
+                "focused_result": "1 passed",
+                "scope": "Exact terminal-tail read-only descriptor phase-command admission. No build or browser rerun.",
+                "next": "Clean producer and one bounded v4 public full match"
+              },
+              "public_v4": {
+                "source_head": "b100d0e98095eae2cecb951f928fdb157cbc65be",
+                "harness_head": "b100d0e98095eae2cecb951f928fdb157cbc65be",
+                "result": "FAIL outer harness expected a published winner before original VS exit",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v4/result-summary.json",
+                "summary_sha256": "5760df0a66372c7adca15aa395d3b2a47d9618499eef36b6cb0ed4f7ac1bd130",
+                "raw_report_sha256": "586cc0114d7128e505692934016949500e195f077f74766e90e3e78c33c4d715",
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 18,
+                "actual_input_traversals_each": 1237,
+                "terminal_source_frame": 1123,
+                "confirmed_last_ordinal": 1236,
+                "terminal_checksum_bytes": 64,
+                "outcome": 2,
+                "pre_close_winner": -1,
+                "terminal_agreement": "Both peers matched exact pre-close checksum and elimination outcome, acknowledged on wire; native command30 released both owners. Winner is intentionally unavailable until canonical finish_vs publishes original MatchEnd.",
+                "scope": "No Results/CSS success observed; not complete functional route or player-ready integration. No source order changes authorized to satisfy a premature harness assertion.",
+                "independent_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v4/independent-result-review.json",
+                "independent_review_sha256": "8b98d32861608608193698440212d05f10fc5615a31b61c34d412fe60bbb41b1",
+                "native_cleanup_passed": false,
+                "native_cleanup_failures": [
+                  "alpha/beta Particle presentation owner failed before teardown"
+                ],
+                "h1_export": "Missing: native cleanup failed, recorder export skipped",
+                "first_results_failure": "Unexpected source camera begin: fresh Results world omitted ordinary token-zero particle draw scope already used by CSS. Not stale source owner reuse."
+              },
+              "published_winner_harness_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-published-winner-harness-v2/freeze.json",
+                "freeze_sha256": "a7ad865b5869a4c6593c110c076ca507ad808c5a7fd06134dc995764a0415f72",
+                "offline_replay_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-retained-v4-assertion-replay-v2/result.json",
+                "offline_replay_sha256": "930d47e8cbad3034110c9a747eecde8030cbaad5166edf4708add0e3a7602b8e",
+                "scope": "Harness-only source-boundary repair: unpublished winner before original close; published winner at Results; exact Fall29 after one-poll platform exit. No native or wire change. Two focused controls and actual assertion-tail replay pass; neither establishes new browser route completion."
+              },
+              "results_prize_draw_scope_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-results-prize-particle-scope-v1/freeze.json",
+                "freeze_sha256": "97ccb27c14947f2d6883017dfc4f0368c8ea5dc4efb3dbdc24711bbed871f1ef",
+                "scope": "Reuses ordinary token-zero draw scope already used by source menu, with exact fresh-world generation and active CPU-interval refusal. Native source order unchanged. Actual extracted Results/Prize draws + scheduler focused lifecycle control and both real private compile-command syntax checks pass. No new build/capture yet.",
+                "next": "New v6 producer and same-bounds complete public route; prepared v5 was not captured because retained v4 already exposed this failure."
+              },
+              "public_v6": {
+                "source_head": "0390130e87d5592d7cacd7c3f8a97a56e891c74f",
+                "harness_head": "0390130e87d5592d7cacd7c3f8a97a56e891c74f",
+                "result": "FAIL alpha F28 clock debt10 exceeds unchanged8; beta timeout is secondary",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v6/result-summary.json",
+                "summary_sha256": "19f1e86ca89d14ebeae990e856fe8ecbebc2f37260078419d973617a45c9267e",
+                "independent_pacing_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v6/independent-pacing-analysis-v1.json",
+                "independent_pacing_review_sha256": "b49756c635e42cb41bcc67fa6487f8d96ec46daabc3f5e32d3a1cb3dd8b5a85b",
+                "raw_report_sha256": "4cf9818d93021ea7849fac4bd377e83f74059eeb68bf4e55f5662b3c7f758072",
+                "native_cleanup_passed": true,
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 17,
+                "scope": "Early timing refusal, Results/Prize fixes not reached. H1 exports retained but native guard failure absent from recorder incident projection; not a timing acceptance pass.",
+                "next": "Source-only reduced released-input gate repair: charge intentional hold and source work, exclude only genuinely absent required received PAD under existing native wait ownership."
+              },
+              "released_late_wait_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-late-released-wait-host-v2/freeze.json",
+                "freeze_sha256": "1fc2308fc8144da39038978a1f6eaeeac590a03c33d3b711557bb146a3897609",
+                "focused": "42 JS controls on v1, followed by the focused actual-accounting control on v2; syntax/diff checks pass.",
+                "scope": "External full-match diagnostic only. Validate exact sender release before starting required-input wait; serially validate/admit actual target then following-neutral using unchanged earliest-hole/native owner checks. Per-receipt arrival/end and host/native wait values retained. Intentional hold/CDP/source work charged. Native clock, guards and wire protocol unchanged.",
+                "next": "Reviewed clean v7 producer and same-bounds public complete-route capture."
+              },
+              "public_v7": {
+                "source_head": "fe0fa683255acb3af3fee2ece98cb0d88620f4de",
+                "harness_head": "fe0fa683255acb3af3fee2ece98cb0d88620f4de",
+                "result": "FAIL original Results draw traps in ftLib_80086A8C; no source fighter projection drawing scope",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v7/result-summary.json",
+                "summary_sha256": "300a9a9cf26203b5892ce41ea76d0ae0648fd638c479846f866892b367b6dbf9",
+                "raw_report_sha256": "8d44dcd2765d2bcf719de43321bb26c1401146f27699ad51a9c9861afbb5986f",
+                "actual_input_traversals_each": 1237,
+                "terminal_source_frame": 1123,
+                "terminal_checksum_agreement": "Both peers completed and acknowledged exact64bytes/outcome2 with unpublishedwinner-1; cmd30 released each native owner.",
+                "native_cleanup_passed": false,
+                "native_cleanup_failures": [
+                  "beta native/source cleanup: Browser driver development/unload: unreachable",
+                  "alpha native/source cleanup: Browser driver development/unload: unreachable"
+                ],
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 19,
+                "scope": "Released-input wait path traversed without native timing refusal. Results route/cleanup still fails; no complete functional route or acceptance claim."
+              },
+              "results_fighter_scope_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-results-fighter-scope-v1/freeze.json",
+                "freeze_sha256": "c413d3a2ca8cf288d50381a4863ac848df6a88613792eeac13886f1f780991ba",
+                "scope": "Actual extracted Results draw + prepared ftLib hook + production fighter owner with modeled provenance/scene/GX leaves reproduces SIGTRAP before repair and passes repeated ordinary draws/restored carry afterward. Existing projection scope only; no native source arithmetic/order or guard changes. Fighter2 and particle1 focused controls plus actual TU syntax pass. Failed fixture/signal evidence retained.",
+                "next": "Reviewed fresh v8 producer and unchanged-bounds complete route"
+              },
+              "public_v8": {
+                "source_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "harness_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                "frontend_head": "3d9c8d998afee5775e234339ad8d6f4f08be603f",
+                "result": "PACED_3600_MATCH_FINAL_COMPLETE",
+                "elapsed_ms": 61449,
+                "capture_summary": {
+                  "path": "runtime-peer-complete-match-public-v8/result-summary.json",
+                  "sha256": "8e1015d85cbae3100273b603b01d579d4c0fd8ed4b6caf0f0c2f6bcddd721b08"
+                },
+                "browser_report": {
+                  "path": "runtime-peer-complete-match-public-v8/browser/result.json",
+                  "sha256": "d62fa4443b3c8f4c535db14d716903dd4506900b523139d0acd8ee9d6e38f985"
+                },
+                "owner_report": {
+                  "path": "runtime-peer-complete-match-public-v8/owner.json",
+                  "sha256": "fcf0d4a5d70c012c0380fa315832cdcb9623ed93faf5215f71b6e758e942dd54"
+                },
+                "independent_review": {
+                  "path": "runtime-peer-complete-match-public-v8/independent-result-review.json",
+                  "sha256": "704d723619493de1c30b6e3e195ea1b7e0817d11e1cb8f2bfa125550ef50d584"
+                },
+                "source_review": {
+                  "path": "runtime373-integrated-source-review-v8.json",
+                  "sha256": "fa1448d77ef417d0d81ff2a38679d0febd28d56837cc9040ca8c848784b16fd5"
+                },
+                "linked_catalog": {
+                  "path": "runtime373-complete-match-catalog-v8/final-linked-configuration-v1.json",
+                  "sha256": "142f1d3ba6d6711dd794747e0ba147b23be8a68da55c9128fd3ef6f496b12e14"
+                },
+                "served_manifest": {
+                  "path": "runtime373-served-complete-match-v8/repaired-manifest.json",
+                  "sha256": "13c708a1f7695d690baff94ea1ecf68a7b12d949ff4bdfb7bdc732ad0157b74b"
+                },
+                "provider_preflight": {
+                  "path": "runtime373-public-provider-readonly-v1/provider-binding-preflight.json",
+                  "sha256": "6b1da5709f3e83e48d89bcb3859c528e7b4ee0b04c8a23282b3d8b33af7e21ab",
+                  "live_provider_query": false
+                },
+                "public_rtt": {
+                  "path": "runtime373-public-rtt-v1/report.json",
+                  "sha256": "e6d22337323db4987699dd3ab03eb37ebd862afc1d72c6f8ca19ecdd09b94352",
+                  "independent_review_sha256": "644eaf6d6a0be19dbc20ed1725100d7831c3578335da1a19dfd7b809e4ff2d36",
+                  "scope": "Separate WSS transport probe, not gameplay latency or source cadence."
+                },
+                "runtime_wasm_sha256": "db383e5a7ae64683769d50fbb5b4a7e92ddf56f59d5127d9777c7b32a53cc6c1",
+                "native_source_state_sha256": "996f0991196488b8a4988cd892309d9af61c81d1280f2781839429000bf95d43",
+                "native_map_sha256": "901efb19333579236fe58a5ad0d57421ba17b681d6b53ee013a96fc5eb6fb314",
+                "relay": {
+                  "wss": "wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev",
+                  "external_worker_owned": false,
+                  "mutated": false,
+                  "idle_status": "unknown; not queried",
+                  "expected_peer_sockets_closed": true
+                },
+                "actual_inputs": {
+                  "capacity_ticks": 3600,
+                  "each_peer": 1237,
+                  "authoritative_pad_record_bytes": 44,
+                  "identical_rows": 1237,
+                  "mismatches": 0,
+                  "alpha_fully_confirmed_corrections": 3,
+                  "beta_fully_confirmed_corrections": 10,
+                  "prediction_bound_ticks": 7,
+                  "history_bound_rows": 8,
+                  "late_p2_pulses": {
+                    "26": "ArrowRight",
+                    "226": "ArrowLeft",
+                    "426": "ArrowRight"
+                  },
+                  "following_rows_neutral": true
+                },
+                "terminal": {
+                  "source_frame": 1123,
+                  "consumed_ordinal": 1237,
+                  "last_input_ordinal": 1236,
+                  "checksum_bytes": 64,
+                  "checksum_sha256": "5af8bb65a6f461beda25f450e08d1491cf69b9c979986992baa6559d90c5e313",
+                  "wire_outcome": 2,
+                  "wire_preclose_winner": -1,
+                  "wire_ack_equal": true,
+                  "published_outcome": 2,
+                  "source_published_winner": 1,
+                  "published_winner_checked_locally_after_source_publication": true
+                },
+                "results_css": {
+                  "both_peers_confirmed_source_ports": [
+                    0,
+                    1
+                  ],
+                  "source_trace_rows_each": 407,
+                  "prize_return": "not exercised",
+                  "both_css_phase": 1,
+                  "both_css_running": 1,
+                  "door_values_each": 40
+                },
+                "stock_cycle": {
+                  "p1_transitions": [
+                    4,
+                    3,
+                    2,
+                    1
+                  ],
+                  "grounded_respawns": 3,
+                  "p2_stocks_at_published_result": 4
+                },
+                "wait_and_clock": {
+                  "host_alpha": {
+                    "count": 335,
+                    "elapsed_ms": 10718.19,
+                    "released_late_input_waits": 6,
+                    "released_late_elapsed_ms": 42.755
+                  },
+                  "host_beta": {
+                    "count": 511,
+                    "elapsed_ms": 10756.225
+                  },
+                  "native_alpha_backpressure_excluded_ms": 10598.56,
+                  "native_beta_backpressure_excluded_ms": 10580.56,
+                  "native_clock_samples": {
+                    "alpha": 4501,
+                    "beta": 4619
+                  },
+                  "native_clock_stalls": {
+                    "alpha": 0,
+                    "beta": 0
+                  },
+                  "threshold_ticks": 8,
+                  "separate_rtt_summary": "prior public WSS probe median approximately 41\u201342 ms and p95 approximately 128 ms; not gameplay latency"
+                },
+                "h1": {
+                  "recorder_exports_retained": true,
+                  "timing_incidents": 0,
+                  "projection": "missing; native clock records were not projected as H1 events"
+                },
+                "cleanup": {
+                  "owner_cleanup_passed": true,
+                  "owned_browser_pids_absent": 19,
+                  "owned_browser_pids_remaining": 0,
+                  "browser_and_server_groups_absent": true,
+                  "native_owner_state_after_finish": 2
+                },
+                "scope": "Bounded experimental-profile functional capture; it does not provide the player-facing start UI or satisfy broader acceptance."
+              },
+              "fixture_repair_v1": {
+                "source_commit": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                "review": {
+                  "path": "runtime373-v8-fixture-repair-reviewed-v1.json",
+                  "sha256": "00207477719f97ce555b33087ef4d8b23a39473ae4ab9a5da1d287d0b7738de3"
+                },
+                "focused_freeze_sha256": "bd01c7cd81b9452858a39f501e685f1f828229a10d3cb10145402f4abe5c9bc7",
+                "patch_sha256": "96a7565026c1cfbf902b2dc04ced8ca32c2affdad380cffe164e6c31b12d81b6",
+                "files": [
+                  "tests/test_gameplay_cpu_checkpoint.py",
+                  "tests/gameplay_cpu_endpoint_admitted_control.cpp",
+                  "src/slippi_profile/tests/test_effect_matrix.py"
+                ],
+                "focused_controls": "All three pass; exact logs and failed scratch retained in the focused freeze."
+              },
+              "validation_after_capture": {
+                "initial_full_regression": {
+                  "source_head": "5527e7f3a9b7444c20c44ce6d4d9fd40ff823f29",
+                  "result": "failed_three_stale_fixture_contracts",
+                  "tests": 3117,
+                  "skipped": 242,
+                  "exit_code": 1,
+                  "result_path": "runtime373-integration-validation-v7/full-regression-result.json",
+                  "result_sha256": "500269f8dde6dcf165f5eb4d8f994cb664a0f8b10efccc0f504e3add40711b03",
+                  "log_path": "runtime373-integration-validation-v7/full-regression.log",
+                  "log_sha256": "7a65fbbcc30b1f9b6e93487ad0039cd8a6a2df74e57230afb968c41ed8957890",
+                  "stale_fixture_tests": [
+                    "test_gameplay_cpu_checkpoint.GameplayCpuCheckpointControls.test_actual_cpu_runner_and_existing_census_node_contracts",
+                    "test_gameplay_cpu_endpoint.GameplayCpuEndpointControls.test_actual_admitted_nine_domain_batches",
+                    "test_slippi_profile_controls_discovery.SlippiEffectMatrixTests.test_only_live_raw_and_normalized_match_paths_use_current_private_hook"
+                  ]
+                },
+                "reviewed_fixture_repair": {
+                  "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                  "result": "focused_pass",
+                  "integration_validation_v8": "PASS",
+                  "wrapper_sha256": "4269a1ed8652d8cb943e2d87ed7ce31f7f5f2ef7b3379cc32befb3d50ccc2613",
+                  "full_regression": {
+                    "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                    "status": "PASS",
+                    "tests": 3117,
+                    "skipped": 242,
+                    "elapsed_s": 717.4575650421903,
+                    "exit_code": 0,
+                    "result_path": "runtime373-integration-validation-v8/full-regression-result.json",
+                    "result_sha256": "54d854cf909a84fff6639291e72049d46b37b04027b68f8334ddf7b803def087",
+                    "log_path": "runtime373-integration-validation-v8/full-regression.log",
+                    "log_sha256": "c0ffd7c9e80f87dbf0b6e7e84fe6eed493ab77ad245f6921a173191b3928ceff"
+                  },
+                  "ordinary_release_build": {
+                    "source_head": "f958906f7318ff4a0ee4f647f523305c3e65e17d",
+                    "status": "PASS",
+                    "elapsed_s": 21.66430554073304,
+                    "exit_code": 0,
+                    "result_path": "runtime373-integration-validation-v8/ordinary-release-result.json",
+                    "result_sha256": "9cbe69bee6d88076167c061890c75fdd6bd33be68dd4574289964bdeca933ad9",
+                    "log_sha256": "8dd298e8a58edf432d301e06c1d280c474e6f0cb8a86e773ac0f09e75c668844"
+                  }
+                }
+              }
             }
           }
         }

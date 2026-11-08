@@ -172,7 +172,7 @@ extern HSD_GObj* HSD_GObj_804D7814;
                 function(cobj,'void HSD_CObjSetOrtho('),
                 function(camera,'bool Camera_80030BBC('),
                 function(camera,'bool Camera_80030CD8('),
-                function(ft,'bool ftLib_80086A8C('),
+                function((profile_src/'melee/ft/ftlib.c').read_text(),'melee_source_bool ftLib_80086A8C('),
                 function(ft,'bool ftLib_80086A58('),
                 function(ft,'bool ftLib_80086B64(')])
             shadow_functions='\n'.join([
@@ -210,18 +210,28 @@ extern HSD_GObj* HSD_GObj_804D7814;
             fixture=fixture.replace('ORIGINAL_SELECTOR_MEMBERS',selector_members)
             fixture=fixture.replace('ORIGINAL_MOBJ_FUNCTIONS',mobj_functions)
             fixture=fixture.replace('ORIGINAL_MOBJ_CONSUMER',material_consumer)
+            results=(ROOT/'src/gameplay_results_context.c').read_text()
+            fixture=fixture.replace('ACTUAL_RESULTS_DRAW',
+                function(results,'int melee_web_results_context_draw('))
             (scratch/'control.c').write_text(fixture)
+            # Exercise the actual draw owner with a modeled private-arm latch.
+            # The separate camera reducer exercises the real arming function.
+            projection=scratch/'projection.c'
+            projection.write_text(
+                '#include "fighter_projection.c"\n'
+                'void fixture_enable_private_draw(void) { private_armed=1; }\n')
+
             cmd=[os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror',
                  '-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1',
                  '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1',
                  '-DMELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS=1','-I'+str(stubs),
                  '-I'+str(ROOT/'src'),str(ROOT/'src/gameplay_cpu_interval.c'),
-                 str(ROOT/'src/slippi_profile/fighter_projection.c'),
+                 '-I'+str(ROOT/'src/slippi_profile'),str(projection),
                  str(scratch/'control.c'),'-o',str(scratch/'control')]
             for name,command in [('compile',cmd),('run',[str(scratch/'control')])]:
                 with (scratch/(name+'.stdout')).open('w') as out, (scratch/(name+'.stderr')).open('w') as err:
                     subprocess.run(command,check=True,stdout=out,stderr=err)
-            for mode in ['active-topology','failed-active','active-rebuilt','inactive-rebuilt',
+            for mode in ['results-fighter-draw','private-canonical-carry','active-topology','failed-active','active-rebuilt','inactive-rebuilt',
                          'active-order','arm-mid-draw','disarm-mid-draw','tuple-active',
                          'image-active','inverse-active','source-root','source-accessory',
                          'source-dedup','source-visibility','source-late-consumer',

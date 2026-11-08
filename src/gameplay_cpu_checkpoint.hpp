@@ -57,8 +57,17 @@ public:
     GameplayCpuCommitResult restore_corrected(const GameplayMatchSession&) noexcept;
     bool finish_corrected(const GameplayMatchSession&) noexcept;
     bool begin_history_incarnation(const GameplayMatchSession&) noexcept;
+    bool history_bind_terminal_cursor(const GameplayMatchSession&,
+        const std::uint64_t* ticks,std::uint32_t ticks_bytes,
+        std::uint64_t world_generation,std::uint64_t pre_completed_tick) noexcept;
+    bool history_terminal_cursor_admit(const GameplayMatchSession&,
+        std::uint64_t completed_tick,std::uint32_t input_ordinal,
+        std::uint32_t source_frame,bool ending,bool complete) const noexcept;
     bool seal_history_incarnation(const GameplayMatchSession&,
                                   const char** refusal=nullptr) noexcept;
+    bool seal_history_terminal_incarnation(const GameplayMatchSession&,
+        std::uint64_t completed_tick,std::uint32_t input_ordinal,
+        std::uint32_t source_frame,const char** refusal=nullptr) noexcept;
     bool history_endpoint_admit(const GameplayMatchSession&,
                                 MeleeWebSourcePayloadEndpointHeader* arena_payload=nullptr) const noexcept;
     /* Archive a predicted endpoint before PRE restore. This closes only the
@@ -71,12 +80,18 @@ public:
     GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&,
         char* refusal=nullptr, std::size_t refusal_bytes=0) noexcept;
     bool finish_history_replay(const GameplayMatchSession&) noexcept;
+    bool finish_history_terminal_replay(const GameplayMatchSession&,
+        std::uint64_t completed_tick,std::uint32_t input_ordinal,
+        std::uint32_t source_frame) noexcept;
     /* Finalize only the actual authoritative prefix C inside the restored
      * interval. The caller proves remote confirmation; this owner proves the
      * source frame and typed leaves. The result is CPU-only and retirement-only,
      * never a drawn endpoint or another continuation of the old capsule. */
     bool finish_history_confirmed_prefix(const GameplayMatchSession&,
                                          std::uint32_t confirmed_end) noexcept;
+    bool finish_history_confirmed_terminal(const GameplayMatchSession&,
+        std::uint64_t completed_tick,std::uint32_t terminal_ordinal,
+        std::uint32_t source_frame) noexcept;
     bool retire_history_confirmed(const GameplayMatchSession&) noexcept;
     GameplayActionStoreHistory* history_actions() const noexcept {
         return history_actions_.get();
@@ -112,7 +127,8 @@ private:
                        HistoryReady, HistoryRecording, HistorySealed,
                        HistoryCorrecting, HistoryCorrectedSealed,
                        Finished, Failed, ConfirmedDetached, Retired,
-                       HistoryConfirmedPrefixSealed };
+                       HistoryConfirmedPrefixSealed, HistoryTerminalSealed,
+                       HistoryTerminalPrefixSealed };
     struct PostBytes {const void* address{};std::vector<std::byte> bytes;CpuComparisonDomain domain{};std::uint32_t kind{};};
     explicit GameplayCpuCheckpoint(std::uint32_t span,bool reusable_loop)
         :span_(span),reusable_loop_(reusable_loop){}
@@ -122,6 +138,10 @@ private:
         const GameplayMatchSession&,std::unique_ptr<GameplayCpuStatics>,
         CpuCaptureDiagnostic&,std::uint32_t span,bool allow_variable,
         bool history_mode=false,CpuHistoryStorage=CpuHistoryStorage::StablePayload) noexcept;
+    bool seal_history_incarnation_impl(const GameplayMatchSession&,
+        std::uint32_t actual_source,std::uint32_t selected_ordinal,
+        std::uint64_t completed_tick,bool terminal,
+        const char** refusal) noexcept;
     const std::uint32_t span_;
     const bool reusable_loop_;
     std::uint64_t motor_token_{};
@@ -138,7 +158,12 @@ private:
     std::unique_ptr<GameplayActionStoreHistory> history_actions_;
     bool history_mode_=false;
     std::uint64_t history_incarnation_{};
-    std::uint32_t history_start_frame_{},history_end_frame_{},history_restore_end_{};
+    std::uint32_t history_start_frame_{},history_end_frame_{},history_end_source_frame_{},
+                  history_restore_end_{},history_restore_source_frame_{};
+    const std::uint64_t* history_terminal_ticks_{};
+    std::uint64_t history_terminal_pre_tick_{},history_terminal_world_generation_{},
+                  history_terminal_context_epoch_{};
+    bool history_terminal_bound_{};
     std::uint32_t history_restore_count_{};
     bool history_endpoint_archived_{},history_endpoint_closed_{};
     MeleeWebSourceMemoryPayloadSnapshot* post_payload_{};

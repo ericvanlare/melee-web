@@ -302,6 +302,13 @@ int main(){
   assert(!melee_web_native_menu_match_history_start_prefix_json());
   match_history_in_tick=false;
   assert(history_start_ordinary_callback_impl());assert(renderer_services==2);
+  const auto source_steps=frames.steps(),source_draws=frames.draws();
+  history_start_release_completed_match();
+  assert(melee_web_native_menu_match_history_start_state()==MatchHistoryStartReleased);
+  assert(!history_start_ordinary_callback_impl());
+  assert(!history_start_prefix_running()&&!history_start_ready_hold_pending_impl());
+  assert(frames.steps()==source_steps&&frames.draws()==source_draws&&renderer_services==2);
+  assert(!melee_web_native_menu_match_history_start_enable());
   match_history_before_close();
   assert(!melee_web_native_menu_match_history_start_publication_data());
   assert(!melee_web_native_menu_match_history_start_live_identity_json());

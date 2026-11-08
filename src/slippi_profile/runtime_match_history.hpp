@@ -7,6 +7,7 @@
 #include "gameplay_cpu_endpoint.hpp"
 #include "gameplay_cpu_statics.hpp"
 #include "gameplay_match_session.hpp"
+#include "slippi_profile/runtime_match_history_terminal_cursor.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -25,6 +26,9 @@ enum class RuntimeMatchHistoryCommand : std::uint32_t {
     FinishConfirmedPrefix=20, CloseConfirmedPrefix=21,
     RetireConfirmedPrefix=22, RebaseConfirmedPrefix=23,
     AdoptPrefixTicket=24,
+    BeginTerminalTail=26, TerminalTailTicket=27,
+    TerminalTailForward=28, TerminalTailPresent=29,
+    FinishTerminalTail=30,
 };
 
 enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
@@ -36,6 +40,14 @@ enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
     InteriorReplayBefore=19, InteriorReplayAfter=20,
     InteriorPresentSubmit=21, InteriorPresentComplete=22,
     InteriorRendererPrepare=23,
+    TerminalForwardAfter=24, TerminalPresentSubmit=25,
+    TerminalPresentComplete=26, TerminalEndpointBegin=27,
+    TerminalEndpointComplete=28, TerminalClose=29, TerminalRetire=30,
+    TerminalReplayAfter=31,
+    TerminalTailBegin=32, TerminalTailPoll=33,
+    TerminalTailForwardBefore=34, TerminalTailForwardAfter=35,
+    TerminalTailPresentSubmit=36, TerminalTailPresentComplete=37,
+    TerminalTailFinish=38, TerminalRestoreBefore=39,
 };
 
 enum class RuntimeMatchHistoryGateResult : std::uint32_t {
@@ -69,6 +81,11 @@ enum class RuntimeMatchHistoryPhase : std::uint32_t {
     EpisodeRecording=21, EpisodePresentPending=22,
     PrefixSealed=23, PrefixCpuCopied=24, PrefixClosed=25, PrefixRetired=26,
     PresentedSealed=27, PresentedComplete=28,
+    TerminalRecording=29, TerminalPresentPending=30, TerminalSealed=31,
+    TerminalCpuCopied=32, TerminalPresentIdle=33, TerminalClosed=34,
+    TerminalRetired=35, TerminalTailReady=36, TerminalTailTicketed=37,
+    TerminalTailForwarded=38, TerminalTailPresentPending=39,
+    TerminalTailPresented=40, TerminalFinished=41,
 };
 
 enum class RuntimeMatchHistoryFailure : std::uint32_t {
@@ -94,6 +111,34 @@ struct RuntimeMatchHistoryMetadata {
     std::uint32_t pre_audio_phase{}, current_audio_phase{};
 };
 static_assert(sizeof(RuntimeMatchHistoryMetadata)==64);
+
+/* Separate private terminal evidence. Original source frames and selected
+ * traversal ordinals remain distinct; the legacy input/ticket records keep
+ * their existing 88/176-byte schema-1 layouts. */
+struct RuntimeMatchHistoryTerminalReceipt {
+    std::uint32_t schema=1,bytes=104,flags{},incarnation{};
+    std::uint32_t pre_source_frame{},selected_source_frame{},pre_ordinal{},selected_ordinal{};
+    std::uint32_t first_ordinal{},first_source_frame{},ticket_id{},local_port{};
+    std::uint32_t remote_port{},reserved{};
+    std::uint64_t pre_completed_tick{},selected_completed_tick{},first_completed_tick{};
+    std::uint64_t world_generation{},context_epoch{},poll_serial{};
+};
+static_assert(sizeof(RuntimeMatchHistoryTerminalReceipt)==104);
+
+/* The terminal tail outlives the seven-row rollback capsule. Its current
+ * source frame remains the authored ending frame while `input_ordinal` and
+ * `completed_tick` advance independently. Adopted rows retain their original
+ * poll identity and raw PAD in this separate ABI. */
+struct RuntimeMatchHistoryTerminalTailTicket {
+    std::uint32_t schema=1,bytes=160,flags{},ticket_id{},request_sequence{};
+    std::uint32_t source_frame{},input_ordinal{},origin_ticket_id{};
+    std::uint32_t origin_source_frame{},incarnation{},origin_incarnation{};
+    std::uint32_t local_port{},remote_port{},reserved{};
+    std::uint64_t completed_tick{},poll_serial{};
+    std::array<std::uint8_t,44> raw_pad{};
+    std::array<std::uint8_t,44> applied_pad{};
+};
+static_assert(sizeof(RuntimeMatchHistoryTerminalTailTicket)==160);
 
 /* Private optional episode receipts. The legacy 168-byte input ABI is kept
  * separate; these fixed records bind actual polls and applied rows to one
@@ -213,6 +258,45 @@ public:
     bool begin_continuation() noexcept;
     bool begin_episode(RuntimeMatchHistoryPrefixHandoff&) noexcept;
     bool adopt_next_prefix_ticket() noexcept;
+    bool begin_terminal_tail(std::uint32_t selected_ordinal) noexcept;
+    bool can_admit_terminal_tail_poll_ticket(std::uint32_t request_sequence,
+                                             unsigned local_port,
+                                             unsigned remote_port) const noexcept;
+    bool adopt_terminal_tail_ticket(std::uint32_t request_sequence) noexcept;
+    bool admit_terminal_tail_poll_ticket(
+        std::uint32_t request_sequence,const PADStatus raw[PAD_MAX_CONTROLLERS],
+        std::uint64_t poll_serial,unsigned local_port,unsigned remote_port) noexcept;
+    bool forward_terminal_tail_ticket(std::uint32_t request_sequence,
+                                      const std::uint8_t* remote_pad,
+                                      unsigned remote_pad_bytes) noexcept;
+    bool submit_terminal_tail_present() noexcept;
+    bool terminal_tail_finish_ready(std::uint32_t& consumed_ordinal,
+                                   std::uint32_t& last_input_ordinal) const noexcept;
+    bool finish_terminal_tail(std::uint32_t consumed_ordinal,
+                              std::uint32_t last_input_ordinal) noexcept;
+    bool terminal_tail_authorized(const GameplayMatchSession&,
+                                  RuntimeMatchHistoryGatePoint,
+                                  std::uint32_t source_frame) const noexcept;
+    const RuntimeMatchHistoryTerminalTailTicket* terminal_tail_ticket() const noexcept;
+    const PADStatus* terminal_tail_applied_input() const noexcept;
+    std::uint32_t terminal_tail_consumed_ordinal() const noexcept {
+        return terminal_tail_input_ordinal_;
+    }
+    std::uint32_t terminal_tail_last_input_ordinal() const noexcept {
+        return terminal_tail_last_input_ordinal_;
+    }
+    std::uint32_t terminal_tail_source_frame() const noexcept {
+        return terminal_tail_source_frame_;
+    }
+    std::uint64_t terminal_tail_completed_tick() const noexcept {
+        return terminal_tail_completed_tick_;
+    }
+    std::uint32_t terminal_tail_suffix_count() const noexcept {
+        return terminal_tail_suffix_count_;
+    }
+    std::uint32_t terminal_tail_suffix_cursor() const noexcept {
+        return terminal_tail_suffix_cursor_;
+    }
     bool forward_from_poll(const PADStatus raw[PAD_MAX_CONTROLLERS],
                            std::uint64_t poll_serial,
                            unsigned local_port, unsigned remote_port,
@@ -277,6 +361,11 @@ public:
     std::uint32_t replay_steps() const noexcept { return replay_steps_; }
     std::uint64_t poll_serial() const noexcept { return poll_serial_; }
     bool episode_mode() const noexcept { return episode_mode_; }
+    const MeleeWebRuntimeMatchHistoryTerminalCursor& terminal_cursor() const noexcept {
+        return terminal_cursor_;
+    }
+    RuntimeMatchHistoryTerminalReceipt terminal_receipt() const noexcept;
+    bool terminal_selected_at(std::uint32_t source_frame) const noexcept;
     const RuntimeMatchHistoryPollTicket* latest_ticket() const noexcept;
     const RuntimeMatchHistoryInputReceipt* episode_input_row(std::uint32_t ordinal) const noexcept;
     /* Copy this value before restore/retire reuses the selected motor tape. */
@@ -287,10 +376,12 @@ private:
         CapturedPre=1u<<0, ArmedPre=1u<<1, PredictedCpu=1u<<2,
         PredictedDraw=1u<<3, RestoredPre=1u<<4, CorrectedCpu=1u<<5,
         CorrectedDraw=1u<<6, PrefixCpu=1u<<7, PresentedFrontier=1u<<8,
+        TerminalEnd=1u<<9,
     };
     enum class EndpointRole : std::uint32_t {
         None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
         RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier,
+        TerminalEnd,
     };
     enum class EndpointCompletionMode : std::uint32_t { CopiedRows, ImmediateAdmission };
 
@@ -302,6 +393,23 @@ private:
     bool checkpoint_failure(RuntimeMatchHistoryFailure,const char*) noexcept;
     bool endpoint_role_allowed(View,Provenance,EndpointRole&) const noexcept;
     bool end_endpoint_batch_impl(EndpointCompletionMode) noexcept;
+    bool read_terminal_cursor(std::uint32_t expected_source_frame,
+                              MeleeWebRuntimeMatchHistoryTerminalOwner&,
+                              std::uint64_t& completed_tick,
+                              std::uint32_t& ending,
+                              std::uint32_t& complete) const noexcept;
+    bool read_terminal_tail_cursor(std::uint64_t expected_completed_tick,
+                                   std::uint32_t expected_source_frame,
+                                   bool allow_complete) const noexcept;
+    bool terminal_tail_finish_state_ready(std::uint32_t& consumed_ordinal,
+                                          std::uint32_t& last_input_ordinal) const noexcept;
+    bool bind_terminal_cursor() noexcept;
+    bool rewind_terminal_cursor_pre() noexcept;
+    bool observe_terminal_cursor(std::uint32_t source_frame_before,
+                                 std::uint64_t tick_before,
+                                 std::uint32_t ending_before,
+                                 std::uint32_t complete_before,
+                                 std::uint32_t source_frame_after) noexcept;
 
     GameplayMatchSession& session_;
     RuntimeMatchHistoryBoundaryCheck boundary_{};
@@ -314,6 +422,7 @@ private:
     std::unique_ptr<GameplayCpuCheckpoint> checkpoint_;
     GameplayCpuEndpointReader reader_{};
     GameplayMatchCpuOwners owners_{};
+    MeleeWebRuntimeMatchHistoryTerminalCursor terminal_cursor_{};
     std::array<PADStatus,PAD_MAX_CONTROLLERS> retained_raw_{};
     std::array<PADStatus,PAD_MAX_CONTROLLERS> retained_forward_{};
     std::array<PADStatus,PAD_MAX_CONTROLLERS> retained_corrected_{};
@@ -330,9 +439,24 @@ private:
     bool has_input_{},source_step_possible_{};
     bool episode_mode_{},arena_mode_{},latest_ticket_valid_{},current_ticket_pending_{};
     bool last_present_source_frame_valid_{};
-    std::uint32_t segment_start_frame_{},replay_target_end_{},ticket_count_{},last_ticket_id_{};
+    std::uint32_t segment_start_frame_{},replay_target_end_{},replay_target_ordinal_{},
+                  ticket_count_{},last_ticket_id_{};
     std::uint32_t prefix_selected_end_{},prefix_suffix_cursor_{},prefix_adopted_cursor_{};
+    std::uint32_t terminal_selected_source_frame_{},terminal_selected_ordinal_{};
+    std::uint64_t terminal_selected_tick_{},terminal_last_presented_tick_{};
     bool prefix_handoff_imported_{},prefix_adoption_pending_{};
+    bool terminal_checkpoint_sealed_{},terminal_needs_present_{};
+    bool terminal_tail_active_{},terminal_tail_ticket_pending_{},
+         terminal_tail_remote_pending_{},terminal_tail_adopted_pending_{},
+         terminal_tail_complete_after_{};
+    std::uint32_t terminal_tail_source_frame_{},terminal_tail_input_ordinal_{},
+                  terminal_tail_last_input_ordinal_{},terminal_tail_incarnation_{},
+                  terminal_tail_suffix_count_{},terminal_tail_suffix_cursor_{},
+                  terminal_tail_last_ticket_id_{},terminal_tail_last_presented_ordinal_{};
+    std::uint64_t terminal_tail_completed_tick_{},terminal_tail_last_poll_serial_{};
+    RuntimeMatchHistoryTerminalTailTicket terminal_tail_ticket_{};
+    std::array<RuntimeMatchHistoryInputReceipt,7> terminal_tail_suffix_rows_{};
+    std::array<PADStatus,PAD_MAX_CONTROLLERS> terminal_tail_applied_{};
     RuntimeMatchHistoryPrefixHandoff* prefix_handoff_{};
     RuntimeMatchHistoryPollTicket latest_ticket_{};
     std::array<RuntimeMatchHistoryInputReceipt,7> episode_rows_{};

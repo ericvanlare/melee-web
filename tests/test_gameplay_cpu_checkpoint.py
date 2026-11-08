@@ -301,7 +301,8 @@ int main(void){
                 'scripts/net_room_relay_runtime_owner.mjs','scripts/net_room_relay_direct_runtime.mjs',
                 'scripts/net_room_relay_miniflare_options.mjs','tests/quiescent_wasm_snapshot.mjs',
                 'dependencies.lock.json','online/relay/worker.mjs','online/relay/wrangler.jsonc']
-        files+=['src/gameplay_audio_fx.c','src/gameplay_audio.h','src/gameplay_audio_stream.h']
+        files+=['src/gameplay_audio_fx.c','src/gameplay_audio.h','src/gameplay_audio_stream.h',
+                'src/gameplay_cpu_endpoint.hpp']
         for relative in files:
             source=SOURCE/relative
             if not source.is_file():source=ROOT/relative

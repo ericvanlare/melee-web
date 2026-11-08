@@ -5,6 +5,7 @@
 #include "gameplay_cpu_interval.h"
 #include "slippi_profile/particle_source_schedule.h"
 #include "slippi_profile/camera_source_prepare.h"
+#include "slippi_profile/fighter_projection.h"
 #if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
 #include "slippi_profile/effect_matrix.h"
 #include "slippi_profile/profile.h"
@@ -61,11 +62,28 @@ extern uint32_t melee_web_match_source_frames(void);
 static int post_effect_matrices(void* context, char* error, size_t error_size)
 {
     (void) context;
+    HSD_GObj* main_camera = NULL;
+    HSD_GObj* scheduled_main = NULL;
+    HSD_GObj* hud_camera = NULL;
+    HSD_GObj* magnifier_camera = NULL;
+    const uint64_t world = melee_web_gameplay_generation();
+    const uint64_t token = melee_web_cpu_interval_token();
+    unsigned hud_hidden = 0;
     if (!slippi_profile_effect_matrices_post_step(error, error_size)) return 0;
-    if (!slippi_camera_source_prepare(melee_web_gameplay_generation(),
-            melee_web_cpu_interval_token(), error, error_size)) return 0;
-    return slippi_particle_source_prepare(melee_web_gameplay_generation(),
-        melee_web_cpu_interval_token(), error, error_size);
+    if (!slippi_camera_source_prepare(world, token, &main_camera,
+                                      error, error_size)) return 0;
+    if (!slippi_particle_source_prepare(world, token, error, error_size)) return 0;
+    if (!token || !slippi_fighter_projection_private_armed()) return 1;
+    if (!slippi_particle_source_magnifier_identity(world, token, &scheduled_main,
+            &hud_camera, &magnifier_camera, &hud_hidden) ||
+        scheduled_main != main_camera) {
+        if (error && error_size)
+            snprintf(error, error_size,
+                     "Fresh source camera schedule lacks exact magnifier/HUD ownership");
+        return 0;
+    }
+    return slippi_fighter_projection_source_prepare(world, token, main_camera,
+        hud_camera, magnifier_camera, hud_hidden);
 }
 
 static int match_gameplay_step(char* error, size_t error_size)

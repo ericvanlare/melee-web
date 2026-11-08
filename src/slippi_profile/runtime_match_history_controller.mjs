@@ -8,11 +8,13 @@ export const MATCH_HISTORY_COMMAND=Object.freeze({capture:1,begin:2,forward:3,pr
   pollTicket:12,forwardTicket:13,seal:14,replayTicket:15,finishReplay:16,
   continue:17,beginEpisode:18,recordingPresent:19,finishPrefix:20,
   closePrefix:21,retirePrefix:22,rebaseConfirmedPrefix:23,
-  adoptNextPrefixTicket:24,sealPresentedFrontier:25});
+  adoptNextPrefixTicket:24,sealPresentedFrontier:25,terminalTailBegin:26,
+  terminalTailTicket:27,terminalTailForward:28,terminalTailPresent:29,
+  finishTerminalTail:30});
 const PREFIX='_melee_web_native_menu_match_history_';
 const QUEUE_COMPLETION_OBSERVER_KEY='__meleeWebRuntimeHistoryQueueCompletionV1';
 const STATUS_BYTES=128,INPUT_BYTES=168,PAD_BYTES=11,FRAME_BYTES=44,TICKET_BYTES=88,INPUT_ROW_BYTES=176;
-const START_STATE_MAX=6,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
+const START_STATE_MAX=7,START_PUBLICATION_BYTES=48,START_HELD_STATE=5,START_PREFIX_MAX=1024;
 const START_PREFIX_SCHEMA='melee-web-runtime-match-start-prefix-v1';
 const START_PREFIX_INPUT='ordinary-local-four-port-pad-v1';
 const UINT32_MAX=0xffffffff,UINT64_MAX=0xffffffffffffffffn;
@@ -32,6 +34,18 @@ const PREFIX_HANDOFF_U32_FIELDS=['oldPreFrame','confirmedFrame','selectedEndFram
   'oldIncarnation','finishRequestSequence','rebaseRequestSequence','suffixCount','suffixCursor',
   'localPort','remotePort'];
 const PREFIX_OWNER_FIELDS=['ownerStorage','ownerContext','ownerFlow','ownerAudio'];
+const TERMINAL_TAIL_SCHEMA='melee-web-runtime-terminal-tail-v1';
+const TERMINAL_TAIL_FIELDS=['schema','requestSequence','preSourceFrame','preOrdinal',
+  'preCompletedTick','firstSourceFrame','firstOrdinal','firstCompletedTick',
+  'selectedSourceFrame','selectedOrdinal','selectedCompletedTick','selectedTicketId',
+  'selectedPollSerial','sourceFrame','consumedOrdinal','completedTick','incarnation',
+  'localPort','remotePort','suffixCount','suffixCursor','worldGeneration','contextEpoch'];
+const TERMINAL_FINAL_SCHEMA='melee-web-runtime-terminal-final-v1';
+const TERMINAL_FINAL_FIELDS=['schema','firstSourceFrame','firstOrdinal','firstCompletedTick',
+  'selectedSourceFrame','selectedOrdinal','selectedCompletedTick','sourceFrame',
+  'consumedOrdinal','lastInputOrdinal','completedTick','ticketId','requestSequence',
+  'pollSerial','localPort','remotePort','outcome','winner','randomSeed','worldGeneration',
+  'contextEpoch','presentationSerial','submission','checksumTick','checksumFrame'];
 const statusNames=['schema','bytes','ownerState','firstFailure','pendingCommand','lastCompletedCommand',
   'requestSequence','completeSequence','expectedFrame','localPort','remotePort','reserved'];
 const metadataNames=['schema','bytes','phase','firstFailure','preFrame','currentFrame','sealedEnd',
@@ -150,8 +164,8 @@ export function decodeRuntimeMatchHistoryStatus(bytes,{episodeMode=false,arenaMo
   metadata.pollSerial=data.getBigUint64(96,true).toString();
   metadata.preAudioPhase=data.getUint32(104,true);metadata.currentAudioPhase=data.getUint32(108,true);
   Object.assign(result,{metadata,...fields(data,['inputReady','gpuPending','endpointActive','rendererErrors'],112)});
-  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?28:episodeMode?21:20,
-    commandLimit=arenaMode?25:episodeMode?18:11;
+  const stepLimit=episodeMode?7:1,restoreLimit=episodeMode?2:1,phaseLimit=arenaMode?41:episodeMode?21:20,
+    commandLimit=arenaMode?30:episodeMode?18:11;
   if(result.schema!==1||result.bytes!==STATUS_BYTES||result.reserved!==0||result.ownerState>2||
     result.pendingCommand>commandLimit||result.lastCompletedCommand>commandLimit||result.completeSequence>result.requestSequence||
     result.inputReady>1||result.gpuPending>1||result.endpointActive>1||
@@ -168,7 +182,7 @@ export function decodeRuntimeMatchHistoryPacing(bytes){
   const result=fields(data,['schema','bytes','phase','currentFrame','steps','pendingSteps','stalled','stallReason']);
   for(const [index,key] of ['elapsedMs','pendingTicks','triggeringValue','threshold'].entries())
     result[key]=data.getFloat64(32+index*8,true);
-  if(result.schema!==1||result.bytes!==64||result.phase>28||result.steps>1||
+  if(result.schema!==1||result.bytes!==64||result.phase>41||result.steps>1||
       result.pendingSteps>8||result.stalled>1||result.stallReason>3||
       (result.stalled?(result.steps!==0||result.stallReason===0):result.stallReason!==0)||
       !Number.isFinite(result.elapsedMs)||result.elapsedMs<0||
@@ -206,6 +220,130 @@ export function decodeRuntimeMatchHistoryPrefixHandoff(rawJSON){
       BigInt('0x'+result[name])===0n)
       throw Error(`Runtime prefix handoff ${name} is not a nonzero fixed-width owner token`);
   }
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryTerminalReceipt(bytes){
+  if(!(bytes instanceof Uint8Array)||bytes.byteLength!==104)
+    throw Error('Runtime terminal receipt extent');
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const result=fields(view,['schema','bytes','flags','incarnation','preSourceFrame',
+    'selectedSourceFrame','preOrdinal','selectedOrdinal','firstOrdinal','firstSourceFrame',
+    'ticketId','localPort','remotePort','reserved']);
+  for(const [index,name] of ['preCompletedTick','selectedCompletedTick','firstCompletedTick',
+      'worldGeneration','contextEpoch','pollSerial'].entries())
+    result[name]=view.getBigUint64(56+index*8,true).toString();
+  if(result.schema!==1||result.bytes!==104||result.reserved||![0,1,3].includes(result.flags))
+    throw Error('Runtime terminal receipt schema or flags');
+  if(result.flags===0){
+    if(bytes.subarray(12).some(byte=>byte!==0))throw Error('Empty runtime terminal receipt has payload');
+    return Object.freeze(result);
+  }
+  const relative=(ordinal,sourceFrame,tick)=>ordinal>result.preOrdinal&&
+    ordinal-result.preOrdinal<=7&&sourceFrame===ordinal-1&&
+    BigInt(tick)===BigInt(result.preCompletedTick)+BigInt(ordinal-result.preOrdinal);
+  const selected=result.flags===3;
+  if(result.preSourceFrame!==result.preOrdinal||result.incarnation<1||result.incarnation>3||
+     result.worldGeneration==='0'||result.contextEpoch==='0'||
+     !relative(result.firstOrdinal,result.firstSourceFrame,result.firstCompletedTick)||
+     (selected?(!result.ticketId||result.pollSerial==='0'||result.localPort>1||result.remotePort>1||
+       result.localPort===result.remotePort||
+       !relative(result.selectedOrdinal,result.selectedSourceFrame,result.selectedCompletedTick)):
+       (result.selectedOrdinal||result.selectedSourceFrame||result.ticketId||result.localPort||
+        result.remotePort||result.selectedCompletedTick!=='0'||result.pollSerial!=='0')))
+    throw Error('Runtime terminal receipt cursor or selected ticket differs');
+  return Object.freeze(result);
+}
+
+export function decodeRuntimeMatchHistoryTerminalTail(rawJSON){
+  if(typeof rawJSON!=='string'||!rawJSON)throw Error('Runtime terminal-tail JSON is required');
+  let result;
+  try{result=JSON.parse(rawJSON);}catch{throw Error('Runtime terminal-tail JSON parse refused');}
+  if(!hasExactKeys(result,TERMINAL_TAIL_FIELDS)||result.schema!==TERMINAL_TAIL_SCHEMA)
+    throw Error('Runtime terminal-tail schema or exact field set violation');
+  for(const name of ['requestSequence','preSourceFrame','preOrdinal','firstSourceFrame','firstOrdinal',
+    'selectedSourceFrame','selectedOrdinal','selectedTicketId','sourceFrame','consumedOrdinal',
+    'incarnation','localPort','remotePort','suffixCount','suffixCursor'])
+    u32(result[name],`Terminal-tail ${name}`);
+  if(!result.requestSequence||!result.selectedTicketId||result.preSourceFrame!==result.preOrdinal||
+    result.firstOrdinal<=result.preOrdinal||result.selectedOrdinal<=result.preOrdinal||
+    result.firstOrdinal-result.preOrdinal>7||result.selectedOrdinal-result.preOrdinal>7||
+    result.firstSourceFrame!==result.firstOrdinal-1||
+    result.selectedSourceFrame!==result.selectedOrdinal-1||result.selectedSourceFrame!==result.sourceFrame||
+    result.consumedOrdinal<result.selectedOrdinal+result.suffixCursor||
+    result.suffixCursor>result.suffixCount||result.selectedOrdinal-result.preOrdinal+result.suffixCount>7||
+    result.incarnation<1||result.incarnation>3||![0,1].includes(result.localPort)||
+    ![0,1].includes(result.remotePort)||result.localPort===result.remotePort)
+    throw Error('Runtime terminal-tail source, ordinal, suffix, incarnation, or port bounds violation');
+  for(const name of ['preCompletedTick','firstCompletedTick','selectedCompletedTick','completedTick'])
+    canonicalU64(result[name],`terminal-tail ${name}`);
+  for(const name of ['worldGeneration','contextEpoch'])
+    canonicalU64(result[name],`terminal-tail ${name}`,{positive:true});
+  const anchor=BigInt(result.preCompletedTick)-BigInt(result.preOrdinal);
+  if(BigInt(result.firstCompletedTick)-BigInt(result.firstOrdinal)!==anchor||
+    BigInt(result.selectedCompletedTick)-BigInt(result.selectedOrdinal)!==anchor||
+    BigInt(result.completedTick)-BigInt(result.consumedOrdinal)!==anchor)
+    throw Error('Runtime terminal-tail completed tick differs from its PRE anchor');
+  canonicalU64(result.selectedPollSerial,'terminal-tail selected poll serial',{positive:true});
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryTerminalTailTicket(bytes){
+  if(!(bytes instanceof Uint8Array)||bytes.length!==160)
+    throw Error('Runtime terminal-tail ticket extent');
+  const data=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const result={schema:data.getUint32(0,true),bytes:data.getUint32(4,true),flags:data.getUint32(8,true),
+    ticketId:data.getUint32(12,true),requestSequence:data.getUint32(16,true),
+    sourceFrame:data.getUint32(20,true),inputOrdinal:data.getUint32(24,true),
+    originTicketId:data.getUint32(28,true),originSourceFrame:data.getUint32(32,true),
+    incarnation:data.getUint32(36,true),originIncarnation:data.getUint32(40,true),
+    localPort:data.getUint32(44,true),remotePort:data.getUint32(48,true),
+    reserved:data.getUint32(52,true),completedTick:data.getBigUint64(56,true).toString(),
+    pollSerial:data.getBigUint64(64,true).toString(),rawPad:bytes.slice(72,116),
+    appliedPad:bytes.slice(116,160),rawBytes:bytes.slice()};
+  if(result.schema!==1||result.bytes!==160||![0,1].includes(result.flags)||!result.ticketId||
+    !result.requestSequence||result.reserved||result.incarnation<1||result.incarnation>3||
+    ![0,1].includes(result.localPort)||![0,1].includes(result.remotePort)||
+    result.localPort===result.remotePort||result.pollSerial==='0'||
+    (result.flags===0&&(result.originTicketId||result.originSourceFrame||result.originIncarnation))||
+    (result.flags===1&&(result.ticketId!==result.originTicketId||
+      result.originSourceFrame!==result.inputOrdinal||result.originIncarnation<1||
+      result.originIncarnation>result.incarnation)))
+    throw Error('Runtime terminal-tail ticket metadata or origin violation');
+  canonicalU64(result.completedTick,'terminal-tail ticket completed tick');
+  canonicalU64(result.pollSerial,'terminal-tail ticket poll serial',{positive:true});
+  return result;
+}
+
+export function decodeRuntimeMatchHistoryTerminalFinal(rawJSON){
+  if(typeof rawJSON!=='string'||!rawJSON)throw Error('Runtime terminal-final JSON is required');
+  let result;
+  try{result=JSON.parse(rawJSON);}catch{throw Error('Runtime terminal-final JSON parse refused');}
+  if(!hasExactKeys(result,TERMINAL_FINAL_FIELDS)||result.schema!==TERMINAL_FINAL_SCHEMA)
+    throw Error('Runtime terminal-final schema or exact field set violation');
+  for(const name of ['firstSourceFrame','firstOrdinal','selectedSourceFrame','selectedOrdinal',
+    'sourceFrame','consumedOrdinal','lastInputOrdinal','ticketId','requestSequence','localPort',
+    'remotePort','randomSeed','checksumTick','checksumFrame'])
+    u32(result[name],`Terminal-final ${name}`);
+  for(const name of ['outcome','winner'])
+    if(!Number.isInteger(result[name])||result[name]<-0x80000000||result[name]>0x7fffffff)
+      throw Error(`Terminal-final ${name} is not int32`);
+  if(!result.ticketId||!result.requestSequence||result.consumedOrdinal!==result.lastInputOrdinal+1||
+    !result.firstOrdinal||!result.selectedOrdinal||result.selectedOrdinal>result.lastInputOrdinal||
+    result.firstSourceFrame!==result.firstOrdinal-1||result.selectedSourceFrame!==result.selectedOrdinal-1||
+    result.selectedSourceFrame!==result.sourceFrame||
+    result.checksumTick!==result.lastInputOrdinal||result.checksumFrame!==result.sourceFrame||
+    ![0,1].includes(result.localPort)||![0,1].includes(result.remotePort)||
+    result.localPort===result.remotePort)
+    throw Error('Runtime terminal-final ordinal, frame, ticket, or port relationship violation');
+  for(const name of ['firstCompletedTick','selectedCompletedTick','completedTick'])
+    canonicalU64(result[name],`terminal-final ${name}`);
+  for(const name of ['pollSerial','worldGeneration','contextEpoch','presentationSerial','submission'])
+    canonicalU64(result[name],`terminal-final ${name}`,{positive:true});
+  const anchor=BigInt(result.selectedCompletedTick)-BigInt(result.selectedOrdinal);
+  if(BigInt(result.firstCompletedTick)-BigInt(result.firstOrdinal)!==anchor||
+    BigInt(result.completedTick)-BigInt(result.consumedOrdinal)!==anchor)
+    throw Error('Runtime terminal-final completed tick differs from its selected anchor');
   return result;
 }
 
@@ -291,7 +429,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   let inlineMode=false,nativeCallPending=false;
   let identityText=null,lastPresentationSubmission=null;
   let adoptedPrefixTicket=null,unclaimedPrefixTicket=false,confirmedPrefixActive=false;
-  const journal=[],pacingJournal=[];
+  let lastPolledEpisodeTicket=null,terminalCandidate=null,terminalTailActive=false;
+  let terminalTailLastTicket=null,terminalTailFinalCopy=null,terminalTailAgreementConfirmed=false;
+  const journal=[],pacingJournal=[],pacingWaitJournal=[];
+  let activePacingWait=null;
   let pacingStarted=false;
   const queueCompletionWindow=globalThis.window??null;
   let queueCompletionInstalled=false,queueCompletionClosed=false;
@@ -536,6 +677,223 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     row.suffixOrdinal=ordinal;
     return row;
   };
+  const readEpisodeRow=ordinal=>{
+    u32(ordinal,'Episode source ordinal');
+    const before=check(status());
+    if(before.pendingCommand||before.completeSequence!==before.requestSequence)
+      throw latch(Error('Episode receipt requires an idle completed native command'));
+    if(episodeExport('input_row_bytes')()!==INPUT_ROW_BYTES)
+      throw latch(Error('Native episode input receipt ABI differs from its controller'));
+    const pointer=episodeExport('input_row_data')(ordinal);
+    if(!pointer)throw latch(Error(`Native episode input receipt ${ordinal} is unavailable`));
+    const receipt=decodeRuntimeMatchHistoryEpisodeInputRow(read(pointer,INPUT_ROW_BYTES));
+    const after=check(status());
+    if(after.requestSequence!==before.requestSequence||after.completeSequence!==before.completeSequence||
+      receipt.sourceFrame<before.metadata.preFrame||
+      receipt.sourceFrame-before.metadata.preFrame!==ordinal||
+      receipt.localPort!==before.localPort||receipt.remotePort!==before.remotePort)
+      throw latch(Error('Native episode input receipt ordinal or owner changed'));
+    receipt.ordinal=ordinal;
+    return receipt;
+  };
+  const readTerminalReceipt=()=>{
+    const before=check(status());
+    if(!arenaMode||before.ownerState!==1||before.pendingCommand||before.endpointActive||
+       !before.completeSequence||before.completeSequence!==before.requestSequence||
+       before.lastCompletedCommand>=26)
+      throw Error('Runtime terminal receipt requires its completed arena owner');
+    if(episodeExport('terminal_receipt_bytes')()!==104)
+      throw Error('Native runtime terminal receipt is unavailable or has an invalid extent');
+    const pointer=episodeExport('terminal_receipt_data')();
+    if(!pointer)throw Error('Native runtime terminal receipt is unavailable');
+    const receipt=decodeRuntimeMatchHistoryTerminalReceipt(read(pointer,104));
+    const after=check(status());
+    if(!sameJsonValue(before,after)||
+       (receipt.flags!==0&&(receipt.preSourceFrame!==before.metadata.preFrame||
+        receipt.incarnation!==before.metadata.incarnation))||
+       (receipt.flags===3&&(receipt.selectedSourceFrame!==before.metadata.currentFrame||
+        receipt.localPort!==before.localPort||receipt.remotePort!==before.remotePort)))
+      throw Error('Native runtime terminal receipt changed its completed owner');
+    return receipt;
+  };
+  const bindTerminalCandidate=(before,after,ticketId,planBytes,replayed)=>{
+    const receipt=readTerminalReceipt();
+    const rowOrdinal=before.metadata.currentFrame-before.metadata.preFrame;
+    if(receipt.flags!==3||receipt.selectedOrdinal!==before.metadata.currentFrame+1||
+       receipt.selectedSourceFrame!==before.metadata.currentFrame||receipt.ticketId!==ticketId||
+       after.metadata.currentFrame!==receipt.selectedSourceFrame)
+      throw Error('Selected terminal traversal does not match the completed ticket');
+    const row=readEpisodeRow(rowOrdinal);
+    if(row.ticketId!==ticketId||row.pollSerial!==receipt.pollSerial||row.state!==(replayed?2:1)||
+       row.sourceFrame!==receipt.selectedSourceFrame||row.incarnation>receipt.incarnation||
+       !sameBytes(row.selected,planBytes)||(!replayed&&!sameBytes(row.forward,planBytes)))
+      throw Error('Selected terminal traversal differs from the retained applied row');
+    if(!replayed){
+      const polled=adoptedPrefixTicket??lastPolledEpisodeTicket;
+      if(!polled||polled.ticketId!==row.ticketId||polled.pollSerial!==row.pollSerial||
+         polled.sourceFrame!==row.sourceFrame||polled.incarnation!==row.incarnation||
+         polled.localPort!==row.localPort||polled.remotePort!==row.remotePort||
+         !sameBytes(polled.raw,row.raw))
+        throw Error('Selected terminal forward differs from its copied actual poll ticket');
+    }
+    terminalCandidate=Object.freeze({inputOrdinal:receipt.selectedOrdinal,
+      sourceFrame:receipt.selectedSourceFrame,rowOrdinal,ticket:row,
+      appliedPad:planBytes.slice(),receipt,status:after});
+  };
+  const readTerminalTailDescriptor=()=>{
+    if(!arenaMode||!terminalTailActive||!terminalCandidate)
+      throw Error('Terminal-tail descriptor requires its selected retired terminal owner');
+    const before=check(status()),getter=module[PREFIX+'terminal_tail_json'];
+    if(typeof getter!=='function'||before.ownerState!==1||before.pendingCommand||before.gpuPending||
+       before.endpointActive||before.completeSequence!==before.requestSequence||
+       ![36,37,38,39,40].includes(before.metadata.phase))
+      throw Error('Terminal-tail descriptor requires an idle active native tail');
+    const pointer=getter();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native terminal-tail descriptor is unavailable'));
+    const text=module.UTF8ToString(pointer>>>0); // Copy borrowed native text before another export.
+    let receipt;
+    try{receipt=decodeRuntimeMatchHistoryTerminalTail(text);}
+    catch(error){throw latch(error);}
+    const after=check(status());
+    if(!sameJsonValue(before,after)||receipt.requestSequence!==before.completeSequence||
+       receipt.sourceFrame!==terminalCandidate.sourceFrame||
+       receipt.selectedSourceFrame!==terminalCandidate.sourceFrame||
+       receipt.selectedOrdinal!==terminalCandidate.inputOrdinal||
+       receipt.selectedTicketId!==terminalCandidate.ticket.ticketId||
+       receipt.selectedPollSerial!==terminalCandidate.ticket.pollSerial||
+       ['preSourceFrame','preOrdinal','preCompletedTick','firstSourceFrame','firstOrdinal',
+         'firstCompletedTick','selectedCompletedTick','worldGeneration','contextEpoch'].some(
+           field=>receipt[field]!==terminalCandidate.receipt[field])||
+       receipt.localPort!==terminalCandidate.ticket.localPort||
+       receipt.remotePort!==terminalCandidate.ticket.remotePort)
+      throw latch(Error('Native terminal-tail descriptor differs from the retained first-terminal forward'));
+    return receipt;
+  };
+  const readTerminalTailTicket=()=>{
+    if(!terminalTailActive)throw Error('Terminal-tail ticket requires its active tail owner');
+    const before=check(status()),size=module[PREFIX+'terminal_tail_ticket_bytes'],data=module[PREFIX+'terminal_tail_ticket_data'];
+    if(typeof size!=='function'||typeof data!=='function'||before.ownerState!==1||
+       before.pendingCommand||before.gpuPending||before.endpointActive||
+       before.completeSequence!==before.requestSequence||
+       ![37,38,39,36,40].includes(before.metadata.phase)||
+       ![27,28,29,5].includes(before.lastCompletedCommand))
+      throw Error('Terminal-tail ticket requires a completed native ticket or forward');
+    if(size()!==160)throw latch(Error('Native terminal-tail ticket ABI differs from its 160-byte controller'));
+    const pointer=data();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native terminal-tail ticket is unavailable'));
+    const ticket=decodeRuntimeMatchHistoryTerminalTailTicket(read(pointer,160));
+    const after=check(status());
+    const descriptor=readTerminalTailDescriptor();
+    const expectedOrdinal=before.metadata.phase===37?descriptor.consumedOrdinal:
+      before.metadata.phase===36?descriptor.consumedOrdinal-1:descriptor.consumedOrdinal-1;
+    const expectedTick=before.metadata.phase===37?BigInt(descriptor.completedTick):
+      BigInt(descriptor.completedTick)-1n;
+    if(!sameJsonValue(before,after)||ticket.sourceFrame!==descriptor.sourceFrame||
+       ticket.inputOrdinal!==expectedOrdinal||BigInt(ticket.completedTick)!==expectedTick||
+       ticket.localPort!==descriptor.localPort||ticket.remotePort!==descriptor.remotePort||
+       (before.metadata.phase===37&&ticket.requestSequence!==before.completeSequence))
+      throw latch(Error('Native terminal-tail ticket differs from its current source cursor'));
+    terminalTailLastTicket=ticket;
+    return ticket;
+  };
+  const readTerminalTailFinal=()=>{
+    if(!terminalTailActive||!terminalTailLastTicket)
+      throw Error('Terminal-final receipt requires a copied final tail ticket');
+    const before=check(status());
+    if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
+       before.completeSequence!==before.requestSequence||before.metadata.phase!==40||
+       before.lastCompletedCommand!==5)
+      throw Error('Terminal-final receipt requires the completed final present and idle fence');
+    const getter=module[PREFIX+'terminal_tail_final_json'];
+    if(typeof getter!=='function')throw Error('Private terminal-final JSON export is unavailable');
+    const pointer=getter();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native terminal-final receipt is unavailable'));
+    const text=module.UTF8ToString(pointer>>>0); // Copy borrowed JSON immediately.
+    let receipt;
+    try{receipt=decodeRuntimeMatchHistoryTerminalFinal(text);}
+    catch(error){throw latch(error);}
+    const extent=module[PREFIX+'terminal_tail_checksum_bytes'];
+    const checksumData=module[PREFIX+'terminal_tail_checksum_data'];
+    if(typeof extent!=='function'||typeof checksumData!=='function'||extent()!==64)
+      throw latch(Error('Native terminal checksum ABI differs from its 64-byte record'));
+    const checksumPointer=checksumData();
+    if(!Number.isInteger(checksumPointer)||checksumPointer<=0||checksumPointer>UINT32_MAX)
+      throw latch(Error('Native terminal checksum is unavailable'));
+    const checksum=read(checksumPointer,64); // Copy borrowed record before reading status.
+    const descriptor=readTerminalTailDescriptor();
+    const ticket=readTerminalTailTicket();
+    const record=new DataView(checksum.buffer,checksum.byteOffset,checksum.byteLength);
+    const after=check(status());
+    if(!sameJsonValue(before,after)||receipt.sourceFrame!==descriptor.sourceFrame||
+       ['firstSourceFrame','firstOrdinal','firstCompletedTick','selectedSourceFrame',
+         'selectedOrdinal','selectedCompletedTick'].some(field=>receipt[field]!==descriptor[field])||
+       receipt.consumedOrdinal!==descriptor.consumedOrdinal||
+       receipt.lastInputOrdinal+1!==receipt.consumedOrdinal||
+       receipt.ticketId!==ticket.ticketId||receipt.requestSequence!==ticket.requestSequence||
+       receipt.pollSerial!==ticket.pollSerial||receipt.localPort!==ticket.localPort||
+       receipt.remotePort!==ticket.remotePort||receipt.completedTick!==descriptor.completedTick||
+       receipt.worldGeneration!==descriptor.worldGeneration||receipt.contextEpoch!==descriptor.contextEpoch||
+       receipt.checksumTick!==receipt.lastInputOrdinal||receipt.checksumFrame!==receipt.sourceFrame||
+       record.getUint32(0,true)!==receipt.lastInputOrdinal||record.getUint32(4,true)!==3||
+       record.getUint32(12,true)!==receipt.sourceFrame)
+      throw latch(Error('Native final result, source cursor, ticket, owner, or checksum record differs'));
+    terminalTailFinalCopy=Object.freeze({receipt,checksum:checksum.slice(),ticket});
+    return Object.freeze({receipt,checksum:checksum.slice(),ticket});
+  };
+  const pacingWaitTransition=(begin,kind,inputOrdinal)=>{
+    active();
+    u32(inputOrdinal,'Network wait input ordinal');
+    if(!pacingStarted||!arenaMode||!inlineMode||![1,2,3,4].includes(kind)||
+       begin===Boolean(activePacingWait)||
+       (!begin&&(activePacingWait.kind!==kind||activePacingWait.inputOrdinal!==inputOrdinal)))
+      throw Error('Network wait requires the exact active native pacing owner and missing input');
+    const name=begin?'pacing_wait_begin':'pacing_wait_end';
+    const transition=episodeExport(name),getReceipt=episodeExport('pacing_wait_json');
+    const before=check(status());
+    if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
+       before.requestSequence!==before.completeSequence)
+      throw Error('Network wait requires a completed quiescent native owner');
+    if(transition(kind,inputOrdinal)!==1){
+      if(begin){
+        const sample=module[PREFIX+'pacing_sample'];
+        const pointer=typeof sample==='function'?sample(0):0;
+        if(pointer){
+          const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
+          if(receipt.stalled){
+            pacingJournal.push({budget:0,...receipt});
+            const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
+            error.pacingSample=receipt;
+            throw latch(error);
+          }
+        }
+      }
+      throw latch(Error(`Native pacing network wait ${begin?'begin':'end'} refused: ${errorText()}`));
+    }
+    const pointer=getReceipt();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native pacing network wait receipt is unavailable'));
+    let receipt;
+    try{receipt=JSON.parse(module.UTF8ToString(pointer));}
+    catch(error){throw latch(Error('Native pacing network wait receipt is malformed',{cause:error}));}
+    const after=check(status());
+    const expectedTotal=pacingWaitJournal.at(-1)?.totalExcludedMs??0;
+    if(!hasExactKeys(receipt,['schema','active','kind','inputOrdinal','sourceFrame','phase',
+      'requestSequence','excludedMs','totalExcludedMs','pendingTicks'])||receipt.schema!==1||
+      receipt.active!==Number(begin)||receipt.kind!==kind||receipt.inputOrdinal!==inputOrdinal||
+      receipt.sourceFrame!==before.metadata.currentFrame||receipt.phase!==before.metadata.phase||
+      receipt.requestSequence!==before.completeSequence||!sameJsonValue(before,after)||
+      ![receipt.excludedMs,receipt.totalExcludedMs,receipt.pendingTicks].every(value=>Number.isFinite(value)&&value>=0)||
+      (begin?(receipt.excludedMs!==0||receipt.totalExcludedMs!==expectedTotal):
+        (receipt.pendingTicks!==activePacingWait.pendingTicks||
+         receipt.totalExcludedMs!==expectedTotal+receipt.excludedMs)))
+      throw latch(Error('Native pacing network wait receipt changed owner, duration, or debt'));
+    activePacingWait=begin?receipt:null;
+    pacingWaitJournal.push(receipt);
+    return {...receipt};
+  };
   const inlineCall=async(name,...args)=>{
     nativeCallPending=true;
     try{return await module.ccall(PREFIX.slice(1)+name,'number',args.map(()=>'number'),args,{async:true});}
@@ -650,6 +1008,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     status,
     journal:()=>structuredClone(journal),
     pacingJournal:()=>structuredClone(pacingJournal),
+    pacingWaitJournal:()=>structuredClone(pacingWaitJournal),
+    pacingWaitBegin(kind,inputOrdinal){return pacingWaitTransition(true,kind,inputOrdinal);},
+    pacingWaitEnd(kind,inputOrdinal){return pacingWaitTransition(false,kind,inputOrdinal);},
+
     pacingStart(){
       active();
       if(pacingStarted||!arenaMode||!inlineMode||!captured)
@@ -662,6 +1024,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     pacingSample(budget){
       active();
       if(!pacingStarted||![0,1].includes(budget))throw Error('Pacing requires a started owner and zero/one budget');
+      if(activePacingWait)throw Error('Pacing sample is unavailable during an owned network wait');
       const sample=module[PREFIX+'pacing_sample'],size=module[PREFIX+'pacing_sample_bytes'];
       if(typeof sample!=='function'||typeof size!=='function'||size()!==64)
         throw latch(Error('Native pacing exports or receipt extent unavailable'));
@@ -746,6 +1109,68 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     prefixOrigin(ordinal){
       active();
       return readPrefixOrigin(ordinal);
+    },
+    terminalTailBegin(selectedOrdinal){
+      active();
+      selectedOrdinal=u32(selectedOrdinal,'Selected terminal input ordinal');
+      const candidate=terminalCandidate;
+      if(!candidate||candidate.inputOrdinal!==selectedOrdinal)
+        throw Error('Terminal-tail begin requires the retained selected terminal forward');
+      const row=this.receipt(candidate.rowOrdinal);
+      if(row.ordinal!==candidate.rowOrdinal||row.sourceFrame!==candidate.sourceFrame||
+         row.ticketId!==candidate.ticket.ticketId||row.incarnation!==candidate.ticket.incarnation||
+         row.pollSerial!==candidate.ticket.pollSerial||row.state!==candidate.ticket.state||
+         !sameBytes(row.raw,candidate.ticket.raw)||!sameBytes(row.forward,candidate.ticket.forward)||
+         !sameBytes(row.selected,candidate.appliedPad))
+        throw Error('Terminal-tail begin lost the exact actual first-terminal receipt');
+      return this.command('terminalTailBegin',selectedOrdinal);
+    },
+    requestTerminalTailTicket(){return this.command('terminalTailTicket');},
+    forwardTerminalTailTicket(){
+      if(!terminalTailLastTicket)throw Error('Terminal-tail forward has no copied native ticket');
+      return this.command('terminalTailForward',terminalTailLastTicket.requestSequence);
+    },
+    presentTerminalTail(){return this.command('terminalTailPresent');},
+    terminalTailDescriptor(){
+      active();
+      return readTerminalTailDescriptor();
+    },
+    terminalTailTicket(){
+      active();
+      return readTerminalTailTicket();
+    },
+    terminalTailSetRemotePad(value){
+      active();
+      if(!terminalTailActive)throw Error('Terminal-tail remote PAD requires its active native owner');
+      const bytes=pad(value),before=check(status());
+      if(before.metadata.phase!==37||before.lastCompletedCommand!==27||
+         before.pendingCommand||before.inputReady!==1||before.completeSequence!==before.requestSequence)
+        throw Error('Terminal-tail remote PAD requires its exact completed native ticket');
+      const admit=module[PREFIX+'terminal_tail_remote_pad'];
+      if(typeof admit!=='function')throw Error('Native terminal-tail remote PAD export is unavailable');
+      const pointer=writePadArgument(bytes);
+      if(admit(pointer,PAD_BYTES)!==1)throw latch(Error(`Native terminal-tail remote PAD refused: ${errorText()}`));
+      const after=check(status());
+      if(!sameJsonValue(before,after))throw latch(Error('Terminal-tail remote PAD admission changed its native command status'));
+      return true;
+    },
+    terminalTailFinal(){
+      active();
+      return readTerminalTailFinal();
+    },
+    finishTerminalTail(agreement){
+      active();
+      const final=terminalTailFinalCopy??readTerminalTailFinal();
+      if(!agreement||agreement.input_ordinal!==final.receipt.lastInputOrdinal||
+         agreement.source_frame!==final.receipt.sourceFrame||
+         agreement.outcome!==final.receipt.outcome||agreement.winner!==final.receipt.winner||
+         agreement.accepted_by!=='lockstep-match-final'||
+         typeof agreement.agreement_hash!=='string'||!/^[0-9a-f]{64}$/.test(agreement.agreement_hash)||
+         agreement.matched_bytes!==64)
+        throw Error('Terminal-tail finish requires the exact completed peer final agreement');
+      terminalTailAgreementConfirmed=true;
+      return this.command('finishTerminalTail',{consumedOrdinal:final.receipt.consumedOrdinal,
+        lastInputOrdinal:final.receipt.lastInputOrdinal});
     },
     enableInlineDispatch(){
       active();
@@ -869,6 +1294,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         ticket.remotePort!==before.remotePort||ticket.pollSerial!==before.metadata.pollSerial||
         !after.inputReady)
         throw latch(Error('Native episode ticket differs from its exact poll completion and live owner'));
+      lastPolledEpisodeTicket=ticket;
       return ticket;
     },
     adoptedTicket(originalRow){
@@ -917,23 +1343,11 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     },
     receipt(ordinal){
       active();if(!episodeMode)throw Error('Episode input receipts require explicit episode mode');
-      u32(ordinal,'Episode source ordinal');
-      const before=check(status());
-      if(before.pendingCommand||before.completeSequence!==before.requestSequence)
-        throw latch(Error('Episode receipt requires an idle completed native command'));
-      if(episodeExport('input_row_bytes')()!==INPUT_ROW_BYTES)
-        throw latch(Error('Native episode input receipt ABI differs from its controller'));
-      const pointer=episodeExport('input_row_data')(ordinal);
-      if(!pointer)throw latch(Error(`Native episode input receipt ${ordinal} is unavailable`));
-      const receipt=decodeRuntimeMatchHistoryEpisodeInputRow(read(pointer,INPUT_ROW_BYTES));
-      const after=check(status());
-      if(after.requestSequence!==before.requestSequence||after.completeSequence!==before.completeSequence||
-        receipt.sourceFrame<before.metadata.preFrame||
-        receipt.sourceFrame-before.metadata.preFrame!==ordinal||
-        receipt.localPort!==before.localPort||receipt.remotePort!==before.remotePort)
-        throw latch(Error('Native episode input receipt ordinal or owner changed'));
-      receipt.ordinal=ordinal;
-      return receipt;
+      return readEpisodeRow(ordinal);
+    },
+    terminalReceipt(){
+      active();
+      return readTerminalReceipt();
     },
     input(){
       active();if(episodeMode)throw Error('Episode mode exposes retained poll tickets and input receipts');
@@ -956,7 +1370,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     },
     admitEndpoint({view,provenance}){
       active();
-      if(!arenaMode||!inlineMode||!captured||![1,2,3].includes(view)||![1,2,3].includes(provenance))
+      const terminalEndpoint=view===4&&provenance===4&&terminalCandidate&&
+        [31,33].includes(check(status()).metadata.phase);
+      if(!arenaMode||!inlineMode||!captured||
+         (!( [1,2,3].includes(view)&&[1,2,3].includes(provenance))&&!terminalEndpoint))
         throw Error('Native endpoint admission requires an inline arena owner and explicit view/provenance');
       const before=check(status()),started=performance.now();
       if(before.pendingCommand||before.endpointActive||before.gpuPending||
@@ -1055,7 +1472,8 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const phase=before.metadata.phase;
       if(!arenaMode||before.ownerState!==1||before.pendingCommand||before.endpointActive||
         !before.completeSequence||before.completeSequence!==before.requestSequence||
-        !(command===4&&(phase===7||phase===14)||command===19&&phase===22))
+        !(command===4&&(phase===7||phase===14)||
+          command===19&&(phase===22||phase===30)||command===29&&phase===39))
         throw Error('Runtime history presentation requires a completed draw before idle');
       const pointer=getter();
       if(!Number.isInteger(pointer)||pointer<-0x80000000||pointer>UINT32_MAX||!(pointer>>>0))
@@ -1088,14 +1506,26 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const framePayload=name==='forwardTicket'||name==='replayTicket';
       const episodeCommands=new Set(['pollTicket','forwardTicket','seal','replayTicket','finishReplay',
         'continue','beginEpisode','recordingPresent','finishPrefix','closePrefix','retirePrefix',
-        'rebaseConfirmedPrefix','adoptNextPrefixTicket','sealPresentedFrontier']);
+        'rebaseConfirmedPrefix','adoptNextPrefixTicket','sealPresentedFrontier','terminalTailBegin',
+        'terminalTailTicket','terminalTailForward','terminalTailPresent','finishTerminalTail']);
       const prefixCommands=new Set(['finishPrefix','closePrefix','retirePrefix',
         'rebaseConfirmedPrefix','adoptNextPrefixTicket']);
+      const terminalTailCommands=new Set(['terminalTailBegin','terminalTailTicket',
+        'terminalTailForward','terminalTailPresent','finishTerminalTail']);
       const legacyExecution=name==='begin'||name==='forward'||name==='correct'||(name==='rebase'&&!arenaMode);
-      let confirmedEnd,ticketId,planBytes,transitionHandoff=null,prefixHandoffComplete=false;
+      let confirmedEnd,ticketId,planBytes,terminalOrdinal,terminalTicketSequence,terminalFinish=null,
+        transitionHandoff=null,terminalTailBefore=null,prefixHandoffComplete=false;
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')confirmedEnd=argument;
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
         u32(confirmedEnd,name==='finishPrefix'?'Confirmed prefix frame':'Confirmed END frame');
+      else if(name==='terminalTailBegin')terminalOrdinal=u32(argument,'Selected terminal input ordinal');
+      else if(name==='terminalTailForward')terminalTicketSequence=u32(argument,'Terminal-tail ticket request sequence');
+      else if(name==='finishTerminalTail'){
+        if(!hasExactKeys(argument,['consumedOrdinal','lastInputOrdinal']))
+          throw Error('Terminal-tail finish requires exactly the native consumed and last-input ordinals');
+        terminalFinish={consumedOrdinal:u32(argument.consumedOrdinal,'Terminal-tail consumed ordinal'),
+          lastInputOrdinal:u32(argument.lastInputOrdinal,'Terminal-tail last input ordinal')};
+      }
       else if(framePayload){
         if(!argument||typeof argument!=='object'||Array.isArray(argument)||
           Object.keys(argument).length!==2||!Object.hasOwn(argument,'ticketId')||!Object.hasOwn(argument,'plan'))
@@ -1110,6 +1540,8 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         throw Error('Recording presentation requires explicit arena history mode');
       if(prefixCommands.has(name)&&!arenaMode)
         throw Error('Confirmed-prefix commands require explicit arena history mode');
+      if(terminalTailCommands.has(name)&&(!arenaMode||!episodeMode))
+        throw Error('Terminal-tail commands require explicit arena episode mode');
       if(episodeCommands.has(name)&&!episodeMode)
         throw Error('Episode commands require explicit pre-capture episode mode');
       if(episodeMode&&legacyExecution)
@@ -1117,6 +1549,22 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(unclaimedPrefixTicket&&name!=='cleanup')
         throw Error('Adopted prefix ticket must be copied before another command');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');
+      if(activePacingWait&&name!=='cleanup')throw Error('Native commands are disabled during an owned network wait');
+      if(terminalTailActive&&!terminalTailCommands.has(name)&&name!=='idle'&&name!=='cleanup')
+        throw Error('Ordinary episode continuation is disabled after terminal-tail admission');
+      if(name==='terminalTailBegin'&&(!terminalCandidate||terminalOrdinal!==terminalCandidate.inputOrdinal))
+        throw Error('Terminal-tail begin must bind the retained actual terminal forward ordinal');
+      if(name==='terminalTailTicket'&&!terminalTailActive)
+        throw Error('Terminal-tail ticket requires a completed terminal-tail begin');
+      if(name==='terminalTailForward'&&(!terminalTailLastTicket||
+          terminalTicketSequence!==terminalTailLastTicket.requestSequence))
+        throw Error('Terminal-tail forward requires its exact copied ticket request sequence');
+      if(name==='terminalTailPresent'&&!terminalTailActive)
+        throw Error('Terminal-tail present requires its active tail owner');
+      if(name==='finishTerminalTail'&&(!terminalTailActive||!terminalTailFinalCopy||
+          !terminalTailAgreementConfirmed||terminalFinish.consumedOrdinal!==terminalTailFinalCopy.receipt.consumedOrdinal||
+          terminalFinish.lastInputOrdinal!==terminalTailFinalCopy.receipt.lastInputOrdinal))
+        throw Error('Terminal-tail finish requires the matched final receipt and peer ACK');
       if(name==='rebase'&&confirmedPrefixActive){
         const handoff=readPrefixHandoff();
         if(!handoff.rebaseRequestSequence||handoff.suffixCursor!==handoff.suffixCount||
@@ -1171,19 +1619,86 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           (!waitForRenderer||value.gpuPending===0),deadline,name,allowFailure,onBlocked,rendererDetail,
           false,entry.queueWait);
         const recordingIdle=name==='idle'&&before.metadata.phase===22;
-        if(name==='recordingPresent'&&(!captured||before.metadata.phase!==21||
-            before.metadata.currentFrame<=before.metadata.preFrame||before.gpuPending||before.endpointActive))
-          throw Error('Recording presentation requires a completed forward boundary');
-        if(name==='sealPresentedFrontier'&&(!captured||before.metadata.phase!==21||
-            before.lastCompletedCommand!==5||before.metadata.currentFrame<=before.metadata.preFrame||
+        const terminalPresentIdle=name==='idle'&&before.metadata.phase===30&&
+          before.lastCompletedCommand===19&&!terminalTailActive;
+        const terminalTailIdle=name==='idle'&&before.metadata.phase===39&&
+          before.lastCompletedCommand===29&&terminalTailActive;
+        const terminalRecordingPresent=name==='recordingPresent'&&terminalCandidate&&
+          ((before.metadata.phase===29&&terminalCandidate.ticket.state===1)||
+           (before.metadata.phase===31&&before.lastCompletedCommand===20&&terminalCandidate.ticket.state===2))&&
+          before.metadata.currentFrame===terminalCandidate.sourceFrame&&
+          sameJsonValue(readTerminalReceipt(),terminalCandidate.receipt);
+        if(name==='recordingPresent'&&(!captured||before.gpuPending||before.endpointActive||
+            (!terminalRecordingPresent&&(before.metadata.phase!==21||
+              before.metadata.currentFrame<=before.metadata.preFrame))))
+          throw Error('Recording presentation requires a completed forward or selected terminal boundary');
+        const terminalSeal=name==='sealPresentedFrontier'&&terminalCandidate&&
+          before.metadata.phase===29&&before.lastCompletedCommand===5&&
+          before.metadata.currentFrame===terminalCandidate.sourceFrame;
+        if(name==='sealPresentedFrontier'&&(!captured||
+            (!terminalSeal&&(before.metadata.phase!==21||before.lastCompletedCommand!==5||
+              before.metadata.currentFrame<=before.metadata.preFrame))||
             before.gpuPending||before.endpointActive))
           throw Error('Presented frontier seal requires the completed idle of its actual recording draw');
+        if(name==='terminalTailBegin'&&(!terminalCandidate||before.ownerState!==1||
+            before.metadata.phase!==35||before.lastCompletedCommand!==9||
+            before.metadata.currentFrame!==terminalCandidate.sourceFrame||
+            before.metadata.endpointMask!==(1<<9)||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence))
+          throw Error('Terminal-tail begin requires the exact retired terminal endpoint and owner');
+        if(name==='terminalTailTicket'&&(before.ownerState!==1||before.metadata.phase!==36||
+            ![26,5].includes(before.lastCompletedCommand)||
+            before.gpuPending||before.endpointActive||before.completeSequence!==before.requestSequence))
+          throw Error('Terminal-tail ticket requires its completed presented/idle boundary');
+        if(name==='terminalTailForward'&&(before.ownerState!==1||before.metadata.phase!==37||
+            before.lastCompletedCommand!==27||before.inputReady!==1||before.gpuPending||
+            before.endpointActive||before.completeSequence!==before.requestSequence))
+          throw Error('Terminal-tail forward requires its exact completed actual ticket');
+        if(name==='terminalTailForward'){
+          terminalTailBefore=readTerminalTailDescriptor();
+          if(terminalTailBefore.consumedOrdinal!==terminalTailLastTicket.inputOrdinal||
+             terminalTailBefore.completedTick!==terminalTailLastTicket.completedTick||
+             terminalTailBefore.sourceFrame!==terminalTailLastTicket.sourceFrame)
+            throw Error('Terminal-tail descriptor cursor differs from its exact pre-forward ticket');
+        }
+        if(name==='terminalTailPresent'&&(before.ownerState!==1||before.metadata.phase!==38||
+            before.lastCompletedCommand!==28||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence))
+          throw Error('Terminal-tail present requires one completed applied input');
+        if(name==='finishTerminalTail'&&(before.ownerState!==1||before.metadata.phase!==40||
+            before.lastCompletedCommand!==5||before.gpuPending||before.endpointActive||
+            before.completeSequence!==before.requestSequence||
+            terminalFinish.consumedOrdinal!==terminalTailFinalCopy?.receipt?.consumedOrdinal||
+            terminalFinish.lastInputOrdinal!==terminalTailFinalCopy?.receipt?.lastInputOrdinal))
+          throw Error('Terminal-tail finish requires the exact final presentation and idle receipt');
         const next=before.requestSequence+1;
         const dispatchGeneric=async()=>{
           if(inlineMode)await requireInlineRequest('request',command);
           else requireSuccess('request',command);
         };
-        if(name==='rebase'){
+        if(name==='terminalTailBegin'){
+          const requestName='request_terminal_tail_begin';
+          if(inlineMode)await requireInlineRequest(requestName,terminalOrdinal);
+          else requireEpisodeSuccess(requestName,terminalOrdinal);
+        }else if(name==='terminalTailTicket'){
+          const requestName='request_terminal_tail_ticket';
+          if(inlineMode)await requireInlineRequest(requestName);
+          else requireEpisodeSuccess(requestName);
+        }else if(name==='terminalTailForward'){
+          const requestName='request_terminal_tail_forward';
+          if(inlineMode)await requireInlineRequest(requestName,terminalTicketSequence);
+          else requireEpisodeSuccess(requestName,terminalTicketSequence);
+        }else if(name==='terminalTailPresent'){
+          const requestName='request_terminal_tail_present';
+          if(inlineMode)await requireInlineRequest(requestName);
+          else requireEpisodeSuccess(requestName);
+        }else if(name==='finishTerminalTail'){
+          const requestName='request_terminal_tail_finish';
+          if(inlineMode)await requireInlineRequest(requestName,terminalFinish.consumedOrdinal,
+            terminalFinish.lastInputOrdinal);
+          else requireEpisodeSuccess(requestName,terminalFinish.consumedOrdinal,
+            terminalFinish.lastInputOrdinal);
+        }else if(name==='rebase'){
           const h=before.metadata;
           const span=confirmedEnd-h.preFrame;
           const supportedSpan=arenaMode?span>=1&&span<=7&&confirmedEnd<=UINT32_MAX-7:span===1;
@@ -1199,12 +1714,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           else requireSuccess('request_rebase',confirmedEnd);
         }else if(name==='finishPrefix'){
           const h=before.metadata;
+          const terminalPrefix=terminalCandidate?.sourceFrame===confirmedEnd&&
+            terminalCandidate.ticket.state===2;
           if(!captured||!identityText||before.ownerState!==1||before.endpointActive||before.gpuPending||
             before.completeSequence!==before.requestSequence||h.phase!==11||
-            h.preFrame!==before.expectedFrame||confirmedEnd<=h.preFrame||
-            confirmedEnd>=h.sealedEnd||h.currentFrame!==confirmedEnd||
-            h.sealedEnd-h.preFrame>7||h.forwardSteps!==h.sealedEnd-h.preFrame||
-            h.replaySteps!==confirmedEnd-h.preFrame||!h.incarnation||h.restoreCount<1||h.restoreCount>2)
+            h.preFrame!==before.expectedFrame||h.currentFrame!==confirmedEnd||
+            !h.incarnation||h.restoreCount<1||h.restoreCount>2||
+            (terminalPrefix?(h.replaySteps!==terminalCandidate.inputOrdinal-h.preFrame||
+              h.replaySteps>h.forwardSteps):
+              (confirmedEnd<=h.preFrame||confirmedEnd>=h.sealedEnd||h.sealedEnd-h.preFrame>7||
+              h.forwardSteps!==h.sealedEnd-h.preFrame||h.replaySteps!==confirmedEnd-h.preFrame)))
             throw Error('Confirmed-prefix finish requires the actual completed CPU replay prefix inside its selected END');
           const requestName='request_prefix_finish';
           if(inlineMode)await requireInlineRequest(requestName,confirmedEnd);
@@ -1308,13 +1827,21 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           deadline,name,allowFailure,null,rendererDetail,allowFailure);
         if(after.requestSequence!==next||after.lastCompletedCommand!==command)
           throw Error('Native command completion sequence mismatch');
-        if(recordingIdle||name==='recordingPresent'){
+        if(recordingIdle||terminalPresentIdle||terminalTailIdle||name==='recordingPresent'){
           const {phase:priorPhase,...prior}=before.metadata;
           const {phase:nextPhase,...now}=after.metadata;
-          if(priorPhase!==(recordingIdle?22:21)||nextPhase!==(recordingIdle?21:22)||
+          const expectedBefore=recordingIdle?22:
+            terminalPresentIdle?30:terminalTailIdle?39:before.metadata.phase;
+          const normalPresentAfter=name==='recordingPresent'&&before.metadata.phase===21?22:
+            terminalRecordingPresent?30:recordingIdle?21:
+            terminalPresentIdle?(terminalCandidate?.ticket.state===2?33:29):0;
+          const expectedAfterValid=terminalTailIdle?[36,40].includes(after.metadata.phase):
+            nextPhase===normalPresentAfter;
+          if(priorPhase!==expectedBefore||!expectedAfterValid||
              !sameJsonValue(prior,now)||before.expectedFrame!==after.expectedFrame||
              before.localPort!==after.localPort||before.remotePort!==after.remotePort||
-             after.ownerState!==1||after.endpointActive||(recordingIdle&&after.gpuPending))
+             after.ownerState!==1||after.endpointActive||
+             ((recordingIdle||terminalPresentIdle||terminalTailIdle)&&after.gpuPending))
             throw Error('Recording presentation changed its forward source owner');
         }
         if(episodeCommands.has(name)&&name!=='recordingPresent'){
@@ -1328,22 +1855,33 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
             valid=[4,21].includes(now.phase)&&now.currentFrame===prior.currentFrame&&
               after.inputReady===1&&now.pollSerial!=='0';break;
           case 'forwardTicket':
-            valid=now.phase===21&&now.currentFrame===prior.currentFrame+1&&
-              now.currentFrame-now.preFrame<=7&&now.forwardSteps===prior.forwardSteps+1&&
-              now.incarnation===prior.incarnation;break;
+            if(arenaMode&&now.phase===29){
+              valid=now.currentFrame===prior.currentFrame&&now.forwardSteps===prior.forwardSteps+1&&
+                now.incarnation===prior.incarnation;
+              if(valid)bindTerminalCandidate(before,after,ticketId,planBytes,false);
+            }else{
+              valid=now.phase===21&&now.currentFrame===prior.currentFrame+1&&
+                now.currentFrame-now.preFrame<=7&&now.forwardSteps===prior.forwardSteps+1&&
+                now.incarnation===prior.incarnation;
+            }
+            lastPolledEpisodeTicket=null;break;
           case 'seal':
             valid=now.phase===5&&now.currentFrame===prior.currentFrame&&
               now.sealedEnd===now.currentFrame&&now.forwardSteps>0;break;
           case 'sealPresentedFrontier':
-            valid=now.phase===27&&now.currentFrame===prior.currentFrame&&
+            valid=(terminalSeal?now.phase===31:now.phase===27)&&now.currentFrame===prior.currentFrame&&
               now.sealedEnd===now.currentFrame&&now.forwardSteps===prior.forwardSteps&&
               now.incarnation===prior.incarnation&&now.restoreCount===prior.restoreCount&&
               now.replaySteps===prior.replaySteps&&now.pollSerial===prior.pollSerial&&
               now.currentAudioPhase===prior.currentAudioPhase&&!after.gpuPending;break;
-          case 'replayTicket':
-            valid=now.phase===11&&now.currentFrame===prior.currentFrame+1&&
+          case 'replayTicket':{
+            const ending=arenaMode&&now.currentFrame===prior.currentFrame;
+            valid=now.phase===11&&(ending||now.currentFrame===prior.currentFrame+1)&&
               now.replaySteps===prior.replaySteps+1&&now.replaySteps<=7&&
-              now.incarnation===prior.incarnation;break;
+              now.incarnation===prior.incarnation;
+            if(valid&&ending)bindTerminalCandidate(before,after,ticketId,planBytes,true);
+            break;
+          }
           case 'finishReplay':
             valid=now.phase===12&&now.currentFrame===now.sealedEnd&&
               now.replaySteps===now.currentFrame-now.preFrame;break;
@@ -1352,6 +1890,14 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
               now.currentFrame===prior.currentFrame&&now.sealedEnd===0&&now.replaySteps===0&&
               now.restoreCount===prior.restoreCount;break;
           case 'finishPrefix':{
+            if(now.phase===31&&terminalCandidate?.ticket.state===2){
+              const receipt=readTerminalReceipt();
+              valid=sameJsonValue(receipt,terminalCandidate.receipt)&&
+                now.currentFrame===confirmedEnd&&now.sealedEnd===confirmedEnd&&
+                now.preFrame===prior.preFrame&&now.incarnation===prior.incarnation&&
+                now.forwardSteps===prior.forwardSteps&&now.replaySteps===prior.replaySteps;
+              break;
+            }
             confirmedPrefixActive=true;
             const handoff=readPrefixHandoff();
             valid=now.phase===23&&now.currentFrame===confirmedEnd&&now.sealedEnd===confirmedEnd&&
@@ -1399,6 +1945,55 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
             if(valid)unclaimedPrefixTicket=true;
             break;
           }
+          case 'terminalTailBegin':{
+            valid=now.phase===36&&now.currentFrame===terminalCandidate.sourceFrame&&
+              now.preFrame===prior.preFrame&&now.forwardSteps===prior.forwardSteps&&
+              now.incarnation===prior.incarnation&&now.endpointMask===(1<<9)&&
+              after.ownerState===1&&!after.gpuPending&&!after.endpointActive;
+            if(valid){
+              terminalTailActive=true;
+              const descriptor=readTerminalTailDescriptor();
+              valid=descriptor.requestSequence===after.completeSequence&&
+                descriptor.consumedOrdinal===terminalCandidate.inputOrdinal&&
+                descriptor.suffixCursor===0;
+            }
+            break;
+          }
+          case 'terminalTailTicket':
+            valid=now.phase===37&&now.currentFrame===prior.currentFrame&&
+              now.preFrame===prior.preFrame&&now.forwardSteps===prior.forwardSteps&&
+              now.incarnation===prior.incarnation&&after.inputReady===1&&
+              after.ownerState===1&&!after.gpuPending&&!after.endpointActive;break;
+          case 'terminalTailForward':{
+            const ticket=terminalTailLastTicket;
+            if(ticket&&terminalTailBefore){
+              const descriptor=readTerminalTailDescriptor();
+              const expectedCursor=terminalTailBefore.suffixCursor+(ticket.flags===1?1:0);
+              valid=now.phase===38&&now.currentFrame===prior.currentFrame&&
+                now.preFrame===prior.preFrame&&now.forwardSteps===prior.forwardSteps&&
+                now.incarnation===prior.incarnation&&after.ownerState===1&&
+                !after.gpuPending&&!after.endpointActive&&
+                descriptor.consumedOrdinal===ticket.inputOrdinal+1&&
+                BigInt(descriptor.completedTick)===BigInt(ticket.completedTick)+1n&&
+                descriptor.sourceFrame===ticket.sourceFrame&&
+                descriptor.suffixCursor===expectedCursor&&
+                descriptor.suffixCount===terminalTailBefore.suffixCount&&
+                descriptor.selectedOrdinal===terminalTailBefore.selectedOrdinal&&
+                descriptor.worldGeneration===terminalTailBefore.worldGeneration&&
+                descriptor.contextEpoch===terminalTailBefore.contextEpoch;
+            }
+            break;
+          }
+          case 'terminalTailPresent':
+            valid=now.phase===39&&now.currentFrame===prior.currentFrame&&
+              now.preFrame===prior.preFrame&&now.forwardSteps===prior.forwardSteps&&
+              now.incarnation===prior.incarnation&&after.ownerState===1&&
+              !after.endpointActive;break;
+          case 'finishTerminalTail':
+            valid=now.phase===41&&after.ownerState===2&&!after.pendingCommand&&
+              after.completeSequence===after.requestSequence&&
+              after.lastCompletedCommand===MATCH_HISTORY_COMMAND.finishTerminalTail;
+            break;
           default:break;
           }
           if(!valid)throw Error(`Episode ${name} completion differs from its bounded native transition`);
@@ -1410,6 +2005,28 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           if(newCursor!==oldCursor+1||!sameJsonValue(oldOwner,newOwner))
             throw Error('Adopted prefix forward did not advance exactly one retained suffix cursor');
           adoptedPrefixTicket=null;
+        }
+        if(name==='restore')terminalCandidate=null;
+        if(terminalCandidate&&name==='close'){
+          const prior=before.metadata,now=after.metadata;
+          if(prior.phase!==32||prior.endpointMask!==(1<<9)||now.phase!==34||
+             now.currentFrame!==terminalCandidate.sourceFrame||
+             now.preFrame!==prior.preFrame||now.forwardSteps!==prior.forwardSteps||
+             now.incarnation!==prior.incarnation||after.gpuPending||after.endpointActive)
+            throw Error('Terminal endpoint close changed its selected source owner');
+        }
+        if(terminalCandidate&&name==='retire'){
+          const prior=before.metadata,now=after.metadata;
+          if(prior.phase!==34||now.phase!==35||
+             now.currentFrame!==terminalCandidate.sourceFrame||
+             now.preFrame!==prior.preFrame||now.forwardSteps!==prior.forwardSteps||
+             now.endpointMask!==(1<<9)||now.incarnation!==prior.incarnation||
+             after.gpuPending||after.endpointActive)
+            throw Error('Terminal endpoint retirement changed its selected source owner');
+        }
+        if(name==='finishTerminalTail'){
+          releasePadArgument();terminal=true;terminalTailActive=false;
+          closeQueueCompletionObserver();
         }
         if(name==='cleanup'){
           if(after.ownerState!==2)throw Error('Native cleanup did not retire the owner');

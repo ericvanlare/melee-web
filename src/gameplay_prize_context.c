@@ -2,6 +2,7 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_menu_host.h"
 #include "hsd_native_joint.h"
+#include "slippi_profile/particle_source_schedule.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/types.h>
 #include <melee/if/if_2FD9.h>
@@ -143,6 +144,8 @@ int melee_web_prize_context_draw(MeleeWebPrizeContext* c, char* e, size_t n)
     if (!live(c, e, n) || !c->scene_entered || c->drawing)
         return fail(e, n, "Prize draw requires an idle live scene");
     if (c->transition == 2) return ok(e, n);
+    if (!slippi_particle_source_draw_begin(c->generation, 0, e, n))
+        return 0;
     c->drawing = 1;
     GXRenderModeObj saved = *HSD_VIGetRenderMode();
     *HSD_VIGetRenderMode() = GXNtsc480IntDf;
@@ -150,6 +153,7 @@ int melee_web_prize_context_draw(MeleeWebPrizeContext* c, char* e, size_t n)
     HSD_StartRender(HSD_RP_SCREEN); HSD_StateInvalidate(HSD_STATE_ALL);
     HSD_GObj_80390FC0(); HSD_Init_803755A8();
     *HSD_VIGetRenderMode() = saved; c->drawing = 0;
+    if (!slippi_particle_source_draw_end(e, n)) return 0;
     if (!melee_web_menu_clock_present()) return fail(e, n, "Prize presentation clock lost ownership");
     return ok(e, n);
 }

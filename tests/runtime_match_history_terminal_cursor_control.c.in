@@ -1,0 +1,229 @@
+/* Extracted original GM control plus the private traversal witness. */
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "slippi_profile/runtime_match_history_terminal_cursor.h"
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef int32_t s32;
+typedef int64_t s64;
+typedef uint64_t u64;
+#define PAD_STACK(x) ((void)0)
+
+enum {
+    OUTCOME_NONE = 0, OUTCOME_TIMEOUT, OUTCOME_ELIMINATION,
+    OUTCOME_TEAM_ELIMINATION, OUTCOME_1P_GAME_OVER,
+    OUTCOME_UNK_1P_HORDE_BATTLE_VICTORY, OUTCOME_UNK_1P_BONUS_STAGE_END,
+    OUTCOME_NO_CONTEST, OUTCOME_RETRY, OUTCOME_TERMINATED,
+};
+typedef int MatchOutcome;
+enum { Gm_PKind_NA = 0, Gm_PKind_Human = 1 };
+enum { DbLKind_DebugRom = 1 };
+enum { HSD_PAD_L=1, HSD_PAD_R=2, HSD_PAD_A=4, HSD_PAD_START=8,
+       PAD_TRIGGER_L=16, PAD_TRIGGER_R=32, PAD_BUTTON_A=64,
+       PAD_BUTTON_START=128, PAD_TRIGGER_Z=256 };
+
+typedef struct { u64 button, trigger; int err; } HSD_PadStatus;
+HSD_PadStatus *HSD_PadCopyStatus;
+int DbLevel;
+typedef struct { u8 respawn_timer, xB, x1; int slot_type; } FighterMatchInfo;
+typedef struct {
+    int x4_2, x5_0, x5_1, match_kind, is_teams, x3_4, x3_2, x3_7;
+    int timer_enabled, timer_counts_up, time_limit;
+    void (*on_frame_start)(void);
+    void (*on_frame_end)(void);
+} StartMeleeRules;
+typedef struct {
+    StartMeleeRules x24C8;
+    int is_singleplayer, unk_0, match_result, terminate_match;
+    int hud_enabled, unk_2C, timer_seconds, pauser;
+    uint32_t frame_count;
+    int pause_timer, unk_3, unpause_timer;
+    FighterMatchInfo FighterMatchInfo[6];
+    int unk_20[4];
+    int unk_1C[60];
+} lbl_8046B6A0_t;
+
+lbl_8046B6A0_t lbl_8046B6A0;
+static int stocks[6], source_calls;
+
+static inline void fn_8016CFE0_inline(void);
+void fn_8016CFE0(void);
+MatchOutcome gm_GetFFAOutcome(void);
+MatchOutcome gm_GetMatchOutcome(void);
+MatchOutcome gm_GetTeamBattleOutcome(void);
+void fn_8016CD98(lbl_8046B6A0_t *);
+void gm_Scene_Vs_OnFrame(void);
+
+MatchOutcome gm_GetTeamBattleOutcome(void)
+{
+    fputs("FFA cursor fixture unexpectedly entered the original team branch\n", stderr);
+    abort();
+}
+
+int Player_GetP1Stock(void) { return stocks[0]; }
+int Player_GetStocks(int slot) { return stocks[slot]; }
+int Player_GetPlayerSlotType(int slot) { return slot < 2 ? Gm_PKind_Human : Gm_PKind_NA; }
+int fn_8016A1E4(void) { return 0; }
+int fn_801693A8(void) { return 0; }
+int Ground_801C1D84(void) { return 0; }
+int gm_801A45E8(int unused) { (void)unused; return 0; }
+int gm_801A4624(void) { return 0; }
+int gm_801A46B8(int unused) { (void)unused; return 0; }
+int gm_GetButtonsTriggered(int unused) { (void)unused; return 0; }
+int gm_GetButtonsPressed(int unused) { (void)unused; return 0; }
+int gm_GetPlayerPressingUnpause(void) { return 0; }
+void fn_8016719C(int slot, int arg) { (void)slot; (void)arg; }
+void fn_8016A4C8(void) {}
+void fn_8016758C(void) {}
+void gm_DoPauseChecksAndRoutine(lbl_8046B6A0_t *data, int arg) { (void)data; (void)arg; }
+void gm_DoUnpauseChecksAndRoutine(lbl_8046B6A0_t *data, int arg) { (void)data; (void)arg; }
+void fn_8016B918(void) {}
+void fn_8016C7F0(void) {}
+void fn_8016B88C(void) {}
+void ifStatus_802F7034(void (*callback)(void)) { (void)callback; }
+void lbAudioAx_80024D50(void) {}
+void gm_801A4634(int arg) { (void)arg; }
+void fn_8016CF4C_dontinline(int slot, MatchOutcome outcome) { (void)slot; (void)outcome; }
+int ifTime_IsTimerHidden(void) { return 0; }
+void lbAudioAx_800237A8(int sound, int volume, int pan) { (void)sound; (void)volume; (void)pan; }
+void lbAudioAx_80023870(int sound, int volume, int pan, int mode) { (void)sound; (void)volume; (void)pan; (void)mode; }
+void fn_8016D634(void) {}
+int fn_80180AC0(void) { return 0; }
+void gm_801A4B60(void) {}
+
+@FN_INLINE@
+@FN_FFA@
+@FN_OUTCOME@
+@FN_CD98@
+@FN_CFE0@
+@FN_SCENE@
+
+static MeleeWebRuntimeMatchHistoryTerminalOwner make_owner(
+    const void *capsule, const void *checkpoint)
+{
+    static int storage, context, flow, audio, ticks;
+    return (MeleeWebRuntimeMatchHistoryTerminalOwner){
+        capsule, checkpoint, &storage, &context, &flow, &audio, &ticks,
+        9, 12, sizeof(uint64_t)
+    };
+}
+
+static void reset_gm(int p1, int p2, int source_frame)
+{
+    memset(&lbl_8046B6A0, 0, sizeof(lbl_8046B6A0));
+    memset(stocks, 0, sizeof(stocks));
+    stocks[0] = p1; stocks[1] = p2;
+    lbl_8046B6A0.x24C8.match_kind = 1;
+    lbl_8046B6A0.frame_count = source_frame;
+    lbl_8046B6A0.hud_enabled = 1;
+    lbl_8046B6A0.unk_0 = 0;
+}
+
+/* This is a component control. The scheduler counter is an explicit modeled
+ * boundary around the actual original source call, not browser evidence. */
+static int traversed_gm_tick(
+    MeleeWebRuntimeMatchHistoryTerminalCursor *cursor,
+    MeleeWebRuntimeMatchHistoryTerminalOwner *owner,
+    uint64_t *ticks)
+{
+    const uint64_t before_tick = *ticks;
+    const uint32_t before_frame = (uint32_t)lbl_8046B6A0.frame_count;
+    const uint32_t ending_before = lbl_8046B6A0.unk_0 != 0;
+    const uint32_t complete_before = lbl_8046B6A0.unk_0 >= 3;
+    if (!melee_web_runtime_match_history_terminal_before(
+            cursor, owner, before_tick, before_frame,
+            ending_before, complete_before))
+        return 0;
+    gm_Scene_Vs_OnFrame();
+    ++source_calls;
+    ++*ticks;
+    const uint32_t after_frame = (uint32_t)lbl_8046B6A0.frame_count;
+    const uint32_t ending_after = lbl_8046B6A0.unk_0 != 0;
+    const uint32_t complete_after = lbl_8046B6A0.unk_0 >= 3;
+    return melee_web_runtime_match_history_terminal_observe(
+        cursor, owner, before_tick, *ticks, before_frame, after_frame,
+        ending_before, ending_after, complete_before, complete_after);
+}
+
+int main(void)
+{
+    int capsule_a, checkpoint_a, capsule_b, checkpoint_b;
+    uint64_t ticks = 500;
+    const uint32_t pre_frame = 41;
+    MeleeWebRuntimeMatchHistoryTerminalOwner owner =
+        make_owner(&capsule_a, &checkpoint_a);
+    MeleeWebRuntimeMatchHistoryTerminalCursor cursor = {0};
+
+    reset_gm(0, 1, (int)pre_frame);
+    if (!melee_web_runtime_match_history_terminal_bind(
+            &cursor, &owner, ticks, pre_frame, pre_frame)) return 10;
+    if (!traversed_gm_tick(&cursor, &owner, &ticks)) return 11;
+    if (lbl_8046B6A0.unk_0 != 1 || lbl_8046B6A0.match_result != OUTCOME_ELIMINATION)
+        return 12;
+    if (lbl_8046B6A0.frame_count != (int)pre_frame ||
+        cursor.completed_tick != 501 || cursor.input_ordinal != pre_frame + 1 ||
+        cursor.source_frame != pre_frame || !cursor.first_terminal_valid ||
+        cursor.first_terminal_source_frame_before != pre_frame ||
+        cursor.first_terminal_source_frame_after != pre_frame ||
+        cursor.first_terminal_ending_before != 0 ||
+        cursor.first_terminal_ending_after != 1 ||
+        cursor.first_terminal_complete_after != 0)
+        return 13;
+
+    /* Existing checkpoint restore is modeled by returning the exact measured
+     * tick/frame and original state to PRE; terminal evidence is retained. */
+    ticks = 500;
+    reset_gm(1, 1, (int)pre_frame);
+    if (!melee_web_runtime_match_history_terminal_rewind_pre(
+            &cursor, &owner, ticks, pre_frame, 0, 0) ||
+        !cursor.first_terminal_valid || cursor.input_ordinal != pre_frame)
+        return 14;
+    if (!traversed_gm_tick(&cursor, &owner, &ticks)) return 15;
+    if (lbl_8046B6A0.unk_0 != 0 ||
+        cursor.input_ordinal != pre_frame + 1 ||
+        cursor.source_frame != pre_frame + 1 || cursor.ending || cursor.complete ||
+        !cursor.first_terminal_valid)
+        return 16;
+
+    /* A wrong owner or stale measured tick is refused before the original
+     * source routine can be invoked. */
+    MeleeWebRuntimeMatchHistoryTerminalOwner wrong =
+        make_owner(&capsule_b, &checkpoint_b);
+    if (melee_web_runtime_match_history_terminal_before(
+            &cursor, &wrong, ticks, cursor.source_frame, 0, 0) || source_calls != 2)
+        return 17;
+    if (melee_web_runtime_match_history_terminal_before(
+            &cursor, &owner, ticks + 1, cursor.source_frame, 0, 0) || source_calls != 2)
+        return 18;
+
+    /* Seven completed input traversals are representable; a further source
+     * call is not admitted by the existing seven-row capsule. */
+    MeleeWebRuntimeMatchHistoryTerminalCursor cap_cursor = {0};
+    uint64_t cap_ticks = 1000;
+    const uint32_t cap_frame = 20;
+    reset_gm(1, 1, (int)cap_frame);
+    MeleeWebRuntimeMatchHistoryTerminalOwner cap_owner =
+        make_owner(&capsule_b, &checkpoint_b);
+    if (!melee_web_runtime_match_history_terminal_bind(
+            &cap_cursor, &cap_owner, cap_ticks, cap_frame, cap_frame)) return 19;
+    for (int i = 0; i < MELEE_WEB_RUNTIME_MATCH_HISTORY_TERMINAL_MAX_SPAN; ++i) {
+        if (!traversed_gm_tick(&cap_cursor, &cap_owner, &cap_ticks)) return 20;
+    }
+    const int calls_at_cap = source_calls;
+    if (traversed_gm_tick(&cap_cursor, &cap_owner, &cap_ticks) ||
+        source_calls != calls_at_cap)
+        return 21;
+
+    MeleeWebRuntimeMatchHistoryTerminalCursor overflow = {0};
+    if (melee_web_runtime_match_history_terminal_bind(
+            &overflow, &owner, ticks, UINT32_MAX, UINT32_MAX))
+        return 22;
+
+    puts("terminal cursor: original stock-out traversal, corrected-live branch, owner/tick preflight, and seven-row bound passed (component control)");
+    return 0;
+}

@@ -2,7 +2,16 @@
 #include "fighter_projection.h"
 #include "gameplay_cpu_interval.h"
 #include "gameplay_source_memory_runtime.h"
+#include "camera_source_prepare.h"
+#include "particle_source_schedule.h"
 #include <melee/ft/types.h>
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+#include <melee/ft/ftdrawcommon.h>
+#include <melee/ft/ftlib.h>
+#include <melee/if/ifmagnify.h>
+#include <melee/pl/player.h>
+#include <sysdolphin/baselib/objalloc.h>
+#endif
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
@@ -100,7 +109,9 @@ typedef struct Projection {
     MeleeWebFighterProjectionIdentity identity;
     unsigned char screen[sizeof(((Fighter*)0)->x2188)];
     unsigned char saved[sizeof(((Fighter*)0)->x2188)];
+    unsigned char plan_screen[sizeof(((Fighter*)0)->x2188)];
     unsigned char flag, saved_flag, selected, listed;
+    unsigned char plan_flag, plan_ready;
     ShadowTuple shadow;
     ShadowValues shadow_values, saved_shadow_values;
     ShadowMember draw_members[SHADOW_MEMBER_LIMIT];
@@ -137,6 +148,15 @@ static HSD_TObj* toon_binding;
 static HSD_TObj* toon_saved_next;
 static HSD_TObj* toon_last_next;
 static int toon_link_registered;
+static int private_armed;
+static int warm_draw_valid;
+static uint32_t warm_draw_source_frame;
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+extern uint32_t melee_web_match_source_frames(void);
+extern int slippi_magnifier_source_hud_visible(void);
+extern int slippi_camera_source_fighter_pass_enabled(void);
+extern HSD_ObjAllocData gobj_alloc_data;
+#endif
 
 static int refuse_with(ProjectionFailure reason)
 {
@@ -777,6 +797,7 @@ int slippi_fighter_projection_world_begin(uint64_t w)
     world=w; failed=0; first_failure=PROJECTION_FAILURE_NONE;
     failure_has_shadow_counts=0;
     draw_interval_active=0;
+    private_armed=0;warm_draw_valid=0;warm_draw_source_frame=0;
     texture_head_slot=NULL;texture_head_before=NULL;texture_owner_count=0;
     pending_texture_owner=NULL;pending_texture_operation=0;
     toon_binding=NULL;toon_saved_next=NULL;toon_last_next=NULL;toon_link_registered=0;
@@ -787,11 +808,202 @@ int slippi_fighter_projection_world_end(uint64_t w)
     if (!w || w!=world || drawing || texture_view_open) return refuse();
     while (owners) { Projection* p=owners; owners=p->next; free(p); }
     world=0; failed=0; draw_interval_active=0;
+    private_armed=0;warm_draw_valid=0;warm_draw_source_frame=0;
     texture_head_slot=NULL;texture_head_before=NULL;texture_owner_count=0;
     pending_texture_owner=NULL;pending_texture_operation=0;
     toon_binding=NULL;toon_saved_next=NULL;toon_last_next=NULL;toon_link_registered=0;
     return 1;
 }
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+int slippi_fighter_projection_private_arm(uint64_t w, uint32_t source_frame)
+{
+    unsigned count = 0;
+    if (!w || w != world || failed || drawing || private_armed ||
+        melee_web_cpu_interval_active() || !warm_draw_valid ||
+        warm_draw_source_frame != source_frame)
+        return refuse();
+    for (Projection* p=owners;p;p=p->next) {
+        if (!current(p)) continue;
+        if (p->shadow_retired || shadow_tuple_failure(p) != PROJECTION_FAILURE_NONE ||
+            p->selected || !p->listed)
+            return refuse_with(PROJECTION_FAILURE_FIGHTER_IDENTITY);
+        ++count;
+    }
+    if (!count) return refuse();
+    /* The most recent successful ordinary draw supplied the carry. All owner
+     * checks finish before any source Fighter field is seeded. */
+    for (Projection* p=owners;p;p=p->next) if (current(p)) {
+        memcpy(&p->fp->x2188,p->screen,sizeof(p->screen));
+        p->fp->x221F_b0=p->flag;
+    }
+    private_armed=1;
+    warm_draw_valid=0;
+    return 1;
+}
+int slippi_fighter_projection_private_armed(void) { return private_armed && !failed; }
+int slippi_fighter_projection_magnifier_private_draw(void)
+{
+    return private_armed && drawing && draw_interval_active && !failed;
+}
+static Projection* projection_for_fighter(Fighter* fp)
+{
+    for (Projection* p=owners;p;p=p->next)
+        if (p->fp==fp && !p->shadow_retired && current(p)) return p;
+    return NULL;
+}
+
+/* GObj_SetupGXLink sets the callback/link fields, not a camera mask.
+ * Prove that the exact fighter is linked into the source traversal. */
+static int fighter_gx_member(const HSD_GObj* fighter)
+{
+    const unsigned link=5;
+    const HSD_GObj* previous=NULL;
+    unsigned remaining=gobj_alloc_data.used, matches=0;
+    if (HSD_GObjLibInitData.gx_link_max<link || !HSD_GObjGXLinkHead ||
+        !HSD_GObj_804D7820)
+        return 0;
+    for (const HSD_GObj* node=HSD_GObjGXLinkHead[link];node;node=node->next_gx) {
+        if (!remaining || node->gx_link!=link || node->prev_gx!=previous)
+            return 0;
+        --remaining;
+        matches+=node==fighter;
+        previous=node;
+    }
+    return matches==1 && previous==HSD_GObj_804D7820[link];
+}
+
+int slippi_fighter_projection_source_prepare(uint64_t w, uint64_t token,
+    HSD_GObj* main_camera, HSD_GObj* hud_camera, HSD_GObj* magnifier_camera,
+    unsigned hud_hidden)
+{
+    HSD_GObj* scheduled_main = NULL;
+    HSD_GObj* scheduled_hud = NULL;
+    HSD_GObj* scheduled_magnifier = NULL;
+    unsigned scheduled_hidden = 0;
+    HSD_CObj* camera;
+    MeleeWebSourceMemoryContext context = {0};
+    HSD_GObj* fighters[6] = {0};
+    Projection* slot_projection[6] = {0};
+    unsigned char eligible[6] = {0};
+    unsigned char edge_ready[6] = {0};
+    unsigned char edge_value[6] = {0};
+    if (!private_armed) return 1;
+    if (!w || w!=world || failed || drawing || !token ||
+        !melee_web_cpu_interval_active() ||
+        !melee_web_cpu_interval_admit(token) ||
+        melee_web_cpu_interval_token()!=token ||
+        melee_web_source_memory_context_read(&context)!=MELEE_WEB_SOURCE_MEMORY_READ_OK ||
+        context.world_generation!=w || !main_camera || !hud_camera ||
+        !magnifier_camera || hud_hidden>1 || !HSD_GObj_Entities)
+        return refuse();
+    if (!slippi_particle_source_magnifier_identity(w,token,&scheduled_main,
+            &scheduled_hud,&scheduled_magnifier,&scheduled_hidden) ||
+        scheduled_main!=main_camera || scheduled_hud!=hud_camera ||
+        scheduled_magnifier!=magnifier_camera || scheduled_hidden!=hud_hidden ||
+        !magnifier_camera->hsd_obj)
+        return refuse();
+    const int hud_visible=slippi_magnifier_source_hud_visible();
+    const int fighter_pass=slippi_camera_source_fighter_pass_enabled();
+    camera=(HSD_CObj*)main_camera->hsd_obj;
+    for (Projection* p=owners;p;p=p->next) p->plan_ready=0;
+
+    /* Phase one is read-only with respect to the Fighter and magnifier
+     * statics. Preserve the original camera traversal order: eligibility uses
+     * the preceding source cull, while plan_screen/plan_flag model the later
+     * main-camera callback against the freshly prepared exact CObj. */
+    for (unsigned slot=0;slot<6;++slot) {
+        ifMagnifyPlayer* player=&ifMagnify_804A1DE0.player[slot];
+        HSD_GObj* fighter=Player_GetEntity((s32)slot);
+        Projection* p=NULL;
+        fighters[slot]=fighter;
+        if (fighter) {
+            if (!fighter->user_data) return refuse();
+            p=projection_for_fighter((Fighter*)fighter->user_data);
+            if (!p || p->shadow_retired || shadow_tuple_failure(p)!=PROJECTION_FAILURE_NONE)
+                return refuse_with(PROJECTION_FAILURE_FIGHTER_IDENTITY);
+            /* Player_GetEntity is a source owner lookup, not proof that this
+             * object still has the authored main-camera renderer registration. */
+            if (fighter->classifier != HSD_GOBJ_CLASS_FIGHTER ||
+                fighter->p_link != 8 || fighter->p_priority != 0 ||
+                fighter->render_priority != 0 || fighter->user_data_kind != 4 ||
+                fighter->gx_link != 5 ||
+                fighter->render_cb != ftDrawCommon_80080E18 ||
+                !fighter_gx_member(fighter))
+                return refuse_with(PROJECTION_FAILURE_FIGHTER_IDENTITY);
+            for (unsigned prior=0;prior<slot;++prior)
+                if (fighters[prior]==fighter) return refuse();
+            slot_projection[slot]=p;
+            eligible[slot]=(unsigned char)(hud_visible &&
+                !player->state.ignore_offscreen && ftLib_80086B64(fighter) &&
+                ftLib_80086ED0(fighter));
+        }
+        if (!p) continue;
+        memcpy(p->plan_screen,&p->fp->x2188,sizeof(p->plan_screen));
+        p->plan_flag=p->fp->x221F_b0;
+        p->plan_ready=0;
+        /* ftDrawCommon_80080E18 skips this fighter before invoking
+         * ftLib_80086A8C, so retain the authored carry unchanged. */
+        if (!fighter_pass || p->fp->x221F_b3) continue;
+        p->plan_ready=1;
+        if (p->fp->x2229_b3 || p->fp->x2220_b7) {
+            p->plan_flag=0;
+            continue;
+        }
+        int wrote=0,culled=0,draw=0;
+        S32Vec2 projected_screen;
+        memcpy(&projected_screen,p->plan_screen,sizeof(projected_screen));
+        if (!slippi_camera_source_project_subject(camera,p->fp->x890_cameraBox,
+                &projected_screen,&wrote,&culled,&draw))
+            return refuse();
+        memcpy(p->plan_screen,&projected_screen,sizeof(projected_screen));
+        (void)wrote;
+        (void)draw;
+        p->plan_flag=(unsigned char)culled;
+    }
+    for (unsigned slot=0;slot<6;++slot) if (eligible[slot]) {
+        Projection* p=slot_projection[slot];
+        if (!p || !fighters[slot]) return refuse();
+        ifMagnifyPlayer projected=ifMagnify_804A1DE0.player[slot];
+        S32Vec2 screen;
+        Vec2 direction,edge_position;
+        memcpy(&screen,p->plan_screen,sizeof(screen));
+        direction.x=screen.x-320.0f;
+        direction.y=-((f32)screen.y-240.0f);
+        ifMagnify_802FB73C(&projected,&direction,&edge_position);
+        edge_value[slot]=projected.state.edge;
+        edge_ready[slot]=1;
+    }
+
+    /* Every owner and branch has been admitted. Commit the exact old render
+     * side effects once for this traversal; source PRE now captures the
+     * rollback-owned pair and magnifier edge state directly. */
+    for (Projection* p=owners;p;p=p->next) if (p->plan_ready) {
+        memcpy(&p->fp->x2188,p->plan_screen,sizeof(p->plan_screen));
+        p->fp->x221F_b0=p->plan_flag;
+        memcpy(p->screen,p->plan_screen,sizeof(p->screen));
+        p->flag=p->plan_flag;
+    }
+    for (unsigned slot=0;slot<6;++slot) {
+        ifMagnifyPlayer* player=&ifMagnify_804A1DE0.player[slot];
+        player->state.is_offscreen=eligible[slot];
+        if (edge_ready[slot]) player->state.edge=edge_value[slot];
+    }
+    return !failed;
+}
+#else
+int slippi_fighter_projection_private_arm(uint64_t w,uint32_t frame)
+{ (void)w; (void)frame; return 1; }
+int slippi_fighter_projection_private_armed(void) { return 0; }
+int slippi_fighter_projection_magnifier_private_draw(void) { return 0; }
+int slippi_fighter_projection_source_prepare(uint64_t w,uint64_t token,
+    HSD_GObj* main_camera,HSD_GObj* hud_camera,HSD_GObj* magnifier_camera,
+    unsigned hud_hidden)
+{
+    (void)w; (void)token; (void)main_camera; (void)hud_camera;
+    (void)magnifier_camera; (void)hud_hidden;
+    return 1;
+}
+#endif
 int slippi_fighter_projection_created(void* object,const void* descriptor,size_t extent)
 {
     MeleeWebFighterProjectionIdentity identity;
@@ -891,8 +1103,10 @@ int slippi_fighter_projection_draw_begin(void)
     for(Projection* p=owners;p;p=p->next) if(p->selected) {
         memcpy(p->saved,&p->fp->x2188,sizeof(p->saved));
         p->saved_flag=p->fp->x221F_b0;
-        memcpy(&p->fp->x2188,p->screen,sizeof(p->screen));
-        p->fp->x221F_b0=p->flag;
+        if (!(interval_active && private_armed)) {
+            memcpy(&p->fp->x2188,p->screen,sizeof(p->screen));
+            p->fp->x221F_b0=p->flag;
+        }
         write_shadow_values(p, &p->shadow_values);
     }
     draw_interval_active = interval_active;
@@ -900,6 +1114,8 @@ int slippi_fighter_projection_draw_begin(void)
 }
 int slippi_fighter_projection_draw_end(void)
 {
+    const int completed_cpu_interval=draw_interval_active;
+    const int completed_private_interval=completed_cpu_interval && private_armed;
     if (!world || !drawing) return refuse_with(PROJECTION_FAILURE_DRAW_STATE);
     /* Lifecycle hooks refuse destruction/construction during the view. Check
      * every identity again before reading or restoring any source fields. */
@@ -915,8 +1131,14 @@ int slippi_fighter_projection_draw_end(void)
     Projection* topology_owner = NULL;
     unsigned topology_final_count = 0;
     for(Projection* p=owners;p;p=p->next) if(p->selected) {
-        memcpy(p->screen,&p->fp->x2188,sizeof(p->screen));
-        p->flag=p->fp->x221F_b0;
+        if (completed_private_interval) {
+            if (memcmp(p->saved,&p->fp->x2188,sizeof(p->saved)) != 0 ||
+                p->saved_flag != p->fp->x221F_b0)
+                refuse_with(PROJECTION_FAILURE_DRAW_STATE);
+        } else {
+            memcpy(p->screen,&p->fp->x2188,sizeof(p->screen));
+            p->flag=p->fp->x221F_b0;
+        }
         read_shadow_values(p, &p->shadow_values);
         unsigned final_count = 0;
         if (draw_interval_active) {
@@ -975,5 +1197,11 @@ int slippi_fighter_projection_draw_end(void)
                    ? refuse_shadow_topology(topology_failure, topology_owner,
                                             topology_final_count)
                    : refuse_with(topology_failure);
+#if defined(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE
+    if (!failed && !completed_cpu_interval && !private_armed) {
+        warm_draw_source_frame=melee_web_match_source_frames();
+        warm_draw_valid=1;
+    }
+#endif
     return !failed;
 }

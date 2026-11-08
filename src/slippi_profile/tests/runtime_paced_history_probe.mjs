@@ -3,6 +3,7 @@
 // snapshots, renderer submission and idle. No CDP operation drives this loop.
 import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
   RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS} from '../runtime_match_history_peer.mjs';
 
@@ -43,7 +44,7 @@ function matchesBytes(value, expected){
 }
 
 export async function waitForLateRemotePairAndResume({tick,sourcePoll,
-  requireFollowingNeutral=false,waitForRemoteSample,resumeLateFrontier}={}){
+  requireFollowingNeutral=false,waitForRemoteSample,resumeLateFrontier,admitRemoteSample}={}){
   if(!Number.isSafeInteger(tick)||tick<0||
       !sourcePoll||sourcePoll.sourceFrame!==tick||sourcePoll.localPort!==1||
       sourcePoll.remotePort!==0||
@@ -55,38 +56,56 @@ export async function waitForLateRemotePairAndResume({tick,sourcePoll,
     throw Error('Late target receipt requires the retained actual beta native source poll');
 
   const actualPad=sourcePoll.raw.slice(sourcePoll.localPort*11,(sourcePoll.localPort+1)*11);
-  const targetPromise=Promise.resolve().then(()=>waitForRemoteSample(tick));
-  const followingPromise=requireFollowingNeutral
-    ?Promise.resolve().then(()=>waitForRemoteSample(tick+1)):Promise.resolve(null);
-  const [targetValue,followingValue]=await Promise.all([targetPromise,followingPromise]);
-  const receiptOf=value=>value?.receipt??value;
-  const target=receiptOf(targetValue),following=receiptOf(followingValue);
   const validReceipt=(receipt,sourceTick,pad)=>receipt&&
     receipt.accepted_by==='lockstep-protocol'&&receipt.sender_role==='beta'&&
     receipt.remote_port===1&&receipt.protocol_input_tick===sourceTick&&
     matchesBytes(receipt.pad,pad);
-  if(!validReceipt(target,tick,actualPad))
-    throw Error('Late target receipt differs from the retained actual beta native source poll');
-  if(requireFollowingNeutral&&!validReceipt(following,tick+1,new Array(11).fill(0)))
-    throw Error('Following beta receipt is not the actual neutral source poll');
-
+  const read=async(sourceTick,pad,error)=>{
+    const value=await waitForRemoteSample(sourceTick);
+    const receipt=value?.receipt??value;
+    if(!validReceipt(receipt,sourceTick,pad))throw Error(error);
+    if(admitRemoteSample)await admitRemoteSample(sourceTick,receipt);
+    return {receipt,timing:value?.timing??null};
+  };
+  const readTarget=()=>read(tick,actualPad,'Late target receipt differs from the retained actual beta native source poll');
+  const readFollowing=()=>requireFollowingNeutral
+    ?read(tick+1,new Array(11).fill(0),'Following beta receipt is not the actual neutral source poll')
+    :null;
+  let targetValue,followingValue;
+  if(admitRemoteSample){
+    // Timeline admission advances the earliest hole before the next native wait.
+    targetValue=await readTarget();
+    followingValue=await readFollowing();
+  }else{
+    [targetValue,followingValue]=await Promise.all([
+      Promise.resolve().then(readTarget),Promise.resolve().then(readFollowing)]);
+  }
+  const target=targetValue.receipt,following=followingValue?.receipt??null;
   await resumeLateFrontier(target);
-  return {target:structuredClone(target),followingNeutral:following?structuredClone(following):null};
+  return {target:structuredClone(target),followingNeutral:following?structuredClone(following):null,
+    ...(admitRemoteSample?{networkWaits:[targetValue.timing,followingValue?.timing].filter(Boolean)}:{})};
 }
 
 export function installRuntimePacedHistoryProbe({role,
-  inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,lateClassPiece=false}={}){
+  inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,lateClassPiece=false,
+  matchFinal=false,networkBackpressure=false}={}){
   const owner=globalThis.__meleeRuntimeMatchHistory;
   const peer=globalThis.__meleeRuntimePeerHistoryProbe;
   if(!owner||!peer||!['alpha','beta'].includes(role)||globalThis.__meleeRuntimePacedHistory||
-      ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS].includes(inputTicks) ||
-      typeof lateClassPiece!=='boolean' || (lateClassPiece&&inputTicks!==RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS))
+      ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
+        RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS].includes(inputTicks) ||
+      typeof lateClassPiece!=='boolean' || (lateClassPiece&&inputTicks!==RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS)||
+      typeof matchFinal!=='boolean' || typeof networkBackpressure!=='boolean'||
+      (networkBackpressure&&!matchFinal)||
+      (inputTicks===RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS&&matchFinal!==true))
     throw Error('Paced probe requires the existing exclusive owners and an explicit supported finite horizon');
   const targetFrame=inputTicks;
   const paced120=inputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
   const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
-  const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:lateClassPiece?[26]:[];
-  const lateKeys=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
+  const fullMatch=inputTicks===RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS;
+  const stockoutScenario=respawn||fullMatch;
+  const lateTicks=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:lateClassPiece?[26]:[];
+  const lateKeys=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const lateEvents=new Map(lateTicks.map(tick=>[tick,{
     scenario:{target_source_tick:tick,anchor:null,keyboard_change:null,held_packet:null,
       release_gate:null,alpha_frontier:null,network_release:null},
@@ -96,7 +115,19 @@ export function installRuntimePacedHistoryProbe({role,
   const walkStart=pauseGate('respawn-walk-start'),walkStop=pauseGate('respawn-walk-stop');
   const recoveryStart=pauseGate('respawn-platform-sample');
   const recoveryStop=pauseGate('respawn-platform-input-complete');
+  const fullMatchWalkStart=pauseGate('full-match-initial-walk-start');
+  const fullMatchCycles=new Map([4,3,2].map(stockBefore=>[stockBefore,{
+    stockBefore,stockAfter:stockBefore-1,stock_loss:null,stock_loss_poll:null,platform_sample:null,
+    platform_exit:null,grounded_respawn:null,
+    walkStop:pauseGate(`full-match-walk-stop-${stockBefore}`),
+    platform:pauseGate(`full-match-platform-${stockBefore-1}`),
+    platformExit:pauseGate(`full-match-platform-exit-${stockBefore-1}`),
+    grounded:pauseGate(`full-match-grounded-${stockBefore-1}`),
+  }]));
+  let fullMatchWalkStock=null,fullMatchAwaitPlatformStock=null,
+    fullMatchPlatformExitStock=null,fullMatchAwaitGroundedStock=null;
   const report={scope:respawn?'600 actual source inputs, three deferred directional peer packets, and one sampled P1 respawn-platform exit':
+      fullMatch?'fixed 3600-input full-match peer horizon, three actual late P2 corrections and repeated source-observed P1 stock cycles':
       lateClassPiece?'120 actual source inputs with one deferred actual peer packet at source tick 26; existing clock and rollback bounds':
       paced120?'120 actual source inputs; functional pacing clock trace with native-sized rollback windows':
       'eight actual source inputs; native admission and measured headless cadence',
@@ -105,10 +136,36 @@ export function installRuntimePacedHistoryProbe({role,
     ...(lateClassPiece?{late_class_piece:lateEvents.get(26).scenario}:{}),
     ...(respawn?{late_corrections:[...lateEvents.values()].map(event=>event.scenario),stock_samples:[],
       respawn_recovery:null}:{}),
+    ...(fullMatch?{late_corrections:[...lateEvents.values()].map(event=>event.scenario),
+      stock_samples:[],stock_cycles:[...fullMatchCycles.values()].map(({stockBefore,stockAfter})=>
+        ({stock_before:stockBefore,stock_after:stockAfter,stock_loss:null,stock_loss_poll:null,
+          platform_sample:null,platform_exit:null,grounded_respawn:null})),
+      final_walkoff_stock:null,terminal_bridge:null}:{}),
+  };
+  let networkWait=null;
+  if(fullMatch)report.network_wait={count:0,elapsed_ms:0,by_kind:{},events:[]};
+  const recordNetworkWait=event=>{
+    const totals=report.network_wait;
+    const kind=totals.by_kind[event.kind]??={count:0,elapsed_ms:0};
+    totals.count++;totals.elapsed_ms+=event.elapsed_ms;
+    kind.count++;kind.elapsed_ms+=event.elapsed_ms;
+    totals.events.push(event);
+  };
+  const finishNetworkWait=(interrupted=false)=>{
+    if(!networkWait)return;
+    const elapsed_ms=performance.now()-networkWait.started_at_ms;
+    recordNetworkWait({...networkWait,elapsed_ms,interrupted});
+    networkWait=null;
+  };
+  const beginNetworkWait=(kind,details)=>{
+    if(!fullMatch||networkWait?.kind===kind)return;
+    finishNetworkWait();
+    networkWait={kind,...details,started_at_ms:performance.now()};
   };
   let lateAborted=false;
   const pauseScenario=async(gate,value,label)=>{
     if(lateAborted)throw Error(`${label} was aborted before entering its gate`);
+    finishNetworkWait();
     await gate.pause(value);
     if(lateAborted)throw Error(`${label} was aborted before leaving its gate`);
   };
@@ -128,6 +185,14 @@ export function installRuntimePacedHistoryProbe({role,
     finally{event.elapsedMs=performance.now()-event.started;}
   };
   const command=name=>call('command',name);
+  const waitForRequiredInput=async(kind,tick,requiredThrough)=>{
+    if(!networkBackpressure)return;
+    const reason={'source-input':1,'full-frontier-confirmation':2,
+      'terminal-confirmation':3,'terminal-input':4}[kind];
+    await call('episodeAwaitNetworkInput',{kind:reason,tick,requiredThrough});
+    finishNetworkWait();
+    if(lateAborted)throw Error('Network wait was aborted by its external owner');
+  };
   const admit=(view,provenance)=>{
     const receipt=owner.admitEndpoint({view,provenance});report.admissions.push(receipt);return receipt;
   };
@@ -156,7 +221,9 @@ export function installRuntimePacedHistoryProbe({role,
         match.outcome!==0||match.rules?.stage!==32||match.players?.length!==2||
         match.rules.match_kind!==1||match.rules.is_stock!==1||match.rules.is_vs!==1||
         match.rules.is_teams!==0||!match.players.every(authoredPlayer)||
-        ![3,4].includes(match.players[0].stocks)||match.players[1].stocks!==4)
+        !(fullMatch?Number.isInteger(match.players[0].stocks)&&match.players[0].stocks>=1&&
+          match.players[0].stocks<=4:[3,4].includes(match.players[0].stocks))||
+        match.players[1].stocks!==4)
       throw Error(`Unexpected source stock observation: ${JSON.stringify(match)}`);
     const sample={frame:match.frame,kind:'post-present-idle',incarnation:metadata.incarnation,
       players:match.players.map(({stocks,fighter,motion,groundAir,facing_direction,x,y})=>
@@ -176,9 +243,21 @@ export function installRuntimePacedHistoryProbe({role,
     const recoveryFollow=respawn&&role==='alpha'&&recoveryStart.resumed&&
       !recoveryStop.entered&&
       row.idle.metadata.currentFrame===report.respawn_recovery?.platform_sample?.frame+1;
-    if(respawn&&row.idle.metadata.currentFrame>=28&&
+    const fullMatchTerminalWalk=fullMatch&&role==='alpha'&&fullMatchWalkStock===1;
+    const fullMatchFollowingPlatform=fullMatch&&role==='alpha'&&fullMatchPlatformExitStock!==null&&
+      row.idle.metadata.currentFrame===fullMatchCycles.get(fullMatchPlatformExitStock+1)?.platform_sample?.frame+1;
+    const fullMatchObserve=fullMatch&&!fullMatchTerminalWalk&&!kind.startsWith('terminal')&&
+      row.idle.metadata.currentFrame>=28&&
+      (role==='alpha'?
         (row.idle.metadata.currentFrame%4===0||kind!=='forward'||
-          row.idle.metadata.currentFrame===targetFrame||recoveryFollow)){
+          fullMatchWalkStock!==null||fullMatchAwaitPlatformStock!==null||
+          fullMatchPlatformExitStock!==null||fullMatchAwaitGroundedStock!==null||
+          !fullMatchWalkStart.entered||fullMatchFollowingPlatform):
+        row.idle.metadata.currentFrame%4===0||kind!=='forward'||
+          row.idle.metadata.currentFrame===targetFrame);
+    if((respawn&&row.idle.metadata.currentFrame>=28&&
+        (row.idle.metadata.currentFrame%4===0||kind!=='forward'||
+          row.idle.metadata.currentFrame===targetFrame||recoveryFollow))||fullMatchObserve){
       const sample=observeStock(state());
       if(role==='alpha'&&walkStart.resumed&&!walkStop.entered&&sample.players[0].stocks===3){
         report.walk_stop_frame=sample.frame;
@@ -203,19 +282,84 @@ export function installRuntimePacedHistoryProbe({role,
         report.respawn_recovery.input_poll=structuredClone(poll);
         await pauseScenario(recoveryStop,{sample,poll},'Respawn platform input completion');
       }
+      if(fullMatch&&role==='alpha'){
+        const p1=sample.players[0];
+        if(fullMatchWalkStock!==null&&fullMatchWalkStock>1){
+          if(p1.stocks===fullMatchWalkStock-1){
+            const cycle=fullMatchCycles.get(fullMatchWalkStock);
+            if(!cycle)throw Error('Full-match stock loss is outside its three respawn cycles');
+            const poll=report.polls.find(item=>item.sourceFrame===sample.frame-1);
+            if(!poll||poll.localPort!==0||poll.remotePort!==1||
+                typeof poll.pollSerial!=='string'||!Array.isArray(poll.raw)||poll.raw.length!==44)
+              throw Error('Full-match stock decrement lost its immediately preceding actual native P1 poll');
+            cycle.stock_loss=sample;
+            cycle.stock_loss_poll=structuredClone(poll);
+            const publicCycle=report.stock_cycles.find(item=>item.stock_before===cycle.stockBefore);
+            publicCycle.stock_loss=sample;publicCycle.stock_loss_poll=structuredClone(poll);
+            fullMatchAwaitPlatformStock=cycle.stockAfter;
+            fullMatchWalkStock=null;
+            await pauseScenario(cycle.walkStop,{sample,poll:structuredClone(poll)},
+              `Full-match P1 ${cycle.stockBefore}-to-${cycle.stockAfter} stock loss`);
+          }else if(p1.stocks!==fullMatchWalkStock){
+            throw Error('Full-match P1 stock count changed by more than one during a held walk-off');
+          }
+        }
+        if(fullMatchAwaitPlatformStock!==null&&p1.stocks===fullMatchAwaitPlatformStock&&
+            p1.motion===13&&p1.groundAir===1){
+          if(!Number.isFinite(p1.facing_direction)||![-1,1].includes(p1.facing_direction)||
+              !Number.isFinite(p1.x)||!Number.isFinite(p1.y))
+            throw Error('Full-match platform exit requires actual finite P1 facing and position');
+          const cycle=fullMatchCycles.get(fullMatchAwaitPlatformStock+1);
+          cycle.platform_sample=sample;
+          report.stock_cycles.find(item=>item.stock_after===fullMatchAwaitPlatformStock).platform_sample=sample;
+          fullMatchAwaitPlatformStock=null;
+          await pauseScenario(cycle.platform,sample,`Full-match P1 ${cycle.stockAfter}-stock RebirthWait platform`);
+        }
+        if(fullMatchFollowingPlatform){
+          const stock=fullMatchPlatformExitStock,cycle=fullMatchCycles.get(stock+1);
+          const platform=cycle?.platform_sample;
+          const poll=report.polls.find(item=>item.sourceFrame===platform?.frame);
+          if(!poll||poll.localPort!==0||poll.remotePort!==1||
+              typeof poll.pollSerial!=='string'||!Array.isArray(poll.raw)||poll.raw.length!==44||
+              sample.frame!==platform.frame+1)
+            throw Error('Full-match one-poll platform exit lost its exact next native P1 poll');
+          const exit={sample,poll:structuredClone(poll)};
+          cycle.platform_exit=exit;
+          report.stock_cycles.find(item=>item.stock_after===stock).platform_exit=exit;
+          await pauseScenario(cycle.platformExit,exit,`Full-match P1 ${stock}-stock one-poll platform exit`);
+        }
+        if(fullMatchAwaitGroundedStock!==null&&p1.stocks===fullMatchAwaitGroundedStock&&
+            p1.motion===14&&p1.groundAir===0){
+          const stock=fullMatchAwaitGroundedStock,cycle=fullMatchCycles.get(stock+1);
+          cycle.grounded_respawn=sample;
+          report.stock_cycles.find(item=>item.stock_after===stock).grounded_respawn=sample;
+          fullMatchAwaitGroundedStock=null;
+          await pauseScenario(cycle.grounded,sample,`Full-match P1 ${stock}-stock grounded Wait14`);
+        }
+      }
     }
   };
   const capture=async()=>{
     await command('capture');admit(1,1);
     await command('beginEpisode');admit(1,1);
   };
-  const sealPresented=async()=>{
-    await command('sealPresentedFrontier');admit(3,2);
+  const sealPresented=async(terminal=false)=>{
+    await command('sealPresentedFrontier');
+    admit(terminal?4:3,terminal?4:2);
   };
   const closeRebase=async(end)=>{
     await command('close');await command('retire');
     const rebased=await call('episodeRebase',end);report.rebases.push(rebased);
     await capture();
+  };
+  const admitRemoteTick=async tick=>{
+    if(tick!==remoteNext)throw Error('Remote admission differs from the next actual input');
+    const admission=await call('episodeAdmit',{tick});
+    const event=lateEvents.get(tick);
+    if(event&&role==='alpha')
+      event.scenario.remote_admission={tick,receipt:admission.receipt,timeline:admission.timeline};
+    remoteNext++;
+    return admission;
   };
   const admitAvailable=async()=>{
     while(remoteNext<targetFrame){
@@ -224,19 +368,17 @@ export function installRuntimePacedHistoryProbe({role,
       if(remoteNext-nextLocal>=active.max_lookahead_ticks)break;
       const receipt=await call('peerRemoteSnapshot',{tick:remoteNext});
       if(!receipt)break;
-      const admission=await call('episodeAdmit',{tick:remoteNext});
-      const event=lateEvents.get(remoteNext);
-      if(event&&role==='alpha')
-        event.scenario.remote_admission={tick:remoteNext,receipt:admission.receipt,
-          timeline:admission.timeline};
-      remoteNext++;
+      await admitRemoteTick(remoteNext);
     }
   };
+  let selectedTerminal=null;
   const reconcile=async(snapshot)=>{
-    const current=state().metadata,pre=current.preFrame,frontier=current.currentFrame;
+    const current=state().metadata,pre=current.preFrame;
+    const predictedTerminal=selectedTerminal;
+    const frontier=predictedTerminal?.selectedOrdinal??current.currentFrame;
     const confirmed=Math.min(snapshot.remote_contiguous_through+1,frontier);
     if(confirmed<=pre||confirmed>frontier)throw Error('Paced correction lacks a newer confirmed anchor');
-    await sealPresented();
+    await sealPresented(Boolean(predictedTerminal));
     const lateScenario=lateEvents.get(snapshot.dirty_from)?.scenario;
     const lateFrontier=lateScenario?.alpha_frontier;
     if(role==='alpha'&&lateFrontier?.pre_frame===pre&&
@@ -258,7 +400,7 @@ export function installRuntimePacedHistoryProbe({role,
     if(snapshot.dirty_from===null&&confirmed===frontier){
       await closeRebase(frontier);return;
     }
-    if(respawn&&snapshot.dirty_from!==null)
+    if(stockoutScenario&&snapshot.dirty_from!==null)
       report.stock_samples=report.stock_samples.filter(sample=>sample.frame<=snapshot.dirty_from);
     const restoreEventIndex=report.events.length;
     const restoreStatus=await command('restore');admit(1,1);
@@ -278,13 +420,32 @@ export function installRuntimePacedHistoryProbe({role,
     }else{
       const replay=await call('episodeReplay',{dirty:snapshot.dirty_from,
         through:frontier-1,speculative:0});
-      retainRows(replay.rows);admit(2,3);
+      retainRows(replay.rows);
+      if(replay.terminal){
+        if(!fullMatch)throw Error('Unexpected ending outside the full-match scenario');
+        selectedTerminal=replay.terminal;
+        await call('episodeTerminalSealReplay');
+        await present(true,'terminal-corrected');admit(4,4);
+        report.corrections.push({kind:'terminal-replay-selection',pre,frontier,confirmed,
+          dirty:snapshot.dirty_from,replay,restore_status:restoreStatus});
+        return;
+      }
+      selectedTerminal=null;
+      admit(2,3);
       const checksum=[...owner.checksum()];
       await present(false,'corrected-frontier');admit(3,3);
       report.corrections.push({kind:'fully-confirmed-correction',pre,frontier,confirmed,
         dirty:snapshot.dirty_from,checksum,replay,
         ...(lateScenario?{restore_event_index:restoreEventIndex,restore_status:restoreStatus}:{})});
       if(frontier!==targetFrame)await closeRebase(frontier);
+    }
+    if(fullMatch&&role==='alpha'&&snapshot.dirty_from===lateTicks[0]&&!fullMatchWalkStart.entered){
+      const baseline=report.stock_samples.at(-1);
+      if(pre!==21||frontier!==28||baseline?.frame!==frontier||
+         baseline.players[0].stocks!==4||baseline.players[1].stocks!==4)
+        throw Error('Full-match walk-off requires the actual corrected four-stock F28 draw');
+      report.full_match_initial_walk_start=baseline;
+      await pauseScenario(fullMatchWalkStart,baseline,'Full-match initial P1 walk-off');
     }
     if(respawn&&role==='alpha'&&snapshot.dirty_from===lateTicks[0]&&!walkStart.entered){
       if(pre!==21||frontier!==28)throw Error('Walk-off requires the first exact late correction');
@@ -295,6 +456,85 @@ export function installRuntimePacedHistoryProbe({role,
       await pauseScenario(walkStart,baseline,'Respawn walk-start');
     }
   };
+  const newCallback=async()=>{
+    const timestamp=await new Promise(resolve=>requestAnimationFrame(resolve));
+    const callback={serial:report.callbacks.length+1,rafTimestamp:timestamp,
+      startedAt:performance.now(),grants:0,reconciliations:0};
+    report.callbacks.push(callback);
+    return callback;
+  };
+  const finishSelectedTerminal=async()=>{
+    if(!fullMatch||!selectedTerminal)throw Error('Terminal finish requires a selected native ending');
+    if(state().metadata.phase===29)await sealPresented(true);
+    await command('close');await command('retire');
+    const began=await call('episodeTerminalBegin');
+    report.terminal_bridge={selected:selectedTerminal,began,rows:[]};
+    let descriptor=began.descriptor,callback=null;
+    for(;;){
+      if(lateAborted)throw Error('Terminal tail was aborted by its external owner');
+      const adopting=descriptor.suffixCursor<descriptor.suffixCount;
+      if(!adopting){
+        if(!callback||callback.grants===8)callback=await newCallback();
+        if(lateAborted)throw Error('Terminal tail was aborted before its next input');
+        const clock=owner.pacingSample(1);
+        if(clock.steps===0){callback=null;continue;}
+        if(clock.steps!==1||clock.phase!==36||clock.currentFrame!==descriptor.sourceFrame)
+          throw Error('Terminal-tail pacing grant lost the exact native owner');
+        callback.grants++;
+      }
+      const next=await call('episodeTerminalTailTicket');
+      const tick=next.ticket.inputOrdinal;
+      if((next.ticket.flags===1)!==adopting||tick!==descriptor.consumedOrdinal)
+        throw Error('Terminal tail changed its retained-suffix or fresh-poll boundary');
+      if(!adopting){
+        report.polls.push({...next.ticket,raw:next.ticket.rawPad});
+        await call('episodeTerminalTailPublish');
+      }
+      let applied=await call('episodeTerminalTailForward');
+      if(applied.waiting){
+        if(adopting||applied.tick!==tick)throw Error('Terminal tail lost its pending actual input');
+        beginNetworkWait('terminal-input',{input_ordinal:tick,source_frame:descriptor.sourceFrame});
+        if(networkBackpressure)await waitForRequiredInput('terminal-input',tick,tick);
+        else{
+          do {
+            callback=await newCallback();
+            if(lateAborted)throw Error('Terminal tail was aborted while awaiting confirmed input');
+            owner.pacingSample(0);
+          } while(!await peer.call('peerRemoteSnapshot',{tick}));
+          finishNetworkWait();
+        }
+        applied=await call('episodeTerminalTailForward');
+        if(applied.waiting)throw Error('Observed terminal remote input became unavailable');
+      }
+      if(applied.ticket.inputOrdinal!==tick||applied.ticket.appliedPad.length!==44)
+        throw Error('Terminal tail lost its exact applied input ordinal');
+      selected.set(tick,applied.ticket.appliedPad);
+      const drawn=await call('episodeTerminalTailPresent');
+      const prior=report.presentations.at(-1)?.receipt;
+      if(BigInt(drawn.presentation.presentationSerial)!==BigInt(prior?.presentationSerial??'0')+1n)
+        throw Error('Terminal tail lost its monotonic original presentation');
+      report.presentations.push({kind:'terminal-tail',inputOrdinal:tick,
+        receipt:drawn.presentation,idle:drawn.idle});
+      descriptor=drawn.descriptor;
+      report.terminal_bridge.rows.push({ticket:applied.ticket,descriptor});
+      owner.pacingSample(0);
+      if(callback)callback.lastWorkAt=performance.now();
+      if(drawn.complete)break;
+    }
+    report.clockFinishedAt=performance.now();
+    const final=await call('episodeTerminalFinish');
+    report.input_capacity_ticks=targetFrame;
+    report.input_ticks=final.receipt.consumedOrdinal;
+    report.finalOwner=final.status;report.finalTimeline=final.timeline;
+    report.finalChecksum={view:'terminal-tail',tick:final.receipt.lastInputOrdinal,
+      frame:final.receipt.sourceFrame,bytes:final.checksum};
+    report.terminal_final={receipt:final.receipt,checksum:final.checksum,agreement:final.agreement};
+    report.authoritativeInputs=Array.from({length:report.input_ticks},(_,tick)=>({tick,bytes:selected.get(tick)}));
+    if(report.authoritativeInputs.some(row=>row.bytes?.length!==44)||
+       report.polls.length!==report.input_ticks)
+      throw Error('Full match lost an authoritative or actual once-polled input');
+    report.result='PACED_3600_MATCH_FINAL_COMPLETE';
+  };
   const api=Object.freeze({
     snapshot:()=>structuredClone({...report,clock:owner.pacingJournal()}),
     lateSnapshot(tick){
@@ -304,9 +544,9 @@ export function installRuntimePacedHistoryProbe({role,
     waitForLateKeyChange(tick){if(role!=='beta')throw Error('Only beta owns the late key-change gate');return lateEvent(tick).key.wait();},
     noteLateKeyChange({tick=26,from,to}={}){
       const {key,scenario}=lateEvent(tick);
-      const targetKey=respawn?lateKeys[lateTicks.indexOf(tick)]:'ArrowRight';
+      const targetKey=stockoutScenario?lateKeys[lateTicks.indexOf(tick)]:'ArrowRight';
       if(role!=='beta'||!key.entered||key.resumed||scenario.keyboard_change||
-          from!==(respawn?null:'ArrowLeft')||to!==targetKey)
+          from!==(stockoutScenario?null:'ArrowLeft')||to!==targetKey)
         throw Error('Late key change must match the configured Playwright direction transition');
       const {preFrame,currentFrame}=state().metadata;
       if(currentFrame!==tick)throw Error('Late key change lost its source frame');
@@ -349,10 +589,37 @@ export function installRuntimePacedHistoryProbe({role,
       scenario.remote_receipt=structuredClone(receipt);
       frontier.release();
     },
-    waitLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral=false}={}){
+    waitLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral=false,released=null}={}){
       if(role!=='alpha')throw Error('Only alpha owns the delayed-input frontier');
+      if(networkBackpressure){
+        const {frontier}=lateEvent(tick);
+        if(!frontier.entered||frontier.resumed||lateAborted||!requireFollowingNeutral||
+           released?.source_tick!==tick||released.poll_serial!==sourcePoll?.pollSerial||
+           released.local_port!==1||released.source_poll?.ticketId!==sourcePoll?.ticketId||
+           released.source_poll?.sourceFrame!==tick||!Array.isArray(sourcePoll?.raw)||
+           !matchesBytes(released.actual_local_pad,sourcePoll.raw.slice(11,22)))
+          throw Error('Late network wait requires the exact completed beta packet release');
+      }
       return waitForLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral,
-        waitForRemoteSample:sourceTick=>peer.call('peerWaitRemote',{tick:sourceTick,timeoutMs:5000}),
+        waitForRemoteSample:async sourceTick=>{
+          if(!networkBackpressure)return peer.call('peerWaitRemote',{tick:sourceTick,timeoutMs:5000});
+          const result=await call('episodeAwaitNetworkInput',{kind:1,tick:sourceTick,requiredThrough:tick+1});
+          if(result.excluded){
+            const {startedAt,observedAt,endedAt,excludedMs}=result.timing;
+            recordNetworkWait({kind:'released-late-input',input_ordinal:sourceTick,
+              required_input_through:tick+1,started_at_ms:startedAt,observed_at_ms:observedAt,
+              ended_at_ms:endedAt,elapsed_ms:observedAt-startedAt,native_excluded_ms:excludedMs,
+              interrupted:false});
+          }
+          return result;
+        },
+        ...(networkBackpressure?{admitRemoteSample:async(sourceTick,receipt)=>{
+          if(lateAborted)throw Error('Late frontier was aborted before remote admission');
+          const admission=await admitRemoteTick(sourceTick);
+          if(admission.receipt.packet_sequence!==receipt.packet_sequence||
+             !matchesBytes(admission.receipt.pad,receipt.pad))
+            throw Error('Late frontier admitted a different receipt');
+        }}:{}),
         resumeLateFrontier:receipt=>api.resumeLateFrontier(receipt)});
     },
     waitForWalkStart(){return walkStart.wait();},
@@ -377,9 +644,91 @@ export function installRuntimePacedHistoryProbe({role,
         throw Error('P1 recovery completion gate is stale or duplicated');
       recoveryStop.release();
     },
+    waitForFullMatchWalkStart(){
+      if(!fullMatch||role!=='alpha')throw Error('Only the 3600-input alpha page owns full-match P1 walk-off');
+      return fullMatchWalkStart.wait();
+    },
+    resumeFullMatchWalkStart(){
+      if(!fullMatch||role!=='alpha'||!fullMatchWalkStart.entered||fullMatchWalkStart.resumed||
+          fullMatchWalkStock!==null)
+        throw Error('Full-match initial P1 walk-off gate is stale or duplicated');
+      fullMatchWalkStock=4;
+      fullMatchWalkStart.release();
+    },
+    waitForFullMatchStockLoss(stockBefore){
+      if(!fullMatch||role!=='alpha'||!fullMatchCycles.has(stockBefore))
+        throw Error('Full-match stock loss requires an actual P1 four-to-one stock cycle');
+      return fullMatchCycles.get(stockBefore).walkStop.wait();
+    },
+    resumeFullMatchStockLoss(stockBefore){
+      const cycle=fullMatchCycles.get(stockBefore);
+      if(!fullMatch||role!=='alpha'||!cycle?.stock_loss||
+          !cycle.walkStop.entered||cycle.walkStop.resumed)
+        throw Error('Full-match P1 stock-loss gate is stale or lacks its observed decrement');
+      cycle.walkStop.release();
+    },
+    waitForFullMatchPlatform(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle)
+        throw Error('Full-match RebirthWait requires the actual post-loss P1 stock count');
+      return cycle.platform.wait();
+    },
+    resumeFullMatchPlatform(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle?.platform_sample||
+          !cycle.platform.entered||cycle.platform.resumed||fullMatchPlatformExitStock!==null)
+        throw Error('Full-match platform input requires its retained actual RebirthWait sample');
+      fullMatchPlatformExitStock=stockAfter;
+      cycle.platform.release();
+    },
+    waitForFullMatchPlatformExit(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle)
+        throw Error('Full-match platform exit completion requires an actual post-loss stock count');
+      return cycle.platformExit.wait();
+    },
+    resumeFullMatchPlatformExit(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle?.platform_exit||
+          !cycle.platformExit.entered||cycle.platformExit.resumed||
+          fullMatchAwaitGroundedStock!==null)
+        throw Error('Full-match one-poll platform exit gate is stale or lacks its actual poll');
+      fullMatchAwaitGroundedStock=stockAfter;
+      fullMatchPlatformExitStock=null;
+      cycle.platformExit.release();
+    },
+    waitForFullMatchGroundedRespawn(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle)
+        throw Error('Full-match grounded Wait14 requires the actual post-loss stock count');
+      return cycle.grounded.wait();
+    },
+    resumeFullMatchGroundedRespawn(stockAfter){
+      const cycle=fullMatchCycles.get(stockAfter+1);
+      if(!fullMatch||role!=='alpha'||!cycle?.grounded_respawn||
+          !cycle.grounded.entered||cycle.grounded.resumed||
+          fullMatchWalkStock!==null)
+        throw Error('Full-match next walk-off requires its retained grounded Wait14 sample');
+      fullMatchWalkStock=stockAfter;
+      if(stockAfter===1)report.final_walkoff_stock={stocks:1,
+        grounded_sample:cycle.grounded_respawn,
+        awaiting:'native actual 1-to-0 terminal receipt'};
+      cycle.grounded.release();
+    },
+    fullMatchStockSnapshot(){
+      if(!fullMatch||role!=='alpha')throw Error('Full-match stock evidence is alpha-owned');
+      return structuredClone({stock_cycles:report.stock_cycles,
+        initial_walk_start:report.full_match_initial_walk_start??null,
+        final_walkoff_stock:report.final_walkoff_stock??null,
+        active_walk_stock:fullMatchWalkStock,
+        awaiting_platform_stock:fullMatchAwaitPlatformStock,
+        awaiting_grounded_stock:fullMatchAwaitGroundedStock});
+    },
     abortLateScenario(){
       lateAborted=true;
       for(const gate of [walkStart,walkStop,recoveryStart,recoveryStop,
+        fullMatchWalkStart,...[...fullMatchCycles.values()].flatMap(cycle=>[
+          cycle.walkStop,cycle.platform,cycle.platformExit,cycle.grounded]),
         ...[...lateEvents.values()].flatMap(event=>[event.key,event.packet,event.frontier])])
         gate.abort();
       return {aborted:true,role};
@@ -398,18 +747,38 @@ export function installRuntimePacedHistoryProbe({role,
         for(;;){
           if(lateAborted)throw Error('Late class-piece scenario was aborted by its external owner');
           if(!continueCallback){
-            const timestamp=await new Promise(resolve=>requestAnimationFrame(resolve));
-            callback={serial:report.callbacks.length+1,rafTimestamp:timestamp,
-              startedAt:performance.now(),grants:0,reconciliations:0};
-            report.callbacks.push(callback);
+            callback=await newCallback();
           }
           continueCallback=false;
           // Budget zero accounts for actual elapsed time before reconciliation;
           // the clock is never reset during a network wait or state transfer.
           owner.pacingSample(0);
+          if(selectedTerminal&&state().metadata.phase===32){
+            // A replay-selected ending holds the exact outstanding timeline plan
+            // until its old suffix has actually run in the terminal tail.
+            await finishSelectedTerminal();
+            break;
+          }
           await admitAvailable();
           let inputs=await timeline(),current=state().metadata;
           const frame=current.currentFrame,confirmed=inputs.remote_contiguous_through+1;
+          if(selectedTerminal){
+            if(confirmed<(current.phase===29?selectedTerminal.selectedOrdinal:inputs.simulated_through+1)){
+              beginNetworkWait('terminal-confirmation',{source_frame:frame,
+                required_input_through:selectedTerminal.selectedOrdinal-1});
+              report.events.push({operation:'terminal-confirmation-wait',frame,confirmed});
+              await waitForRequiredInput('terminal-confirmation',remoteNext,selectedTerminal.selectedOrdinal-1);
+              continue;
+            }
+            finishNetworkWait();
+            if(current.phase===29&&inputs.dirty_from!==null){
+              callback.reconciliations++;
+              await reconcile(inputs);
+              continue;
+            }
+            await finishSelectedTerminal();
+            break;
+          }
           const activeLate=[...lateEvents.values()].find(({scenario})=>frame<=scenario.target_source_tick+2||
             !scenario.anchor);
           const lateScenario=activeLate?.scenario;
@@ -421,7 +790,9 @@ export function installRuntimePacedHistoryProbe({role,
             throw Error('Late-piece run advanced past its required native anchor');
           if(atLateAnchor&&inputs.dirty_from===null){
             if(inputs.confirmed_through<lateAnchorFrame-1){
+              beginNetworkWait('source-input',{source_frame:frame,required_input_through:lateAnchorFrame-1});
               report.events.push({operation:'late-anchor-network-wait',frame,confirmed});
+              await waitForRequiredInput('source-input',remoteNext,lateAnchorFrame-1);
               continue;
             }
             if(current.preFrame===lateAnchorFrame)
@@ -441,8 +812,10 @@ export function installRuntimePacedHistoryProbe({role,
                   frame===target+2&&target<frame&&frame<=current.preFrame+7))
                 throw Error('Late alpha frontier is outside the current native PRE and seven-tick bound');
               if(inputs.remote_contiguous_through<target-1){
+                beginNetworkWait('source-input',{source_frame:frame,required_input_through:target-1});
                 report.events.push({operation:'late-prefix-network-wait',frame,
                   remote_contiguous_through:inputs.remote_contiguous_through,dirty_from:inputs.dirty_from});
+                await waitForRequiredInput('source-input',remoteNext,target-1);
                 continue;
               }
               if(inputs.remote_contiguous_through!==target-1||inputs.dirty_from!==null)
@@ -461,6 +834,7 @@ export function installRuntimePacedHistoryProbe({role,
             await pauseScenario(activeLate.packet,structuredClone(lateScenario.release_gate),'Late beta packet');
           }
           if(frame===targetFrame&&confirmed===targetFrame&&inputs.dirty_from===null){
+            if(fullMatch)throw Error('Full-match capacity reached before the original terminal transition');
             report.finalTimeline=inputs;
             // The final endpoint is explicitly post-draw, not CPU-before-draw.
             if(current.phase!==16)await sealPresented();
@@ -508,6 +882,13 @@ export function installRuntimePacedHistoryProbe({role,
             ? (fullWindow||atLateAnchor)&&confirmed>=frame&&current.preFrame<frame
             : fullWindow&&confirmed>current.preFrame;
           if(inputs.dirty_from!==null||cleanRebase){
+            if(fullMatch&&inputs.dirty_from!==null&&confirmed<frame){
+              beginNetworkWait('full-frontier-confirmation',{source_frame:frame,required_input_through:frame-1});
+              report.events.push({operation:'full-match-replay-confirmation-wait',frame,confirmed});
+              await waitForRequiredInput('full-frontier-confirmation',remoteNext,frame-1);
+              continue;
+            }
+            finishNetworkWait();
             if(callback.reconciliations===1)continue;
             callback.reconciliations++;
             await reconcile(inputs);
@@ -519,8 +900,13 @@ export function installRuntimePacedHistoryProbe({role,
           // Remote samples ahead of local execution are retained by the existing
           // transport/timeline; only actual simulated inputs can become anchors.
           if(frame===targetFrame||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
-            report.events.push({operation:'network-wait',frame,confirmed});continue;
+            beginNetworkWait('source-input',{source_frame:frame});
+            report.events.push({operation:'network-wait',frame,confirmed});
+            const requiredThrough=frame===targetFrame||frame-current.preFrame>=7?frame-1:frame-7;
+            if(remoteNext<=requiredThrough)await waitForRequiredInput('source-input',remoteNext,requiredThrough);
+            continue;
           }
+          finishNetworkWait();
           if(callback.grants===8)continue;
           const clock=owner.pacingSample(1);
           if(clock.steps===0)continue;
@@ -543,7 +929,12 @@ export function installRuntimePacedHistoryProbe({role,
           // this owner admits them only between complete source operations.
           const actual=frame<=inputs.remote_contiguous_through;
           const forwarded=await call('episodeForward',{tick:frame,ticketId:polled.ticket.ticketId,actual});
-          retainRows([forwarded]);await present(true);
+          retainRows([forwarded]);
+          if(forwarded.terminal){
+            if(!fullMatch)throw Error('Unexpected ending outside the full-match scenario');
+            selectedTerminal=forwarded.terminal;
+            await present(true,'terminal-forward');
+          }else await present(true);
           const remaining=owner.pacingSample(0);
           callback.lastWorkAt=performance.now();
           continueCallback=(remaining.pendingSteps>0||frame+1===targetFrame)&&callback.grants<8;
@@ -552,7 +943,9 @@ export function installRuntimePacedHistoryProbe({role,
         report.result='FAIL';report.failure={message:String(error?.message??error),
           stack:error?.stack??null,pacingSample:error?.pacingSample??null};
       }finally{
+        finishNetworkWait(true);
         report.finishedAt=performance.now();report.clock=owner.pacingJournal();
+        if(fullMatch)report.native_network_wait=owner.pacingWaitJournal();
         report.commands=owner.journal();
       }
       return structuredClone(report);

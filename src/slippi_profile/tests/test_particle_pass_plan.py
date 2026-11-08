@@ -109,6 +109,7 @@ struct HSD_GObj {
  void *hsd_obj, *user_data; void (*user_data_remove_func)(void*);
 };
 #define HSD_GOBJ_CLASS_EFFECT 8
+#define HSD_GOBJ_CLASS_UI 0xE
 #define HSD_GOBJ_CLASS_CAMERA 0x13
 #define HSD_GOBJ_OBJ_NONE 255
 #define HSD_GOBJ_USER_DATA_NONE 255
@@ -225,6 +226,9 @@ void grDisplay_801C5F60(HSD_GObj*, int);
     "melee/if/ifmagnify.h": r'''#ifndef FIXTURE_IFMAGNIFY_H
 #define FIXTURE_IFMAGNIFY_H
 #include <sysdolphin/baselib/gobj.h>
+typedef struct { HSD_GObj* gobj; void* jobj; void* idesc; } ifMagnifyPlayer;
+typedef struct { ifMagnifyPlayer player[6]; } ifMagnify;
+extern ifMagnify ifMagnify_804A1DE0;
 void ifMagnify_802FBBDC(HSD_GObj*);
 void ifMagnify_802FB8C0(HSD_GObj*, int);
 #endif
@@ -313,6 +317,11 @@ def source_fixture() -> str:
                 "void HSD_GObj_LObjCallback(HSD_GObj* gobj, int unused)",
                 "void HSD_GObj_JObjCallback(HSD_GObj* gobj, int arg1)",
             )
+        ),
+        "ACTUAL_RESULT_SCENE_DRAWS": "\n\n".join(
+            extract_function((ROOT / f"src/gameplay_{scene}_context.c").read_text(encoding="utf-8"),
+                             f"int melee_web_{scene}_context_draw(")
+            for scene in ("results", "prize")
         ),
         "ACTUAL_DEVTEXT_SOURCE": "\n\n".join([
             extract_function(textdraw, "HSD_GObj* DevText_GetGObj(void)"),
@@ -547,6 +556,8 @@ class ParticlePassPlanTests(unittest.TestCase):
                 PROFILE / "particle_source_schedule.c",
                 PROFILE / "particle_source_schedule.h",
                 ROOT / "src/gameplay_cpu_interval.h",
+                ROOT / "src/gameplay_results_context.c",
+                ROOT / "src/gameplay_prize_context.c",
                 PROFILE / "tests/particle_pass_source_control.c.in",
                 PROFILE / "tests/test_particle_pass_plan.py",
                 ROOT / "tests/test_slippi_particle_pass_plan.py",

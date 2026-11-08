@@ -103,6 +103,10 @@ typedef struct CameraEvent {
 typedef struct Schedule {
     uint64_t world, interval;
     unsigned main_x398_b3, hud_hidden, selected_links;
+    SlippiParticlePassSource identity_source;
+    HSD_GObj* main_camera;
+    HSD_GObj* hud_camera;
+    HSD_GObj* magnify_camera;
     NodeProof* camera_nodes;
     size_t camera_node_count;
     CameraEvent* events;
@@ -733,6 +737,34 @@ static int source_roles_unchanged(const SlippiParticlePassSource* source)
                source->magnify_callback;
 }
 
+static int magnifier_hud_nodes_unchanged(const Schedule* schedule)
+{
+    const unsigned hud_index = 3; /* snapshot_selected_links order: ... 10, 11, 15, 17 */
+    if (!schedule || !(schedule->selected_links & (1u << 11))) return 0;
+    for (unsigned slot = 0; slot < 6; ++slot) {
+        const ifMagnifyPlayer* player = &ifMagnify_804A1DE0.player[slot];
+        const HSD_GObj* icon = player->gobj;
+        unsigned matches = 0;
+        if (!icon || !player->jobj || !player->idesc) return 0;
+        for (size_t n = 0; n < schedule->link_count[hud_index]; ++n) {
+            const NodeProof* proof = &schedule->selected_nodes[
+                schedule->link_first[hud_index] + n];
+            if (proof->object != icon) continue;
+            if (proof->user_data != player ||
+                proof->render_callback != ifMagnify_802FB8C0 ||
+                proof->classifier != HSD_GOBJ_CLASS_UI || proof->p_link != 15 ||
+                proof->p_priority != 0 || proof->render_priority != 0 ||
+                proof->user_data_kind != 0xE ||
+                proof->gx_link != 11 ||
+                proof->object_kind != HSD_GObj_JObjKind || !proof->hsd_object)
+                return 0;
+            ++matches;
+        }
+        if (matches != 1) return 0;
+    }
+    return 1;
+}
+
 static int append_visits(Schedule* schedule, size_t* capacity,
                          const SlippiParticlePassVisit* visits, size_t count,
                          size_t maximum)
@@ -906,6 +938,7 @@ static int build_schedule(Schedule* output, uint64_t world,
     output->interval = interval;
     output->main_x398_b3 = main_x398_b3;
     output->hud_hidden = base.hud_hidden;
+    output->identity_source = base;
 
     for (node = base.gx_heads[SLIPPI_PARTICLE_GX_LINK_MAX + 1]; node;
          node = node->next_gx) {
@@ -948,6 +981,18 @@ static int build_schedule(Schedule* output, uint64_t world,
         event.visit_first = output->visit_count - count;
         event.visit_count = count;
         event.kind = kind;
+        if (kind == SLIPPI_PARTICLE_CAMERA_MAIN_TAIL) {
+            if (output->main_camera && output->main_camera != node) {
+                free(one_visits);
+                return refuse(error, error_size,
+                              "Multiple main camera source identities exceed the admitted route");
+            }
+            output->main_camera = node;
+        } else if (kind == SLIPPI_PARTICLE_CAMERA_HUD) {
+            output->hud_camera = node;
+        } else if (kind == SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO) {
+            output->magnify_camera = node;
+        }
         output->events[output->event_count++] = event;
         output->selected_links |= mask;
         if (kind == SLIPPI_PARTICLE_CAMERA_HUD)
@@ -964,7 +1009,7 @@ static int build_schedule(Schedule* output, uint64_t world,
                       "Original camera callback chain tail disagrees with topology");
     if (main_seen != 1)
         return refuse(error, error_size,
-                      "Private main camera is not unique in the source callback chain");
+                      "Private source requires one main camera callback");
     if (!source_roles_unchanged(&base))
         return refuse(error, error_size,
                       "Source camera role identity or HUD hidden state changed during preflight");
@@ -1097,6 +1142,74 @@ int slippi_particle_source_prepare(uint64_t world_generation,
     state.schedule = candidate;
     state.event_cursor = 0;
     state.failed = 0;
+    return 1;
+}
+
+int slippi_particle_source_magnifier_identity(uint64_t world_generation,
+    uint64_t interval_token, HSD_GObj** main_camera, HSD_GObj** hud_camera,
+    HSD_GObj** magnifier_camera, unsigned* hud_hidden)
+{
+    HSD_GObj* current_main = NULL;
+    HSD_GObj* current_hud = NULL;
+    GObj_RenderFunc main_callback = NULL, hud_callback = NULL;
+    HSD_GObjEvent main_process = NULL;
+    unsigned main_suppressed = 0, current_hidden = 0;
+    size_t main_index=SIZE_MAX,hud_index=SIZE_MAX,magnify_index=SIZE_MAX;
+    const Schedule* schedule = &state.schedule;
+    if (main_camera) *main_camera = NULL;
+    if (hud_camera) *hud_camera = NULL;
+    if (magnifier_camera) *magnifier_camera = NULL;
+    if (hud_hidden) *hud_hidden = 0;
+    if (!main_camera || !hud_camera || !magnifier_camera || !hud_hidden ||
+        !state.active || state.failed || state.drawing || state.ordinary_drawing ||
+        !world_generation || !interval_token || state.world != world_generation ||
+        state.interval != interval_token || schedule->world != world_generation ||
+        schedule->interval != interval_token || !schedule->main_camera ||
+        !schedule->hud_camera || !schedule->magnify_camera ||
+        schedule->magnify_camera->render_priority != 0 ||
+        schedule->main_camera->render_priority != 2 ||
+        schedule->hud_camera->render_priority != 8 ||
+        schedule->identity_source.screen_render_pass != 1 ||
+        !magnifier_hud_nodes_unchanged(schedule) ||
+        !source_roles_unchanged(&schedule->identity_source))
+        return 0;
+    slippi_particle_source_main_camera_identity(&current_main, &main_callback,
+                                                &main_process, &main_suppressed);
+    slippi_particle_source_hud_identity(&current_hud, &hud_callback,
+                                         &current_hidden);
+    if (main_suppressed || current_main != schedule->main_camera ||
+        main_callback != schedule->identity_source.main_callback ||
+        main_process != schedule->identity_source.main_process_callback ||
+        current_hud != schedule->hud_camera ||
+        hud_callback != schedule->identity_source.hud_callback ||
+        current_hidden != schedule->hud_hidden ||
+        slippi_particle_source_magnify_callback() !=
+            schedule->identity_source.magnify_callback)
+        return 0;
+    for (size_t i=0;i<schedule->event_count;++i) {
+        switch (schedule->events[i].kind) {
+        case SLIPPI_PARTICLE_CAMERA_MAIN_TAIL:
+            if (main_index!=SIZE_MAX) return 0;
+            main_index=i;
+            break;
+        case SLIPPI_PARTICLE_CAMERA_HUD:
+            if (hud_index!=SIZE_MAX) return 0;
+            hud_index=i;
+            break;
+        case SLIPPI_PARTICLE_CAMERA_MAGNIFY_ZERO:
+            if (magnify_index!=SIZE_MAX) return 0;
+            magnify_index=i;
+            break;
+        default:
+            break;
+        }
+    }
+    if (!(magnify_index<main_index && main_index<hud_index) ||
+        hud_index==SIZE_MAX) return 0;
+    *main_camera = schedule->main_camera;
+    *hud_camera = schedule->hud_camera;
+    *magnifier_camera = schedule->magnify_camera;
+    *hud_hidden = schedule->hud_hidden;
     return 1;
 }
 

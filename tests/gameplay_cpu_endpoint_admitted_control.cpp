@@ -202,7 +202,14 @@ std::uint32_t GameplayMatchSession::source_frames() const
 { return live_frame; }
 bool GameplayMatchSession::diagnostic_source_files_quiescent() const noexcept
 { return source_files_quiet; }
+bool GameplayMatchSession::ending() const
+{ return false; } // Existing admitted batch fixture models a live match.
+bool GameplayMatchSession::complete() const
+{ return false; }
 }
+
+extern "C" std::uint64_t melee_web_gameplay_generation(void)
+{ return live_owners.world; }
 
 namespace melee_web {
 struct GameplayCpuEndpointTestFixture {
@@ -253,6 +260,7 @@ struct GameplayCpuEndpointTestFixture {
         value->history_incarnation_=incarnation;
         value->history_start_frame_=10;
         value->history_end_frame_=end_frame;
+        value->history_end_source_frame_=end_frame;
         value->history_restore_end_=restore_end;
         value->history_restore_count_=restore_count;
         value->commit_.effect_token=phase==GameplayCpuCheckpoint::Phase::HistoryReady?0:0x10b;

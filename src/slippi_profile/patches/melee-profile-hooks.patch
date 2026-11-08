@@ -2846,6 +2846,121 @@ diff --git a/src/melee/if/ifnametag.c b/src/melee/if/ifnametag.c
 diff --git a/src/melee/if/ifmagnify.c b/src/melee/if/ifmagnify.c
 --- a/src/melee/if/ifmagnify.c
 +++ b/src/melee/if/ifmagnify.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++#include <slippi_profile/fighter_projection.h>
++#endif
+ #include "ifmagnify.h"
+ 
+ #include <math.h>
+@@ -78,6 +81,13 @@
+     return true;
+ }
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++int slippi_magnifier_source_hud_visible(void)
++{
++    return ifMagnify_IsHUDVisible();
++}
++#endif
++
+ static inline void ifMagnify_GetPlayerColor(GXColor* color, s32 slot)
+ {
+     *color =
+@@ -192,6 +202,11 @@
+     melee_source_bool should_display;
+     s32 arrow_kind;
+     u8 operand_pad[8];
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    const int private_draw = slippi_fighter_projection_magnifier_private_draw();
++    unsigned char projected_edge;
++    ifMagnifyPlayer projected_player;
++#endif
+ 
+     if (code != 0) {
+         return;
+@@ -210,7 +225,18 @@
+ 
+             HSD_JObjSetRotationZ(player->jobj, atan2f(dir.y, dir.x));
+ 
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            if (private_draw) {
++                projected_player = *player;
++                ifMagnify_802FB73C(&projected_player, &dir, &edge_pos);
++                projected_edge = projected_player.state.edge;
++            } else {
++                ifMagnify_802FB73C(player, &dir, &edge_pos);
++                projected_edge = player->state.edge;
++            }
++#else
+             ifMagnify_802FB73C(player, &dir, &edge_pos);
++#endif
+             translate.x = 0.09125f * edge_pos.x;
+             translate.y = 0.1f * edge_pos.y;
+             translate.z = 0.0f;
+@@ -218,11 +244,20 @@
+                                  &translate);
+ 
+             HSD_GObj_JObjCallback(gobj, code);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            if (private_draw ? ((projected_edge == 4) || (projected_edge == 2)) :
++                               ((player->state.edge == 4) || (player->state.edge == 2))) {
++#else
+             if ((player->state.edge == 4) || (player->state.edge == 2)) {
++#endif
+                 ifMagnify_GetPlayerColor(&color, slot);
+                 cp = &color_copy;
+                 color_copy = color;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++                if (private_draw ? projected_edge == 2 : player->state.edge == 2) {
++#else
+                 if (player->state.edge == 2) {
++#endif
+                     arrow_kind = 1;
+                 } else {
+                     arrow_kind = 2;
+@@ -301,8 +336,14 @@
+     f32 mix3;
+     melee_source_bool should_display;
+     melee_source_bool is_outside;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    const int private_draw = slippi_fighter_projection_magnifier_private_draw();
++#endif
+ 
+     magnify = &ifMagnify_804A1DE0;
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++    if (!private_draw)
++#endif
+     for (i = 0; i < 6; i++) {
+         magnify->player[i].state.is_offscreen = 0;
+     }
+@@ -319,8 +360,14 @@
+         for (i = 0; i < 6; i++) {
+             player = &magnify->player[i];
+             fighter_gobj = Player_GetEntity(i);
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            if (player->state.ignore_offscreen || fighter_gobj == NULL ||
++                (private_draw ? !player->state.is_offscreen :
++                 (!ftLib_80086B64(fighter_gobj) || !ftLib_80086ED0(fighter_gobj))))
++#else
+             if (player->state.ignore_offscreen || fighter_gobj == NULL ||
+                 !ftLib_80086B64(fighter_gobj) || !ftLib_80086ED0(fighter_gobj))
++#endif
+             {
+                 continue;
+             }
+@@ -440,7 +487,11 @@
+             HSD_GObj_804D7814 = NULL;
+             lb_800122C8(player->idesc, 0, 0, true);
+             HSD_CObjEndCurrent();
++#if defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE
++            if (!private_draw) player->state.is_offscreen = 1;
++#else
+             player->state.is_offscreen = 1;
++#endif
+         }
+ 
+         HSD_CObjSetOrtho(cobj, top, bottom, left, right);
 @@ -463,5 +463,12 @@ static void melee_web_magnify_camera(HSD_GObj* gobj, int pass)
      ifMagnify_802FBBDC(gobj);
  }
@@ -3180,7 +3295,7 @@ diff --git a/src/sysdolphin/baselib/texp.c b/src/sysdolphin/baselib/texp.c
 diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
 --- a/src/melee/cm/camera.c
 +++ b/src/melee/cm/camera.c
-@@ -4309,6 +4309,15 @@
+@@ -4309,6 +4309,82 @@
  HSD_GObj* Camera_80030A50(void)
  {
      return cm_80452C68.gobj;
@@ -3192,6 +3307,73 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
 +    *copy = cm_804D6464;
 +    *mode = cm_80452C68.mode;
 +    *stage = stage_info.grkind;
++}
++
++int slippi_camera_source_fighter_pass_enabled(void)
++{
++    /* The original main-camera GX5 mask comes from inline_cam_gx_b0. */
++    return !cm_80452C68.x398_b0;
++}
++
++/* Exact Camera_80030BBC arithmetic with the authenticated source CObj passed
++ * explicitly. `wrote` mirrors its output-write boundary, including points
++ * outside the scissor after successful projection. */
++int slippi_camera_source_to_screen(HSD_CObj* cobj, Vec3* position,
++                                    S32Vec2* screen, int* wrote)
++{
++    Vec3 point;
++    Scissor scissor;
++    s32 px, py;
++    if (wrote) *wrote = 0;
++    if (!cobj || !position) return 0;
++    if (lbVector_WorldToScreen(cobj, position, &point, 1) == NULL) return 0;
++    if ((point.x > 2.1474836e9f) || (point.x < -2.1474836e9f) ||
++        (point.y > 2.1474836e9f) || (point.y < -2.1474836e9f))
++        return 0;
++    px = point.x;
++    py = point.y;
++    if (screen) { screen->x = px; screen->y = py; }
++    if (wrote) *wrote = 1;
++    HSD_CObjGetScissor(cobj, &scissor);
++    return !((px < scissor.left) || (px >= scissor.right) ||
++             (py < scissor.top) || (py >= scissor.bottom));
++}
++
++/* The private source preparation follows ftLib_80086A8C's main-camera
++ * branch without changing the SDK's global current CObj. */
++int slippi_camera_source_subject_visible(HSD_CObj* cobj, CmSubject* cam_box,
++                                         f32 tolerance)
++{
++    Vec3 eye_pos, interest, sp38, sp20;
++    f32 range;
++    if (!cobj || !cam_box) return 0;
++    HSD_CObjGetEyePosition(cobj, &eye_pos);
++    HSD_CObjGetInterest(cobj, &interest);
++    if (lbVector_8000E838(&interest, &eye_pos, &cam_box->bone_pos, &sp38) <
++        (cam_box->ext.v.z + tolerance))
++        return 1;
++    lbVector_Diff(&sp38, &cam_box->bone_pos, &sp20);
++    lbVector_Normalize(&sp20);
++    range = cam_box->ext.v.z + tolerance;
++    sp20.x *= range;
++    sp20.y *= range;
++    sp20.z *= range;
++    lbVector_Add(&sp20, &cam_box->bone_pos);
++    return slippi_camera_source_to_screen(cobj, &sp20, NULL, NULL);
++}
++int slippi_camera_source_project_subject(HSD_CObj* cobj, CmSubject* subject,
++                                         S32Vec2* screen, int* wrote,
++                                         int* culled, int* draw)
++{
++    if (wrote) *wrote = 0;
++    if (culled) *culled = 0;
++    if (draw) *draw = 0;
++    if (!cobj || !subject || !screen || !culled || !draw) return 0;
++    *draw = slippi_camera_source_to_screen(cobj, &subject->bone_pos, screen, wrote);
++    if (*draw) return 1;
++    *culled = 1;
++    *draw = slippi_camera_source_subject_visible(cobj, subject, 15.0f);
++    return 1;
 +}
 +#endif
  

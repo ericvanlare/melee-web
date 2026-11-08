@@ -674,6 +674,34 @@ test('ordinary-runtime binding uses only its fixed direct export namespace', asy
     {runtime:'match-history',module}),/direct endpoint exports/);
 });
 
+test('terminal END keeps its appended native view/provenance pair and ordinary record extent',async()=>{
+  const header=readFileSync(new URL('../../gameplay_cpu_endpoint.hpp',import.meta.url),'utf8');
+  assert.match(header,/enum class GameplayCpuEndpointView[^}]*TerminalEnd\s*=\s*4/);
+  assert.match(header,/enum class GameplayCpuEndpointProvenance[^}]*Terminal\s*=\s*4/);
+  assert.equal(CPU_ENDPOINT_RECORD_BYTES,312);
+  const fixture=makeFixture({view:CPU_ENDPOINT_VIEW.terminalEnd,
+    provenance:CPU_ENDPOINT_PROVENANCE.terminal});
+  const module=fixture.module;
+  for(const name of Object.keys(module)){
+    if(!name.startsWith('_melee_web_synctest_'))continue;
+    module[name.replace('_melee_web_synctest_','_melee_web_native_menu_match_history_')]=module[name];
+    delete module[name];
+  }
+  const value=collectCpuEndpointInPage({view:4,provenance:4,expectedSourceFrame:'300'},
+    {runtime:'match-history',module});
+  const endpoint=decodeCpuEndpointResult(toWire(value));
+  assert.equal(endpoint.view,CPU_ENDPOINT_VIEW.terminalEnd);
+  assert.equal(endpoint.provenance,CPU_ENDPOINT_PROVENANCE.terminal);
+  assert.equal(endpoint.sourceFrame,'300');
+  assert.equal(fixture.batchActive,false);
+  assert.throws(()=>collectCpuEndpointInPage({view:4,provenance:3},
+    {runtime:'match-history',module}),/view\/provenance request is invalid/);
+  assert.throws(()=>collectCpuEndpointInPage({view:4,provenance:4}),
+    /view\/provenance request is invalid/);
+  const malformed=structuredClone(endpoint);malformed.provenance=3;
+  assert.throws(()=>decodeCpuEndpointResult(malformed),/terminal view\/provenance/);
+});
+
 test('ordinary-runtime binding rejects unknown owner modes and arbitrary prefixes', () => {
   const module=makeFixture().module;
   for(const binding of [null,{runtime:'other',module},

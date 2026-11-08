@@ -32,6 +32,12 @@ int slippi_particle_source_world_end(uint64_t world_generation);
 int slippi_particle_source_prepare(uint64_t world_generation,
                                    uint64_t interval_token, char* error,
                                    size_t error_size);
+/* Read-only identities from the exact schedule just prepared for this owner
+ * and interval. No rescan, callback, allocation, or render operation. */
+int slippi_particle_source_magnifier_identity(uint64_t world_generation,
+    uint64_t interval_token, struct HSD_GObj** main_camera,
+    struct HSD_GObj** hud_camera, struct HSD_GObj** magnifier_camera,
+    unsigned* hud_hidden);
 int slippi_particle_source_draw_begin(uint64_t world_generation,
                                       uint64_t interval_token, char* error,
                                       size_t error_size);
@@ -74,6 +80,11 @@ static inline int slippi_particle_source_prepare(uint64_t world,
 {
     (void) world; (void) interval; (void) error; (void) size; return 1;
 }
+static inline int slippi_particle_source_magnifier_identity(uint64_t world,
+ uint64_t interval, struct HSD_GObj** main_camera, struct HSD_GObj** hud_camera,
+ struct HSD_GObj** magnifier_camera, unsigned* hud_hidden)
+{ (void)world; (void)interval; (void)main_camera; (void)hud_camera;
+  (void)magnifier_camera; (void)hud_hidden; return 0; }
 static inline int slippi_particle_source_draw_begin(uint64_t world,
                                                     uint64_t interval,
                                                     char* error, size_t size)
