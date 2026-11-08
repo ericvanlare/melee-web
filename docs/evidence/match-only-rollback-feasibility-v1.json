@@ -15656,7 +15656,7 @@
         "cleanup": "Retained by its original capture; the later source-idle reducer does not close this failure."
       }
     ],
-    "next": "The hosted functional UI milestone is achieved pending reviewed integration in PR #377. Final regression and exact-head CI remain tracked there. Preserve the frame-308 SourceFilesBusy refusal as unresolved; do not repeat the full match without a changed runtime hypothesis. Broader profile, timing, foreground, and human/two-machine acceptance remain open.",
+    "next": "Historical #375 checkpoint integrated through PR #377. The current owner-reported lobby recovery boundary and source-refill repair are recorded under staging_lobby_recovery_378; historical producers and failed receipts remain unchanged.",
     "hosted_pages_full_match_v1": {
       "result": "FULL_MATCH_UI_PASS",
       "capture": {
@@ -15838,5 +15838,791 @@
       }
     },
     "historical_source_idle_scope": "The top-level producer, ui_path and result describe the earlier local-served source-idle reducer only. The current hosted full-match producer and evidence are in hosted_pages_full_match_v1."
+  },
+  "staging_lobby_recovery_378": {
+    "issue": 378,
+    "status": "HOSTED_FULL_ROUTE_FUNCTIONAL_PASS_ACCEPTANCE_OPEN",
+    "retained_run": "online-lobby-recovery-20261108-114053-2ecf2c7c",
+    "runtime_source_sha": "f75670cfa3b4883d0c31818933380fad78f74146",
+    "harness_source_sha": "09d81082a31a80bcc7939f70c7dd6e6790c0e074",
+    "deployment": {
+      "deployment_id": "0f61658e-9218-46c0-be83-772278a97805",
+      "source_sha": "f75670cfa3b4883d0c31818933380fad78f74146",
+      "immutable_url": "https://0f61658e.webmelee-staging.pages.dev",
+      "stable_url": "https://webmelee-staging.pages.dev",
+      "manifest_sha256": "62fd929c1be6e700211b79d2d535f652d1d301aa308c1dd0db9667629117999f"
+    },
+    "result": "FULL_MATCH_UI_PASS",
+    "scope": "Original local menus/Results, shared lobby and fixed Mario/FD room; one complete public-relay route with actual keyboard and browser Gamepad fixture. Not physical/two-machine, broader combat/profile or performance acceptance.",
+    "lobby_recovery": {
+      "hostStartState": 2,
+      "guestStartState": 1,
+      "guestPhase": 3,
+      "guestLobby": {
+        "beta": {
+          "revision": 2,
+          "phase": "sss",
+          "characters": [
+            8,
+            8
+          ],
+          "colors": [
+            1,
+            0
+          ],
+          "stage": null
+        },
+        "alpha": {
+          "revision": 3,
+          "phase": "selected",
+          "characters": [
+            8,
+            8
+          ],
+          "colors": [
+            1,
+            0
+          ],
+          "stage": 32
+        }
+      },
+      "guestHostLabel": "Host · P1: ready · Mario / Final Destination"
+    },
+    "battlefield": {
+      "phase": 3,
+      "start_state": 1,
+      "movements": 2
+    },
+    "guest_gamepad": {
+      "before_frame": 4,
+      "input": {
+        "sample": 791,
+        "port": 1,
+        "source": "gamepad",
+        "err": 0,
+        "buttons": 0,
+        "stick": [
+          127,
+          0
+        ],
+        "cstick": [
+          0,
+          0
+        ],
+        "triggers": [
+          0,
+          0
+        ],
+        "keyboard_active_mask": 1,
+        "physical_mask": 2,
+        "online_local_device_port": 0,
+        "online_local_logical_port": 1
+      },
+      "release_sample": 797
+    },
+    "terminal": {
+      "receipt_fields": {
+        "consumedOrdinal": 1224,
+        "lastInputOrdinal": 1223,
+        "sourceFrame": 1110,
+        "outcome": 2,
+        "winner": -1,
+        "randomSeed": 3669366284
+      },
+      "agreement_hash": "30bcbc2785eb85fdfe54d1f53d27f770b3514929ed4b4fad96a7ceebc9282a49",
+      "literal_checksum_hex": "c7040000030000000c16b6da56040000090000003d00000013122a15779d8c90c49bf709e7b2a9d4f9b44dd7021556f6d07ecf94fb79c9505b36774951eb61ae",
+      "matching_literal_terminal_applied_pad_rows": [
+        1216,
+        1217,
+        1218,
+        1219,
+        1220,
+        1221,
+        1222,
+        1223
+      ],
+      "matching_pad_sha256": "522febc1c379bbe7c86f76bb6396977dfecdf9e3a0af95c6d4d8729b383220b3"
+    },
+    "peers": {
+      "alpha": {
+        "actual_polls": 1224,
+        "refills": {
+          "quiet_rebases": 184,
+          "source_ticks": 3,
+          "recent": [
+            {
+              "source_frame": 200,
+              "pre_frame": 195,
+              "remote_next_before": 198,
+              "settled_frame": 201,
+              "remote_next_after": 198,
+              "dirty_from_after_admission": null
+            },
+            {
+              "source_frame": 307,
+              "pre_frame": 303,
+              "remote_next_before": 306,
+              "settled_frame": 308,
+              "remote_next_after": 306,
+              "dirty_from_after_admission": null
+            },
+            {
+              "source_frame": 522,
+              "pre_frame": 519,
+              "remote_next_before": 521,
+              "settled_frame": 523,
+              "remote_next_after": 522,
+              "dirty_from_after_admission": null
+            }
+          ]
+        },
+        "native_wait_total_excluded_ms": 14117.514988899231,
+        "current_incidents": 0,
+        "retained_incidents": 0,
+        "source_boundary_failures": [],
+        "ui_leave": {
+          "action": "local UI Leave",
+          "result": "MATCH_FINAL_COMPLETE",
+          "stage": "closed",
+          "phase": 0,
+          "running": 0,
+          "error": null
+        },
+        "corrections": [
+          {
+            "dirty": 5,
+            "pre": 0,
+            "frontier": 6,
+            "predicted_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 6,
+            "pre": 6,
+            "frontier": 9,
+            "predicted_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "host_network_wait": {
+          "count": 504,
+          "elapsed_ms": 14300.484992980957
+        },
+        "results_confirmation": {
+          "source_frame_before_tick": 281,
+          "source_frame_after_tick": 282,
+          "phase": 4,
+          "stats_phase": 2,
+          "confirmed": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "consumed_start_ports": [
+            1
+          ],
+          "raw_pad_errors": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "copied_pad_errors": [
+            0,
+            0,
+            -1,
+            -1
+          ]
+        },
+        "prize_return": {
+          "initial_phase": 9,
+          "final_phase": 1
+        },
+        "returned_css_phase": 1
+      },
+      "beta": {
+        "actual_polls": 1224,
+        "refills": {
+          "quiet_rebases": 185,
+          "source_ticks": 3,
+          "recent": [
+            {
+              "source_frame": 201,
+              "pre_frame": 198,
+              "remote_next_before": 201,
+              "settled_frame": 202,
+              "remote_next_after": 201,
+              "dirty_from_after_admission": null
+            },
+            {
+              "source_frame": 308,
+              "pre_frame": 306,
+              "remote_next_before": 308,
+              "settled_frame": 309,
+              "remote_next_after": 308,
+              "dirty_from_after_admission": null
+            },
+            {
+              "source_frame": 523,
+              "pre_frame": 522,
+              "remote_next_before": 522,
+              "settled_frame": 524,
+              "remote_next_after": 525,
+              "dirty_from_after_admission": null
+            }
+          ]
+        },
+        "native_wait_total_excluded_ms": 14145.06500530243,
+        "current_incidents": 0,
+        "retained_incidents": 0,
+        "source_boundary_failures": [],
+        "ui_leave": {
+          "action": "local UI Leave",
+          "result": "MATCH_FINAL_COMPLETE",
+          "stage": "closed",
+          "phase": 0,
+          "running": 0,
+          "error": null
+        },
+        "corrections": [
+          {
+            "dirty": 10,
+            "pre": 6,
+            "frontier": 12,
+            "predicted_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 123,
+            "pre": 120,
+            "frontier": 126,
+            "predicted_remote": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 243,
+            "pre": 240,
+            "frontier": 246,
+            "predicted_remote": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 309,
+            "pre": 306,
+            "frontier": 312,
+            "predicted_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 573,
+            "pre": 570,
+            "frontier": 576,
+            "predicted_remote": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 639,
+            "pre": 636,
+            "frontier": 642,
+            "predicted_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 783,
+            "pre": 780,
+            "frontier": 786,
+            "predicted_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 903,
+            "pre": 900,
+            "frontier": 906,
+            "predicted_remote": [
+              0,
+              0,
+              129,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "dirty": 969,
+            "pre": 966,
+            "frontier": 972,
+            "predicted_remote": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "actual_remote": [
+              0,
+              0,
+              127,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ],
+        "host_network_wait": {
+          "count": 525,
+          "elapsed_ms": 14331.26999950409
+        },
+        "results_confirmation": {
+          "source_frame_before_tick": 280,
+          "source_frame_after_tick": 281,
+          "phase": 4,
+          "stats_phase": 2,
+          "confirmed": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "consumed_start_ports": [
+            1
+          ],
+          "raw_pad_errors": [
+            0,
+            0,
+            -1,
+            -1
+          ],
+          "copied_pad_errors": [
+            0,
+            0,
+            -1,
+            -1
+          ]
+        },
+        "prize_return": {
+          "initial_phase": 9,
+          "final_phase": 1
+        },
+        "returned_css_phase": 1
+      }
+    },
+    "cleanup": {
+      "owner": {
+        "result": "pass",
+        "capture_exit_code": 0,
+        "cleanup_passed": true,
+        "cdp_attribution_complete": true,
+        "process_observation_passed": true,
+        "capture_process_group_absent": true,
+        "server_process_group_absent": true
+      },
+      "browser": {
+        "browsersClosed": {
+          "alpha": true,
+          "beta": true
+        },
+        "driversDisposed": {
+          "alpha": true,
+          "beta": true
+        },
+        "serverClosed": true
+      }
+    },
+    "scope_limit": "Hosted paired headless functional route with authored browser Gamepad fixture. Streaming retention covers the reported correction and terminal rows, and does not retain a full PAD journal. Timing, physical controllers, audible output, original equivalence, and two-machine acceptance are separate.",
+    "artifacts": [
+      {
+        "path": "hosted-fullmatch-audio-v3/inputs.json",
+        "sha256": "db350b0c1ceae610b395b7e89fe35258be4be38e28e2056f50b7a95253d0fd39"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/browser/result.json",
+        "sha256": "d3309fe3e875855bc10d32c4257289881cc89e4bccabdc07d48503bfbf451c1d"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/owner-report.json",
+        "sha256": "06cbee091bca653f1c6b8b0edc9717fc5065b7d97ed628d6c2bcd826d145642a"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/independent-review.json",
+        "sha256": "9a301a9bca4dafc16a23d7b0eb3d73db7b55d333385054ba50d6dc954b632c76"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/independent-review.md",
+        "sha256": "09b04ea1d1ca6431dd1f2d1c489da98b131790ce60c08dbe9605bac5a1194da4"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/browser/alpha-match-final-diagnostics.json",
+        "sha256": "2bcedfac2704466de8562c15477ad3a0769b344ca7676aa9ea8eed6d96c553bc"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/browser/beta-match-final-diagnostics.json",
+        "sha256": "63728981d01362efc91df7841cb39b7218f5db184004e0d5b96c393ec0aa0a7a"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/browser/alpha-after-leave-diagnostics.json",
+        "sha256": "343f0e16f2e7e35f71107d5f5917de4f23567970437703f4db58bbdc7353b4de"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v3/browser/beta-after-leave-diagnostics.json",
+        "sha256": "c053dcce122e0940a2dfdfdfa02df96c76ee2b02437a12e5c906188a5380f3ee"
+      },
+      {
+        "path": "package-audio-v1/site.manifest.json",
+        "sha256": "62fd929c1be6e700211b79d2d535f652d1d301aa308c1dd0db9667629117999f"
+      },
+      {
+        "path": "package-audio-v1/linked/linked-statics-receipt.json",
+        "sha256": "37575a414bacd2298fd210ce97c0963bc9763fdeb3134b57c72cee808e730d21"
+      },
+      {
+        "path": "deployment-audio-v1/deployment.json",
+        "sha256": "11dd46ced6ab5a8cf7f044cf189ce44f04eb6c398e8bf77af8234c343953855e"
+      },
+      {
+        "path": "audio-v1-linked-review.md",
+        "sha256": "cda069084ec98b3e88fb5cb4d533dcd934d566e6e16800af58c1c2af4b0e6210"
+      },
+      {
+        "path": "independent-hps-scheduler-review.md",
+        "sha256": "12e5ca7aab74544c1690b4be9e24fb1acbdd4c8a6934fd310f9c94b98e9e715b"
+      },
+      {
+        "path": "independent-results-driver-review.md",
+        "sha256": "105c72a19fb14a1a5a3a94afa494e4a26524fa93105869011ed08c475a2854f3"
+      },
+      {
+        "path": "independent-held-walk-review.md",
+        "sha256": "08e7092c1eb60f1583beeb0d2a4a5443eeb06dabe70e42ed57f4f09480f85be4"
+      },
+      {
+        "path": "hps-source-cadence-v2/review.md",
+        "sha256": "28be84fdc1dd563046cc55d39d121a86e8c012de588e626404829d652a1aff38"
+      },
+      {
+        "path": "staging-audio-v1-build-result.json",
+        "sha256": "de7f1051b6ab5c21ca5f207514ab44966d59c54c050851d5541dcd980a9cef36"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v1/independent-raw-review.json",
+        "sha256": "b1c5b815a7f1ecfbedf3c92847d97a3e8779bc0a31237e87e4207bdbbb824036"
+      },
+      {
+        "path": "hosted-fullmatch-audio-v2/walk-input-review.md",
+        "sha256": "48e466fb5214b74de9e4402b6c1294e5ca2a30c7a7fa013c3bc6196ed7d0df2a"
+      },
+      {
+        "path": "hosted-fullmatch-v1/independent-first-failure-review.json",
+        "sha256": "a1b01e8c97cbf8cb21236ca341079d9d93b6d8cb7bc313f9d7e53a0a1f75ee59"
+      },
+      {
+        "path": "validation-audio-v1/regression-result.json",
+        "sha256": "57634dab807d580857772c36b3e7780f67e4d4dac084d5ef33ddceac1b92868c"
+      },
+      {
+        "path": "validation-audio-v1/regression.log",
+        "sha256": "9c5a04cf27e2b65f2fa7808091ffa97de4a3032c768bcd3265254eac3a2b651b"
+      },
+      {
+        "path": "validation-audio-v1/ordinary-build-result.json",
+        "sha256": "3ea45486eb83e0f0c17185ca29bcc1d3e2de301d58bc8e060b9d8af2d41c5030"
+      },
+      {
+        "path": "validation-audio-v1/ordinary-build.log",
+        "sha256": "015fc439f9a73799c5709d9f94a011759ceae55df334b068d38af413c581e1a3"
+      }
+    ],
+    "known_limits": [
+      "Strict native seven-tick, source-order, PAD, RNG and timing guards unchanged.",
+      "Live staging opts in to six quiet ticks plus one normal reserved refill tick; repeated pending or reserved-tick terminal selection still refuses.",
+      "No full-session authoritative PAD rows retained by the bounded streaming journal; literal review covers the declared terminal rows and dirty corrections.",
+      "No new RTT probe or input-delay tuning; host waits and native excluded waits remain separate measurements."
+    ],
+    "retained_failures": [
+      {
+        "run": "local-start-v1",
+        "result": "START_ONLY_PASS; outer FAIL",
+        "cause": "Wrong outer browser-report path; original receipt preserved."
+      },
+      {
+        "run": "hosted-fullmatch-v1",
+        "result": "FAIL",
+        "cause": "Source loading at frame308/PRE301; smaller original HPS reducer and reviewed scheduler followed."
+      },
+      {
+        "run": "hosted-fullmatch-audio-v1",
+        "result": "FAIL",
+        "cause": "Native match complete; Results driver rejected source-proven stopped phase8 retirement."
+      },
+      {
+        "run": "hosted-fullmatch-audio-v2",
+        "result": "FAIL",
+        "cause": "Held-walk PAD probe ended during native network wait; no native/source failure before cleanup, later transport recovery not observed."
+      }
+    ],
+    "validation": {
+      "source_sha": "09d81082a31a80bcc7939f70c7dd6e6790c0e074",
+      "full_regression": {
+        "result": "PASS",
+        "tests": 3145,
+        "skips": 244,
+        "elapsed_seconds": 736.5105781555176
+      },
+      "staging_release": {
+        "result": "PASS",
+        "source_sha": "f75670cfa3b4883d0c31818933380fad78f74146"
+      },
+      "ordinary_release": {
+        "result": "PASS",
+        "source_sha": "09d81082a31a80bcc7939f70c7dd6e6790c0e074"
+      },
+      "review": "Independent source, linked-package, raw-browser and reduced-harness controls passed.",
+      "integration": "Publication-head CI and reviewed current-main integration receipts are tracked by the milestone PR linked from issue #378."
+    }
   }
 }

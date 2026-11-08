@@ -317,7 +317,7 @@ test('Results observer completion cannot accept a sample after the shared deadli
   }
 });
 
-test('Results next-scene phase 5 requires the actual P2 edge and waits for an active terminal route', async () => {
+test('Completed Results can stop at phase 8 before the phase-5 transfer and active Prize', async () => {
   const samples = [
     makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
     makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
@@ -340,10 +340,15 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
         append({phase: 3, statsPhase: 2, confirmed: [1, 0, 1, 1], startPorts: [0]});
       } else {
         append({phase: 4, statsPhase: 2, confirmed: [1, 1, 1, 1], startPorts: [1]});
-        host = preparationHost(5, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE);
+        append({phase: 4, statsPhase: 2, confirmed: [1, 1, 1, 1]});
+        host = {phase: 8, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+          status: 'Match confirmed. Continue through the original Results screen.', error: null,
+          owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: false}};
       }
     },
-    wait: async () => { host = activeHost(9); },
+    wait: async () => {
+      host = host.phase === 8 ? preparationHost(5, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE) : activeHost(9);
+    },
   });
   assert.deepEqual(presses, ['Enter', 'Enter', 'End']);
   assert.equal(result.p2_confirmation.phase, 4);
@@ -351,6 +356,10 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
   assert.equal(result.original_exit.host_phase, 9,
     'phase 5 is only an intermediate stopped transfer; the helper returns on actual Prize phase 9');
   assert.deepEqual(result.post_confirmation_preparation, [{
+    phase: 8, reason: 'results-retirement',
+    message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+    status: 'Match confirmed. Continue through the original Results screen.', observations: 1,
+  }, {
     phase: 5, reason: 'asset-transfer',
     message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
     status: `${RESULTS_NEXT_SCENE_PREPARATION_MESSAGE} · 25 ms · audio paused`, observations: 1,
@@ -360,10 +369,22 @@ test('Results next-scene phase 5 requires the actual P2 edge and waits for an ac
     assert.deepEqual(order.slice(index, index + 2), ['trace', 'host']);
 });
 
+test('Stopped Results retirement before the second confirmation refuses without input', async () => {
+  await assert.rejects(confirmTwoHumanResults({
+    deadlineAt: Date.now() + 1000,
+    observeSample: async () => ({
+      host: preparationHost(8, RESULTS_NEXT_SCENE_PREPARATION_MESSAGE),
+      trace: makeTrace([makeTraceRow(0, {phase: 2, statsPhase: 0, confirmed: [0, 0, 0, 0]})]),
+    }),
+    press: async () => assert.fail('unconfirmed stopped Results must not send input'),
+    wait: async () => assert.fail('unconfirmed stopped Results must not wait for exit'),
+  }), /phase-2 presentation gate: host is not an active Results owner/);
+});
+
 test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 completion rows', async () => {
   const run = async ({p2Phase = 4, p2Stats = 2, p2Flags = [1, 1, 1, 1],
     finalFlags = p2Flags, rawP2Start = true, message = RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
-    running = 0, p2Edge = true, hostError = null} = {}) => {
+    running = 0, p2Edge = true, hostError = null, hostPhase = 5} = {}) => {
     const samples = [
       makeTraceRow(0, {phase: 0, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
       makeTraceRow(1, {phase: 1, statsPhase: 0, confirmed: [0, 0, 0, 0]}),
@@ -390,7 +411,7 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
           if (finalFlags !== p2Flags)
             append({phase: 4, statsPhase: 2, confirmed: finalFlags});
         }
-        host = {...preparationHost(5, message), running, error: hostError,
+        host = {...preparationHost(hostPhase, message), running, error: hostError,
           pause_disabled: running === 0};
       }
       },
@@ -399,6 +420,10 @@ test('Results phase 5 rejects a synthetic P1-only prefix and malformed P2 comple
   };
   await assert.rejects(run({p2Edge: false}), /expected exactly one consumed source Start edge/,
     'a source-derived prefix without a P2 edge cannot authorize phase 5');
+  await assert.rejects(run({p2Edge: false, hostPhase: 8}), /expected exactly one consumed source Start edge/,
+    'a source-derived prefix without a P2 edge cannot authorize phase-8 retirement');
+  await assert.rejects(run({p2Flags: [1, 0, 1, 1], hostPhase: 8}), /source edge: source Results did not retain phase 4/,
+    'a P2 edge without all confirmations cannot authorize phase-8 retirement');
   for (const [label, options, pattern] of [
     ['wrong Results phase', {p2Phase: 3}, /source edge: source Results did not retain phase 4/],
     ['wrong stats phase', {p2Stats: 1}, /regressed the original stats phase/],

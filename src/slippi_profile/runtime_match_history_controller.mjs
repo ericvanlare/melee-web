@@ -1035,6 +1035,16 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     journalRetention,
     pacingWaitBegin(kind,inputOrdinal){return pacingWaitTransition(true,kind,inputOrdinal);},
     pacingWaitEnd(kind,inputOrdinal){return pacingWaitTransition(false,kind,inputOrdinal);},
+    sourceRefillBoundary(frame){
+      active();u32(frame,'Refill boundary source frame');
+      if(diagnosticMode||!pacingStarted||activePacingWait)
+        throw Error('Refill boundary requires the live staging pacing owner');
+      const observe=episodeExport('refill_boundary');
+      const boundary=observe(frame);
+      if(boundary!==1&&boundary!==2)
+        throw latch(Error(`Native refill boundary refused at source frame ${frame}`));
+      return boundary===2?'owned-pending':'quiet';
+    },
 
     pacingStart(){
       active();

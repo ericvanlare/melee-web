@@ -15,6 +15,9 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+#include <utility>
+#endif
 
 namespace {
 MeleeWebInputSnapshot state{};
@@ -22,6 +25,25 @@ const char* initialization_error = "";
 const char* configuration_error = "";
 int keyboard_layout = 0; // 0: existing split keyboard, 1: one-player B0XX.
 BoxxInput boxx;
+
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+unsigned online_local_port = 0;
+
+uint32_t online_logical_mask(uint32_t mask)
+{
+    return online_local_port == 1 ? (mask & ~3U) | ((mask & 1U) << 1) | ((mask & 2U) >> 1) : mask;
+}
+
+void route_online_samples()
+{
+    // Move entire provider samples at the input owner, before PADClamp and
+    // before rollback retains the row. Keyboard/physical priority stays local.
+    if (online_local_port == 1) {
+        std::swap(state.raw[0], state.raw[1]);
+        std::swap(state.clamped[0], state.clamped[1]);
+    }
+}
+#endif
 
 uint32_t requested_keyboards()
 {
@@ -86,6 +108,9 @@ void neutral_snapshot()
                                                        : PAD_ERR_NO_CONTROLLER);
         state.clamped[port] = state.raw[port];
     }
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    route_online_samples();
+#endif
 }
 
 void apply_policy()
@@ -256,11 +281,17 @@ extern "C" const MeleeWebInputSnapshot* melee_web_input_poll(void)
             neutral(state.raw[port], state.raw[port].err);
         state.clamped[port] = state.raw[port];
     }
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    route_online_samples();
+    const uint32_t logical_physical = online_logical_mask(physical);
+#else
+    const uint32_t logical_physical = physical;
+#endif
     PADClamp(state.clamped);
     ++state.samples;
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port) {
         if (!has_input(state.raw[port])) continue;
-        state.last_non_neutral = {state.samples, port, 1, bool(physical & (1U << port)),
+        state.last_non_neutral = {state.samples, port, 1, bool(logical_physical & (1U << port)),
                                   state.raw[port], state.clamped[port]};
         break;
     }
@@ -268,6 +299,18 @@ extern "C" const MeleeWebInputSnapshot* melee_web_input_poll(void)
 }
 
 extern "C" const MeleeWebInputSnapshot* melee_web_input_snapshot(void) { return &state; }
+
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+extern "C" void melee_web_input_set_online_guest_route(int enabled)
+{
+    const unsigned local_port = enabled ? 1 : 0;
+    if (online_local_port == local_port) return;
+    online_local_port = local_port;
+    reset_keyboard();
+    state.last_non_neutral = {};
+    neutral_snapshot();
+}
+#endif
 
 extern "C" void melee_web_input_set_activity(int focused, int visible)
 {
@@ -321,15 +364,31 @@ extern "C" void melee_web_input_set_keyboard(int enabled)
 extern "C" const char* melee_web_input_message(void)
 {
     static char text[4096];
+    uint32_t physical_mask = state.physical_mask;
+    uint32_t requested_mask = state.keyboard_requested_mask;
+    uint32_t active_mask = state.keyboard_active_mask;
+    uint32_t effective_mask = requested_keyboards();
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    physical_mask = online_logical_mask(physical_mask);
+    requested_mask = online_logical_mask(requested_mask);
+    active_mask = online_logical_mask(active_mask);
+    effective_mask = online_logical_mask(effective_mask);
+#endif
     int length = std::snprintf(text, sizeof(text),
         "{\"ready\":%d,\"focused\":%d,\"visible\":%d,\"active\":%d,"
         "\"keyboard_requested\":%d,\"keyboard_active\":%d,"
         "\"keyboard_requested_mask\":%u,\"keyboard_active_mask\":%u,"
         "\"physical_mask\":%u,\"keyboard_layout\":%d,"
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+        "\"online_local_device_port\":0,\"online_local_logical_port\":%u,"
+#endif
         "\"samples\":%llu,\"error\":\"%s\",\"pads\":[",
         state.ready, state.focused, state.visible, state.active,
-        state.keyboard_requested, state.keyboard_active, state.keyboard_requested_mask,
-        state.keyboard_active_mask, state.physical_mask, keyboard_layout,
+        int((requested_mask & 1U) != 0), int((active_mask & 1U) != 0),
+        requested_mask, active_mask, physical_mask, keyboard_layout,
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+        online_local_port,
+#endif
         static_cast<unsigned long long>(state.samples),
         initialization_error[0] ? initialization_error : configuration_error);
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port) {
@@ -339,8 +398,8 @@ extern "C" const char* melee_web_input_message(void)
             "%s{\"source\":\"%s\",\"err\":%d,\"buttons\":%u,\"stick\":[%d,%d],"
             "\"cstick\":[%d,%d],\"triggers\":[%u,%u],\"analog\":[%u,%u],"
             "\"clamped\":{\"stick\":[%d,%d],\"cstick\":[%d,%d],\"triggers\":[%u,%u]}}",
-            port ? "," : "", state.physical_mask & (1U << port) ? "gamepad" :
-                requested_keyboards() & (1U << port) ? "keyboard" : "none",
+            port ? "," : "", physical_mask & (1U << port) ? "gamepad" :
+                effective_mask & (1U << port) ? "keyboard" : "none",
             raw.err, raw.button, raw.stickX, raw.stickY, raw.substickX, raw.substickY,
             raw.triggerLeft, raw.triggerRight, raw.analogA, raw.analogB,
             clamped.stickX, clamped.stickY, clamped.substickX, clamped.substickY,
@@ -377,6 +436,9 @@ extern "C" void melee_web_input_shutdown(void)
         reset_keyboard();
     }
     keyboard_layout = 0;
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    online_local_port = 0;
+#endif
     boxx.reset();
     state = {};
     initialization_error = "";

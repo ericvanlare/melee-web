@@ -386,6 +386,59 @@ void keyboard_source_changes()
     check(!keyboard[0] && !melee_web_input_snapshot()->keyboard_requested, "fallback can be disabled explicitly");
 }
 
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+void online_guest_route()
+{
+    startup();
+    melee_web_input_set_keyboard_port(1, 1);
+    supplied[0].stickX = 67;
+    supplied[1].button = PAD_BUTTON_B;
+    auto snapshot = melee_web_input_poll();
+    check(snapshot->raw[0].stickX == 67 && snapshot->raw[1].button == PAD_BUTTON_B,
+          "ordinary input is sampled at its configured ports before takeover");
+    melee_web_input_set_online_guest_route(1);
+    check(reads == 1 && !melee_web_input_snapshot()->last_non_neutral.valid,
+          "changing the route clears diagnostic history without sampling");
+    snapshot = melee_web_input_poll();
+    check(snapshot->raw[1].stickX == 67 && snapshot->clamped[1].stickX == 41 &&
+          snapshot->raw[0].button == PAD_BUTTON_B,
+          "local P1 keyboard reaches guest PAD with independent clamp");
+
+    melee_web_input_set_keyboard_layout(1);
+    supplied = {};
+    key(SDL_SCANCODE_4); key(SDL_SCANCODE_V); key(SDL_SCANCODE_M);
+    snapshot = melee_web_input_poll();
+    check(snapshot->raw[1].stickX == 53 && snapshot->raw[1].button == PAD_BUTTON_A &&
+          snapshot->raw[0].err == PAD_ERR_NO_CONTROLLER,
+          "B0XX reaches the guest PAD and preserves the other port's connectivity");
+
+    melee_web_input_set_online_guest_route(0);
+    neutral(melee_web_input_poll()->raw[0]);
+    key(SDL_SCANCODE_M);
+    snapshot = melee_web_input_poll();
+    check(snapshot->raw[0].button == PAD_BUTTON_A && snapshot->raw[1].err == PAD_ERR_NO_CONTROLLER,
+          "ordinary P1 input is restored after rollback");
+    connected[0] = 9;
+    snapshot = melee_web_input_poll();
+    neutral(snapshot->raw[0]);
+    check(snapshot->raw[0].err == PAD_ERR_NONE && snapshot->raw[1].err == PAD_ERR_NO_CONTROLLER,
+          "a released physical controller remains a connected ordinary startup PAD");
+
+    melee_web_input_set_online_guest_route(1);
+    supplied[0].stickX = 53;
+    supplied[0].substickY = -68;
+    supplied[0].triggerLeft = 199;
+    supplied[0].analogA = 17;
+    supplied[0].button = PAD_BUTTON_X;
+    snapshot = melee_web_input_poll();
+    check(snapshot->raw[1].stickX == 53 && snapshot->raw[1].substickY == -68 &&
+          snapshot->raw[1].triggerLeft == 199 && snapshot->raw[1].analogA == 17 &&
+          snapshot->raw[1].button == PAD_BUTTON_X && snapshot->last_non_neutral.port == 1 &&
+          snapshot->last_non_neutral.physical && snapshot->raw[1].err == PAD_ERR_NONE,
+          "the existing physical sample and source attribution move together");
+}
+#endif
+
 void startup_failure_and_shutdown()
 {
     init_ok = false;
@@ -480,6 +533,9 @@ int main(int argc, char** argv)
         {"focus_and_visibility", focus_and_visibility}, {"disconnect_and_errors", disconnect_and_errors},
         {"keyboard_source_changes", keyboard_source_changes},
         {"startup_failure_and_shutdown", startup_failure_and_shutdown},
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+        {"online_guest_route", online_guest_route},
+#endif
     };
     if (argc != 2 || !cases.contains(argv[1])) return 2;
     try {

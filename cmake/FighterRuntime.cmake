@@ -957,6 +957,7 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_native_menu_running
     _melee_web_native_menu_cache_idle
     _melee_web_native_menu_phase
+    _melee_web_native_menu_online_lobby_observe
     _melee_web_input_set_activity
     _melee_web_input_set_keyboard
     _melee_web_input_set_keyboard_port
@@ -991,6 +992,7 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_native_menu_match_history_pacing_wait_begin
     _melee_web_native_menu_match_history_pacing_wait_end
     _melee_web_native_menu_match_history_pacing_wait_json
+    _melee_web_native_menu_match_history_refill_boundary
     _melee_web_native_menu_match_history_request
     _melee_web_native_menu_match_history_request_rebase
     _melee_web_native_menu_match_history_request_prefix_finish

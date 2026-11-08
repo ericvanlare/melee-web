@@ -1202,12 +1202,23 @@ test('staging journals retain bounded tails and count dropped command, pacing, a
       pendingTicks:0.25})+'\0'),waitPointer);
     return waitPointer;
   };
-  for(let index=0;index<65;index++){
+  let refillBoundary=1;
+  module[prefix+'refill_boundary']=frame=>{assert.equal(frame,7);return refillBoundary;};
+  assert.equal(owner.sourceRefillBoundary(7),'quiet');
+  owner.pacingWaitBegin(1,0);
+  assert.throws(()=>owner.sourceRefillBoundary(7),/live staging pacing owner/);
+  owner.pacingWaitEnd(1,0);
+  assert.equal(owner.sourceRefillBoundary(7),'quiet');
+  refillBoundary=2;
+  assert.equal(owner.sourceRefillBoundary(7),'owned-pending');
+  for(let index=0;index<64;index++){
     owner.pacingWaitBegin(1,0);owner.pacingWaitEnd(1,0);
   }
   retained=owner.journalRetention();
   assert.deepEqual(retained.networkWaits,{retained:64,dropped:66,limit:64});
   assert.equal(owner.pacingWaitJournal().at(-1).active,0);
+  refillBoundary=3;
+  assert.throws(()=>owner.sourceRefillBoundary(7),/Native refill boundary refused at source frame 7/);
 });
 
 test('native endpoint admission is atomic, publishes no raw rows, and latches refusal',async()=>{

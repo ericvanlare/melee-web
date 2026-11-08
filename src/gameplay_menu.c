@@ -17,6 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+#include "slippi_profile/online_menu_admission.inc"
+#endif
+
 struct MeleeWebMenuSession {
     MeleeWebMenuRuntime runtime;
     CSSData css;
@@ -545,16 +549,37 @@ int melee_web_menu_character_available(int ckind)
     /* Availability is intentionally narrower than the retail unlock table.
      * All CSS entries may be unlocked by the host; only implemented source
      * owners are admitted to this development boundary. */
-    return melee_web_fighter_content(ckind) != NULL;
+    if (melee_web_fighter_content(ckind) == NULL) {
+        return 0;
+    }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    return melee_web_online_menu_admission_character(ckind);
+#else
+    return 1;
+#endif
 }
 
 int melee_web_menu_stage_available(int stkind)
 {
-    return melee_web_stage_content(stkind) != NULL;
+    if (melee_web_stage_content(stkind) == NULL) {
+        return 0;
+    }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    return melee_web_online_menu_admission_stage(stkind);
+#else
+    return 1;
+#endif
 }
 
 int melee_web_menu_stage_explicit_confirm_available(int stkind)
 {
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    /* Keep the rollback profile's supported stage gate ahead of the separate
+     * Stadium diagnostic permission below. */
+    if (!melee_web_menu_stage_available(stkind)) {
+        return 0;
+    }
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     /* Called only with the source's explicitly selected tile. Random-stage
      * selection and ordinary match admission keep the content-only predicate. */

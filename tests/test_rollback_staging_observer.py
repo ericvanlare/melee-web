@@ -14,6 +14,7 @@ class RollbackStagingObserverTests(unittest.TestCase):
         result = subprocess.run(
             [str(node_runtime(ROOT)), "--test", str(ROOT / "tests/rollback_staging_observer.test.mjs"),
              str(ROOT / "tests/staging_rollback_pair_correction.test.mjs"),
+             str(ROOT / "tests/staging_rollback_pair_held_walk.test.mjs"),
              str(ROOT / "tests/staging_rollback_pair_cdp.test.mjs")],
             cwd=ROOT, capture_output=True, text=True, timeout=20,
         )

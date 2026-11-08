@@ -43,25 +43,19 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 
 ### Track A: match-only rollback online
 
-**Current execution — [#375](https://github.com/ericvanlare/melee-web/issues/375).**
-The bounded #373 public diagnostic completes the four-stock Mario/Final
-Destination route through matched terminal checksum/outcome, original local
-Results and CSS, but still scripts both pages from Node. A first hosted Pages
-capture of the player-facing Host/Join UI also completed that route; its
-functional result and failed outer process-attribution gate are pinned in the
-[rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md). The
-separate prospective CDP collector control passes, but does not repair or
-retroactively clear the hosted capture's owner-gate failure. This completes the
-narrow functional UI milestone; integration validation is tracked in PR #377.
-Preserve both receipts without repeating the match absent a new hypothesis. Native code must retain ownership of
-selection, match construction and outcome; mismatches refuse before play.
-Results remain local. Keep Vanilla offline-only and the experimental profile
-separate from the ordinary player. Reuse the merged
-[#356 input timeline](status/2026-10-28-match-input-timeline.md) and existing
-runtime owners. This is functional staging integration, not complete Slippi,
-human/two-machine or foreground-performance acceptance. Official-service
-cross-play remains parked indefinitely by owner decision; no official-service
-traffic is in scope.
+**Current player-test boundary — [#378](https://github.com/ericvanlare/melee-web/issues/378).**
+The owner-reported room join with incompatible stage choices is covered by shared
+lobby progress/readiness, a constrained Mario/Final Destination room and native
+guest input routing. The hosted public-relay regression completes the original
+local-menu/match/Results/CSS route and normal disconnect; scoped evidence,
+retained failures and exact identities are in the
+[rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md).
+A reviewed source-refill reservation keeps the existing native checkpoint and
+timing guards. Human/two-machine, broader combat/profile and performance checks
+remain open. Keep native ownership of selections, construction and outcome;
+menus and Results remain local. Preserve the completed witness without another
+capture absent a changed hypothesis. Vanilla remains offline-only. Official-service
+cross-play stays parked indefinitely; no official-service traffic is in scope.
 
 **Target.** Two people on different machines play the **Slippi rules** profile
 in the browser with rollback confined to the match. **Vanilla is offline-only**

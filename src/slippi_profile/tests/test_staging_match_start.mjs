@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createServer} from 'node:http';
 import {createHash} from 'node:crypto';
-import {createStagingMatchStart, stagingHeldIdentity} from '../staging_match_start.mjs';
+import {createStagingMatchStart, stagingHeldIdentity, validateStagingLobbyState} from '../staging_match_start.mjs';
 
 const identity = {runtime_sha256:'a'.repeat(64), asset_identity_sha256:'b'.repeat(64),
   save_profile_sha256:'c'.repeat(64), profile_identity:'experimental-test-profile'};
@@ -26,7 +26,7 @@ function held({poll = 10, submission = 20, pad = '00'.repeat(44)} = {}) {
   return {identity:live,prefix,publication};
 }
 function peers({selectionChange, agreementChange, prefixChange, heldNever = false} = {}) {
-  const ends = {}, traffic = [], calls = {alpha:[],beta:[]}, failures = [];
+  const ends = {}, traffic = [], calls = {alpha:[],beta:[]}, failures = [], lobby = {alpha:[],beta:[]};
   let resolveReady;
   const ready = new Promise(resolve => { resolveReady=resolve; });
   const createEndpoint = options => {
@@ -65,15 +65,77 @@ function peers({selectionChange, agreementChange, prefixChange, heldNever = fals
           ...(role==='beta' && agreementChange ? {unexpected:true} : {})}); },
       commit(value,text) { calls[role].push(['commit',value,text]); },
       held() { calls[role].push('held');
-        if (heldNever) return new Promise(() => {});
+        if (heldNever===true||heldNever===role) return new Promise(() => {});
         return held(role==='beta'?{poll:100,submission:200,...(prefixChange?{pad:'01'.repeat(44)}:{})}:{});
       },
     };
     owners[role]=createStagingMatchStart({role,url:'wss://example.test',roomId:'test-room',identity,
-      native,createEndpoint,timeoutMs:2000,onFailure:error=>failures.push({role,error})});
+      native,createEndpoint,timeoutMs:2000,onFailure:error=>failures.push({role,error}),
+      onLobby:entry=>lobby[role].push(entry)});
   }
-  return {owners,ends,traffic,calls,failures};
+  return {owners,ends,traffic,calls,failures,lobby};
 }
+
+test('local menu choices and progress reach both peers before either commits',async()=>{
+  const f=peers();
+  const css={phase:'css',characters:[8,8],colors:[0,0],stage:null};
+  const sss={phase:'sss',characters:[8,8],colors:[0,0],stage:31};
+  await f.owners.alpha.publishLobby(css);
+  await f.owners.beta.publishLobby(sss);
+  await Promise.all(Object.values(f.ends).map(e=>e.drainInbound()));
+  for(const role of ['alpha','beta']){
+    assert(f.lobby[role].some(e=>e.role==='alpha'&&e.state.phase==='css'));
+    assert(f.lobby[role].some(e=>e.role==='beta'&&e.state.stage===31));
+    assert.equal(f.calls[role].length,0,'a cursor observation must not commit or create a match');
+  }
+  await f.owners.alpha.publishLobby(css);
+  assert.equal(f.traffic.length,2,'unchanged observations should not flood the room');
+  await f.owners.beta.publishLobby({...sss,stage:32});
+  await f.ends.alpha.drainInbound();
+  assert.equal(f.lobby.alpha.at(-1).revision,2);
+  assert.equal(f.lobby.alpha.at(-1).state.stage,32);
+  await Promise.all(Object.values(f.owners).map(o=>o.negotiate()));
+  await assert.rejects(f.owners.alpha.publishLobby(css),/followed match agreement/);
+  await Promise.all(Object.values(f.owners).map(o=>o.close()));
+});
+
+test('lobby updates reject malformed, replayed and unknown-version packets',async()=>{
+  for(const value of [{phase:'css',characters:[8,8],colors:[0,0],stage:null,extra:true},
+    {phase:'playing',characters:[8,8],colors:[0,0],stage:32},{phase:'css',characters:[8],colors:[0,0],stage:null},
+    {phase:'sss',characters:[8,8],colors:[0,0],stage:Infinity}])
+    assert.throws(()=>validateStagingLobbyState(value),/Invalid shared lobby state/);
+  const f=peers();
+  await f.owners.alpha.publishLobby({phase:'css',characters:[8,8],colors:[0,0],stage:null});
+  await f.ends.beta.drainInbound();
+  assert.throws(()=>f.ends.beta.options.onMessage(f.traffic[0].text),/Invalid shared lobby revision/);
+  await Promise.all(Object.values(f.owners).map(o=>o.close()));
+  const old=peers();
+  assert.throws(()=>old.ends.alpha.options.onMessage(JSON.stringify({
+    schema:'melee-web-staging-match-session-v1'})),/versions differ.*Reload both/);
+  await Promise.all(Object.values(old.owners).map(o=>o.close()));
+});
+
+test('peer held proof closes inbound lobby updates before local negotiation completes',async()=>{
+  const f=peers({heldNever:'beta'});
+  await f.owners.alpha.publishLobby({phase:'css',characters:[8,8],colors:[0,0],stage:null});
+  const pending=Promise.allSettled(Object.values(f.owners).map(owner=>owner.negotiate()));
+  const deadline=performance.now()+1000;
+  try{
+    while(!f.traffic.some(({role,text})=>role==='alpha'&&JSON.parse(text).stage==='held')){
+      assert(performance.now()<deadline,'host held proof never reached the relay');
+      await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    await f.ends.beta.drainInbound();
+    assert(f.calls.beta.includes('held'));
+    const next=JSON.parse(f.traffic[0].text);
+    next.stage=2;
+    assert.throws(()=>f.ends.beta.options.onMessage(JSON.stringify(next)),/Invalid shared lobby revision/);
+    assert.equal(f.lobby.beta.length,1);
+  }finally{
+    await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
+    await pending;
+  }
+});
 
 test('page peers agree exact native context with host source seed and preserve startup PAD comparison',async()=>{
   const f=peers();

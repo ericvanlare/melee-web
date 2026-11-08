@@ -104,10 +104,14 @@ test('ordinary menus use the queued boundary and a retired native owner bypasses
   native.phase = 1;
   native.running = 1;
   native.ownerState = 0;
+  world.context.Module._melee_web_native_menu_match_history_start_state = () => {
+    calls.push('native start state');return 1;
+  };
   const ordinary = await snapshot();
   assert.equal(ordinary.phase, 1);
   assert.equal(ordinary.running, 1);
-  assert.deepEqual(calls.splice(0), ['ordinary boundary', 'typed status', 'native phase', 'native running']);
+  assert.equal(ordinary.startState, 1);
+  assert.deepEqual(calls.splice(0), ['ordinary boundary', 'typed status', 'native phase', 'native running', 'native start state']);
 
   world.startCommitted = true;
   world.nativeRetired = true;
@@ -119,6 +123,7 @@ test('ordinary menus use the queued boundary and a retired native owner bypasses
   assert.equal(retired.stage, 'closed');
   assert.equal(retired.phase, 0);
   assert.equal(retired.owner.ownerState, 2);
+  assert.equal(retired.startState, null);
   assert.deepEqual(calls, ['typed status', 'native phase', 'native running']);
 });
 

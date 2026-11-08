@@ -20,14 +20,35 @@ window.addEventListener('blur',()=>heldKeys.clear(),true);
 let player,context,state,controller,setup,bridge,loop,prepareWork,loopWork,closed=false,roomUsed=false,discReady=false;
 let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,nativeRetired=false,userLeave=false;
 let startCommitted=false;
+let menuProgressWork,stopMenuProgress=false;
 const report={schema:'melee-web-staging-rollback-session-v1',result:'pending',failure:null,
   scope:'experimental Mario/FD match-only rollback; no full-profile or timing acceptance',
-  sourceBoundaryFailures:[]};
+  sourceBoundaryFailures:[],lobby:{},setupEvents:[]};
+function setupEvent(kind,value){
+  report.setupEvents.push({at:performance.now(),kind,value});
+  if(report.setupEvents.length>64)report.setupEvents.shift();
+  try{sessionStorage.setItem('webmelee-last-online-session',JSON.stringify(report));}catch{}
+}
+function showLobby({role:side,revision,state:selection}){
+  report.lobby[side]={revision,...selection};
+  setupEvent('lobby',{role:side,revision,...selection});
+  const label=side==='alpha'?'Host · P1':'Guest · P2';
+  const characters=selection.characters.every(kind=>kind===8)?'Mario / Mario':'choose Mario for both slots';
+  const phases={css:characters+' · character select',sss:'choosing Final Destination',
+    selected:'ready · Mario / Final Destination',preparing:'preparing the agreed match'};
+  $('lobby-'+side).textContent=label+(side===role?' (you)':'')+': '+phases[selection.phase];
+  const local=report.lobby[role],remote=report.lobby[role==='alpha'?'beta':'alpha'];
+  if(local&&remote&&JSON.stringify(local.colors)!==JSON.stringify(remote.colors))
+    $('lobby-warning').textContent='Costumes differ between computers. Choose the same Mario costumes before leaving character select.';
+  else $('lobby-warning').textContent='';
+}
 function error(error){
   const message=String(error?.message??error);$('error').textContent=message;$('error').hidden=false;
   report.failure??=message;report.result='FAIL';
+  $('report').disabled=false;
+  setupEvent('failure',message);
 }
-const status=text=>{$('room-status').textContent=text;};
+const status=text=>{$('room-status').textContent=text;setupEvent('status',text);};
 const hex=bytes=>[...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');
 const digest=async bytes=>hex(await crypto.subtle.digest('SHA-256',bytes));
 const sha=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
@@ -116,7 +137,7 @@ async function loadPackage(){
 }
 async function close(){
   if(closeWork)return closeWork;
-  closed=true;loop?.abortLateScenario();
+  closed=true;stopMenuProgress=true;loop?.abortLateScenario();
   closeWork=(async()=>{
     const failures=[];
     for(const action of [()=>bridge?.close(),()=>setup?.close(),async()=>{
@@ -135,13 +156,15 @@ async function close(){
     }
     $('host').disabled=$('join').disabled=$('leave').disabled=$('controls-open').disabled=true;
     report.closed=true;
+    setupEvent('closed',{nativeRetired});
     if(failures.length)throw new AggregateError(failures,'Room cleanup failed.');
   })();
   closeWork.catch(()=>{});return closeWork;
 }
 // Bounded, read-only diagnostics for the same UI that players use. Native
 // observers copy source state; callers receive no runtime or command handles.
-export async function onlineSessionSnapshot({source=false,diagnostics=false}={}){
+export async function onlineSessionSnapshot({source=false,diagnostics=false,stageKind=32}={}){
+  if(stageKind!==31&&stageKind!==32)throw Error('Unsupported stage observation target');
   const supplement=async snapshot=>{
     snapshot.stagingDiagnosticsEnabled=context?.callbacks?.menuStagingDiagnosticsEnabled()??false;
     if(diagnostics){
@@ -167,6 +190,7 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
         loopWork?'playing':roomUsed?'starting':discReady?'ready':'loading',
       roomStatus:$('room-status').textContent,error:report.failure,phase,
       running:m?._melee_web_native_menu_running?.()??null,owner,
+      startState:!historyOwned&&!nativeRetired?(m?._melee_web_native_menu_match_history_start_state?.()??null):null,
       canPause:state?.canPause??false,
       progress:report.progress??null,result:report.result,closed:!!report.closed};
     if(source&&m){
@@ -182,8 +206,8 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
             snapshot.css={cursors:Array.from(m.HEAP32.subarray(pointers[0]>>2,(pointers[0]>>2)+16)),
               doors:Array.from(m.HEAP32.subarray(pointers[1]>>2,(pointers[1]>>2)+40)),
               geometry:Array.from(m.HEAPF32.subarray(pointers[2]>>2,(pointers[2]>>2)+48))};
-          }else if(phase===3&&m._melee_web_sss_observe(32,pointers[0],pointers[1])){
-            const gateObserved=m._melee_web_sss_observe_input_gate(32,pointers[2])===1;
+          }else if(phase===3&&m._melee_web_sss_observe(stageKind,pointers[0],pointers[1])){
+            const gateObserved=m._melee_web_sss_observe_input_gate(stageKind,pointers[2])===1;
             snapshot.sss={ids:Array.from(m.HEAP32.subarray(pointers[0]>>2,(pointers[0]>>2)+4)),
               geometry:Array.from(m.HEAPF32.subarray(pointers[1]>>2,(pointers[1]>>2)+6)),
               gateObserved,cooldown:gateObserved?m.HEAP32[pointers[2]>>2]:null};
@@ -207,10 +231,22 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
   return supplement(!historyOwned&&!nativeRetired?await context.boundary(sample):sample());
 }
 window.onlineSessionSnapshot=onlineSessionSnapshot;
+async function publishMenuProgress(){
+  while(!closed&&!stopMenuProgress){
+    const snapshot=await context.boundary(()=>{
+      const m=context.Module,p=m._melee_web_native_menu_online_lobby_observe();
+      return p?JSON.parse(m.UTF8ToString(p)):null;
+    });
+    if(closed||stopMenuProgress)return;
+    if(snapshot)await setup.publishLobby(snapshot);
+    await new Promise(resolve=>setTimeout(resolve,250));
+  }
+}
 async function openRoom(nextRole,roomId){
   if(roomUsed||!discReady||!state.canStart)throw Error('Choose a disc before starting a new room.');
   if(!/^[A-Za-z0-9_-]{24,64}$/.test(roomId))throw Error('Paste the complete room code.');
   roomUsed=true;role=nextRole;report.role=role;report.roomId=roomId;
+  $('lobby').hidden=false;
   $('room-code').value=roomId;$('host').disabled=$('join').disabled=true;
   $('copy').disabled=false;$('leave').disabled=false;
   status(role==='alpha'?'Room created. Share the code and choose locally.':'Joining room…');
@@ -225,18 +261,29 @@ async function openRoom(nextRole,roomId){
     save_profile_sha256:await baselineDigest(),profile_identity:packageInfo.profileIdentity};
   healthy();
   report.identity=hostIdentity;
-  $('instructions').textContent='On each Mac, keep both Mario selections. Press Start after READY TO FIGHT, then choose Final Destination. Release controls while the match prepares. You will play P'+(role==='alpha'?'1':'2')+'.';
+  $('instructions').textContent='Use Player 1 controls on this computer for the menus. Keep both Mario selections, press Start, then select Final Destination. Both players’ progress appears above. Release controls while the match prepares. You will play P'+(role==='alpha'?'1':'2')+'.';
   setup=createStagingMatchStart({role,url:STAGING_RELAY_URL,roomId,identity:hostIdentity,onState:status,
+    onLobby:showLobby,
     onFailure:cause=>{error(cause);void close().catch(error);},
     native:{
       async offer({signal}){
         await until(()=>controller.startState()===2,{signal,timeoutMs:120000});
+        stopMenuProgress=true;
+        await menuProgressWork;
         status('Release controls; waiting for the other player.');
         await until(neutralControls,{signal,timeoutMs:10000});
-        return controller.startOffer(hostIdentity);
+        const offer=controller.startOffer(hostIdentity);
+        const selected=JSON.parse(offer).selection.start;
+        await setup.publishLobby({phase:'selected',characters:selected.players.slice(0,2).map(p=>p.ckind),
+          colors:selected.players.slice(0,2).map(p=>p.color),
+          stage:selected.rules.stage_kind});
+        return offer;
       },
       agreement:seed=>controller.startAgreement(seed,hostIdentity),
-      commit:(seed,agreement)=>{
+      commit:async(seed,agreement,{signal})=>{
+        const {characters,colors,stage}=report.lobby[role];
+        await setup.publishLobby({phase:'preparing',characters,colors,stage});
+        signal.throwIfAborted();healthy();
         startCommitted=true;
         return controller.startCommit(seed,agreement,hostIdentity);
       },
@@ -248,18 +295,14 @@ async function openRoom(nextRole,roomId){
       },
     }});
   context.attachNetworkSession(close);player.focus();
+  menuProgressWork=publishMenuProgress();
+  menuProgressWork.catch(cause=>{if(!closed){error(cause);void close().catch(error);}});
   const agreed=await setup.negotiate();healthy();
   report.start=agreed;
   const localPort=agreed.localPort,remotePort=1-localPort;
   const prefix=JSON.parse(held.prefix),raw=prefix.rows.at(-1).pad_hex;
   if(!/^[0-9a-f]{88}$/.test(raw))throw Error('The source start has no actual four-port PAD row.');
   const initialRemotePad=raw.match(/../g).slice(remotePort*11,(remotePort+1)*11).map(x=>parseInt(x,16));
-  if(localPort===1){
-    const controllers=player.controllers.inspect();
-    const local=controllers.find(row=>row.port===0&&row.status==='ready');
-    if(local&&!controllers.some(row=>row.port===1&&row.status==='ready'))
-      player.controllers.assign(local.key,1);
-  }
   historyOwned=true;
   controller.takeOver({sourceFrame:0,localPort,remotePort});controller.configure(table.rows);
   const identity=controller.identity(hostIdentity);
@@ -270,12 +313,12 @@ async function openRoom(nextRole,roomId){
     createEndpoint:setup.createMatchEndpoint});
   await bridge.call('peerStart');healthy();
   loop=createRuntimeMatchSessionLoop({owner:controller,peer:bridge,role,streaming:true,
-    inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,matchFinal:true,networkBackpressure:true,
+    inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,matchFinal:true,networkBackpressure:true,reserveHpsTick:true,
     onState:summary=>{report.progress=summary;}});
   prepareWork=loop.prepare();await prepareWork;healthy();
   $('report').disabled=true;
   status('Playing · P'+(localPort+1)+' · rollback active');
-  $('instructions').textContent='Use Controls for your assigned player slot. Menus and Results run locally. Reload to create another room.';
+  $('instructions').textContent='Keep using Player 1 controls on this computer. Your input controls online P'+(localPort+1)+'. Menus and Results run locally. Reload to create another room.';
   player.focus();loopWork=loop.run();
   const result=await loopWork;report.match=result;$('report').disabled=false;
   if(result.result!=='MATCH_FINAL_COMPLETE'){

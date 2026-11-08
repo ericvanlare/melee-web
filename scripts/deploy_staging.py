@@ -301,6 +301,29 @@ def verify_http(source_root, origin, manifest, *, rollback_staging=False, base_a
     return report
 
 
+def verify_previous_overlay(source_root, deployment, record, manifest, base_audio_manifest):
+    source_sha = record.get('source_sha', '')
+    require(isinstance(source_sha, str) and re.fullmatch(r'[0-9a-f]{40}', source_sha),
+            'Previous staging record requires a full source SHA')
+    identity = validate_deployment(deployment, source_sha)
+    require(record.get('immutable_url') == identity['immutable_url'],
+            'Previous staging record does not match the canonical immutable URL')
+    raw = manifest.read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == record['manifest_sha256'],
+            'Previous staging manifest does not match the deployment record')
+    rollback = json.loads(raw).get('rollback')
+    player = rollback.get('player') if isinstance(rollback, dict) else None
+    require(isinstance(player, dict) and player.get('sourceSha') == source_sha,
+            'Previous rollback player source differs from the deployment record')
+    # The frozen-audio HTTP verifier checks rollback.audio_base, all protected
+    # manifest identities (including the backend), and the immutable HTTP bytes.
+    report = verify_http(source_root, identity['immutable_url'], manifest, rollback_staging=True,
+                         base_audio_manifest=base_audio_manifest)
+    require(report['manifest_sha256'] == record['manifest_sha256'],
+            'Previous staging manifest changed during HTTP verification')
+    return report
+
+
 def _api_request(origin, path, method, *, body=None, headers=None):
     data = None if body is None else body.encode('utf-8')
     request = urllib.request.Request(origin + path, data=data, method=method,
@@ -452,6 +475,8 @@ def main():
     parser.add_argument('--deployment-id')
     parser.add_argument('--immutable-url')
     parser.add_argument('--previous-record', type=Path)
+    parser.add_argument('--previous-manifest', type=Path,
+                        help='Manifest of the current canonical frozen-audio rollback overlay')
     parser.add_argument('--rollback-build', type=Path)
     parser.add_argument('--rollback-linked', type=Path)
     parser.add_argument('--rollback-linked-receipt-sha256')
@@ -477,6 +502,9 @@ def main():
         require(rollback_staging, 'Frozen audio proof requires all rollback staging producer inputs')
         audit_options['frozen_audio_proof'] = args.frozen_audio_proof.resolve()
         base_audio_manifest = args.base_manifest.resolve()
+    require(args.previous_manifest is None or
+            (args.action == 'deploy' and base_audio_manifest is not None and args.previous_record is not None),
+            'Previous manifest requires a frozen-audio deploy and a previous deployment record')
     args.report_dir = args.report_dir.resolve()
     require(not args.report_dir.is_relative_to(args.output.resolve()) and
             not args.report_dir.is_relative_to(args.base_output.resolve()),
@@ -523,18 +551,25 @@ def main():
         previous = project.get('canonical_deployment')
         record['previous_staging_deployment_id'] = previous.get('id') if previous else None
         if base_audio_manifest is not None and args.action == 'deploy':
-            require((previous or {}).get('id') == stage.FROZEN_AUDIO_BASE['deployment_id'],
-                    'Canonical staging deployment differs from the frozen audio base')
+            require(previous, 'Frozen-audio deploy requires a canonical staging deployment')
+            if previous.get('id') != stage.FROZEN_AUDIO_BASE['deployment_id']:
+                require(args.previous_manifest,
+                        'Canonical staging deployment differs from the frozen audio base; supply its overlay manifest')
         if previous and args.action == 'deploy':
             require(args.previous_record, 'Preserve the previous staging deployment record before replacing it')
             previous_record = json.loads(args.previous_record.read_text())
-            require(previous_record.get('deployment_id') == previous['id'] and
+            require(previous.get('id') and previous_record.get('deployment_id') == previous['id'] and
                     previous_record.get('project') == PROJECT and
                     re.fullmatch(r'[0-9a-f]{64}', previous_record.get('manifest_sha256', '')),
                     'Previous staging record does not match the current rollback target')
             if base_audio_manifest is not None:
-                require(previous_record['manifest_sha256'] == stage.FROZEN_AUDIO_BASE['manifest_sha256'],
-                        'Previous staging receipt does not bind the frozen audio manifest')
+                if previous['id'] == stage.FROZEN_AUDIO_BASE['deployment_id']:
+                    require(previous_record['manifest_sha256'] == stage.FROZEN_AUDIO_BASE['manifest_sha256'],
+                            'Previous staging receipt does not bind the frozen audio manifest')
+                else:
+                    write_json(args.report_dir / 'previous-staging-http.json',
+                               verify_previous_overlay(args.source_root, previous, previous_record,
+                                                       args.previous_manifest, base_audio_manifest))
             write_json(args.report_dir / 'previous-staging-deployment.json', previous_record)
         write_json(args.report_dir / 'operation-started.json', record)
         if args.action == 'rollback':

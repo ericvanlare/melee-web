@@ -52,6 +52,16 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-11-08 — Owner feedback: coordinate the room before match start
+
+**Author:** Owner feedback, implementation response.
+
+**Ask:** Joining a room must not leave incompatible local stage choices as a silent dead end; the owner expected shared CSS progress.
+
+**Status:** The existing match-only architecture is retained: original menus run locally, while the room exchanges choices and readiness. The current experimental room explicitly constrains its supported Mario/FD setup and rejects unsupported confirmations before creating an offer. Broader profile/menu admission remains separate.
+
+**Links:** [#378](https://github.com/ericvanlare/melee-web/issues/378), [current scoped receipt](status/2026-10-12-match-only-rollback-feasibility.md), [online roadmap](ROADMAP.md#track-a-match-only-rollback-online).
+
 ### 2026-10-28 — Owner and Codex: prioritize working rollback
 
 **Ask:** Continue autonomously until working rollback or an owner stop, and
