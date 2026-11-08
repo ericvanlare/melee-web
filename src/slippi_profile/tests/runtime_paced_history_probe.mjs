@@ -23,6 +23,43 @@ function pauseGate(label){
   });
 }
 
+function matchesBytes(value, expected){
+  return Array.isArray(value)&&value.length===expected.length&&
+    value.every((byte,index)=>Number.isInteger(byte)&&byte>=0&&byte<=255&&byte===expected[index]);
+}
+
+export async function waitForLateRemotePairAndResume({tick,sourcePoll,
+  requireFollowingNeutral=false,waitForRemoteSample,resumeLateFrontier}={}){
+  if(!Number.isSafeInteger(tick)||tick<0||
+      !sourcePoll||sourcePoll.sourceFrame!==tick||sourcePoll.localPort!==1||
+      sourcePoll.remotePort!==0||
+      typeof sourcePoll.pollSerial!=='string'||!Array.isArray(sourcePoll.raw)||
+      sourcePoll.raw.length!==44||
+      !sourcePoll.raw.every(byte=>Number.isInteger(byte)&&byte>=0&&byte<=255)||
+      typeof waitForRemoteSample!=='function'||typeof resumeLateFrontier!=='function'||
+      typeof requireFollowingNeutral!=='boolean')
+    throw Error('Late target receipt requires the retained actual beta native source poll');
+
+  const actualPad=sourcePoll.raw.slice(sourcePoll.localPort*11,(sourcePoll.localPort+1)*11);
+  const targetPromise=Promise.resolve().then(()=>waitForRemoteSample(tick));
+  const followingPromise=requireFollowingNeutral
+    ?Promise.resolve().then(()=>waitForRemoteSample(tick+1)):Promise.resolve(null);
+  const [targetValue,followingValue]=await Promise.all([targetPromise,followingPromise]);
+  const receiptOf=value=>value?.receipt??value;
+  const target=receiptOf(targetValue),following=receiptOf(followingValue);
+  const validReceipt=(receipt,sourceTick,pad)=>receipt&&
+    receipt.accepted_by==='lockstep-protocol'&&receipt.sender_role==='beta'&&
+    receipt.remote_port===1&&receipt.protocol_input_tick===sourceTick&&
+    matchesBytes(receipt.pad,pad);
+  if(!validReceipt(target,tick,actualPad))
+    throw Error('Late target receipt differs from the retained actual beta native source poll');
+  if(requireFollowingNeutral&&!validReceipt(following,tick+1,new Array(11).fill(0)))
+    throw Error('Following beta receipt is not the actual neutral source poll');
+
+  await resumeLateFrontier(target);
+  return {target:structuredClone(target),followingNeutral:following?structuredClone(following):null};
+}
+
 export function installRuntimePacedHistoryProbe({role,
   inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,lateClassPiece=false}={}){
   const owner=globalThis.__meleeRuntimeMatchHistory;
@@ -268,6 +305,12 @@ export function installRuntimePacedHistoryProbe({role,
         throw Error('Alpha source loop requires the received actual beta packet before frontier release');
       scenario.remote_receipt=structuredClone(receipt);
       frontier.release();
+    },
+    waitLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral=false}={}){
+      if(role!=='alpha')throw Error('Only alpha owns the delayed-input frontier');
+      return waitForLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral,
+        waitForRemoteSample:sourceTick=>peer.call('peerWaitRemote',{tick:sourceTick,timeoutMs:5000}),
+        resumeLateFrontier:receipt=>api.resumeLateFrontier(receipt)});
     },
     waitForWalkStart(){return walkStart.wait();},
     resumeWalkStart(){walkStart.release();},

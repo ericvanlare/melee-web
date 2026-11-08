@@ -17,6 +17,7 @@
 namespace melee_web {
 class GameplayCpuCheckpoint;
 class GameplayMatchSession;
+class RuntimeMatchHistory;
 
 enum class GameplayCpuEndpointStatus : std::uint32_t {
     Ok=0, Invalid=1, WrongPhase=2, OwnerRefused=3, LeafRefused=4,
@@ -148,6 +149,7 @@ public:
     GameplayCpuEndpointStatus status() const noexcept { return status_; }
     bool active() const noexcept { return active_; }
 private:
+    friend class RuntimeMatchHistory;
     struct BatchData {
         MeleeWebActionEndpointHeader actions{};
         MeleeWebSourcePayloadEndpointHeader payload{};
@@ -171,6 +173,8 @@ private:
     bool collect(BatchData&) const noexcept;
     bool same_batch(const BatchData&,const BatchData&) const noexcept;
     bool history_identity_matches() const noexcept;
+    /* Used only by RuntimeMatchHistory's same-stack admission-only path. */
+    bool complete_immediate() noexcept;
     const GameplayMatchSession* session_{};
     const GameplayCpuCheckpoint* checkpoint_{};
     GameplayCpuEndpointView view_{};

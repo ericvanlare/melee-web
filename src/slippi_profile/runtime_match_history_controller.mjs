@@ -963,8 +963,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           before.completeSequence!==before.requestSequence)
         throw Error('Native endpoint admission requires an idle owner');
       try{
-        if(module[PREFIX+'cpu_endpoint_begin'](view,provenance)!==0||
-            module[PREFIX+'cpu_endpoint_end']()!==0)
+        const admit=module[PREFIX+'cpu_endpoint_admit'];
+        if(typeof admit!=='function')
+          throw Error('Native atomic endpoint admission export is unavailable');
+        if(admit(view,provenance)!==0)
           throw Error(`Native endpoint admission refused: ${errorText()}`);
         const after=check(status());
         if(after.requestSequence!==before.requestSequence||after.completeSequence!==before.completeSequence||

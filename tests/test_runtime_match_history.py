@@ -855,6 +855,7 @@ struct GameplayCpuEndpointReader {
     return true;
   }
   bool revalidate() const { return revalidate_ok; }
+  bool complete_immediate() const { assert(false); return false; }
 };
 struct NativeHistoryFixture {
   using View=::View; using Provenance=::Provenance;
@@ -864,6 +865,7 @@ struct NativeHistoryFixture {
     PresentedFrontier=1u<<8 };
   enum class EndpointRole { None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
     RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier };
+  enum class EndpointCompletionMode { CopiedRows, ImmediateAdmission };
   Session session_{}; std::unique_ptr<MockCheckpoint> checkpoint_=std::make_unique<MockCheckpoint>();
   GameplayCpuEndpointReader reader_{};
   RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::EpisodeRecording;
@@ -886,6 +888,8 @@ struct NativeHistoryFixture {
   bool endpoint_role_allowed(View,Provenance,EndpointRole&) const noexcept;
   bool begin_endpoint_batch(View,Provenance) noexcept;
   bool end_endpoint_batch() noexcept;
+  bool admit_endpoint_batch(View,Provenance) noexcept;
+  bool end_endpoint_batch_impl(EndpointCompletionMode) noexcept;
   bool close_selected_endpoint() noexcept;
   bool begin_continuation() noexcept;
   bool restore_pre() noexcept;
@@ -1148,6 +1152,172 @@ int main(){
             result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
             output = result.stdout + result.stderr
             (self.work / f'renderer-preparation-{name}.log').write_text(output)
+            self.assertEqual(result.returncode, 0, output)
+
+    def test_atomic_endpoint_admission_closes_same_stack_and_split_batch_revalidates(self):
+        native = (ROOT / 'src/slippi_profile/runtime_match_history.cpp').read_text()
+        endpoint = (ROOT / 'src/gameplay_cpu_endpoint.cpp').read_text()
+
+        def native_method(start, end):
+            begin = native.index(start)
+            return native[begin:native.index(end, begin)].replace(
+                'RuntimeMatchHistory::', 'NativeHistoryFixture::')
+
+        runtime_methods = '\n'.join([
+            native_method('bool RuntimeMatchHistory::endpoint_role_allowed(',
+                          '\nGameplayCpuEndpointRecord RuntimeMatchHistory::endpoint_record('),
+            native_method('bool RuntimeMatchHistory::end_endpoint_batch() noexcept',
+                          '\nbool RuntimeMatchHistory::close_selected_endpoint() noexcept'),
+        ])
+
+        def endpoint_method(start, end):
+            begin = endpoint.index(start)
+            return endpoint[begin:endpoint.index(end, begin)]
+
+        immediate_begin = endpoint.index(
+            'bool GameplayCpuEndpointReader::complete_immediate() noexcept')
+        immediate_end = endpoint.index('\n}', immediate_begin) + 2
+        reader_methods = '\n'.join([
+            endpoint_method('bool GameplayCpuEndpointReader::history_identity_matches() const noexcept',
+                            '\nbool GameplayCpuEndpointReader::begin('),
+            endpoint_method('bool GameplayCpuEndpointReader::begin_history(',
+                            '\nbool GameplayCpuEndpointReader::particle_header('),
+            endpoint_method('bool GameplayCpuEndpointReader::revalidate() noexcept',
+                            '\nbool GameplayCpuEndpointReader::complete_immediate() noexcept'),
+            endpoint[immediate_begin:immediate_end],
+        ])
+        fixture = r'''#include <array>
+#include <cassert>
+#include <cstdint>
+namespace melee_web {
+enum class GameplayCpuEndpointStatus : std::uint32_t { Invalid, Ok, WrongPhase, OwnerRefused, Incomplete };
+using Status=GameplayCpuEndpointStatus;
+enum class GameplayCpuEndpointView : std::uint32_t { Pre=1, CpuEnd=2, DrawEnd=3 };
+enum class GameplayCpuEndpointProvenance : std::uint32_t { SharedPre=1, Reference=2, Corrected=3 };
+enum class RuntimeMatchHistoryPhase : std::uint32_t {
+  Captured, CapturedPreCopied, ArmedPrePending, Armed, PredictedSealed, PredictedCpuCopied,
+  PredictedDrawIdle, PredictedComplete, RestoredPrePending, Restored, CorrectedSealed,
+  CorrectedCpuCopied, CorrectedDrawIdle, CorrectedComplete, Failed, PrefixSealed,
+  PrefixCpuCopied, PresentedSealed, PresentedComplete
+};
+enum class RuntimeMatchHistoryFailure : std::uint32_t { None, Boundary, Phase, Endpoint };
+enum class RuntimeMatchHistoryGatePoint : std::uint32_t { EndpointBegin, EndpointComplete };
+struct GameplayMatchSession { std::uint32_t frame=100; std::uint32_t source_frames()const{return frame;} };
+struct GameplayCpuCheckpoint {
+ bool history_mode_=true;std::uint32_t phase_=4,history_end_frame_{},history_restore_count_{};
+ std::uint64_t history_incarnation_=1;struct {std::uint64_t frame=100;} owner_;
+ struct {std::uint64_t effect_token=77;} commit_;
+};
+struct EndpointData {
+ std::uint32_t source_frame{},history_phase{},history_pre_frame{},history_current_end{},history_restore_count{};
+ std::uint64_t history_incarnation{},history_effect_token{},leaf_epoch{};
+};
+struct ReaderCalls {unsigned collects{},same_batches{};} calls;
+std::uint64_t leaf_epoch=0;
+class GameplayCpuEndpointReader {
+public:
+ using View=GameplayCpuEndpointView;using Provenance=GameplayCpuEndpointProvenance;
+ using BatchData=EndpointData;
+ bool active()const{return active_;}
+ bool begin_history(const GameplayMatchSession&,const GameplayCpuCheckpoint&,View,Provenance)noexcept;
+ bool revalidate()noexcept;
+ bool complete_immediate()noexcept;
+ bool history_identity_matches()const noexcept;
+ bool collect(EndpointData&)const noexcept;
+ bool same_batch(const EndpointData&,const EndpointData&)const noexcept;
+ bool active_{};bool history_mode_{};GameplayCpuEndpointStatus status_=Status::Invalid;
+ const GameplayMatchSession* session_{};const GameplayCpuCheckpoint* checkpoint_{};EndpointData data_{};
+ View view_{};Provenance provenance_{};
+};
+bool GameplayCpuEndpointReader::collect(EndpointData& out)const noexcept{
+ ++calls.collects;if(!session_||!checkpoint_)return false;
+ out.source_frame=session_->source_frames();out.history_phase=checkpoint_->phase_;
+ out.history_pre_frame=static_cast<std::uint32_t>(checkpoint_->owner_.frame);
+ out.history_current_end=checkpoint_->history_end_frame_;out.history_restore_count=checkpoint_->history_restore_count_;
+ out.history_incarnation=checkpoint_->history_incarnation_;out.history_effect_token=checkpoint_->commit_.effect_token;
+ out.leaf_epoch=leaf_epoch;return true;
+}
+bool GameplayCpuEndpointReader::same_batch(const EndpointData& a,const EndpointData& b)const noexcept{
+ ++calls.same_batches;
+ return a.source_frame==b.source_frame&&a.history_phase==b.history_phase&&
+  a.history_pre_frame==b.history_pre_frame&&a.history_current_end==b.history_current_end&&
+  a.history_restore_count==b.history_restore_count&&a.history_incarnation==b.history_incarnation&&
+  a.history_effect_token==b.history_effect_token&&a.leaf_epoch==b.leaf_epoch;
+}
+@READER_METHODS@
+class NativeHistoryFixture {
+public:
+ using View=GameplayCpuEndpointView;using Provenance=GameplayCpuEndpointProvenance;
+ enum EndpointBit : std::uint32_t { CapturedPre=1u<<0,ArmedPre=1u<<1,PredictedCpu=1u<<2,
+  PredictedDraw=1u<<3,RestoredPre=1u<<4,CorrectedCpu=1u<<5,CorrectedDraw=1u<<6,
+  PrefixCpu=1u<<7,PresentedFrontier=1u<<8 };
+ enum class EndpointRole : std::uint32_t { None,CapturedPre,ArmedPre,PredictedCpu,PredictedDraw,
+  RestoredPre,CorrectedCpu,CorrectedDraw,PrefixCpu,PresentedFrontier };
+ enum class EndpointCompletionMode : std::uint32_t { CopiedRows,ImmediateAdmission };
+ GameplayMatchSession session_{};GameplayCpuCheckpoint checkpoint_storage_{};
+ GameplayCpuCheckpoint* checkpoint_=&checkpoint_storage_;GameplayCpuEndpointReader reader_{};
+ RuntimeMatchHistoryPhase phase_=RuntimeMatchHistoryPhase::Captured;
+ RuntimeMatchHistoryFailure failure_=RuntimeMatchHistoryFailure::None;EndpointRole endpoint_role_=EndpointRole::None;
+ std::uint32_t pre_frame_=100,sealed_end_=101,endpoint_mask_{};bool endpoint_read_failure_{},gate_ok=true;
+ unsigned gates{},fail_gate{};
+ bool live_owner(std::uint32_t frame)const{return session_.source_frames()==frame;}
+ bool gate(RuntimeMatchHistoryGatePoint,std::uint32_t frame){++gates;return gate_ok&&gates!=fail_gate&&live_owner(frame);}
+ bool fail(RuntimeMatchHistoryFailure f,const char* =nullptr){failure_=f;phase_=RuntimeMatchHistoryPhase::Failed;return false;}
+ bool endpoint_role_allowed(View,Provenance,EndpointRole&)const noexcept;
+ bool begin_endpoint_batch(View,Provenance)noexcept;
+ bool end_endpoint_batch()noexcept;
+ bool admit_endpoint_batch(View,Provenance)noexcept;
+ bool end_endpoint_batch_impl(EndpointCompletionMode)noexcept;
+};
+@RUNTIME_METHODS@
+}
+int main(){
+ using namespace melee_web;using View=GameplayCpuEndpointView;using Provenance=GameplayCpuEndpointProvenance;
+ calls={};leaf_epoch=0;NativeHistoryFixture atomic{};
+ assert(atomic.admit_endpoint_batch(View::Pre,Provenance::SharedPre));
+ assert(calls.collects==1&&calls.same_batches==0);
+ assert(atomic.endpoint_mask_==NativeHistoryFixture::CapturedPre);
+ assert(atomic.phase_==RuntimeMatchHistoryPhase::CapturedPreCopied);
+ assert(atomic.endpoint_role_==NativeHistoryFixture::EndpointRole::None&&atomic.gates==2);
+
+ calls={};leaf_epoch=0;NativeHistoryFixture split{};
+ assert(split.begin_endpoint_batch(View::Pre,Provenance::SharedPre));
+ assert(calls.collects==1);++leaf_epoch;
+ assert(!split.end_endpoint_batch());
+ assert(calls.collects==2&&calls.same_batches==1);
+ assert(split.endpoint_mask_==0&&split.phase_==RuntimeMatchHistoryPhase::Failed);
+
+ calls={};leaf_epoch=0;NativeHistoryFixture rejected{};rejected.fail_gate=2;
+ assert(!rejected.admit_endpoint_batch(View::Pre,Provenance::SharedPre));
+ assert(calls.collects==1&&calls.same_batches==0);
+ assert(rejected.endpoint_mask_==0&&rejected.phase_==RuntimeMatchHistoryPhase::Failed);
+
+ calls={};NativeHistoryFixture bad_role{};
+ assert(!bad_role.admit_endpoint_batch(View::DrawEnd,Provenance::Reference));
+ assert(calls.collects==0&&calls.same_batches==0&&bad_role.gates==0);
+ assert(bad_role.endpoint_mask_==0&&bad_role.failure_==RuntimeMatchHistoryFailure::Phase);
+
+ NativeHistoryFixture stale{};
+ assert(stale.reader_.begin_history(stale.session_,stale.checkpoint_storage_,View::Pre,Provenance::SharedPre));
+ ++stale.checkpoint_storage_.phase_;
+ assert(!stale.reader_.complete_immediate());
+ assert(stale.reader_.status_==Status::OwnerRefused&&!stale.reader_.active_);
+}
+'''
+        source = self.work / 'atomic-endpoint-admission.cpp'
+        binary = self.work / 'atomic-endpoint-admission'
+        source.write_text(fixture.replace('@READER_METHODS@', reader_methods)
+                          .replace('@RUNTIME_METHODS@', runtime_methods))
+        compiler = shutil.which('clang++') or shutil.which('c++')
+        self.assertIsNotNone(compiler, 'A C++20 compiler is required')
+        for name, command in [
+            ('compile-atomic-endpoint-admission', [compiler, '-std=c++20', '-Wall', '-Wextra', '-Werror',
+                                                   str(source), '-o', str(binary)]),
+            ('run-atomic-endpoint-admission', [str(binary)]),
+        ]:
+            result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=30)
+            output = result.stdout + result.stderr
+            (self.work / f'{name}.log').write_text(output)
             self.assertEqual(result.returncode, 0, output)
 
 

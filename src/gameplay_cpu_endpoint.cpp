@@ -760,4 +760,17 @@ bool GameplayCpuEndpointReader::revalidate() noexcept
     active_=false;status_=Status::Ok;session_=nullptr;checkpoint_=nullptr;history_mode_=false;
     return true;
 }
+
+bool GameplayCpuEndpointReader::complete_immediate() noexcept
+{
+    if(!active_||!session_||!checkpoint_){status_=Status::Incomplete;return false;}
+    if(!history_mode_||session_->source_frames()!=data_.source_frame||
+       !history_identity_matches()){
+        active_=false;status_=Status::OwnerRefused;
+        session_=nullptr;checkpoint_=nullptr;history_mode_=false;
+        return false;
+    }
+    active_=false;status_=Status::Ok;session_=nullptr;checkpoint_=nullptr;history_mode_=false;
+    return true;
+}
 }

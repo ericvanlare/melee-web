@@ -18,6 +18,8 @@ import {
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
+import {waitForLateRemotePairAndResume}
+  from '../src/slippi_profile/tests/runtime_paced_history_probe.mjs';
 
 const loadedIdentity = Object.freeze({
   runtime_sha256: '1'.repeat(64),
@@ -836,4 +838,55 @@ test('arena bridge refuses rebase outside the fully confirmed page timeline',asy
   await assert.rejects(bridge.call('episodeRebase',4),/fully confirmed selected END/);
   assert.equal(commands,0);
   assert.equal((await bridge.call('episodeTimeline')).confirmed_through,-1);
+});
+
+function actualBetaPoll(tick=26){
+  const raw=new Array(44).fill(0);
+  raw.splice(11,11,0,0,127,0,0,0,0,0,0,0,0);
+  return {sourceFrame:tick,localPort:1,remotePort:0,pollSerial:'492',raw};
+}
+
+function remotePadReceipt(tick,pad){
+  return {accepted_by:'lockstep-protocol',sender_role:'beta',remote_port:1,
+    protocol_input_tick:tick,pad:[...pad]};
+}
+
+test('late packet handoff arms target and neutral receipts before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),actualPad=sourcePoll.raw.slice(11,22),neutral=new Array(11).fill(0);
+  const pending=new Map(),started=[];let resumed=0;
+  const handoff=waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample(tick){
+      started.push(tick);
+      return new Promise(resolve=>pending.set(tick,resolve));
+    },
+    resumeLateFrontier(receipt){++resumed;assert.deepEqual(receipt,remotePadReceipt(26,actualPad));},
+  });
+  await Promise.resolve();
+  assert.deepEqual(started,[26,27],'both remote waits are armed before the first receipt resolves');
+  pending.get(26)(remotePadReceipt(26,actualPad));
+  await Promise.resolve();
+  assert.equal(resumed,0,'the target receipt alone cannot release alpha');
+  pending.get(27)(remotePadReceipt(27,neutral));
+  const result=await handoff;
+  assert.equal(resumed,1);
+  assert.deepEqual(result.target,remotePadReceipt(26,actualPad));
+  assert.deepEqual(result.followingNeutral,remotePadReceipt(27,neutral));
+});
+
+test('late packet handoff refuses an incorrect target before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),neutral=new Array(11).fill(0);let resumed=0;
+  await assert.rejects(waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample:async tick=>remotePadReceipt(tick,neutral),
+    resumeLateFrontier(){++resumed;},
+  }),/Late target receipt differs/);
+  assert.equal(resumed,0);
+});
+
+test('late packet handoff refuses a non-neutral following receipt before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),actualPad=sourcePoll.raw.slice(11,22);let resumed=0;
+  await assert.rejects(waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample:async tick=>remotePadReceipt(tick,tick===26?actualPad:[0,0,1,0,0,0,0,0,0,0,0]),
+    resumeLateFrontier(){++resumed;},
+  }),/Following beta receipt is not the actual neutral source poll/);
+  assert.equal(resumed,0);
 });

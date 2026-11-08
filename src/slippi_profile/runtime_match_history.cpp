@@ -1007,13 +1007,28 @@ bool RuntimeMatchHistory::endpoint_particle_row(
 
 bool RuntimeMatchHistory::end_endpoint_batch() noexcept
 {
+    return end_endpoint_batch_impl(EndpointCompletionMode::CopiedRows);
+}
+
+bool RuntimeMatchHistory::admit_endpoint_batch(View view,
+                                               Provenance provenance) noexcept
+{
+    if(!begin_endpoint_batch(view,provenance))return false;
+    return end_endpoint_batch_impl(EndpointCompletionMode::ImmediateAdmission);
+}
+
+bool RuntimeMatchHistory::end_endpoint_batch_impl(
+    EndpointCompletionMode mode) noexcept
+{
     if(!reader_.active()||endpoint_role_==EndpointRole::None)
         return fail(RuntimeMatchHistoryFailure::Phase);
     const EndpointRole role=endpoint_role_;
     const std::uint32_t expected=(role==EndpointRole::CapturedPre||
         role==EndpointRole::ArmedPre||role==EndpointRole::RestoredPre)?
         pre_frame_:sealed_end_;
-    if(endpoint_read_failure_||!reader_.revalidate()||!live_owner(expected)||
+    if(endpoint_read_failure_||
+       !(mode==EndpointCompletionMode::ImmediateAdmission?
+             reader_.complete_immediate():reader_.revalidate())||!live_owner(expected)||
        !gate(RuntimeMatchHistoryGatePoint::EndpointComplete,expected))
         return fail(RuntimeMatchHistoryFailure::Endpoint);
     reader_=GameplayCpuEndpointReader{};

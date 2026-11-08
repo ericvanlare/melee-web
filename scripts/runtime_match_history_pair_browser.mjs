@@ -1567,35 +1567,56 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         }
         return result.value;
       };
+      const timedCoordination=async(event,stage,operation)=>{
+        const started=performance.now();
+        try{return await operation();}
+        finally{
+          (event.coordination??=[]).push({stage,started_at_ms:started,
+            elapsed_ms:performance.now()-started});
+        }
+      };
       const beta=items.find(item=>item.role==='beta'),alpha=items.find(item=>item.role==='alpha');
       for(const tick of lateTicks){
         const event=respawn?{target_source_tick:tick}:proof.late_class_piece;
         if(respawn)proof.late_corrections.push(event);
-        const inputGate=await awaitGate(beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange(t),tick),
-          'Late beta input gate');
+        event.coordination??=[];
+        const inputGate=await timedCoordination(event,'beta-input-gate',()=>awaitGate(
+          beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange(t),tick),
+          'Late beta input gate'));
         assert.deepEqual([inputGate.source_tick,inputGate.current_frame],[tick,tick]);
         assert(inputGate.pre_frame<=tick,'Late keyboard target is already before beta PRE');
-        if(beta.keyToRelease){await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;}
-        await beta.page.keyboard.down('ArrowRight');beta.keyToRelease='ArrowRight';
-        await beta.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.noteLateKeyChange(args),
-          {tick,from:respawn?null:'ArrowLeft',to:'ArrowRight'});
-        await beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.resumeLateKeyChange(t),tick);
+        await timedCoordination(event,'beta-key-transition',async()=>{
+          if(beta.keyToRelease){await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;}
+          await beta.page.keyboard.down('ArrowRight');beta.keyToRelease='ArrowRight';
+        });
+        const keyboardChange=await timedCoordination(event,'beta-note-and-resume-key',()=>
+          beta.page.evaluate(args=>{
+            const api=globalThis.__meleeRuntimePacedHistory;
+            const change=api.noteLateKeyChange(args);api.resumeLateKeyChange(args.tick);return change;
+          },{tick,from:respawn?null:'ArrowLeft',to:'ArrowRight'}));
+        event.keyboard_change=keyboardChange;
         const [betaReleaseGate,alphaFrontier]=await Promise.all([
-          awaitGate(beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLatePacketGate(t),tick),
-            'Late beta packet-release gate'),
-          awaitGate(alpha.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateFrontier(t),tick),
-            'Late alpha frontier gate'),
+          timedCoordination(event,'beta-packet-gate',()=>awaitGate(
+            beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLatePacketGate(t),tick),
+            'Late beta packet-release gate')),
+          timedCoordination(event,'alpha-frontier-gate',()=>awaitGate(
+            alpha.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateFrontier(t),tick),
+            'Late alpha frontier gate')),
         ]);
-        const [alphaBoundary,betaEvidence,alphaBeforePacket]=await Promise.all([
-          alpha.page.evaluate(async()=>({status:globalThis.__meleeRuntimeMatchHistory.status(),
-            timeline:await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline')})),
-          beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.lateSnapshot(t),tick),
-          alpha.page.evaluate(t=>globalThis.__meleeRuntimePeerHistoryProbe.call('peerRemoteSnapshot',{tick:t}),tick),
+        const [alphaObservation,betaEvidence]=await Promise.all([
+          timedCoordination(event,'alpha-pre-release-snapshot',()=>alpha.page.evaluate(async tick=>({
+            status:globalThis.__meleeRuntimeMatchHistory.status(),
+            timeline:await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline'),
+            beforePacket:await globalThis.__meleeRuntimePeerHistoryProbe.call('peerRemoteSnapshot',{tick}),
+          }),tick)),
+          timedCoordination(event,'beta-actual-poll-snapshot',()=>
+            beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.lateSnapshot(t),tick)),
         ]);
-        assert.deepEqual([alphaBoundary.status.metadata.preFrame,alphaBoundary.status.metadata.currentFrame],
+        const {status:alphaStatus,timeline:alphaTimeline,beforePacket:alphaBeforePacket}=alphaObservation;
+        assert.deepEqual([alphaStatus.metadata.preFrame,alphaStatus.metadata.currentFrame],
           [alphaFrontier.pre_frame,alphaFrontier.frontier]);
-        assert.deepEqual([alphaBoundary.timeline.simulated_through,alphaBoundary.timeline.remote_contiguous_through,
-          alphaBoundary.timeline.dirty_from,alphaBoundary.timeline.plan_outstanding],
+        assert.deepEqual([alphaTimeline.simulated_through,alphaTimeline.remote_contiguous_through,
+          alphaTimeline.dirty_from,alphaTimeline.plan_outstanding],
           [alphaFrontier.frontier-1,tick-1,null,false]);
         assert.equal(alphaBeforePacket,null,'Actual beta tick escaped before its held release');
         assert.deepEqual([betaReleaseGate.frontier,betaEvidence.poll?.sourceFrame,betaEvidence.poll?.localPort],
@@ -1609,25 +1630,32 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         event.beta_release_gate=betaReleaseGate;
         event.alpha_frontier=alphaFrontier;
         event.beta_native_poll=betaEvidence.poll;
-        const released=await beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.releaseLatePacket(t),tick);
-        if(respawn){await beta.page.keyboard.up('ArrowRight');beta.keyToRelease=null;}
-        await beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.resumeLatePacket(t),tick);
-        const remote=await alpha.page.evaluate(t=>globalThis.__meleeRuntimePeerHistoryProbe.call(
-          'peerWaitRemote',{tick:t,timeoutMs:5000}),tick);
-        assert.deepEqual(Buffer.from(remote.receipt.pad),P2_RIGHT,'Released peer packet differs from the actual beta poll');
-        assert.equal(remote.receipt.protocol_input_tick,tick);
-        assert.equal(remote.receipt.sender_role,'beta');
+        if(respawn)await timedCoordination(event,'beta-release-key',async()=>{
+          await beta.page.keyboard.up('ArrowRight');beta.keyToRelease=null;
+        });
+        const alphaReceiptTask=timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
+          alpha.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.waitLateRemotePairAndResume(args),{
+            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:respawn}),
+          'Late target and following-neutral receipts'));
+        const betaReleaseTask=timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
+          beta.page.evaluate(async tick=>{
+            const api=globalThis.__meleeRuntimePacedHistory;
+            const released=await api.releaseLatePacket(tick);api.resumeLatePacket(tick);return released;
+          },tick),'Late beta packet release and source resume'));
+        const [received,released]=await Promise.all([alphaReceiptTask,betaReleaseTask]);
+        const remote=received.target;
+        assert.deepEqual(Buffer.from(remote.pad),Buffer.from(betaEvidence.poll.raw).subarray(11,22),
+          'Released peer packet differs from the actual beta poll');
+        assert.equal(remote.protocol_input_tick,tick);
+        assert.equal(remote.sender_role,'beta');
+        assert.equal(remote.remote_port,1);
         assert.equal(released.poll_serial,betaEvidence.poll.pollSerial);
         if(respawn){
-          const next=await awaitGate(alpha.page.evaluate(t=>globalThis.__meleeRuntimePeerHistoryProbe.call(
-            'peerWaitRemote',{tick:t,timeoutMs:5000}),tick+1),'Post-pulse neutral actual packet');
-          assert.deepEqual(Buffer.from(next.receipt.pad),neutral);
-          event.following_remote_receipt=next.receipt;
+          assert.deepEqual(Buffer.from(received.followingNeutral.pad),neutral);
+          event.following_remote_receipt=received.followingNeutral;
         }
         event.network_release=released;
-        event.alpha_remote_receipt=remote.receipt;
-        await alpha.page.evaluate(receipt=>globalThis.__meleeRuntimePacedHistory.resumeLateFrontier(receipt),
-          remote.receipt);
+        event.alpha_remote_receipt=remote;
         if(respawn&&tick===lateTicks[0]){
           const start=await awaitGate(alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForWalkStart()),
             'Walk-off start');

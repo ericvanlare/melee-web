@@ -1678,6 +1678,12 @@ int melee_web_native_menu_match_history_cpu_endpoint_begin(unsigned view,unsigne
  if(!c.capsule||c.dispatching||c.status.pending_command||c.status.first_failure||
     !c.capsule->begin_endpoint_batch(static_cast<RuntimeMatchHistory::View>(view),static_cast<RuntimeMatchHistory::Provenance>(provenance))){history_refuse("Endpoint begin refused");return 1;}return 0;
 }
+int melee_web_native_menu_match_history_cpu_endpoint_admit(unsigned view,unsigned provenance){
+ auto& c=match_history;
+ if(!c.episode_enabled||!c.arena_enabled||!c.inline_dispatch||!c.capsule||
+    c.dispatching||c.status.pending_command||match_history_in_tick||!history_runtime_idle()||c.status.first_failure||
+    !c.capsule->admit_endpoint_batch(static_cast<RuntimeMatchHistory::View>(view),static_cast<RuntimeMatchHistory::Provenance>(provenance))){history_refuse("Endpoint admission refused");return 1;}history_sync();return 0;
+}
 int melee_web_native_menu_match_history_cpu_endpoint_record(unsigned domain,unsigned kind,unsigned index){
  auto& c=match_history;c.record={};
  if(!c.capsule||c.dispatching||c.status.pending_command||c.status.first_failure)return 1;

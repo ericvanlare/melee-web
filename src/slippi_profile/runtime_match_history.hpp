@@ -244,6 +244,8 @@ public:
     bool endpoint_particle_row(std::uint32_t kind, std::uint32_t index,
                                SlippiParticleCellEndpointRow&) const noexcept;
     bool end_endpoint_batch() noexcept;
+    /* Same-stack admission for callers that publish no endpoint rows. */
+    bool admit_endpoint_batch(View, Provenance) noexcept;
 
     bool close_selected_endpoint() noexcept;
     bool retire_confirmed() noexcept;
@@ -290,6 +292,7 @@ private:
         None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
         RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier,
     };
+    enum class EndpointCompletionMode : std::uint32_t { CopiedRows, ImmediateAdmission };
 
     RuntimeMatchHistory(GameplayMatchSession&, RuntimeMatchHistoryBoundaryCheck,
                         RuntimeMatchHistoryPresentSubmit, RuntimeMatchHistoryAudioStep, unsigned&, void*) noexcept;
@@ -298,6 +301,7 @@ private:
     bool fail(RuntimeMatchHistoryFailure, const char* message=nullptr) noexcept;
     bool checkpoint_failure(RuntimeMatchHistoryFailure,const char*) noexcept;
     bool endpoint_role_allowed(View,Provenance,EndpointRole&) const noexcept;
+    bool end_endpoint_batch_impl(EndpointCompletionMode) noexcept;
 
     GameplayMatchSession& session_;
     RuntimeMatchHistoryBoundaryCheck boundary_{};

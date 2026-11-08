@@ -48,7 +48,7 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
     _melee_web_net_validate_pad:(pointer,size)=>{padCalls.push({operation:'validate',pointer,size,
       pad:[...heap.subarray(pointer,pointer+size)]});return 1;}};
   for(const name of ['take_over','configure','remote_pad','request','status','status_bytes','input','input_bytes',
-    'error','identity_json','cpu_endpoint_begin','cpu_endpoint_record','cpu_endpoint_data','cpu_endpoint_bytes',
+    'error','identity_json','cpu_endpoint_begin','cpu_endpoint_admit','cpu_endpoint_record','cpu_endpoint_data','cpu_endpoint_bytes',
     'cpu_endpoint_end','motor_data','motor_bytes','motor_commit_data','motor_commit_bytes','pcm_data','pcm_bytes'])module[prefix+name]=()=>0;
   module[prefix+'status']=()=>256;module[prefix+'status_bytes']=()=>128;
   module[prefix+'error']=()=>errorPointer;
@@ -1116,29 +1116,24 @@ function inlineFixture(options){
   return {...f,owner,inlineEnableCalls:()=>enableCalls};
 }
 
-test('native endpoint admission revalidates without publishing raw rows and latches refusal',async()=>{
-  for(const failure of [null,'begin','end']){
+test('native endpoint admission is atomic, publishes no raw rows, and latches refusal',async()=>{
+  for(const failure of [null,'admit']){
     const f=inlineFixture(),{owner,module}=f;
     owner.enableArenaHistory();
     module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
     owner.enableInlineDispatch();
     await owner.command('capture');f.put(56,1);
     const calls=[];
-    module[prefix+'cpu_endpoint_begin']=(view,provenance)=>{
-      calls.push(['begin',view,provenance]);
-      if(failure==='begin')return 1;
-      f.put(120,1);return 0;
-    };
-    module[prefix+'cpu_endpoint_end']=()=>{
-      calls.push(['end']);
-      if(failure==='end')return 1;
-      f.put(120,0);f.put(56,2);f.put(84,1);return 0;
+    module[prefix+'cpu_endpoint_admit']=(view,provenance)=>{
+      calls.push(['admit',view,provenance]);
+      if(failure==='admit')return 1;
+      f.put(120,1);f.put(120,0);f.put(56,2);f.put(84,1);return 0;
     };
     module[prefix+'cpu_endpoint_record']=()=>{throw Error('Native-only admission must not claim raw row publication');};
     if(failure){
       assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
       assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/Native endpoint admission refused/);
-      assert.deepEqual(calls,failure==='begin'?[['begin',1,1]]:[['begin',1,1],['end']]);
+      assert.deepEqual(calls,[['admit',1,1]]);
     }else{
       f.put(116,1);
       assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/idle owner/);
@@ -1147,9 +1142,24 @@ test('native endpoint admission revalidates without publishing raw rows and latc
       assert.equal(receipt.scope,'native-typed-admission-only');
       assert.equal(receipt.rawRowsPublished,false);
       assert.deepEqual([receipt.before.metadata.phase,receipt.after.metadata.phase],[1,2]);
-      assert.deepEqual(calls,[['begin',1,1],['end']]);
+      assert.deepEqual(calls,[['admit',1,1]]);
     }
   }
+});
+
+test('split controllers construct without the atomic export, and atomic use refuses without fallback',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  delete module[prefix+'cpu_endpoint_admit'];
+  assert.doesNotThrow(()=>createRuntimeMatchHistoryController(module));
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();
+  await owner.command('capture');f.put(56,1);
+  const calls=[];
+  module[prefix+'cpu_endpoint_begin']=()=>{calls.push('begin');return 0;};
+  module[prefix+'cpu_endpoint_end']=()=>{calls.push('end');return 0;};
+  assert.throws(()=>owner.admitEndpoint({view:1,provenance:1}),/atomic endpoint admission export is unavailable/);
+  assert.deepEqual(calls,[]);
 });
 
 test('paced controller retains the native clock stall before generic owner failure',async()=>{
