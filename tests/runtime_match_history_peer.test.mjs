@@ -1099,10 +1099,10 @@ function finalPacket(snapshot,role,checksum,inputOrdinal,sourceFrame,type='match
     source_frame:sourceFrame,...finalOutcome,checksum:Buffer.from(checksum).toString('base64')};
 }
 
-async function startFinalPeers({inputTicks=4,through=1,timeoutMs=500,matchFinal=true}={}){
+async function startFinalPeers({inputTicks=4,through=1,timeoutMs=500,matchFinal=true,streaming=false}={}){
   const bus=createEndpointBus();
-  const alpha=makePeer(bus,'alpha',{inputTicks,timeoutMs,matchFinal});
-  const beta=makePeer(bus,'beta',{inputTicks,timeoutMs,matchFinal});
+  const alpha=makePeer(bus,'alpha',{inputTicks,timeoutMs,matchFinal,streaming});
+  const beta=makePeer(bus,'beta',{inputTicks,timeoutMs,matchFinal,streaming});
   const [startedAlpha,startedBeta]=await Promise.all([alpha.start(),beta.start()]);
   assert.equal(startedAlpha.agreement_hash,startedBeta.agreement_hash);
   for(let tick=0;tick<=through;++tick){
@@ -1114,6 +1114,57 @@ async function startFinalPeers({inputTicks=4,through=1,timeoutMs=500,matchFinal=
   }
   return {bus,alpha,beta,startedAlpha,startedBeta};
 }
+
+test('exact partner close immediately after final ACK preserves only the matched session',async()=>{
+  const normal='4001: peer disconnected';
+  for(const reason of [normal,'1006: room relay closed']){
+    const {bus,alpha,beta}=await startFinalPeers({streaming:true,inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS});
+    try{
+      const endpoint=bus.endpoints.get('alpha'),deliver=endpoint.deliver.bind(endpoint);
+      let disposition,closed;
+      const notified=new Promise(resolve=>{closed=resolve;});
+      endpoint.deliver=text=>{
+        const delivery=deliver(text);
+        if(JSON.parse(text).type==='match_final_ack'){
+          // Same serialized delivery order as a relay message immediately followed by close.
+          endpoint.inbound.then(()=>{
+            endpoint.closed=true;
+            disposition=endpoint.options.onDisconnect('alpha',reason);
+            closed();
+          });
+        }
+        return delivery;
+      };
+      const final={...finalOutcome,inputOrdinal:1,sourceFrame:602,checksum:finalChecksum(1,602)};
+      const completions=Promise.allSettled([alpha.publishMatchFinal(final),beta.publishMatchFinal(final)]);
+      await notified;
+      const outcomes=await completions;
+      if(reason===normal){
+        assert.equal(disposition,'expected-final-disconnect');
+        assert(outcomes.every(outcome=>outcome.status==='fulfilled'));
+        assert.equal(alpha.snapshot().failure,null);
+        endpoint.options.onEndpointError('alpha',Error('retained endpoint failure'));
+        assert.notEqual(await endpoint.options.onDisconnect('alpha',normal),'expected-final-disconnect');
+        assert.match(alpha.snapshot().failure,/retained endpoint failure/);
+      }else{
+        assert.notEqual(disposition,'expected-final-disconnect');
+        assert.match(alpha.snapshot().failure,/relay disconnected/);
+      }
+    }finally{await Promise.allSettled([alpha.close(),beta.close()]);}
+  }
+});
+
+test('publishing a final record before the matching ACK cannot excuse partner close',async()=>{
+  const {bus,alpha,beta}=await startFinalPeers({streaming:true,inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS});
+  try{
+    const endpoint=bus.endpoints.get('alpha');
+    const final={...finalOutcome,inputOrdinal:1,sourceFrame:602,checksum:finalChecksum(1,602)};
+    const refusal=assert.rejects(alpha.publishMatchFinal(final),/relay disconnected/);
+    await endpoint.options.onDisconnect('alpha','4001: peer disconnected');
+    await refusal;
+    assert.match(alpha.snapshot().failure,/relay disconnected/);
+  }finally{await Promise.allSettled([alpha.close(),beta.close()]);}
+});
 
 test('3600-input match-final scope is fixed and permits an actual early terminal record without padding',async()=>{
   assert.equal(RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS,3600);

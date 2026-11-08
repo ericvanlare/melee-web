@@ -5,6 +5,8 @@ import {createHash} from 'node:crypto';
 import vm from 'node:vm';
 import {observeRuntimeOwner} from './runtime_owner_observation.mjs';
 import {
+  classifyResultsOwnerReadiness,
+  classifyResultsDestinationReadiness,
   confirmTwoHumanResults,
   RESULTS_TRACE_CAPACITY,
   RESULTS_TRACE_START_MASK,
@@ -21,6 +23,25 @@ const activeHost = (phase, message = phase === 8 ? 'Original Results' :
 const preparationHost = (phase, message, label = message) => ({
   phase, running: 0, message, status: `${label} · 25 ms · audio paused`, error: null,
   pause_present: true, pause_disabled: true,
+});
+
+test('ordinary runtime readiness uses its actual Pause capability without a development control', () => {
+  const active = {phase: 8, running: 1, message: 'Original Results',
+    owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: true}};
+  assert.deepEqual(classifyResultsOwnerReadiness(active), {kind: 'active', owner: 'results', phase: 8});
+  const preparing = {phase: 5, running: 0, message: RESULTS_NEXT_SCENE_PREPARATION_MESSAGE,
+    owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: false}};
+  assert.equal(classifyResultsDestinationReadiness(preparing).kind, 'preparing');
+});
+
+test('ordinary runtime readiness refuses missing, ambiguous, or contradictory capabilities', () => {
+  const active = {phase: 8, running: 1, message: 'Original Results'};
+  for (const state of [active,
+    {...active, owner_capabilities: {schema: 'ordinary-runtime-v1'}},
+    {...active, owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: 1}},
+    {...active, owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: false}},
+    {...activeHost(8), owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: true}}])
+    assert.equal(classifyResultsOwnerReadiness(state).kind, 'invalid');
 });
 
 function makeTraceRow(sourceFrame, {phase, statsPhase, confirmed, startPorts = []}) {

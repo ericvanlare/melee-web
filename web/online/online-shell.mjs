@@ -167,9 +167,12 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
         loopWork?'playing':roomUsed?'starting':discReady?'ready':'loading',
       roomStatus:$('room-status').textContent,error:report.failure,phase,
       running:m?._melee_web_native_menu_running?.()??null,owner,
+      canPause:state?.canPause??false,
       progress:report.progress??null,result:report.result,closed:!!report.closed};
     if(source&&m){
       const readJSON=name=>{const pointer=m[name]?.();return pointer?JSON.parse(m.UTF8ToString(pointer)):null;};
+      const message=m._melee_web_native_menu_message?.();
+      snapshot.nativeMessage=message?m.UTF8ToString(message):null;
       snapshot.input=readJSON('_melee_web_input_message');
       if(phase===1||phase===3){
         const sizes=phase===1?[64,160,192]:[16,24,4],pointers=[];
@@ -190,6 +193,12 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
       if(owner?.ownerState===1&&!owner.pendingCommand&&owner.completeSequence===owner.requestSequence&&
           !owner.gpuPending&&!owner.endpointActive&&!owner.firstFailure&&!owner.rendererErrors)
         snapshot.match=readJSON('_melee_web_native_menu_match_observe');
+      if(!historyOwned&&owner?.ownerState===2&&phase===8){
+        snapshot.match=readJSON('_melee_web_native_menu_match_observe');
+        snapshot.results=snapshot.match;
+      }
+      if(!historyOwned&&owner?.ownerState===2&&[1,5,8,9].includes(phase))
+        snapshot.resultsTrace=readJSON('_melee_web_native_menu_results_pad_trace');
     }
     return structuredClone(snapshot);
   };

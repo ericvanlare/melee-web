@@ -121,3 +121,30 @@ test('ordinary menus use the queued boundary and a retired native owner bypasses
   assert.equal(retired.owner.ownerState, 2);
   assert.deepEqual(calls, ['typed status', 'native phase', 'native running']);
 });
+
+
+test('original Results reads trace and native message inside the ordinary owner boundary', async () => {
+  const {snapshot, world, calls, native} = fixture();
+  world.startCommitted = false;
+  world.state.canPause = true;
+  native.phase = 8;
+  native.running = 1;
+  native.ownerState = 2;
+  const module = world.context.Module;
+  module._melee_web_native_menu_message = () => 3;
+  module._melee_web_native_menu_results_pad_trace = () => {
+    calls.push('native Results trace');
+    return 4;
+  };
+  const decode = module.UTF8ToString;
+  module.UTF8ToString = pointer => pointer === 3 ? 'Original Results' :
+    pointer === 4 ? '{"samples":[]}' : decode(pointer);
+  const value = await snapshot({source:true});
+  assert.equal(value.canPause, true);
+  assert.equal(value.nativeMessage, 'Original Results');
+  assert.equal(value.match.frame, 0);
+  assert.deepEqual(value.results, value.match);
+  assert.deepEqual(value.resultsTrace, {samples:[]});
+  assert.equal(calls[0], 'ordinary boundary');
+  assert(calls.includes('native Results trace'));
+});

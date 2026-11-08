@@ -286,7 +286,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   const deferredLocalReleasePending = new Set();
   const localPublishPending = new Set();
   const remoteWaiters = new Set();
-  let matchFinalPublished = false;
+  let matchFinalPublished = false, matchedFinal = null;
   let localPublishedThrough = -1, remoteAcceptedThrough = -1, prunedThrough = -1;
 
   const wakeRemoteWaiters = () => {
@@ -403,12 +403,13 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     if (!peer) throw Error('Runtime history peer receive arrived before LockstepPeer ownership');
     return peer.receive(text);
   }
-  async function onDisconnect(disconnectedRole, reason) {
+  function onDisconnect(disconnectedRole, reason) {
+    if (streaming && matchedFinal && !failure && !peer.terminal && disconnectedRole === role &&
+        reason === '4001: peer disconnected') return 'expected-final-disconnect';
     if (intentionalClose) return;
     const error = Error(`Runtime history ${disconnectedRole} relay disconnected: ${reason}`);
     latch(error);
-    try { await peer.disconnect(String(reason || 'room relay closed')); }
-    catch (terminalError) { latch(terminalError); }
+    return peer.disconnect(String(reason || 'room relay closed')).catch(error => { latch(error); });
   }
   function onEndpointError(errorRole, error) {
     if (intentionalClose) return;
@@ -651,10 +652,11 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         sourceFrame: finalSourceFrame, checksum: bytes, outcome, winner}), timeoutMs,
       'Runtime history final checksum agreement');
       throwIfFailed();
-      return Object.freeze({accepted_by:'lockstep-match-final', role,
+      matchedFinal = Object.freeze({accepted_by:'lockstep-match-final', role,
         input_ordinal:result.input_ordinal, source_frame:result.source_frame,
         agreement_hash:result.agreement_hash, outcome:result.outcome,
         winner:result.winner, matched_bytes:result.matched_bytes});
+      return matchedFinal;
     } catch (error) {
       latch(error);
       if (!peer.terminal) {

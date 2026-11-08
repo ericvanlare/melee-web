@@ -141,6 +141,26 @@ test('same socket hands off once and preserves early match traffic plus normal c
   assert(a.closed && b.closed);
 });
 
+test('attached setup delegates close but ignores only explicit matched-final disposition',async()=>{
+  for(const expected of [true,false]){
+    const f=peers();
+    await Promise.all(Object.values(f.owners).map(owner=>owner.negotiate()));
+    let forwarded=0;
+    f.owners.alpha.createMatchEndpoint({role:'alpha',url:'wss://example.test',roomId:'test-room',
+      onMessage(){},onEndpointError(){},onDisconnect(role,reason){
+        ++forwarded;
+        assert.equal(role,'alpha');
+        assert.equal(reason,'4001: peer disconnected');
+        return expected?'expected-final-disconnect':undefined;
+      }});
+    await f.ends.alpha.options.onDisconnect('alpha','4001: peer disconnected');
+    assert.equal(forwarded,1);
+    if(expected)assert.equal(f.owners.alpha.failed,null);
+    else assert.match(f.owners.alpha.failed.message,/Room disconnected: 4001: peer disconnected/);
+    await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
+  }
+});
+
 test('disconnect while waiting for native readiness cancels setup without a later takeover',async()=>{
   const f=peers({heldNever:true});
   const pending=Object.values(f.owners).map(owner=>owner.negotiate());

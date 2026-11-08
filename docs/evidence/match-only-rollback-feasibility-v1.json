@@ -15592,5 +15592,70 @@
         }
       }
     }
+  },
+  "staging_rollback_ui_375": {
+    "issue": 375,
+    "status": "SOURCE_IDLE_REDUCER_PASS_FULL_UI_MATCH_PENDING",
+    "boundary": "Two actual staging UI pages through the existing deployed staging relay reached source frame 320 without gameplay key injection; zero corrections and zero native source failures. This does not establish a full match or hosted Pages result.",
+    "producer": {
+      "source_sha": "15b6a654ddd623b1d7bd41cd139dc38d5f225f6b",
+      "profile_identity": "slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20",
+      "wasm_sha256": "0c1cf00d9048953f66d4630f789fdd307c29cd8987fdcae6fd001719643051cb",
+      "table_sha256": "95953ad602a922f11af36c7caff7e7b8c1f59e30a10e821acad3fc00f30e5d19",
+      "policy_sha256": "fb44c0a5e3d82db09665459499c2a69222ce4ea952db49a8e758ddb0a2e5fd95"
+    },
+    "ui_path": {
+      "menus": "Original two-Human Mario CSS and original SSS Final Destination selection using actual keyboard input",
+      "session": "Page-owned Host/Join and agreement through the existing deployed staging relay",
+      "local_served": "127.0.0.1:8787/online/index.html; hosted Pages origin was not exercised",
+      "scope": "Source-idle reducer through frame 320; no gameplay input, correction, full match, or acceptance claim"
+    },
+    "result": {
+      "path": "runtime375-source-idle-reducer-v1/browser/result.json",
+      "sha256": "4696e5a67caac09c8c52687f77bc312f2a3cd64b9726f4af35c41c55c2d1da56",
+      "owner_cleanup_path": "runtime375-source-idle-reducer-v1/owner-report.json",
+      "owner_cleanup_sha256": "627b5afbd9d0a1529dcdf8f1371ab5e5ac13ff7fa6adff3620afe28c84c11c5b",
+      "frames": [
+        320,
+        320
+      ],
+      "corrections": [
+        0,
+        0
+      ],
+      "native_failures": [
+        0,
+        0
+      ],
+      "owned_browser_pids_absent": 20,
+      "native_owners_retired_phase_running": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "leave": "Alpha used UI Leave; beta observed relay disconnect. Beta's loop records the expected peer-close as FAIL; this is not a dual-page normal-Leave pass."
+    },
+    "retained_ui_failures": [
+      {
+        "attempt": "runtime375-page-start-v1",
+        "result": "FAIL",
+        "first_failure": "Alpha pacing debt reason 1 reached 11 against threshold 8 at source frame 26.",
+        "cleanup": "Passed"
+      },
+      {
+        "attempt": "runtime375-page-start-v2",
+        "result": "FAIL",
+        "first_failure": "SourceFilesBusy at gate point 18 at frame 308, PRE 301 on both peers.",
+        "harness_issue": "A snapshot was queued before takeover and waited 117.6 seconds.",
+        "native_diagnostic": "Not retained; cause remains unresolved.",
+        "cleanup": "Retained by its original capture; the later source-idle reducer does not close this failure."
+      }
+    ],
+    "next": "Complete focused terminal/disconnect/Results adapter, review the full UI harness, run required integration validation and exact-head CI, then run a separate hosted staging capture. Final UI full-match witness is pending."
   }
 }

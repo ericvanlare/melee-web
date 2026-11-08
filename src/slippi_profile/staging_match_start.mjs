@@ -136,8 +136,12 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
   endpoint = createEndpoint({url, roomId, role, timeoutMs, onMessage: receive,
     onDisconnect: (side, reason) => {
       if (closed) return;
+      let disposition;
+      try { disposition = matchCallbacks?.onDisconnect(side, reason); }
+      catch (error) { throw fail(error); }
+      if (disposition === 'expected-final-disconnect') return;
       fail(Error(`Room disconnected: ${reason}`));
-      return matchCallbacks?.onDisconnect(side, reason);
+      return disposition;
     },
     onEndpointError: (side, error) => {
       if (closed) return;

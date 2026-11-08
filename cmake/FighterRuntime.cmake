@@ -967,6 +967,7 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_css_observe_port
     _melee_web_sss_observe
     _melee_web_native_menu_match_observe
+    _melee_web_native_menu_results_pad_trace
     _melee_web_net_validate_pad
     _melee_web_sss_observe_input_gate
     _melee_web_native_menu_match_history_start_enable

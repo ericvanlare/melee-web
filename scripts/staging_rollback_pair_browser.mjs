@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /*
- * Bounded two-page check of the real online staging UI. Both pages load their
+ * Bounded two-page checks of the real online staging UI. Both pages load their
  * own local disc, use the original CSS/SSS, negotiate through the page-owned
- * relay setup, start the existing rollback loop, send one actual P2 keyboard
- * pulse, and leave through the UI. The harness never advances source ticks or
+ * relay setup, and start the existing rollback loop. The full route uses real
+ * keyboard input to finish the original match and return from Results to CSS. The harness never advances source ticks or
  * calls a native input/write API.
  */
 import assert from 'node:assert/strict';
@@ -16,13 +16,17 @@ import {performance} from 'node:perf_hooks';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
+import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
+import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
 
 const {values} = parseArgs({options: {
   'served-root': {type: 'string'},
+  url: {type: 'string'},
   disc: {type: 'string'},
   output: {type: 'string'},
   playwright: {type: 'string'},
   'start-only': {type: 'boolean', default: false},
+  'full-match': {type: 'boolean', default: false},
   'source-idle-probe': {type: 'boolean', default: false},
   'timeout-ms': {type: 'string', default: '300000'},
 }, strict: true});
@@ -31,14 +35,16 @@ const output = values.output ? path.resolve(values.output) : null;
 const disc = values.disc || process.env.MELEE_DISC_IMAGE || null;
 const timeoutMs = Number(values['timeout-ms']);
 const idleProbe = values['source-idle-probe'];
-if (!root || !disc || !output || values['start-only'] === idleProbe ||
+const fullMatch = values['full-match'];
+if (!root || !disc || !output || [values['start-only'], idleProbe, fullMatch].filter(Boolean).length !== 1 ||
     !Number.isSafeInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 300000)
-  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe) --served-root <immutable-staging-package> --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
+  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe | --full-match) --served-root <immutable-staging-package> [--url <exact-staging-Pages-online-route>] --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
 
 const SERVER_HOST = '127.0.0.1';
 const SERVER_PORT = 8787;
 const ROUTE = '/online/index.html';
 const DIAGNOSTIC_QUERY = '?melee-web-staging-diagnostics=1';
+const hostedUrl = values.url ? checkedHostedUrl(values.url) : null;
 const RELAY_ORIGIN = 'wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev';
 const REMOTE_LEAVE = 'Room disconnected: 4001: peer disconnected';
 const OBSERVER_BUSY = 'Runtime history Asyncify call is in progress';
@@ -51,6 +57,10 @@ const STAGE_FINAL_DESTINATION = 32;
 const MARIO_SOURCE_KIND = 8;
 const CSS_START_BUTTON = 0x1000;
 const SSS_CONFIRM_BUTTON = 0x0100;
+const MATCH_STATE_TIMEOUT_MS = 15000;
+const MATCH_READY_MOTION = 14;
+const REBIRTH_WAIT_MOTION = 13;
+const REBIRTH_EXIT_MOTION = 29;
 
 const mediaTypes = new Map([
   ['.css', 'text/css; charset=utf-8'], ['.data', 'application/octet-stream'],
@@ -62,14 +72,15 @@ const mediaTypes = new Map([
 
 const report = {
   schema: 'melee-web-staging-rollback-pair-start-only-v1',
-  mode: idleProbe ? 'source-idle-probe' : 'start-only',
-  scope: idleProbe ? 'two actual online pages; no gameplay key injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 keyboard pulse; UI Leave; no full-match, correction, timing, or acceptance claim',
+  mode: fullMatch ? 'full-match' : idleProbe ? 'source-idle-probe' : 'start-only',
+  scope: fullMatch ? 'two actual online pages; original CSS, SSS, four-stock match, Results, and returned CSS using keyboard input' : idleProbe ? 'two actual online pages; no gameplay key injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 keyboard pulse; UI Leave; no full-match, correction, timing, or acceptance claim',
   result: 'not_started',
-  hypothesis: idleProbe ? 'Retain the first native source-file refusal through frame 320 without gameplay key injection and with a nonblocking observation across takeover.' : 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
+  hypothesis: fullMatch ? 'Real P1 walk-offs and respawns reach a common native match-final receipt and original Results before both pages return to CSS and Leave.' : idleProbe ? 'Retain the first native source-file refusal through frame 320 without gameplay key injection and with a nonblocking observation across takeover.' : 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
   producer: null,
   disc: null,
   relay: {owner: 'existing deployed staging relay selected by the online page', harness_owned: false},
-  server: {host: SERVER_HOST, port: SERVER_PORT, owned: false, closed: false},
+  server: hostedUrl ? {hosted: true, owned: false, url: hostedUrl} :
+    {host: SERVER_HOST, port: SERVER_PORT, owned: false, closed: false},
   pages: {alpha: null, beta: null},
   checks: [],
   timing: {
@@ -156,6 +167,28 @@ async function makeStaticServer(directory) {
     server.listen(SERVER_PORT, SERVER_HOST);
   });
   return {server, root: realRoot, url: `http://${SERVER_HOST}:${SERVER_PORT}${ROUTE}${DIAGNOSTIC_QUERY}`};
+}
+
+function checkedHostedUrl(value) {
+  assert(/^https:\/\/(?:[0-9a-f]{8}\.)?webmelee-staging\.pages\.dev\/online\/(?:index\.html)?$/.test(value),
+    '--url must be the exact stable or immutable staging Pages online route');
+  return new URL('/online/' + DIAGNOSTIC_QUERY, value).href;
+}
+
+async function verifyHostedProducer(url, producer) {
+  const observed = [];
+  for (const record of producer.files) {
+    const fileUrl = new URL(record.name === 'online/index.html' ? '/online/' : '/' + record.name, url);
+    const response = await fetch(fileUrl, {redirect: 'error', cache: 'no-store',
+      headers: {'User-Agent': 'WebMelee-Release-Audit/1.0'},
+      signal: AbortSignal.timeout(Math.min(30000, remaining()))});
+    assert.equal(response.status, 200, `Hosted producer returned HTTP ${response.status} for ${record.name}`);
+    const body = Buffer.from(await response.arrayBuffer());
+    assert.equal(body.length, record.bytes, `Hosted producer size differs for ${record.name}`);
+    assert.equal(sha256(body), record.sha256, `Hosted producer hash differs for ${record.name}`);
+    observed.push(record.name);
+  }
+  return observed;
 }
 
 async function producerIdentity(servedRoot) {
@@ -406,6 +439,8 @@ async function openPage(item, chromium, browserConfig, browserPath, playwrightPa
     {surface: 'development', timeoutMs: remaining(), deadline});
   const response = await item.page.goto(url, {waitUntil: 'load', timeout: remaining()});
   assert.equal(response?.status(), 200, `${item.role} online route did not return HTTP 200`);
+  assert(!response.request().redirectedFrom() && response.url() === url && item.page.url() === url,
+    `${item.role} online route redirected or changed during navigation`);
   // One early clock observation lets the host brackets be compared with the
   // page's retained callback timestamps without adding live browser reads.
   const hostStart = performance.now();
@@ -418,7 +453,7 @@ async function openPage(item, chromium, browserConfig, browserPath, playwrightPa
   };
   report.pages[item.role] = {browser: {version: item.browser.version(), executable: path.basename(browserPath),
       playwright: path.basename(playwrightPath), mode: 'headless', speaker_output: 'muted'},
-    url_path: ROUTE + DIAGNOSTIC_QUERY, configured_controls: null, input_events: item.inputEvents,
+    url_path: new URL(url).pathname + DIAGNOSTIC_QUERY, configured_controls: null, input_events: item.inputEvents,
     source: item.source, observed_websocket_origins: item.websockets, live_timing: item.liveTiming,
     error_count: 0, leave: null};
 }
@@ -537,6 +572,252 @@ async function waitForProgress(item, previousFrame) {
     'source progress after P2 pulse', {timeoutMs: 5000});
 }
 
+function stockSample(snapshot) {
+  const match = snapshot.match;
+  if (!match || !Number.isSafeInteger(match.frame)) return null;
+  if (snapshot.owner?.ownerState === 1)
+    assert.equal(match.frame, snapshot.owner.metadata?.currentFrame, 'Match sample differed from the live source cursor');
+  const [p1, p2] = match.players ?? [];
+  assert(p1?.human && p2?.human && p1.source_port === 0 && p2.source_port === 1 &&
+    p1.source_character === MARIO_SOURCE_KIND && p2.source_character === MARIO_SOURCE_KIND &&
+    Number.isInteger(p1.stocks) && p1.stocks >= 0 && p1.stocks <= 4 && p2.stocks === 4,
+  `Unexpected source stock state: ${JSON.stringify(match.players)}`);
+  return {frame: match.frame, ending: match.ending, players: [p1, p2].map(player => ({
+    stocks: player.stocks, motion: player.motion, groundAir: player.groundAir,
+    x: player.x, y: player.y, facing: player.facing_direction,
+  }))};
+}
+
+function p1Direction(player, facingOnly = false) {
+  assert(Number.isFinite(player.x) && Number.isFinite(player.y) && [-1, 1].includes(player.facing),
+    'P1 direction requires finite source position and authored facing');
+  const stickX = facingOnly ? player.facing : Math.sign(player.x) || player.facing;
+  return {key: stickX < 0 ? 'a' : 'd', stickX};
+}
+
+async function waitStock(item, stocks, motion, groundAir, label) {
+  const snapshot = await waitSnapshot(item, value => {
+    const player = stockSample(value)?.players[0];
+    return player && player.stocks === stocks && player.motion === motion && player.groundAir === groundAir;
+  }, label, {source: true, timeoutMs: MATCH_STATE_TIMEOUT_MS});
+  return stockSample(snapshot);
+}
+
+async function walkOff(item, initial) {
+  const stockBefore = initial.players[0].stocks;
+  const {key, stickX} = p1Direction(initial.players[0]);
+  const before = await readSnapshot(item, true, {label: 'P1 pre-walk input snapshot'});
+  const afterSample = Number(before.input?.last_non_neutral?.sample ?? 0);
+  const event = {key, label: `P1 walk off from ${stockBefore} stocks`, port: 0,
+    down: 'Playwright page keyboard', initial};
+  item.inputEvents.push(event);
+  await item.page.locator('#canvas').focus({timeout: remaining()});
+  try {
+    await bracketLive(item, `${event.label} keydown`, () =>
+      withinBound(() => item.page.keyboard.down(key), deadline));
+    event.receipt = await bracketLive(item, `${event.label} PAD observation`, () =>
+      withinBound(() => item.page.evaluate(sourceInputObserved, {
+        afterSample, port: 0, stickX, observerBusy: OBSERVER_BUSY,
+        observationMs: SOURCE_KEY_TIMEOUT_MS - 25,
+      }), Math.min(deadline, Date.now() + SOURCE_KEY_TIMEOUT_MS)));
+    assert(event.receipt && event.receipt.sample > afterSample, `${event.label} lacked an actual PAD receipt`);
+    const ending = await waitSnapshot(item, value => {
+      if (stockBefore === 1 && value.result === 'MATCH_FINAL_COMPLETE') return true;
+      const sample = stockSample(value);
+      if (!sample) return false;
+      const stocks = sample.players[0].stocks;
+      assert(stocks === stockBefore || stocks === stockBefore - 1, 'P1 source stock loss skipped a stock');
+      return stockBefore === 1 ? sample.ending === true && stocks === 0 : stocks === stockBefore - 1;
+    }, `${event.label} source outcome`, {source: true, timeoutMs: MATCH_STATE_TIMEOUT_MS});
+    event.outcome = stockSample(ending) ?? {frame: frameOf(ending), result: ending.result, phase: ending.phase};
+    return event.outcome;
+  } finally {
+    await bracketLive(item, `${event.label} keyup`, () =>
+      withinBound(() => item.page.keyboard.up(key), hardDeadline - 1000));
+  }
+}
+
+async function playFullMatch(alpha, beta) {
+  await sendP2Pulse(beta);
+  const cycles = [];
+  alpha.source.stockCycles = cycles;
+  let grounded = await waitStock(alpha, 4, MATCH_READY_MOTION, 0, 'P1 initial grounded Wait');
+  for (const stockBefore of [4, 3, 2]) {
+    const stockAfter = stockBefore - 1;
+    const cycle = {stockBefore, stockAfter};
+    cycles.push(cycle);
+    cycle.loss = await walkOff(alpha, grounded);
+    cycle.platform = await waitStock(alpha, stockAfter, REBIRTH_WAIT_MOTION, 1, 'P1 airborne RebirthWait');
+    const direction = p1Direction(cycle.platform.players[0], true);
+    cycle.exitInput = await pressWithReceipt(alpha, direction.key, 'P1 facing-directed respawn-platform exit',
+      {stickX: direction.stickX}, 0, 0);
+    cycle.fall = await waitStock(alpha, stockAfter, REBIRTH_EXIT_MOTION, 1, 'P1 airborne Fall after platform exit');
+    grounded = cycle.grounded = await waitStock(alpha, stockAfter, MATCH_READY_MOTION, 0, 'P1 grounded Wait after respawn');
+    assert(cycle.loss.frame < cycle.platform.frame && cycle.platform.frame < cycle.fall.frame &&
+      cycle.fall.frame < grounded.frame, 'P1 respawn source frames did not advance in order');
+  }
+  alpha.source.finalWalk = await walkOff(alpha, grounded);
+}
+
+function requireDirtyCorrection(matches) {
+  const frameBytes = value => Array.isArray(value) && value.length === 44 &&
+    value.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255);
+  const portBytes = (frame, port) => frame.slice(port * 11, (port + 1) * 11);
+  for (const [localPort, match] of matches.entries()) {
+    const remotePort = 1 - localPort;
+    const role = localPort === 0 ? 'alpha' : 'beta';
+    assert.equal(match.role, role);
+    assert(Array.isArray(match.corrections) && match.corrections.length <= match.retention?.limit &&
+      match.retention.limit === 64, `${role} lacks its bounded streaming correction journal`);
+    for (const correction of match.corrections) {
+      const {dirty, pre, frontier, confirmed, replay, kind} = correction;
+      if (dirty === null) continue;
+      assert((kind === 'fully-confirmed-correction' || kind === 'terminal-replay-selection') &&
+        [dirty, pre, frontier, confirmed].every(Number.isSafeInteger) &&
+        pre >= 0 && pre <= dirty && dirty < frontier && frontier - pre <= 7 && confirmed === frontier,
+      `${role} dirty correction lacks a bounded, fully confirmed replay interval`);
+      const {plan, rows} = replay ?? {};
+      assert(plan?.kind === 'replay' && plan.from === dirty && plan.through === frontier - 1 &&
+        plan.speculative_ticks === 0 && plan.frames?.length === frontier - dirty,
+      `${role} dirty correction lacks its actual replay plan`);
+      const [actual] = plan.frames;
+      const receipt = rows?.[dirty - pre];
+      const row = receipt?.row;
+      const status = receipt?.status;
+      assert(row?.sourceFrame === dirty && row.ordinal === dirty - pre && row.state === 2 &&
+        row.localPort === localPort && row.remotePort === remotePort &&
+        row.schema === 1 && row.bytes === 176 && Number.isSafeInteger(row.ticketId) && row.ticketId > 0 &&
+        typeof row.pollSerial === 'string' && /^[1-9][0-9]*$/.test(row.pollSerial) &&
+        receipt.unchangedPrefix === false && status?.ownerState === 1 && status.pendingCommand === 0 &&
+        status.lastCompletedCommand === 15 && status.completeSequence === status.requestSequence &&
+        status.completeSequence > row.ticketId && status.metadata?.preFrame === pre &&
+        status.metadata.incarnation === row.incarnation && status.metadata.restoreCount >= 1 &&
+        status.metadata.currentFrame === dirty + (receipt.terminal === true ? 0 : 1),
+      `${role} dirty correction lacks its retained native replay ticket and poll identity`);
+      assert([row.raw, row.forward, row.selected, actual?.frame].every(frameBytes),
+        `${role} dirty correction lacks its exact four-port PAD bytes`);
+      assert(actual.tick === dirty && actual.remote_source === 'actual' && actual.speculative === false,
+        `${role} dirty replay selected a speculative or unindexed remote PAD`);
+      assert.deepEqual(row.selected, actual.frame, `${role} native replay did not consume its actual plan`);
+      assert.deepEqual(actual.local_pad, portBytes(row.raw, localPort));
+      assert.deepEqual(actual.remote_pad, portBytes(row.selected, remotePort));
+      for (const port of [localPort, 2, 3]) {
+        assert.deepEqual(portBytes(row.forward, port), portBytes(row.raw, port));
+        assert.deepEqual(portBytes(row.selected, port), portBytes(row.raw, port));
+      }
+      const predictedRemote = portBytes(row.forward, remotePort);
+      assert.notDeepEqual(actual.remote_pad, predictedRemote,
+        `${role} dirty replay did not replace the originally predicted remote bytes`);
+
+      // The bridge requires an indexed lockstep-protocol receipt for every
+      // actual remote plan row. Join independent retained journals when those
+      // still cover this tick. The terminal tail can age the 64-row rings out.
+      const admission = match.events?.find(event => event.operation === 'episodeAdmit' && event.value?.tick === dirty);
+      const localPoll = match.polls?.find(poll => poll.inputOrdinal === undefined && poll.sourceFrame === dirty);
+      const remotePoll = matches[remotePort].polls?.find(poll =>
+        poll.inputOrdinal === undefined && poll.sourceFrame === dirty);
+      if (admission) {
+        const peer = admission.result?.receipt;
+        assert(peer?.accepted_by === 'lockstep-protocol' && peer.sender_role === matches[remotePort].role &&
+          peer.protocol_input_tick === dirty && peer.remote_port === remotePort,
+        `${role} retained admission did not bind the actual peer packet`);
+        assert.deepEqual(peer.pad, actual.remote_pad);
+      }
+      if (localPoll) {
+        assert.equal(localPoll.ticketId, row.ticketId);
+        assert.equal(localPoll.pollSerial, row.pollSerial);
+        assert.deepEqual(localPoll.raw, row.raw);
+      }
+      if (remotePoll) {
+        assert.equal(remotePoll.localPort, remotePort);
+        assert(frameBytes(remotePoll.raw));
+        assert.deepEqual(portBytes(remotePoll.raw, remotePort), actual.remote_pad);
+      }
+      return {role, kind, dirty, pre, frontier, confirmed, localPort, remotePort,
+        raw: row.raw, forward: row.forward, selected: row.selected, ticketId: row.ticketId,
+        pollSerial: row.pollSerial, replayRequestSequence: status.completeSequence,
+        predictedRemote, actualRemote: actual.remote_pad, remoteSource: actual.remote_source,
+        retainedJoins: {localPoll: !!localPoll, remotePoll: !!remotePoll, peerAdmission: !!admission}};
+    }
+  }
+  throw Error('Full match lacks a retained non-vacuous actual late-input correction');
+}
+
+function compareTerminalReceipts(matches) {
+  for (const [index, match] of matches.entries()) {
+    const label = index === 0 ? 'Alpha' : 'Beta';
+    const receipt = match?.terminal_final?.receipt;
+    const agreement = match?.terminal_final?.agreement;
+    const timeline = match?.finalTimeline;
+    assert.equal(match?.result, 'MATCH_FINAL_COMPLETE', `${label} lacks native terminal completion`);
+    assert(Number.isSafeInteger(receipt?.sourceFrame) && receipt.sourceFrame > 0 &&
+      Number.isSafeInteger(receipt.lastInputOrdinal) && receipt.lastInputOrdinal >= 0 &&
+      receipt.consumedOrdinal === receipt.lastInputOrdinal + 1 &&
+      receipt.consumedOrdinal === match.actualPollCount && receipt.consumedOrdinal === match.input_ticks,
+    `${label} terminal receipt lacks the consumed source input count`);
+    assert.equal(receipt.outcome, 2, `${label} native terminal outcome was not elimination`);
+    assert.equal(receipt.winner, -1, `${label} native pre-Results winner publication changed`);
+    assert.equal(timeline?.dirty_from, null, `${label} terminal timeline remained dirty`);
+    assert.equal(timeline?.plan_outstanding, false, `${label} terminal timeline retained an execution plan`);
+    assert.equal(timeline?.simulated_through, receipt.lastInputOrdinal);
+    assert(timeline?.remote_contiguous_through >= receipt.lastInputOrdinal);
+    const checksum = match.terminal_final.checksum;
+    assert(Array.isArray(checksum) && checksum.length === 64 &&
+      checksum.every(byte => Number.isInteger(byte) && byte >= 0 && byte <= 255));
+    assert(agreement && agreement.input_ordinal === receipt.lastInputOrdinal &&
+      agreement.source_frame === receipt.sourceFrame && agreement.outcome === receipt.outcome &&
+      agreement.winner === receipt.winner && agreement.matched_bytes === 64 &&
+      /^[0-9a-f]{64}$/.test(agreement.agreement_hash), `${label} terminal wire agreement was incomplete`);
+    assert.equal(match.finalOwner?.ownerState, 2);
+    assert.equal(match.finalOwner?.lastCompletedCommand, 30);
+  }
+  const [alpha, beta] = matches.map(match => match.terminal_final);
+  for (const field of ['consumedOrdinal', 'lastInputOrdinal', 'sourceFrame', 'outcome', 'winner', 'randomSeed'])
+    assert.equal(alpha.receipt[field], beta.receipt[field], `Native terminal receipts differed at ${field}`);
+  assert.deepEqual(alpha.checksum, beta.checksum, 'Native terminal checksums differed');
+  assert.equal(alpha.agreement.agreement_hash, beta.agreement.agreement_hash, 'Final wire agreement hashes differed');
+  return alpha;
+}
+
+async function waitForOriginalResults(item) {
+  const value = await waitSnapshot(item, snapshot => snapshot.result === 'MATCH_FINAL_COMPLETE' &&
+    snapshot.phase === 8 && snapshot.running === 1 && snapshot.match?.terminal,
+  'original Results and native terminal publication', {source: true, timeoutMs: 30000});
+  const match = value.match;
+  assert.equal(match.leg, 'vs');
+  assert.equal(match.complete, true);
+  assert.deepEqual(match.observed_player_source_slots, [0, 1]);
+  assert.deepEqual(match.players?.map(player => player.human), [true, true]);
+  assert.deepEqual(match.terminal, {outcome: 2, winners: [1]});
+  item.source.originalResults = match;
+}
+
+async function returnFromResults(item) {
+  const resultsDeadline = Math.min(deadline, Date.now() + 45000);
+  const observeSample = async label => {
+    const value = await readSnapshot(item, true, {label, bound: resultsDeadline});
+    return {
+      host: {phase: value.phase, running: value.running, message: value.nativeMessage,
+        status: value.roomStatus, error: value.error,
+        owner_capabilities: {schema: 'ordinary-runtime-v1', canPause: value.canPause}},
+      trace: value.resultsTrace,
+    };
+  };
+  const press = key => pressWithReceipt(item, key, `Original Results/Prize ${key}`,
+    {buttonMask: CSS_START_BUTTON}, key === 'End' ? 1 : 0, 150);
+  const wait = ms => item.page.waitForTimeout(ms);
+  const confirmation = await confirmTwoHumanResults({deadlineAt: resultsDeadline, sourcePorts: [0, 1],
+    observeSample, press: () => press('Enter'), pressSecond: () => press('End'), wait});
+  item.source.resultsConfirmation = confirmation;
+  if (confirmation.original_exit.host_phase === 9)
+    item.source.prizeReturn = await returnFromCompetitivePrize({deadlineAt: resultsDeadline, sourcePorts: [0, 1],
+      observeSample, press: () => press('Enter'), wait});
+  const css = await waitSnapshot(item, value => value.phase === 1 && value.running === 1 && value.css?.doors?.length === 40,
+    'return to original CSS after Results', {source: true, bound: resultsDeadline});
+  item.source.returnedCss = {phase: css.phase, running: css.running, doors: cssDoors(css.css)};
+  await item.page.screenshot({path: path.join(output, `${item.role}-returned-css.png`), timeout: remaining()});
+}
+
 async function clickLeave(item, bound = deadline) {
   item.leaveAttempted = true;
   await bracketLive(item, 'UI Leave click', () =>
@@ -552,13 +833,14 @@ function ownerDrained(snapshot) {
 
 async function observeLeave(item, local) {
   const expectedError = local ? null : REMOTE_LEAVE;
+  const expectedResult = fullMatch ? 'MATCH_FINAL_COMPLETE' : local ? 'LEFT_EARLY' : 'FAIL';
   const final = await waitSnapshot(item, value => value.closed && value.stage === 'closed' &&
     ownerDrained(value) && (!local || value.roomStatus === 'Room closed. Reload to play again.'),
     local ? 'local Leave and native retirement' : 'remote disconnect and native drain',
     {expectedError, timeoutMs: 30000});
   const diagnostics = await readSnapshot(item, false, {expectedError, diagnostics: true});
   assert.equal(final.error, expectedError, `${item.role} teardown error differed`);
-  assert.equal(final.result, local ? 'LEFT_EARLY' : 'FAIL', `${item.role} teardown result differed`);
+  assert.equal(final.result, expectedResult, `${item.role} teardown result differed`);
   assert.equal(final.owner.firstFailure, 0, `${item.role} reported a native failure during teardown`);
   assert.equal(final.owner.rendererErrors, 0, `${item.role} reported a renderer failure during teardown`);
   item.source.leave = {action: local ? 'local UI Leave' : 'remote relay disconnect after alpha Leave',
@@ -599,12 +881,19 @@ async function main() {
   assert(discStat.isFile(), 'Disc input must be a local regular file');
   report.disc = {name: path.basename(disc), bytes: discStat.size, sha256: await hashFile(disc)};
   report.producer = producer;
-  const served = await makeStaticServer(root);
-  server = served.server;report.server.owned = true;report.server.url = served.url;
+  let url = hostedUrl;
+  if (url) {
+    report.server.verified_producer_paths = await verifyHostedProducer(url, producer);
+  } else {
+    const served = await makeStaticServer(root);
+    server = served.server;
+    report.server.owned = true;
+    report.server.url = url = served.url;
+  }
   const tools = await loadBrowserTools(values.playwright);
   ({chromium, browser: browserConfig, browserPath, playwrightPath} = tools);
   await settlePair(pages.map(item => openPage(item, chromium, browserConfig, browserPath,
-    playwrightPath, served.url)));
+    playwrightPath, url)));
   await settlePair(pages.map(loadDiscAndConfigure));
   report.checks.push('Both pages imported the same local disc independently and selected P1/P2 keyboard input through Controls.');
 
@@ -617,7 +906,25 @@ async function main() {
   await settlePair(pages.map(waitForLiveMatch));
   report.checks.push('Page-owned negotiation reached the same original four-stock Mario/Final Destination rollback session on both roles.');
 
-  if (idleProbe) {
+  let finalMatches;
+  if (fullMatch) {
+    await playFullMatch(alpha, beta);
+    await settlePair(pages.map(waitForOriginalResults));
+    const terminalExports = await settlePair(pages.map(item =>
+      retainDiagnostics(item, deadline, 'match-final-diagnostics')));
+    finalMatches = terminalExports.map(exported => exported.session?.match);
+    report.terminalFinal = compareTerminalReceipts(finalMatches);
+    for (const item of pages) {
+      assert.equal(item.source.originalResults.frame, report.terminalFinal.receipt.sourceFrame);
+      assert.equal(item.source.originalResults.outcome, report.terminalFinal.receipt.outcome);
+    }
+    report.checks.push('Both pages completed the same native match-final wire agreement and original Results published P2 as winner.');
+    await settlePair(pages.map(item => item.page.screenshot({
+      path: path.join(output, `${item.role}-original-results.png`), timeout: remaining(),
+    })));
+    await settlePair(pages.map(returnFromResults));
+    report.checks.push('Both pages used original Results keyboard confirmations and returned to original CSS.');
+  } else if (idleProbe) {
     const observations = await settlePair(pages.map(item => waitSnapshot(item,
       value => value.stage === 'playing' && frameOf(value) >= 320,
       'source-file boundary through frame 320', {timeoutMs: 15000})));
@@ -642,17 +949,28 @@ async function main() {
   for (const item of pages) {
     assert.deepEqual(item.websockets, [RELAY_ORIGIN], `${item.role} did not use the expected staging relay`);
   }
-  // The second page observes the relay's clean partner disconnect. Two racing
-  // Leave clicks would make the remote outcome ambiguous.
-  await clickLeave(alpha);
-  await settlePair([observeLeave(alpha, true), observeLeave(beta, false)]);
-  report.checks.push('Alpha used UI Leave. Beta observed the expected relay disconnect. Both native owners retired and drained renderer work.');
+  if (fullMatch) {
+    await settlePair(pages.map(async item => {
+      await clickLeave(item);
+      await observeLeave(item, true);
+    }));
+    report.checks.push('Both pages used UI Leave after returning to CSS and retained their completed-match result.');
+  } else {
+    // After an early Leave the second page observes the relay partner disconnect.
+    await clickLeave(alpha);
+    await settlePair([observeLeave(alpha, true), observeLeave(beta, false)]);
+    report.checks.push('Alpha used UI Leave. Beta observed the expected relay disconnect. Both native owners retired and drained renderer work.');
+  }
   const diagnosticExports = await settlePair(pages.map(item =>
     retainDiagnostics(item, deadline, 'after-leave-diagnostics')));
   for (const diagnostic of diagnosticExports) {
     assert.equal(diagnostic.stagingDiagnosticsEnabled, true, 'H1 recorder state was lost');
     assert(diagnostic.incidents && diagnostic.retainedIncidents && diagnostic.session?.start,
       'Staging diagnostic exports or page-owned agreement were unavailable');
+    if (hostedUrl) {
+      for (const field of ['sourceSha', 'profileIdentity', 'wasmSha256', 'tableSha256', 'policySha256'])
+        assert.equal(diagnostic.session.producer?.[field], producer[field], `Hosted page producer differed at ${field}`);
+    }
   }
   const [alphaStart, betaStart] = diagnosticExports.map(row => row.session.start);
   assert.equal(alphaStart.localPort, 0);
@@ -661,7 +979,13 @@ async function main() {
     assert.deepEqual(alphaStart[field], betaStart[field], `Page-owned ${field} receipts differ`);
   }
   assert.deepEqual(pages.flatMap(item => item.errors), [], 'One or both online pages reported browser/network errors');
-  report.result = idleProbe ? 'IDLE_320_PASS' : 'START_ONLY_PASS';
+  if (fullMatch) {
+    // Finish the original UI route and retain its scoped evidence even if the
+    // live relay did not produce a non-vacuous correction in this run.
+    report.dirtyCorrection = requireDirtyCorrection(finalMatches);
+    report.checks.push('A retained native replay used actual late remote PAD bytes that differed from prediction on its original ticket.');
+  }
+  report.result = fullMatch ? 'FULL_MATCH_UI_PASS' : idleProbe ? 'IDLE_320_PASS' : 'START_ONLY_PASS';
 }
 
 try {
