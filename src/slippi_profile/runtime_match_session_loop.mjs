@@ -906,7 +906,7 @@ export function createRuntimeMatchSessionLoop({owner, peer, role,
             report.result=respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
           const fullWindow=frame-current.preFrame===7;
-          const cleanRebase=lateEvents.size>0
+          const cleanRebase=streaming||lateEvents.size>0
             ? (fullWindow||atLateAnchor)&&confirmed>=frame&&current.preFrame<frame
             : fullWindow&&confirmed>current.preFrame;
           if(inputs.dirty_from!==null||cleanRebase){

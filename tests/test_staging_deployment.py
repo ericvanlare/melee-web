@@ -120,6 +120,78 @@ class StagingDeploymentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'non-secret'):
             staging.validate_project(secret_project)
 
+    def redacted_pages_project(self):
+        project = self.project()
+        project['domains'] = ['webmelee-staging.pages.dev']
+        for environment, config in project['deployment_configs'].items():
+            config.update(fail_open=True, always_use_latest_compatibility_date=False,
+                          compatibility_date=('2026-10-01' if environment == 'production' else '2026-09-13'),
+                          compatibility_flags=[], build_image_major_version=3, usage_model='standard')
+            config['env_vars'] = {
+                key: ({'type': 'secret_text', 'value': ''} if key == 'DIAGNOSTICS_ADMIN_TOKEN'
+                      else {'type': 'plain_text', 'value': value})
+                for key, value in config['env_vars'].items()
+            }
+            config['d1_databases'] = {'DIAGNOSTICS_DB': {'id': '2a94860d-c09a-46a3-883b-00af5308b0b1'}}
+        project['deployment_configs']['production']['wrangler_config_hash'] = 'opaque-provider-metadata'
+        return project
+
+    def test_observed_redacted_pages_metadata_uses_authenticated_d1_name(self):
+        project = self.redacted_pages_project()
+        with self.assertRaisesRegex(ValueError, 'lacks an authenticated name'):
+            staging.validate_project(project)
+        database = {'database_id': '2a94860d-c09a-46a3-883b-00af5308b0b1',
+                    'database_name': 'webmelee-staging-diagnostics'}
+        staging.validate_project(project, authenticated_database=database)
+        config = staging.diagnostics_wrangler_config(project, authenticated_database=database)
+        self.assertEqual(config['compatibility_date'], '2026-10-01')
+        self.assertEqual(config['d1_databases'], [{'binding': 'DIAGNOSTICS_DB', **database}])
+        self.assertEqual(config['vars'], {
+            'DIAGNOSTICS_RATE_LIMIT': '60',
+            'DIAGNOSTICS_DAILY_REPORT_CAP': '1000',
+            'DIAGNOSTICS_DAILY_BYTE_CAP': '16777216',
+            'DIAGNOSTICS_ALLOWED_RELEASES': '{"staging":[],"production":[]}',
+        })
+        self.assertEqual(project, self.redacted_pages_project())
+
+    def test_provider_metadata_and_d1_identity_changes_fail_closed(self):
+        database = {'database_id': '2a94860d-c09a-46a3-883b-00af5308b0b1',
+                    'database_name': 'webmelee-staging-diagnostics'}
+        for key, value in (
+            ('kv_namespaces', {'OTHER': {'namespace_id': 'a' * 32}}),
+            ('fail_open', 1),
+            ('fail_open', False),
+            ('always_use_latest_compatibility_date', True),
+            ('compatibility_date', '2026-10-02'),
+            ('compatibility_flags', ['nodejs_compat']),
+            ('build_image_major_version', 4),
+            ('usage_model', 'bundled'),
+            ('wrangler_config_hash', None),
+            ('d1_databases', {'DIAGNOSTICS_DB': {'id': 'b' * 32}}),
+            ('d1_databases', {'DIAGNOSTICS_DB': {'id': database['database_id'], 'name': 'other'}}),
+            ('d1_databases', {'DIAGNOSTICS_DB': {'id': database['database_id'], 'binding': 'OTHER'}}),
+        ):
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                project = self.redacted_pages_project()
+                project['deployment_configs']['production'][key] = value
+                staging.validate_project(project, authenticated_database=database)
+
+    def test_authenticated_d1_lookup_is_pinned_and_checks_the_frozen_identity(self):
+        api = object.__new__(staging.Pages)
+        api.wrangler = '/path/to/pinned/wrangler'
+        api.env = {'WRANGLER_SEND_METRICS': 'false'}
+        match = {'uuid': '2a94860d-c09a-46a3-883b-00af5308b0b1', 'name': 'webmelee-staging-diagnostics'}
+        with patch.object(staging, '_validate_wrangler_version') as pin, \
+                patch.object(staging.subprocess, 'run',
+                             return_value=SimpleNamespace(returncode=0, stdout=json.dumps(match))) as run:
+            self.assertEqual(api.diagnostics_database(), {'database_id': match['uuid'], 'database_name': match['name']})
+            pin.assert_called_once_with(api.wrangler)
+            self.assertEqual(run.call_args.args[0], [api.wrangler, 'd1', 'info', match['name'], '--json'])
+            self.assertIs(run.call_args.kwargs['env'], api.env)
+            run.return_value.stdout = json.dumps({**match, 'uuid': 'b' * 32})
+            with self.assertRaisesRegex(ValueError, 'differs from the frozen'):
+                api.diagnostics_database()
+
     def test_admin_secret_metadata_is_required_exact_and_never_uploaded(self):
         missing = self.project()
         del missing['deployment_configs']['production']['env_vars']['DIAGNOSTICS_ADMIN_TOKEN']
@@ -148,11 +220,12 @@ class StagingDeploymentTests(unittest.TestCase):
         self.assertNotIn('DIAGNOSTICS_ADMIN_TOKEN', generated['vars'])
         self.assertNotIn('opaque-test-secret', json.dumps(generated, sort_keys=True))
 
-        short_api_secret = self.project()
-        short_api_secret['deployment_configs']['production']['env_vars'][
-            'DIAGNOSTICS_ADMIN_TOKEN'] = {'type': 'secret_text', 'value': 'short'}
-        with self.assertRaisesRegex(ValueError, 'at least 16 characters'):
-            staging.validate_project(short_api_secret)
+        for value in ('short', None):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'at least 16 characters'):
+                invalid_api_secret = self.project()
+                invalid_api_secret['deployment_configs']['production']['env_vars'][
+                    'DIAGNOSTICS_ADMIN_TOKEN'] = {'type': 'secret_text', 'value': value}
+                staging.validate_project(invalid_api_secret)
 
     def test_origin_cannot_escape_staging(self):
         self.assertEqual(staging.immutable_origin('https://1234abcd.webmelee-staging.pages.dev/'),

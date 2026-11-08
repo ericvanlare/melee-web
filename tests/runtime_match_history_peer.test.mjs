@@ -1600,3 +1600,36 @@ test('terminal streaming refuses receipt growth when its owner omits safe prunin
     'the overflow refusal does not retain a 33rd local receipt');
   await Promise.allSettled([alpha.close(),beta.close()]);
 });
+
+test('streaming clean full windows wait for the exact missing input before rebasing', async () => {
+  const source=await readFile(new URL(
+    '../src/slippi_profile/runtime_match_session_loop.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('          const fullWindow=frame-current.preFrame===7;');
+  const end=source.indexOf('          finishNetworkWait();\n          if(callback.grants===8)',start);
+  assert(start>=0&&end>start,'Expected the actual clean-window and source-input scheduling block');
+  const run=new (Object.getPrototypeOf(async function(){}).constructor)('options', `
+    const {streaming,confirmed,dirty}=options;
+    const frame=7,current={preFrame:0},targetFrame=600,remoteNext=confirmed;
+    const inputs={dirty_from:dirty,remote_contiguous_through:confirmed-1};
+    const lateEvents=new Map(),atLateAnchor=false,fullMatch=streaming;
+    const report={events:[]},callback={reconciliations:0,grants:0};
+    const calls=[];
+    const beginNetworkWait=()=>{},finishNetworkWait=()=>{};
+    const waitForRequiredInput=async (...args)=>calls.push(['wait',...args]);
+    const reconcile=async input=>calls.push(['reconcile',input.dirty_from]);
+    const owner={pacingSample:()=>({pendingSteps:0})};
+    let continueCallback=false;
+    for(const iteration of [0]){
+      ${source.slice(start,end)}
+    }
+    return {calls,reconciliations:callback.reconciliations};
+  `);
+  assert.deepEqual(await run({streaming:true,confirmed:4,dirty:null}),
+    {calls:[['wait','source-input',4,6]],reconciliations:0});
+  assert.deepEqual(await run({streaming:true,confirmed:7,dirty:null}),
+    {calls:[['reconcile',null]],reconciliations:1});
+  assert.deepEqual(await run({streaming:true,confirmed:4,dirty:3}),
+    {calls:[['wait','full-frontier-confirmation',4,6]],reconciliations:0});
+  assert.deepEqual(await run({streaming:false,confirmed:4,dirty:null}),
+    {calls:[['reconcile',null]],reconciliations:1});
+});

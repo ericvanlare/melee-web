@@ -12,6 +12,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {createReadStream} from 'node:fs';
+import {performance} from 'node:perf_hooks';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
@@ -68,6 +69,11 @@ const report = {
   server: {host: SERVER_HOST, port: SERVER_PORT, owned: false, closed: false},
   pages: {alpha: null, beta: null},
   checks: [],
+  timing: {
+    live_match_screenshots: false,
+    host_time_origin_ms: performance.timeOrigin,
+    bracket_columns: ['operation', 'host_start_ms', 'host_end_ms'],
+  },
   cleanup: {browsersClosed: {}, driversDisposed: {}, serverClosed: false},
   failure: null,
 };
@@ -209,11 +215,22 @@ async function sourceInputObserved({
 function newPageOwner(role) {
   return {role, browser: null, context: null, page: null, driver: null, errors: [],
     websockets: [], roomCode: null, configured: null, source: {},
-    inputEvents: [], lastSnapshot: null, roomActionAttempted: false, leaveAttempted: false};
+    inputEvents: [], lastSnapshot: null, roomActionAttempted: false, leaveAttempted: false,
+    traceLive: false, liveTiming: {anchor: null, brackets: []}};
 }
 
-async function readSnapshot(item, source = false, options = {}) {
-  return waitSnapshot(item, () => true, 'snapshot', {...options, source});
+async function bracketLive(item, label, action) {
+  if (!item.traceLive) return action();
+  const started = performance.now();
+  try {
+    return await action();
+  } finally {
+    item.liveTiming.brackets.push([label, started, performance.now()]);
+  }
+}
+
+async function readSnapshot(item, source = false, {label = 'snapshot', ...options} = {}) {
+  return waitSnapshot(item, () => true, label, {...options, source});
 }
 
 async function waitSnapshot(item, predicate, label, {
@@ -225,17 +242,19 @@ async function waitSnapshot(item, predicate, label, {
   while (Date.now() < stopAt) {
     // Classify the exact native observer exception before Playwright wraps
     // it with its own evaluation error and stack. Every other error escapes.
-    const snapshot = await withinBound(() => item.page.evaluate(async ({source, diagnostics, busy}) => {
-      try { return await window.onlineSessionSnapshot({source, diagnostics}); }
-      catch (error) {
-        if (error.message === busy) return null;
-        throw error;
-      }
-    }, {source, diagnostics, busy: OBSERVER_BUSY}), stopAt);
+    const snapshot = await bracketLive(item, label, () =>
+      withinBound(() => item.page.evaluate(async ({source, diagnostics, busy}) => {
+        try { return await window.onlineSessionSnapshot({source, diagnostics}); }
+        catch (error) {
+          if (error.message === busy) return null;
+          throw error;
+        }
+      }, {source, diagnostics, busy: OBSERVER_BUSY}), stopAt));
     if (snapshot) {
       last = snapshot;
       const {session, incidents, retainedIncidents, ...summary} = snapshot;
       item.lastSnapshot = summary;
+      if (snapshot.closed) item.traceLive = false;
       if (!inspectFailure) requireHealthy(item, snapshot, label, expectedError);
       if (predicate(snapshot)) return snapshot;
     }
@@ -266,10 +285,11 @@ async function pressWithReceipt(item, key, label, expected, port = 0, releaseMs 
   const afterSample = Number(before.input?.last_non_neutral?.sample ?? 0);
   const event = {key, label, port, down: 'Playwright page keyboard', releaseMs};
   item.inputEvents.push(event);
-  const observed = await item.driver.pressChord([key], {holdMs: 0, releaseMs,
-    observeBeforeRelease: {predicate: sourceInputObserved,
-      arg: {afterSample, port, observerBusy: OBSERVER_BUSY,
-        observationMs: SOURCE_KEY_TIMEOUT_MS - 25, ...expected}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}});
+  const observed = await bracketLive(item, label, () =>
+    item.driver.pressChord([key], {holdMs: 0, releaseMs,
+      observeBeforeRelease: {predicate: sourceInputObserved,
+        arg: {afterSample, port, observerBusy: OBSERVER_BUSY,
+          observationMs: SOURCE_KEY_TIMEOUT_MS - 25, ...expected}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}}));
   assert(observed && observed.port === port && observed.sample > afterSample,
     `${item.role} ${label} did not reach a new actual keyboard PAD poll: ${JSON.stringify(observed)}`);
   event.receipt = observed;
@@ -355,6 +375,7 @@ async function selectFinalDestination(item) {
   item.source.sss_selection = {stage: snapshot.sss.ids[1], movements,
     cursor: snapshot.sss.geometry.slice(0, 2), target: snapshot.sss.geometry.slice(2, 4),
     cooldown: snapshot.sss.cooldown};
+  item.traceLive = true;
   await pressWithReceipt(item, 'j', 'P1 A: original SSS confirms Final Destination',
     {buttonMask: SSS_CONFIRM_BUTTON});
   const matchScene = await waitSnapshot(item, value => value.phase === 7,
@@ -382,10 +403,20 @@ async function openPage(item, chromium, browserConfig, browserPath, playwrightPa
     {surface: 'development', timeoutMs: remaining(), deadline});
   const response = await item.page.goto(url, {waitUntil: 'load', timeout: remaining()});
   assert.equal(response?.status(), 200, `${item.role} online route did not return HTTP 200`);
+  // One early clock observation lets the host brackets be compared with the
+  // page's retained callback timestamps without adding live browser reads.
+  const hostStart = performance.now();
+  const pageClock = await withinBound(() => item.page.evaluate(() => ({
+    page_time_origin_ms: performance.timeOrigin,
+    page_now_ms: performance.now(),
+  })), deadline);
+  item.liveTiming.anchor = {
+    host_start_ms: hostStart, host_end_ms: performance.now(), ...pageClock,
+  };
   report.pages[item.role] = {browser: {version: item.browser.version(), executable: path.basename(browserPath),
       playwright: path.basename(playwrightPath), mode: 'headless', speaker_output: 'muted'},
     url_path: ROUTE + DIAGNOSTIC_QUERY, configured_controls: null, input_events: item.inputEvents,
-    source: item.source, observed_websocket_origins: item.websockets,
+    source: item.source, observed_websocket_origins: item.websockets, live_timing: item.liveTiming,
     error_count: 0, leave: null};
 }
 
@@ -471,19 +502,19 @@ async function waitForLiveMatch(item) {
   item.source.match = match;
   item.source.live = {stage: live.stage, localPort: live.localPort,
     ownerState: live.owner.ownerState, currentFrame: frameOf(live), progressFrame: live.progress?.frame ?? null};
-  await item.page.screenshot({path: path.join(output, `${item.role}-rollback-live.png`), timeout: remaining() });
   return live;
 }
 
 async function sendP2Pulse(beta) {
-  const before = await readSnapshot(beta, true);
+  const before = await readSnapshot(beta, true, {label: 'P2 pre-key input snapshot'});
   const beforeSample = Number(before.input?.last_non_neutral?.sample ?? 0);
   const beforeFrame = frameOf(before);
   assert.equal(before.localPort, 1, 'Beta page is not bound to source P2');
-  const actual = await beta.driver.pressChord(['ArrowRight'], {holdMs: 0, releaseMs: 120,
-    observeBeforeRelease: {predicate: sourceInputObserved,
-      arg: {afterSample: beforeSample, port: 1, stickX: 1, observerBusy: OBSERVER_BUSY,
-        observationMs: SOURCE_KEY_TIMEOUT_MS - 25}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}});
+  const actual = await bracketLive(beta, 'P2 ArrowRight key and PAD observation', () =>
+    beta.driver.pressChord(['ArrowRight'], {holdMs: 0, releaseMs: 120,
+      observeBeforeRelease: {predicate: sourceInputObserved,
+        arg: {afterSample: beforeSample, port: 1, stickX: 1, observerBusy: OBSERVER_BUSY,
+          observationMs: SOURCE_KEY_TIMEOUT_MS - 25}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}}));
   assert(actual && actual.port === 1 && actual.source === 'keyboard' && actual.stick?.[0] > 0,
     `Beta P2 right pulse was not observed by an actual native input poll: ${JSON.stringify(actual)}`);
   beta.inputEvents.push({key: 'ArrowRight', label: 'P2 short gameplay pulse', port: 1,
@@ -505,7 +536,8 @@ async function waitForProgress(item, previousFrame) {
 
 async function clickLeave(item, bound = deadline) {
   item.leaveAttempted = true;
-  await item.page.locator('#leave').click({timeout: remaining(bound)});
+  await bracketLive(item, 'UI Leave click', () =>
+    item.page.locator('#leave').click({timeout: remaining(bound)}));
 }
 
 function ownerDrained(snapshot) {
@@ -582,7 +614,8 @@ async function main() {
   await settlePair(pages.map(waitForLiveMatch));
   report.checks.push('Page-owned negotiation reached the same original four-stock Mario/Final Destination rollback session on both roles.');
 
-  const pulseBaseline = await settlePair(pages.map(item => readSnapshot(item)));
+  const pulseBaseline = await settlePair(pages.map(item =>
+    readSnapshot(item, false, {label: 'P2 pre-pulse source frame baseline'})));
   for (const [index, item] of pages.entries()) {
     const frame = frameOf(pulseBaseline[index]);
     assert(Number.isSafeInteger(frame), `${item.role} lacked a source frame before P2 pulse`);
