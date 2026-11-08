@@ -203,14 +203,22 @@ int main(void){char e[128]={0};reset();assert(melee_web_gameplay_step_post_sourc
             post_source,
         )
         self.assertIn(
-            "return slippi_particle_source_prepare(melee_web_gameplay_generation(),\n"
-            "        melee_web_cpu_interval_token(), error, error_size);",
+            "if (!slippi_particle_source_prepare(world, token, error, error_size)) return 0;",
             post_source,
         )
-        self.assertLess(
-            post_source.index("slippi_profile_effect_matrices_post_step("),
-            post_source.index("slippi_particle_source_prepare("),
+        self.assertIn(
+            "if (!token || !slippi_fighter_projection_private_armed()) return 1;",
+            post_source,
         )
+        order = [
+            post_source.index(hook)
+            for hook in ("slippi_profile_effect_matrices_post_step(",
+                         "slippi_camera_source_prepare(",
+                         "slippi_particle_source_prepare(",
+                         "slippi_particle_source_magnifier_identity(",
+                         "slippi_fighter_projection_source_prepare(")
+        ]
+        self.assertEqual(order, sorted(order))
         bootstrap = (ROOT / "src/gameplay_bootstrap.c").read_text(encoding="utf-8")
         body = _function(bootstrap, "gameplay_step")
         self.assertLess(body.index("HSD_GObj_80390CFC();"), body.index("post_source(post_source_context"))
