@@ -316,6 +316,119 @@ class StagingDeploymentTests(unittest.TestCase):
             account.assert_not_called()
             self.assertFalse((root / 'reports').exists())
 
+    def test_repeat_frozen_audio_deploy_verifies_canonical_overlay_before_upload(self):
+        source_root = Path(staging.__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            base = {'runtime_hash': '1234567890abcdef', 'backend': {'directory': 'base.functions'}, 'files': []}
+            base_manifest = root / 'base.manifest.json'
+            base_manifest.write_text(json.dumps(base))
+            pin = {'deployment_id': '9876abcd-0000-0000-0000-000000000000',
+                   'manifest_sha256': staging.hashlib.sha256(base_manifest.read_bytes()).hexdigest()}
+            source_sha = 'a' * 40
+            deployment = {'id': '1234abcd-0000-0000-0000-000000000000',
+                          'url': 'https://1234abcd.webmelee-staging.pages.dev',
+                          'project_name': staging.PROJECT, 'environment': 'production',
+                          'latest_stage': {'status': 'success'},
+                          'deployment_trigger': {'metadata': {'branch': staging.BRANCH, 'commit_hash': source_sha}}}
+            record = staging.validate_deployment(deployment, source_sha)
+            manifest = root / 'candidate.manifest.json'
+            manifest.write_text('{}')
+            previous_manifest = root / 'previous.manifest.json'
+            previous_record = root / 'previous.json'
+            argv = ['deploy_staging.py', 'deploy', '--source-root', str(source_root),
+                    '--sha', 'b' * 40, '--base-output', str(root / 'base'),
+                    '--base-manifest', str(base_manifest), '--base-manifest-sha256', pin['manifest_sha256'],
+                    '--output', str(root / 'public'), '--manifest', str(manifest),
+                    '--manifest-sha256', staging.hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                    '--rollback-build', str(root / 'build'), '--rollback-linked', str(root / 'linked'),
+                    '--rollback-linked-receipt-sha256', 'e' * 64, '--frozen-audio-proof', str(root / 'proof'),
+                    '--wrangler', str(root / 'wrangler'), '--account-id', 'f' * 32,
+                    '--previous-record', str(previous_record)]
+            real_load = staging.load_module
+            real_verify = staging.verify_http
+            stage = SimpleNamespace(FROZEN_AUDIO_BASE=pin, audit_staging=lambda *_args, **_kwargs: {})
+            for case, error in (
+                ('missing', 'supply its overlay manifest'),
+                ('id', 'current rollback target'),
+                ('url', 'canonical immutable URL'),
+                ('source', 'requested staging SHA'),
+                ('player-source', 'player source differs'),
+                ('hash', 'does not match the deployment record'),
+                ('base', 'changed the frozen audio identity'),
+                ('backend', 'changed the frozen audio identity'),
+                ('verified-hash', 'changed during HTTP verification'),
+                ('verified', 'upload boundary'),
+                ('first-overlay', 'upload boundary'),
+            ):
+                with self.subTest(case=case):
+                    rollback = {'audio_base': pin if case != 'base' else {**pin, 'runtime_hash': 'changed'},
+                                'player': {'sourceSha': 'c' * 40 if case == 'player-source' else source_sha}}
+                    previous = {**base, 'rollback': rollback}
+                    if case == 'backend':
+                        previous['backend'] = {'directory': 'different.functions'}
+                    previous_manifest.write_text(json.dumps(previous))
+                    digest = staging.hashlib.sha256(previous_manifest.read_bytes()).hexdigest()
+                    receipt = {**record, 'manifest_sha256': digest}
+                    canonical = deployment
+                    if case == 'id':
+                        receipt['deployment_id'] = pin['deployment_id']
+                    elif case == 'url':
+                        receipt['immutable_url'] = 'https://2345abcd.webmelee-staging.pages.dev'
+                    elif case == 'source':
+                        receipt['source_sha'] = 'c' * 40
+                    elif case == 'hash':
+                        receipt['manifest_sha256'] = 'c' * 64
+                    elif case == 'first-overlay':
+                        canonical = {**deployment, 'id': pin['deployment_id']}
+                        receipt.update(deployment_id=pin['deployment_id'], manifest_sha256=pin['manifest_sha256'])
+                    previous_record.write_text(json.dumps(receipt))
+                    report_dir = root / 'reports' / case
+                    arguments = argv + ['--report-dir', str(report_dir)]
+                    if case not in ('missing', 'first-overlay'):
+                        arguments += ['--previous-manifest', str(previous_manifest)]
+
+                    def load(path, name):
+                        if name == '_staging_package':
+                            return stage
+                        return real_load(path, name)
+
+                    def assert_upload_boundary(*_args, **_kwargs):
+                        self.assertTrue((report_dir / 'previous-staging-deployment.json').is_file())
+                        if case == 'verified':
+                            self.assertEqual(json.loads((report_dir / 'previous-staging-http.json').read_text()),
+                                             {'manifest_sha256': digest})
+                        raise ValueError('upload boundary')
+
+                    with patch.object(staging.sys, 'argv', arguments), \
+                            patch.dict(staging.sys.modules, {'stage_public':
+                                SimpleNamespace(FROZEN_AUDIO_BASE=pin, ROLLBACK_RELAY='unused')}), \
+                            patch.object(staging.sys, 'path', [str(source_root / 'scripts'), *staging.sys.path]), \
+                            patch.object(staging, 'tooling_head', return_value='d' * 40), \
+                            patch.object(staging, 'load_module', side_effect=load), \
+                            patch.object(staging, 'Pages') as account, \
+                            patch.object(staging, 'validate_project'), \
+                            patch.object(staging, 'verify_http',
+                                side_effect=real_verify if case in ('base', 'backend') else None,
+                                return_value={'manifest_sha256': 'c' * 64 if case == 'verified-hash' else digest}
+                            ) as verify, \
+                            patch.object(staging.tempfile, 'TemporaryDirectory',
+                                         side_effect=assert_upload_boundary) as upload, \
+                            patch.object(staging.urllib.request, 'urlopen') as network, \
+                            self.assertRaisesRegex(ValueError, error):
+                        account.return_value.request.return_value = {'canonical_deployment': canonical}
+                        staging.main()
+                    network.assert_not_called()
+                    if case in ('verified', 'first-overlay'):
+                        upload.assert_called_once()
+                    else:
+                        upload.assert_not_called()
+                    if case in ('base', 'backend', 'verified-hash', 'verified'):
+                        verify.assert_called_once_with(source_root, record['immutable_url'], previous_manifest,
+                                                       rollback_staging=True, base_audio_manifest=base_manifest)
+                    else:
+                        verify.assert_not_called()
+
     def test_http_verification_rejects_raw_wasm_alias(self):
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / 'candidate.manifest.json'

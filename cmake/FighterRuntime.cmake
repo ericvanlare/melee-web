@@ -957,6 +957,7 @@ elseif(MELEE_WEB_ROLLBACK_STAGING)
     _melee_web_native_menu_running
     _melee_web_native_menu_cache_idle
     _melee_web_native_menu_phase
+    _melee_web_native_menu_online_lobby_observe
     _melee_web_input_set_activity
     _melee_web_input_set_keyboard
     _melee_web_input_set_keyboard_port

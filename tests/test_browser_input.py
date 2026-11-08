@@ -27,7 +27,8 @@ class BrowserInputTests(unittest.TestCase):
         cls.addClassCleanup(cls.temp.cleanup)
         cls.binary = Path(cls.temp.name) / "browser_input_test"
         result = subprocess.run(
-            [compiler, "-std=c++20", "-DTARGET_PC", "-Wall", "-Wextra", "-Werror", "-O1",
+            [compiler, "-std=c++20", "-DTARGET_PC", "-DMELEE_WEB_ROLLBACK_STAGING=1",
+             "-Wall", "-Wextra", "-Werror", "-O1",
              "-I", str(ROOT / "src"), "-I", str(aurora), "-I", str(sdl),
              str(ROOT / "src/browser_input.cpp"), str(ROOT / "tests/browser_input_test.cpp"),
              "-o", str(cls.binary)], capture_output=True, text=True, timeout=120,
@@ -155,6 +156,15 @@ const assertHealthyState = () => {};
 
     def test_keyboard_fallback_does_not_mix_with_physical_controller(self):
         self.run_case("keyboard_source_changes")
+
+    def test_online_guest_route_moves_local_input_before_rollback_capture(self):
+        result = self.run_case("online_guest_route")
+        self.assertEqual(result["online_local_device_port"], 0)
+        self.assertEqual(result["online_local_logical_port"], 1)
+        self.assertEqual(result["physical_mask"], 2)
+        self.assertEqual(result["pads"][1]["source"], "gamepad")
+        self.assertEqual(result["pads"][1]["analog"], [17, 0])
+        self.assertEqual(result["last_non_neutral"]["port"], 1)
 
     def test_setup_failure_and_shutdown_are_explicit(self):
         self.run_case("startup_failure_and_shutdown")

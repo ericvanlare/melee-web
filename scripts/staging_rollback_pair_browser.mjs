@@ -2,9 +2,9 @@
 /*
  * Bounded two-page checks of the real online staging UI. Both pages load their
  * own local disc, use the original CSS/SSS, negotiate through the page-owned
- * relay setup, and start the existing rollback loop. The full route uses real
- * keyboard input to finish the original match and return from Results to CSS. The harness never advances source ticks or
- * calls a native input/write API.
+ * relay setup, and start the existing rollback loop. The full route uses
+ * browser inputs to finish the original match and return from Results to CSS.
+ * The harness never advances source ticks or calls a native input/write API.
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -19,6 +19,7 @@ import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
 import {validateBrowserProcessInfo} from './net_lockstep_browser_handshake_probe.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
+import {standardPad} from '../tests/controller-fixtures.mjs';
 
 const {values} = parseArgs({options: {
   'served-root': {type: 'string'},
@@ -29,6 +30,8 @@ const {values} = parseArgs({options: {
   'start-only': {type: 'boolean', default: false},
   'full-match': {type: 'boolean', default: false},
   'source-idle-probe': {type: 'boolean', default: false},
+  'lobby-recovery': {type: 'boolean', default: false},
+  'guest-gamepad': {type: 'boolean', default: false},
   'timeout-ms': {type: 'string', default: '300000'},
 }, strict: true});
 const root = values['served-root'] ? path.resolve(values['served-root']) : null;
@@ -37,9 +40,11 @@ const disc = values.disc || process.env.MELEE_DISC_IMAGE || null;
 const timeoutMs = Number(values['timeout-ms']);
 const idleProbe = values['source-idle-probe'];
 const fullMatch = values['full-match'];
+const lobbyRecovery = values['lobby-recovery'];
+const guestGamepad = values['guest-gamepad'];
 if (!root || !disc || !output || [values['start-only'], idleProbe, fullMatch].filter(Boolean).length !== 1 ||
     !Number.isSafeInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 300000)
-  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe | --full-match) --served-root <immutable-staging-package> [--url <exact-staging-Pages-online-route>] --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
+  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe | --full-match) [--lobby-recovery] [--guest-gamepad] --served-root <immutable-staging-package> [--url <exact-staging-Pages-online-route>] --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
 
 const SERVER_HOST = '127.0.0.1';
 const SERVER_PORT = 8787;
@@ -54,6 +59,7 @@ const CSS_SETTLE_MS = 5000;
 const SOURCE_READY_TIMEOUT_MS = 30000;
 const SOURCE_KEY_TIMEOUT_MS = 500;
 const SSS_MOVE_LIMIT = 240;
+const STAGE_BATTLEFIELD = 31;
 const STAGE_FINAL_DESTINATION = 32;
 const MARIO_SOURCE_KIND = 8;
 const CSS_START_BUTTON = 0x1000;
@@ -74,7 +80,9 @@ const mediaTypes = new Map([
 const report = {
   schema: 'melee-web-staging-rollback-pair-start-only-v1',
   mode: fullMatch ? 'full-match' : idleProbe ? 'source-idle-probe' : 'start-only',
-  scope: fullMatch ? 'two actual online pages; original CSS, SSS, four-stock match, Results, and returned CSS using keyboard input' : idleProbe ? 'two actual online pages; no gameplay key injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 keyboard pulse; UI Leave; no full-match, correction, timing, or acceptance claim',
+  lobbyRecovery, guestGamepad,
+  scope: (fullMatch ? 'two actual online pages; original CSS, SSS, four-stock match, Results, and returned CSS' : idleProbe ? 'two actual online pages; no gameplay input injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 input pulse; UI Leave; no full-match, correction, timing, or acceptance claim') +
+    (guestGamepad ? '; authored browser Gamepad fixture, no physical-controller claim' : '; keyboard input'),
   result: 'not_started',
   hypothesis: fullMatch ? 'Real P1 walk-offs and respawns reach a common native match-final receipt and original Results before both pages return to CSS and Leave.' : idleProbe ? 'Retain the first native source-file refusal through frame 320 without gameplay key injection and with a nonblocking observation across takeover.' : 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
   producer: null,
@@ -224,6 +232,7 @@ async function producerIdentity(servedRoot) {
 
 async function sourceInputObserved({
   afterSample, port, observerBusy, observationMs, buttonMask = null, stickX = null, stickY = null,
+  source = 'keyboard',
 }) {
   // Keep this asynchronous observation within the existing key-hold budget.
   // Only the explicit native observer-busy refusal permits another read.
@@ -234,14 +243,17 @@ async function sourceInputObserved({
       if (snapshot.error) throw Error(snapshot.error);
       const input = snapshot.input, row = input?.last_non_neutral;
       if (row && row.sample > afterSample && row.port === port &&
-          row.source === 'keyboard' && row.err === 0 && input.keyboard_layout === 0 &&
-          (input.keyboard_active_mask & (1 << port)) !== 0 &&
+          row.source === source && row.err === 0 &&
+          (source === 'gamepad' ? (input.physical_mask & (1 << port)) !== 0 :
+            input.keyboard_layout === 0 && (input.keyboard_active_mask & (1 << port)) !== 0) &&
           (buttonMask === null || (row.buttons & buttonMask) === buttonMask) &&
           (stickX === null || Math.sign(row.stick?.[0] || 0) === stickX) &&
           (stickY === null || Math.sign(row.stick?.[1] || 0) === stickY)) {
         return {sample: row.sample, port: row.port, source: row.source, err: row.err,
           buttons: row.buttons, stick: row.stick, cstick: row.cstick, triggers: row.triggers,
-          keyboard_active_mask: input.keyboard_active_mask};
+          keyboard_active_mask: input.keyboard_active_mask, physical_mask: input.physical_mask,
+          online_local_device_port: input.online_local_device_port,
+          online_local_logical_port: input.online_local_logical_port};
       }
     } catch (error) {
       if (error.message !== observerBusy) throw error;
@@ -273,7 +285,7 @@ async function readSnapshot(item, source = false, {label = 'snapshot', ...option
 }
 
 async function waitSnapshot(item, predicate, label, {
-  source = false, diagnostics = false, timeoutMs = Infinity, bound = deadline,
+  source = false, diagnostics = false, stageKind, timeoutMs = Infinity, bound = deadline,
   expectedError = null, inspectFailure = false,
 } = {}) {
   const stopAt = Math.min(bound, Date.now() + timeoutMs);
@@ -282,13 +294,13 @@ async function waitSnapshot(item, predicate, label, {
     // Classify the exact native observer exception before Playwright wraps
     // it with its own evaluation error and stack. Every other error escapes.
     const snapshot = await bracketLive(item, label, () =>
-      withinBound(() => item.page.evaluate(async ({source, diagnostics, busy}) => {
-        try { return await window.onlineSessionSnapshot({source, diagnostics}); }
+      withinBound(() => item.page.evaluate(async ({source, diagnostics, stageKind, busy}) => {
+        try { return await window.onlineSessionSnapshot({source, diagnostics, stageKind}); }
         catch (error) {
           if (error.message === busy) return null;
           throw error;
         }
-      }, {source, diagnostics, busy: OBSERVER_BUSY}), stopAt));
+      }, {source, diagnostics, stageKind, busy: OBSERVER_BUSY}), stopAt));
     if (snapshot) {
       last = snapshot;
       const {session, incidents, retainedIncidents, ...summary} = snapshot;
@@ -351,36 +363,74 @@ async function settlePair(actions) {
   return results.map(result => result.value);
 }
 
+const useGamepad = item => guestGamepad && item.role === 'beta';
+const gamepadActions = {
+  Enter: {button: 9}, j: {button: 0},
+  a: {axis: 0, value: -1}, d: {axis: 0, value: 1},
+  w: {axis: 1, value: -1}, s: {axis: 1, value: 1},
+};
+
+async function pressGamepad(item, key, observation, releaseMs) {
+  const action = gamepadActions[key];
+  assert(action, `No authored browser Gamepad action for ${key}`);
+  assert(SOURCE_KEY_TIMEOUT_MS + releaseMs < remaining(), 'Gamepad sequence exceeds remaining wall-time bound');
+  await item.page.locator('#canvas').focus({timeout: remaining()});
+  const set = (pressed, bound) => withinBound(() => item.page.evaluate(({action, pressed}) => {
+    const pad = window.stagingPairGamepad;
+    if (action.button !== undefined) pad.buttons[action.button] = {pressed, value: Number(pressed)};
+    else pad.axes[action.axis] = pressed ? action.value : 0;
+  }, {action, pressed}), bound);
+  let receipt;
+  try {
+    await set(true, deadline);
+    const result = await item.page.waitForFunction(sourceInputObserved, observation,
+      {timeout: Math.min(SOURCE_KEY_TIMEOUT_MS, remaining()), polling: 10});
+    try { receipt = await result.jsonValue(); }
+    finally { await result.dispose(); }
+  } finally {
+    await set(false, hardDeadline - 1000);
+  }
+  if (releaseMs) await item.page.waitForTimeout(releaseMs);
+  return receipt;
+}
+
 async function pressWithReceipt(item, key, label, expected, port = 0, releaseMs = 100) {
   const before = await readSnapshot(item, true);
   const afterSample = Number(before.input?.last_non_neutral?.sample ?? 0);
-  const event = {key, label, port, down: 'Playwright page keyboard', releaseMs};
+  const gamepad = useGamepad(item) && key !== 'End';
+  const source = gamepad ? 'gamepad' : 'keyboard';
+  const observation = {afterSample, port, source, observerBusy: OBSERVER_BUSY,
+    observationMs: SOURCE_KEY_TIMEOUT_MS - 25, ...expected};
+  const event = {key, label, port, down: gamepad ? 'authored browser Gamepad fixture' : 'Playwright page keyboard', releaseMs};
   item.inputEvents.push(event);
-  const observed = await bracketLive(item, label, () =>
+  const observed = await bracketLive(item, label, () => gamepad ? pressGamepad(item, key, observation, releaseMs) :
     item.driver.pressChord([key], {holdMs: 0, releaseMs,
-      observeBeforeRelease: {predicate: sourceInputObserved,
-        arg: {afterSample, port, observerBusy: OBSERVER_BUSY,
-          observationMs: SOURCE_KEY_TIMEOUT_MS - 25, ...expected}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}}));
-  assert(observed && observed.port === port && observed.sample > afterSample,
-    `${item.role} ${label} did not reach a new actual keyboard PAD poll: ${JSON.stringify(observed)}`);
+      observeBeforeRelease: {predicate: sourceInputObserved, arg: observation, timeoutMs: SOURCE_KEY_TIMEOUT_MS}}));
+  assert(observed && observed.port === port && observed.source === source && observed.sample > afterSample,
+    `${item.role} ${label} did not reach a new actual ${source} PAD poll: ${JSON.stringify(observed)}`);
   event.receipt = observed;
   return observed;
 }
 
-async function setKeyboardControls(item) {
+async function setControls(item) {
   const page = item.page;
+  const playerOne = useGamepad(item) ? 'controller' : 'keyboard';
   await page.locator('#controls-open').click({timeout: remaining()});
   await page.locator('#controls-dialog[open]').waitFor({timeout: remaining()});
   await page.locator('#keyboard-layout').selectOption('two', {timeout: remaining()});
-  await page.locator('#player-one-source').selectOption('keyboard', {timeout: remaining()});
+  await page.locator('#player-one-source').selectOption(playerOne, {timeout: remaining()});
   await page.locator('#player-two-source').selectOption('keyboard', {timeout: remaining()});
   const configured = await page.evaluate(() => ({layout: document.querySelector('#keyboard-layout')?.value,
     playerOne: document.querySelector('#player-one-source')?.value,
     playerTwo: document.querySelector('#player-two-source')?.value,
     statusOne: document.querySelector('#player-one-source-status')?.textContent?.trim(),
     statusTwo: document.querySelector('#player-two-source-status')?.textContent?.trim()}));
-  assert.deepEqual(configured, {layout: 'two', playerOne: 'keyboard', playerTwo: 'keyboard',
-    statusOne: 'Keyboard', statusTwo: 'Keyboard'}, `${item.role} keyboard controls were not selected in the UI`);
+  assert.deepEqual([configured.layout, configured.playerOne, configured.playerTwo, configured.statusTwo],
+    ['two', playerOne, 'keyboard', 'Keyboard'], `${item.role} controls were not selected in the UI`);
+  if (useGamepad(item))
+    assert.match(configured.statusOne, /^Controller only · Xbox Wireless Controller/,
+      'Guest fixture was not recognized as a ready P1 controller');
+  else assert.equal(configured.statusOne, 'Keyboard');
   await page.locator('#controls-close').click({timeout: remaining()});
   await page.locator('#controls-dialog').waitFor({state: 'hidden', timeout: remaining()});
   item.configured = configured;
@@ -422,12 +472,13 @@ async function enterSss(item) {
   await item.page.screenshot({path: path.join(output, `${item.role}-original-sss.png`), timeout: remaining()});
 }
 
-async function selectFinalDestination(item) {
+async function hoverStage(item, stageKind) {
+  const options = {source: true, stageKind, timeoutMs: SOURCE_READY_TIMEOUT_MS};
+  const ready = value => value.phase === 3 && value.sss?.gateObserved && value.sss.cooldown === 0;
   let snapshot = await waitSnapshot(item,
-    value => value.phase === 3 && value.sss?.gateObserved && value.sss.cooldown === 0,
-    'SSS source input readiness', {source: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    ready, 'SSS source input readiness', options);
   const movements = [];
-  for (let attempt = 0; attempt < SSS_MOVE_LIMIT && snapshot.sss.ids?.[1] !== STAGE_FINAL_DESTINATION; attempt++) {
+  for (let attempt = 0; attempt < SSS_MOVE_LIMIT && snapshot.sss.ids?.[1] !== stageKind; attempt++) {
     const [x, y, targetX, targetY] = snapshot.sss.geometry;
     const dx = targetX - x, dy = targetY - y;
     const key = Math.abs(dx) > 1.2 ? (dx > 0 ? 'd' : 'a') :
@@ -435,29 +486,64 @@ async function selectFinalDestination(item) {
     const expected = key === 'a' ? {stickX: -1} : key === 'd' ? {stickX: 1} :
       key === 'w' ? {stickY: 1} : {stickY: -1};
     const input = await pressWithReceipt(item, key, `P1 SSS cursor movement ${attempt + 1}`, expected, 0, 40);
-    snapshot = await waitSnapshot(item,
-      value => value.phase === 3 && value.sss?.gateObserved && value.sss.cooldown === 0,
-      `SSS source readiness after movement ${attempt + 1}`, {source: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    snapshot = await waitSnapshot(item, ready, `SSS source readiness after movement ${attempt + 1}`, options);
     movements.push({key, input, selectedStage: snapshot.sss.ids?.[1],
       cursor: snapshot.sss.geometry.slice(0, 2), target: snapshot.sss.geometry.slice(2, 4)});
   }
-  assert.equal(snapshot.sss?.ids?.[1], STAGE_FINAL_DESTINATION,
-    `${item.role} original SSS cursor did not reach Final Destination: ${JSON.stringify(snapshot.sss)}`);
-  item.source.sss_selection = {stage: snapshot.sss.ids[1], movements,
+  assert.equal(snapshot.sss?.ids?.[1], stageKind,
+    `${item.role} original SSS cursor did not reach source stage ${stageKind}: ${JSON.stringify(snapshot.sss)}`);
+  return {stage: snapshot.sss.ids[1], movements,
     cursor: snapshot.sss.geometry.slice(0, 2), target: snapshot.sss.geometry.slice(2, 4),
     cooldown: snapshot.sss.cooldown};
+}
+
+async function confirmFinalDestination(item) {
   item.traceLive = true;
   await pressWithReceipt(item, 'j', 'P1 A: original SSS confirms Final Destination',
     {buttonMask: SSS_CONFIRM_BUTTON});
+}
+
+async function waitForMatchScene(item) {
   const matchScene = await waitSnapshot(item, value => value.phase === 7,
     'original SSS→match scene', {timeoutMs: SOURCE_READY_TIMEOUT_MS});
   item.source.match_scene = {phase: matchScene.phase, roomStatus: matchScene.roomStatus};
+}
+
+async function rejectUnsupportedStage(beta) {
+  const hover = await hoverStage(beta, STAGE_BATTLEFIELD);
+  const input = await pressWithReceipt(beta, 'j', 'P1 A: attempt unsupported Battlefield',
+    {buttonMask: SSS_CONFIRM_BUTTON});
+  const observed = await readSnapshot(beta, true, {stageKind: STAGE_BATTLEFIELD});
+  assert.equal(observed.phase, 3, 'Unsupported confirmation left the original stage screen');
+  assert.equal(observed.startState, 1, 'Unsupported confirmation created a native offer');
+  assert.equal(observed.sss?.ids?.[1], STAGE_BATTLEFIELD, 'Unsupported confirmation changed the hovered stage');
+  beta.source.unsupportedStage = {hover, input, phase: observed.phase, startState: observed.startState};
+}
+
+async function verifySharedReady(alpha, beta) {
+  const guest = await waitSnapshot(beta, value => value.session?.lobby?.alpha?.phase === 'selected' &&
+    value.session.lobby.beta?.phase === 'sss',
+    'guest sees host ready while guest remains in stage select', {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+  const host = await readSnapshot(alpha, false, {diagnostics: true});
+  assert.equal(host.startState, 2, 'Host did not hold its original source offer while waiting for the guest');
+  assert.equal(guest.startState, 1, 'Guest started before confirming the admitted stage');
+  assert.equal(guest.phase, 3, 'Guest left original SSS before confirming the admitted stage');
+  assert.equal(guest.session.lobby.alpha.stage, STAGE_FINAL_DESTINATION);
+  assert(!host.session.start && !guest.session.start, 'Match agreement appeared before both confirmations');
+  const guestHostLabel = await beta.page.locator('#lobby-alpha').textContent({timeout: remaining()});
+  assert.match(guestHostLabel, /ready · Mario \/ Final Destination/);
+  report.lobbyRecoveryProof = {hostStartState: host.startState, guestStartState: guest.startState,
+    guestPhase: guest.phase, guestLobby: guest.session.lobby, guestHostLabel};
 }
 
 async function openPage(item, chromium, browserConfig, browserPath, playwrightPath, url) {
   item.browser = await chromium.launch(browserLaunchOptions(browserConfig, {headed: false, timeout: Math.min(60000, remaining())}));
   item.context = await item.browser.newContext({viewport: {width: 1280, height: 960}, deviceScaleFactor: 1});
   item.page = await item.context.newPage();
+  if (useGamepad(item)) await item.page.addInitScript(pad => {
+    window.stagingPairGamepad = pad;
+    Object.defineProperty(navigator, 'getGamepads', {value: () => [pad]});
+  }, standardPad());
   item.page.setDefaultTimeout(remaining());
   item.page.setDefaultNavigationTimeout(remaining());
   item.page.on('pageerror', error => item.errors.push({kind: 'pageerror', message: error.message}));
@@ -520,7 +606,7 @@ async function loadDiscAndConfigure(item) {
   assert(discReady.incidents, `${item.role} diagnostics recorder did not export a report`);
   await item.page.locator('#host:enabled').waitFor({timeout: remaining()});
   await item.page.locator('#join:enabled').waitFor({timeout: remaining()});
-  await setKeyboardControls(item);
+  await setControls(item);
   report.pages[item.role].configured_controls = item.configured;
 }
 
@@ -580,19 +666,12 @@ async function waitForLiveMatch(item) {
 
 async function sendP2Pulse(beta) {
   const before = await readSnapshot(beta, true, {label: 'P2 pre-key input snapshot'});
-  const beforeSample = Number(before.input?.last_non_neutral?.sample ?? 0);
   const beforeFrame = frameOf(before);
   assert.equal(before.localPort, 1, 'Beta page is not bound to source P2');
-  const actual = await bracketLive(beta, 'P2 ArrowRight key and PAD observation', () =>
-    beta.driver.pressChord(['ArrowRight'], {holdMs: 0, releaseMs: 120,
-      observeBeforeRelease: {predicate: sourceInputObserved,
-        arg: {afterSample: beforeSample, port: 1, stickX: 1, observerBusy: OBSERVER_BUSY,
-          observationMs: SOURCE_KEY_TIMEOUT_MS - 25}, timeoutMs: SOURCE_KEY_TIMEOUT_MS}}));
-  assert(actual && actual.port === 1 && actual.source === 'keyboard' && actual.stick?.[0] > 0,
-    `Beta P2 right pulse was not observed by an actual native input poll: ${JSON.stringify(actual)}`);
-  beta.inputEvents.push({key: 'ArrowRight', label: 'P2 short gameplay pulse', port: 1,
-    down: 'Playwright page keyboard', receipt: actual});
-  const neutral = await waitSnapshot(beta, value => value.input?.pads?.[1]?.source === 'keyboard' &&
+  const actual = await pressWithReceipt(beta, 'd', 'P2 short gameplay pulse', {stickX: 1}, 1, 120);
+  assert.equal(actual.online_local_device_port, 0, 'Guest pulse did not use the local P1 device');
+  assert.equal(actual.online_local_logical_port, 1, 'Guest pulse did not reach the logical P2 route');
+  const neutral = await waitSnapshot(beta, value => value.input?.pads?.[1]?.source === actual.source &&
     value.input.pads[1].err === 0 && value.input.pads[1].stick?.[0] === 0 &&
     value.input.samples > actual.sample,
     'actual P2 neutral release poll', {source: true, timeoutMs: 3000});
@@ -930,13 +1009,28 @@ async function main() {
   await settlePair(pages.map(item => openPage(item, chromium, browserConfig, browserPath,
     playwrightPath, url)));
   await settlePair(pages.map(loadDiscAndConfigure));
-  report.checks.push('Both pages imported the same local disc independently and selected P1/P2 keyboard input through Controls.');
+  report.checks.push(guestGamepad ?
+    'Both pages imported the same local disc independently. Controls selected the authored browser Gamepad for guest P1 and keyboard for the other ports.' :
+    'Both pages imported the same local disc independently and selected P1/P2 keyboard input through Controls.');
 
   const [alpha, beta] = pages;
   await hostThenJoin(alpha, beta);
   await settlePair(pages.map(enterSss));
-  await settlePair(pages.map(selectFinalDestination));
-  report.checks.push('Both pages used actual P1 keyboard events to traverse the original CSS and source-observed SSS to Final Destination.');
+  if (lobbyRecovery) {
+    await rejectUnsupportedStage(beta);
+    report.checks.push('Guest attempted to confirm visible Battlefield with actual P1 input and remained at original SSS without producing a native offer.');
+  }
+  await settlePair(pages.map(async item => {
+    item.source.sss_selection = await hoverStage(item, STAGE_FINAL_DESTINATION);
+  }));
+  if (lobbyRecovery) {
+    await confirmFinalDestination(alpha);
+    await verifySharedReady(alpha, beta);
+    report.checks.push('Guest saw the host ready for Final Destination while guest remained in SSS and host held its native offer.');
+    await confirmFinalDestination(beta);
+  } else await settlePair(pages.map(confirmFinalDestination));
+  await settlePair(pages.map(waitForMatchScene));
+  report.checks.push('Both pages used actual P1 input to traverse the original CSS and source-observed SSS to Final Destination.');
 
   await settlePair(pages.map(waitForLiveMatch));
   report.checks.push('Page-owned negotiation reached the same original four-stock Mario/Final Destination rollback session on both roles.');
@@ -978,7 +1072,7 @@ async function main() {
       waitForProgress(item, frameOf(pulseBaseline[index]))));
     report.pages.alpha.source.live.frameAfterPulse = frameOf(progressed[0]);
     report.pages.beta.source.live.frameAfterPulse = frameOf(progressed[1]);
-    report.checks.push('Beta P2 ArrowRight was observed in a real native keyboard input poll; both page-owned loops progressed across the pulse interval.');
+    report.checks.push(`Guest P2 right pulse was observed in a real native ${beta.source.gameplay_pulse.input.source} input poll; both page-owned loops progressed across the pulse interval.`);
   }
 
   for (const item of pages) {

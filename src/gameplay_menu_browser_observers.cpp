@@ -492,6 +492,23 @@ const char* melee_web_native_menu_match_observe(){
   return text;
  }
 }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+const char* melee_web_native_menu_online_lobby_observe(){
+ // Copy source-owned selection scalars only. Unlike geometry diagnostics this
+ // never requests a joint matrix rebuild or advances menu/input state.
+ if(!host||!host_entered)return nullptr;
+ StartMeleeData selection{};
+ uint8_t header[6]{};
+ const int kind=melee_web_menu_host_selection_state(host,&selection,header);
+ if(kind!=1&&kind!=2)return nullptr;
+ static char text[256];
+ melee_web::FixedFormatWriter out(text,sizeof(text));
+ out.add("{\"phase\":\"%s\",\"characters\":[%d,%d],\"colors\":[%d,%d],\"stage\":null}",
+   kind==1?"css":"sss",int(selection.players[0].ckind),int(selection.players[1].ckind),
+   int(selection.players[0].color),int(selection.players[1].color));
+ return text;
+}
+#endif
 const char* melee_web_native_menu_source_observe(){
  static char text[3072];
  MeleeWebMenuSourceObservation observed{};

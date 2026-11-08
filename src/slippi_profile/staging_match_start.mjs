@@ -4,7 +4,7 @@
 import {createRoomRelayPeerEndpoint} from '../../scripts/net_lockstep_websocket_relay.mjs';
 import {validateRuntimeMatchStartPrefix} from './runtime_match_history_controller.mjs';
 
-const SCHEMA = 'melee-web-staging-match-session-v1';
+const SCHEMA = 'melee-web-staging-match-session-v2';
 const STAGES = ['offer', 'agreement', 'held'];
 const LIMIT = 65536;
 const encoder = new TextEncoder();
@@ -12,6 +12,17 @@ const identityFields = ['runtime_sha256', 'asset_identity_sha256', 'save_profile
 const assert = (value, message) => { if (!value) throw Error(message); };
 const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value) &&
   Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+export function validateStagingLobbyState(value) {
+  assert(exactKeys(value, ['phase', 'characters', 'colors', 'stage']) &&
+    ['css', 'sss', 'selected', 'preparing'].includes(value.phase) &&
+    Array.isArray(value.characters) && value.characters.length === 2 &&
+    value.characters.every(kind => Number.isInteger(kind) && kind >= -1 && kind <= 255) &&
+    Array.isArray(value.colors) && value.colors.length === 2 &&
+    value.colors.every(color => Number.isInteger(color) && color >= 0 && color <= 255) &&
+    (value.stage === null || Number.isInteger(value.stage) && value.stage >= -1 && value.stage <= 255),
+    'Invalid shared lobby state');
+  return {phase:value.phase, characters:[...value.characters], colors:[...value.colors],stage:value.stage};
+}
 function boundedText(value, label) {
   assert(typeof value === 'string' && value.length && !value.includes('\0') &&
     encoder.encode(value).byteLength <= LIMIT, `${label} is not bounded source JSON`);
@@ -69,7 +80,7 @@ export async function stagingHeldIdentity({identity, prefix, publication}) {
  */
 export function createStagingMatchStart({role, url, roomId, identity, native,
   timeoutMs = 120000, createEndpoint = createRoomRelayPeerEndpoint,
-  onState = () => {}, onFailure = () => {}}) {
+  onState = () => {}, onFailure = () => {}, onLobby = () => {}}) {
   assert(role === 'alpha' || role === 'beta', 'Unknown room role');
   assert(Number.isSafeInteger(timeoutMs) && timeoutMs > 0, 'Invalid room setup timeout');
   for (const method of ['offer', 'agreement', 'commit', 'held'])
@@ -80,6 +91,7 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
   let matchCallbacks = null, queuedBytes = 0, operation = null, closeOperation = null;
   let endpoint = null, teardownQueued = false;
   let matchChain = Promise.resolve();
+  let sentLobbyRevision = 0, receivedLobbyRevision = 0, lastLobby = null;
   const abort = new AbortController();
   let rejectStopped;
   const stopped = new Promise((_, reject) => { rejectStopped = reject; });
@@ -107,8 +119,19 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
     try {
       check();
       const packet = JSON.parse(text);
+      if (typeof packet?.schema === 'string' && packet.schema.startsWith('melee-web-staging-match-session-') &&
+          packet.schema !== SCHEMA)
+        throw Error('Online player versions differ. Reload both computers before joining again.');
       assert(exactKeys(packet, ['schema', 'role', 'channel', 'stage', 'payload']) &&
         packet.schema === SCHEMA && packet.role === remoteRole, 'Unexpected room session packet');
+      if (packet.channel === 'lobby') {
+        assert(!negotiated && received < STAGES.length && packet.stage === receivedLobbyRevision + 1 &&
+          receivedLobbyRevision < 1024, 'Invalid shared lobby revision');
+        const state = validateStagingLobbyState(JSON.parse(boundedText(packet.payload, 'Lobby state')));
+        ++receivedLobbyRevision;
+        onLobby({role:remoteRole, revision:receivedLobbyRevision, state});
+        return;
+      }
       if (packet.channel === 'setup') {
         assert(packet.stage === STAGES[received], 'Duplicate or out-of-order setup packet');
         boundedText(packet.payload, 'Setup payload');
@@ -164,6 +187,23 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
       });
     });
   }
+  async function publishLobby(value) {
+    check();
+    assert(!negotiated, 'Lobby publication followed match agreement');
+    const state = validateStagingLobbyState(value), payload = JSON.stringify(state);
+    if (payload === lastLobby) return;
+    assert(sentLobbyRevision < 1024, 'Shared lobby update bound exceeded');
+    await endpoint.ready;
+    check();
+    assert(!negotiated, 'Lobby publication followed match agreement');
+    assert(sentLobbyRevision < 1024, 'Shared lobby update bound exceeded');
+    // Recheck after readiness: two callers may have waited for the same peer.
+    if (payload === lastLobby) return;
+    const revision = ++sentLobbyRevision;
+    lastLobby = payload;
+    await endpoint.send(JSON.stringify({schema:SCHEMA, role, channel:'lobby', stage:revision, payload}));
+    onLobby({role, revision, state});
+  }
   function negotiate() {
     if (operation) return operation;
     operation = (async () => {
@@ -174,7 +214,7 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
         const bounded = value => Promise.race([Promise.resolve(value), stopped]);
         try {
         await bounded(endpoint.ready);
-        onState('Choose locally on the original character and stage screens.');
+        onState('Connected. Both players choose Mario, then Final Destination.');
         const localText = boundedText(await bounded(native.offer({signal: abort.signal})), 'Local offer');
         const local = parseOffer(localText, identity);
         const remote = parseOffer(await exchange('offer', localText, deadline), identity);
@@ -233,6 +273,6 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
     closeOperation = endpoint.close();
     return closeOperation;
   }
-  return Object.freeze({negotiate, createMatchEndpoint, close,
+  return Object.freeze({negotiate, publishLobby, createMatchEndpoint, close,
     get failed() { return failure; }});
 }

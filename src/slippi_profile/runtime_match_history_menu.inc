@@ -1119,6 +1119,9 @@ EM_BOOL history_dispatch(double,void*) {
   if(command==10){
    if(!history_runtime_idle()||!history_gpu_idle())history_refuse("Cleanup requires actual renderer and Asyncify idle");
    else {
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    melee_web_input_set_online_guest_route(0);
+#endif
     close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();
     okay=!match&&!world&&!host&&!results&&!prize&&!c.capsule;
     if(okay){c.prefix_handoff.clear();c.prefix_handoff_json={};
@@ -1287,6 +1290,9 @@ EM_BOOL history_dispatch(double,void*) {
   c.terminal_tail_handoff_ready=false;c.terminal_tail_remote_ready=false;
   c.terminal_tail_remote={};match_history_terminal=false;
   // Resume at the ordinary pending preparation, before any further source tick.
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+  melee_web_input_set_online_guest_route(0);
+#endif
   history_start_release_completed_match();
   pending=true;menu_clock.reset();audio_clock.reset();
   emscripten_set_main_loop(tick,0,0);
@@ -2052,6 +2058,9 @@ int melee_web_native_menu_match_history_take_over(uint32_t frame,unsigned local,
   melee_web::slippi_profile::detail::validate_pointer_free_start(match->start_selection().start.rules);
   c.selection=match->start_selection();c.match_owner=match.get();c.archive_owner=archive_cache.get();c.host_owner=host;c.asset_owner=asset_generation;
   c.status.expected_frame=frame;c.status.local_port=local;c.status.remote_port=remote;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+  if(agreed_ready)melee_web_input_set_online_guest_route(local==1);
+#endif
   match_history_terminal=true;emscripten_cancel_main_loop();running=false;menu_clock.reset();audio_clock.reset();
   c.status.owner_state=1;return 1;
  }catch(const std::exception& e){return history_refuse(e.what());}

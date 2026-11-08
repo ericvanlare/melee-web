@@ -55,6 +55,12 @@ int melee_web_input_set_keyboard_port(unsigned port, int enabled);
  * ports retain priority). Requested keyboard flags survive switching back.
  * Clears held input on change; rejects unknown values. No simulation mutation. */
 int melee_web_input_set_keyboard_layout(int layout);
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+/* In rollback only, route the existing local P1 device to the guest slot.
+ * The input owner moves complete provider samples, including status bytes.
+ * Restore ordinary routing before local menus resume. */
+void melee_web_input_set_online_guest_route(int enabled);
+#endif
 /* Small JSON diagnostic. No physical-device or gameplay validation is implied. */
 const char* melee_web_input_message(void);
 /* Menu buttons from physical ports 0/1 using the same mapped PAD snapshot. */
