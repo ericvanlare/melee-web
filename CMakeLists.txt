@@ -25,10 +25,16 @@ option(MELEE_WEB_SLIPPI_SYNCTEST
   "Build the private drawn-reference versus no-draw Slippi dependency synctest" OFF)
 option(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC
   "Build the private Release ordinary-runtime source-history profile" OFF)
+option(MELEE_WEB_ROLLBACK_STAGING
+  "Build the experimental browser rollback staging profile" OFF)
+set(MELEE_WEB_MATCH_HISTORY_CORE OFF)
+if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC OR MELEE_WEB_ROLLBACK_STAGING)
+  set(MELEE_WEB_MATCH_HISTORY_CORE ON)
+endif()
 option(MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY
   "Enable private source-history staging-shadow inventory" OFF)
 set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED OFF)
-if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
+if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_CORE)
   set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED ON)
 endif()
 option(MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK
@@ -60,8 +66,9 @@ if(MELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE AND
    NOT MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
   message(FATAL_ERROR "Particle presentation requires the private v15 TObj profile")
 endif()
-if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
-  if(NOT EMSCRIPTEN OR NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR
+if(MELEE_WEB_MATCH_HISTORY_CORE)
+  if((MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC AND MELEE_WEB_ROLLBACK_STAGING) OR
+     NOT EMSCRIPTEN OR NOT CMAKE_BUILD_TYPE STREQUAL "Release" OR
      MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME OR
      MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_PIPELINE_PROVENANCE OR
      MELEE_WEB_SELECTIVE_PIPELINES OR MELEE_WEB_STADIUM_C1A_DIAGNOSTIC OR
@@ -69,7 +76,7 @@ if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
      MELEE_WEB_FMA_VELOCITY_Y_DIAGNOSTIC OR MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE OR
      MELEE_WEB_SLIPPI_PROFILE_BROWSER OR MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY)
     message(FATAL_ERROR
-      "Match-history diagnostic requires the private ordinary-runtime Release profile without synctest")
+      "Match-history runtime requires exactly one isolated Emscripten Release profile")
   endif()
   if(NOT MELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK OR
      NOT MELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE OR
@@ -78,7 +85,7 @@ if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)
      NOT MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY OR
      NOT MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC)
     message(FATAL_ERROR
-      "Match-history diagnostic requires the complete v20 profile and Aurora staging/quiescence owners")
+      "Match-history runtime requires the complete v20 profile and Aurora staging/quiescence owners")
   endif()
 endif()
 option(MELEE_WEB_FMA_COLLISION_DIAGNOSTIC
@@ -130,7 +137,7 @@ if(MELEE_WEB_PIPELINE_PROVENANCE)
   endif()
   add_compile_definitions(MELEE_WEB_PIPELINE_PROVENANCE=1)
 endif()
-if(EMSCRIPTEN AND MELEE_WEB_PUBLIC_RUNTIME)
+if(EMSCRIPTEN AND (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_ROLLBACK_STAGING))
   add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
   add_compile_options("-fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.")
 endif()

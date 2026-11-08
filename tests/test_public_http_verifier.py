@@ -13,11 +13,13 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import unittest
 import urllib.parse
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from verify_public_http import verify  # noqa: E402
+from verify_public_http import PLAYER_CSP, ROLLBACK_RELAY, verify
+import stage_audio_preview as audio  # noqa: E402
 
 
 class _StaticHTTP:
@@ -27,8 +29,11 @@ class _StaticHTTP:
                  overrides: dict[str, tuple[int, bytes]] | None = None,
                  missing_headers: set[str] | None = None,
                  missing_values: set[str] | None = None,
-                 missing_values_by_path: dict[str, set[str]] | None = None):
+                 missing_values_by_path: dict[str, set[str]] | None = None,
+                 rollback_staging: bool = False, duplicate_csp_path: str | None = None):
         self.files = files
+        self.rollback_staging = rollback_staging
+        self.duplicate_csp_path = duplicate_csp_path
         self.profile = profile
         self.canonical_redirects = canonical_redirects
         self.overrides = overrides or {}
@@ -62,7 +67,8 @@ class _StaticHTTP:
     def _get(self, request: BaseHTTPRequestHandler) -> None:
         path = urllib.parse.urlsplit(request.path).path
         if self.canonical_redirects and path.endswith(".html") and path in self.files:
-            destination = "/" if path == "/index.html" else path.removesuffix(".html")
+            destination = {"/index.html": "/", "/online/index.html": "/online/"}.get(
+                path, path.removesuffix(".html"))
             request.send_response(301)
             request.send_header("Location", destination)
             request.end_headers()
@@ -73,27 +79,37 @@ class _StaticHTTP:
             status, body = 200, self.files[path]
         else:
             request.send_response(404)
+            if self.rollback_staging:
+                request.send_header("X-Robots-Tag", "noindex")
             request.end_headers()
             return
         request.send_response(status)
         if status == 200:
+            online = self.rollback_staging and (path == "/online" or path.startswith("/online/"))
+            asset_cache = "no-cache" if online else "public, max-age=31536000, immutable"
+            if online:
+                if not path.endswith((".css", ".js", ".mjs", ".wasm", ".data")):
+                    request.send_header("Cache-Control", asset_cache)
+                if path.endswith(".json"):
+                    request.send_header("Content-Type", "application/json")
             if path.endswith(".css"):
                 request.send_header("Content-Type", "text/css")
-                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                request.send_header("Cache-Control", asset_cache)
             elif path.endswith((".js", ".mjs")):
                 request.send_header("Content-Type", "application/javascript")
-                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                request.send_header("Cache-Control", asset_cache)
             elif path.endswith(".wasm"):
                 request.send_header("Content-Type", "application/wasm")
-                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                request.send_header("Cache-Control", asset_cache)
             elif path.endswith(".data"):
                 request.send_header("Content-Type", "application/octet-stream")
-                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+                request.send_header("Cache-Control", asset_cache)
             elif path == "/licenses/runtime-third-party.txt":
                 request.send_header("Content-Type", "text/plain")
                 if "Cache-Control" not in self.missing_values | self.missing_values_by_path.get(path, set()):
                     request.send_header("Cache-Control", "public, max-age=0, must-revalidate")
-            elif path.endswith(".html") or path in {"/", "/terms", "/privacy", "/copyright", "/notices"}:
+            elif path.endswith(".html") or path in {"/", "/terms", "/privacy", "/copyright", "/notices",
+                                                       "/online", "/online/", "/online/source", "/404"}:
                 request.send_header("Content-Type", "text/html")
             if path not in self.missing_headers:
                 connect = "self" if self.profile == "player" else "none"
@@ -106,6 +122,12 @@ class _StaticHTTP:
                     "Permissions-Policy": "fullscreen=(self)",
                     "X-Robots-Tag": "noindex, nofollow, noarchive",
                 }
+                if self.rollback_staging:
+                    headers["Content-Security-Policy"] = (PLAYER_CSP.replace(
+                        "connect-src 'self';", f"connect-src 'self' {ROLLBACK_RELAY};", 1)
+                        if online else PLAYER_CSP)
+                    if path == self.duplicate_csp_path:
+                        request.send_header("Content-Security-Policy", PLAYER_CSP)
                 missing_values = self.missing_values | self.missing_values_by_path.get(path, set())
                 for key, value in headers.items():
                     if key not in missing_values:
@@ -217,6 +239,82 @@ class PublicHTTPVerifierTests(unittest.TestCase):
         self.servers.append(server)
         return server
 
+    def test_rollback_requires_opt_in_and_exact_effective_csp_on_real_http(self):
+        files, manifest = _player_fixture()
+        online = {"/online/index.html": b"<html>Online</html>",
+                  "/online/source.html": b"<html>Source</html>",
+                  "/online/runtime/rollback.json": b"{}",
+                  "/online/runtime/gameplay_menu_browser.wasm": b"staging wasm",
+                  "/online/web/online/online-shell.mjs": b"export {};"}
+        rows = [{"path": name.lstrip("/"), "size": len(body),
+                 "sha256": hashlib.sha256(body).hexdigest()}
+                for name, body in sorted(online.items())]
+        manifest["files"].extend(rows)
+        manifest["rollback"] = {"files": rows}
+        files.update(online)
+        files["/online"] = files["/online/"] = online["/online/index.html"]
+        files["/online/source"] = online["/online/source.html"]
+        self.manifest_path.write_text(json.dumps(manifest))
+        origin = self.server(files, profile="player", canonical_redirects=True, rollback_staging=True)
+        with self.assertRaisesRegex(ValueError, "explicit rollback"):
+            verify(origin.url, self.manifest_path)
+        report = verify(origin.url, self.manifest_path, rollback_staging=True)
+        self.assertIn("/online/", [item["canonical_path"] for item in report["aliases"]])
+        for path in ("/online/", "/"):
+            with self.subTest(path=path):
+                duplicate = self.server(files, profile="player", canonical_redirects=True,
+                                        rollback_staging=True, duplicate_csp_path=path)
+                with self.assertRaisesRegex(ValueError, "exactly one exact"):
+                    verify(duplicate.url, self.manifest_path, rollback_staging=True)
+
+    def test_frozen_audio_uses_real_audio_verifier_and_separate_online_inventory(self):
+        files, old = _player_fixture()
+        runtime_hash = old["runtime"]["hash"]
+        root = f"/runtime/{runtime_hash}/"
+        for path in tuple(files):
+            if path.startswith(root):
+                del files[path]
+        for name in (*audio.MODULES, *audio.NATIVE, "player/player-shell.mjs", "player/player.css"):
+            files[root + name] = name.encode()
+        files["/assets/site.0123456789abcdef.css"] = b"body {}"
+        files["/404.html"] = b"<html>Not found</html>"
+        files["/licenses/dolphin-gpl-2.0-or-later.txt"] = b"audio license"
+        files["/_headers"] = b"configuration"
+        files["/_redirects"] = b"configuration"
+        aliases = {"/", "/terms", "/privacy", "/copyright", "/notices"}
+        def records(entries):
+            return [{"path": path.lstrip("/"), "size": len(body),
+                     "sha256": hashlib.sha256(body).hexdigest()}
+                    for path, body in sorted(entries.items()) if path not in aliases]
+        base = {"schema": audio.PRODUCTION_SCHEMA, "project": "webmelee", "profile": "audio-player",
+                "runtime_hash": runtime_hash, "source_sha": "a" * 40, "identity_sha256": "b" * 64,
+                "files": records(files)}
+        base_manifest = self.manifest_path.with_name("audio.json")
+        base_manifest.write_text(json.dumps(base))
+        pin = {"manifest_sha256": hashlib.sha256(base_manifest.read_bytes()).hexdigest()}
+        online = {"/online/index.html": b"<html>Online</html>",
+                  "/online/source.html": b"<html>Source</html>"}
+        combined = dict(base, files=records(files | online),
+                        rollback={"audio_base": pin, "files": records(online),
+                                  "player": {"sourceSha": "c" * 40}})
+        self.manifest_path.write_text(json.dumps(combined))
+        for path in ("/_headers", "/_redirects"):
+            del files[path]
+        files.update(online)
+        files["/404"] = files["/404.html"]
+        files["/online"] = files["/online/"] = online["/online/index.html"]
+        files["/online/source"] = online["/online/source.html"]
+        origin = self.server(files, profile="player", canonical_redirects=True, rollback_staging=True)
+        with patch("verify_public_http.FROZEN_AUDIO_BASE", pin):
+            result = verify(origin.url, self.manifest_path, rollback_staging=True,
+                            base_audio_manifest=base_manifest)
+            self.assertIn(root.lstrip("/") + audio.NATIVE[1], result["resources"])
+            self.assertEqual(len(result["online_aliases"]), 3)
+            combined["source_sha"] = "c" * 40
+            self.manifest_path.write_text(json.dumps(combined))
+            with self.assertRaisesRegex(ValueError, "frozen audio identity"):
+                verify(origin.url, self.manifest_path, rollback_staging=True, base_audio_manifest=base_manifest)
+
     def test_valid_canonical_html_redirects_pass(self):
         origin = self.server(canonical_redirects=True)
         result = verify(origin.url, self.manifest_path)
@@ -281,7 +379,7 @@ class PublicHTTPVerifierTests(unittest.TestCase):
         environment["PYTHONPATH"] = str(ROOT / "scripts")
         probe = subprocess.run(
             [sys.executable, "-O", "-c",
-             "import sys; from verify_public_http import verify; verify(sys.argv[1], sys.argv[2])",
+             "import sys; from verify_public_http import PLAYER_CSP, ROLLBACK_RELAY, verify; verify(sys.argv[1], sys.argv[2])",
              origin.url, str(self.manifest_path)],
             env=environment, capture_output=True, text=True,
         )

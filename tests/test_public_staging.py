@@ -4,8 +4,13 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from build_public import _diagnostics_graph_hash
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -93,6 +98,168 @@ class PublicStagingTests(unittest.TestCase):
         overlay_value["files"] = stage._records(overlay_files)
         manifest.write_text(json.dumps(overlay_value, indent=2, sort_keys=True) + "\n")
         return output, manifest, overlay_files
+
+    def _rollback_fixture(self):
+        header = b"/*\n  Content-Security-Policy: default-src 'none'; connect-src 'self';\n"
+        self.base_files["_headers"] = header + self.base_files["_headers"]
+        (self.base / "_headers").write_bytes(self.base_files["_headers"])
+        self.base_value["files"] = stage._records(self.base_files)
+        self.base_manifest.write_bytes(stage._canonical_json_bytes(self.base_value))
+        self.base_digest = stage._sha256_bytes(self.base_manifest.read_bytes())
+        for name in (*stage.ROLLBACK_SOURCE_FILES, "web/online/index.html",
+                     "web/audio-worklet.js", "web/audio-ring.mjs",
+                     "src/slippi_profile/COPYING", "src/slippi_profile/README.md",
+                     "docs/licenses/runtime-third-party.txt",
+                     "docs/licenses/dolphin-gpl-2.0-or-later.txt"):
+            path = self.source / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"fixture {name}\n")
+        (self.source / "src/slippi_profile/profile.h").write_text(
+            '#define SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID "profile-v20"\n')
+        build, linked = self.root / "rollback-build", self.root / "rollback-linked"
+        build.mkdir()
+        linked.mkdir()
+        artifacts = {}
+        for name in stage.ROLLBACK_NATIVE_FILES:
+            data = name.encode()
+            (build / name).write_bytes(data)
+            artifacts[name] = stage._sha256_bytes(data)
+        table = {"schema": "melee-web-rollback-linked-statics-v1", "rows": [[32, 4, 2, 1]],
+                 "wasmSha256": artifacts["gameplay_menu_browser.wasm"], "policySha256": "d" * 64}
+        table_raw = stage._canonical_json_bytes(table)
+        (linked / "linked-statics.json").write_bytes(table_raw)
+        receipt = {"schema": "melee-web-rollback-staging-linked-table-receipt-v1",
+                   "profile": "runtime-rollback-staging", "sourceSha": "b" * 40,
+                   "artifacts": artifacts, "policySha256": "d" * 64,
+                   "configurationIdentitySha256": "e" * 64,
+                   "tableSha256": stage._sha256_bytes(table_raw), "rowCount": 1}
+        receipt_raw = stage._canonical_json_bytes(receipt)
+        (linked / "linked-statics-receipt.json").write_bytes(receipt_raw)
+        return dict(rollback_build=build, rollback_linked=linked,
+                    rollback_linked_receipt_sha256=stage._sha256_bytes(receipt_raw))
+
+    def test_rollback_exact_inventory_and_protected_vanilla(self):
+        options = self._rollback_fixture()
+        output, receipt = self.root / "online-output", self.root / "online-receipt.json"
+        with patch.object(stage, "_validate_source_sha"), patch.object(stage, "_validate_pr15_guard"), \
+                patch.object(stage, "_source_audit"):
+            result = stage.prepare_staging(
+                self.source, "b" * 40, output, receipt, reuse_output=self.base,
+                reuse_manifest=self.base_manifest, base_manifest_sha256=self.base_digest, **options)
+            self.assertEqual(result["staging_mode"], "rollback")
+            self.assertEqual(stage.validate_receipt(receipt)["rollback"], result["rollback"])
+            for rel, data in self.base_files.items():
+                if rel != "_headers":
+                    self.assertEqual((output / rel).read_bytes(), data)
+            headers = (output / "_headers").read_bytes()
+            self.assertTrue(headers.startswith(self.base_files["_headers"]))
+            self.assertIn(stage.ROLLBACK_RELAY.encode(), headers.split(b"/online/*", 1)[1])
+            self.assertEqual(json.loads((output / "online/runtime/rollback.json").read_bytes()),
+                             result["rollback"]["player"])
+            with self.assertRaisesRegex(stage.StageError, "schema"):
+                stage.audit_staging(self.source, "b" * 40, self.base, self.base_manifest,
+                                    self.base_digest, output, result["manifest"])
+            for rel in ("online/unauthorized.txt", "index.html"):
+                with self.subTest(rel=rel):
+                    path = output / rel
+                    before = path.read_bytes() if path.exists() else None
+                    path.write_bytes(b"untrusted")
+                    manifest = json.loads(result["manifest"].read_bytes())
+                    manifest["files"] = stage._records(stage._walk_files(output, "mutated package"))
+                    result["manifest"].write_bytes(stage._canonical_json_bytes(manifest))
+                    with self.assertRaisesRegex(stage.StageError, "exact overlay"):
+                        stage.audit_staging(self.source, "b" * 40, self.base, self.base_manifest,
+                                            self.base_digest, output, result["manifest"], **options)
+                    if before is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(before)
+
+    def test_rollback_native_path_scan_allows_only_actual_virtual_home_context(self):
+        virtual = b'FS.mkdir("/home/web_user");var env={PWD:"/",HOME:"/home/web_user",LANG:lang}'
+        js = "gameplay_menu_browser.js"
+        self.assertFalse(stage._rollback_native_has_local_path(js, virtual, self.source))
+        for path in (b'/home/web_user', b'/home/web_user' + b'/secret', b'/home/developer',
+                     b'/Users/developer', b'/Volumes/AgentStorage/private'):
+            with self.subTest(path=path):
+                self.assertTrue(stage._rollback_native_has_local_path(js, virtual + path, self.source))
+        self.assertTrue(stage._rollback_native_has_local_path("gameplay_menu_browser.wasm",
+                                                             virtual, self.source))
+
+    def test_rollback_rejects_stale_producer_artifact_and_table(self):
+        options = self._rollback_fixture()
+        build, linked = options["rollback_build"], options["rollback_linked"]
+        args = self.source, "b" * 40, self.base_files
+        inputs = stage._rollback_inputs(build, linked, options["rollback_linked_receipt_sha256"])
+        with self.assertRaisesRegex(stage.StageError, "exact staging producer"):
+            stage._rollback_package(self.source, "c" * 40, self.base_files, inputs)
+        for path, error in ((build / "gameplay_menu_browser.wasm", "artifact differs"),
+                            (linked / "linked-statics.json", "statics differs")):
+            with self.subTest(path=path.name):
+                data = path.read_bytes()
+                path.write_bytes(data + b" ")
+                with self.assertRaisesRegex(stage.StageError, error):
+                    stage._rollback_package(*args, inputs)
+                path.write_bytes(data)
+
+    def test_frozen_audio_overlay_preserves_distinct_source_and_backend(self):
+        options = self._rollback_fixture()
+        base_source = "a" * 40
+        base_runtime = "1234567890abcdef"
+        deployment_id = "11111111-2222-3333-4444-555555555555"
+        origin = "https://11111111.webmelee-staging.pages.dev"
+        proof = self.root / "audio-proof"
+        proof.mkdir()
+        backend = self.base.with_name(self.base.name + ".functions")
+        backend.mkdir()
+        routes = {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}
+        backend_bytes = {"_routes.json": stage._canonical_json_bytes(routes),
+                         "functions/api/diagnostics.js": b"frozen diagnostics"}
+        for name, raw in backend_bytes.items():
+            path = backend / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+        graph_hash = _diagnostics_graph_hash(backend_bytes)
+        identity = {"audio_policy": stage.FROZEN_AUDIO_POLICY, "artifacts": []}
+        identity_sha = stage._sha256_bytes(stage._canonical_json_bytes(identity))
+        manifest = {
+            "schema": "melee-web-audio-player-package-v1", "profile": "audio-player", "project": "webmelee",
+            "source_sha": base_source, "runtime_hash": base_runtime, "identity_sha256": identity_sha,
+            "files": stage._records(self.base_files),
+            "backend": {"directory": backend.name, "routes": routes, "graph_sha256": graph_hash,
+                        "files": stage._records(backend_bytes)},
+        }
+        self.base_manifest.write_bytes(stage._canonical_json_bytes(manifest))
+        digest = stage._sha256_bytes(self.base_manifest.read_bytes())
+        pin = {"source_sha": base_source, "runtime_hash": base_runtime, "deployment_id": deployment_id,
+               "manifest_sha256": digest, "backend_sha256": graph_hash}
+        receipts = {
+            "deployment-receipt.json": dict(pin, project=stage.STAGING_PROJECT, branch=stage.STAGING_BRANCH,
+                                            immutable_url=origin),
+            "immutable-http.json": {"origin": origin, "result": "pass", "manifest_sha256": digest},
+            "functions-proof.json": {"validated": True},
+            "runtime-audio-preview-identity.json": identity,
+        }
+        for name, data in receipts.items():
+            (proof / name).write_bytes(stage._canonical_json_bytes(data))
+        proof_pins = {name: stage._sha256_bytes((proof / name).read_bytes()) for name in receipts}
+        output, receipt = self.root / "online-output", self.root / "online-receipt.json"
+        with patch.object(stage, "FROZEN_AUDIO_BASE", pin), patch.object(stage, "FROZEN_AUDIO_PROOFS", proof_pins), \
+                patch.object(stage, "_validate_source_sha"), patch.object(stage, "_validate_pr15_guard"), \
+                patch.object(stage, "_source_audit") as source_audit:
+            result = stage.prepare_staging(
+                self.source, "b" * 40, output, receipt, reuse_output=self.base, reuse_manifest=self.base_manifest,
+                base_manifest_sha256=digest, frozen_audio_proof=proof, **options)
+            source_audit.assert_not_called()
+            overlay = json.loads(result["manifest"].read_bytes())
+            self.assertEqual(overlay["source_sha"], base_source)
+            self.assertEqual(overlay["rollback"]["player"]["sourceSha"], "b" * 40)
+            self.assertEqual(overlay["backend"], manifest["backend"])
+            self.assertEqual(stage.validate_receipt(receipt)["rollback"]["audio_base"], pin)
+            (backend / "functions/api/diagnostics.js").write_bytes(b"unexpected Functions")
+            with self.assertRaisesRegex(stage.StageError, "Functions bytes changed"):
+                stage.audit_staging(self.source, "b" * 40, self.base, self.base_manifest, digest, output,
+                                    result["manifest"], frozen_audio_proof=proof, **options)
 
     def test_reuse_inputs_are_all_or_none(self):
         output = self.root / "new-output"

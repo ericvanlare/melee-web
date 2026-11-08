@@ -50,6 +50,9 @@ struct MeleeWebSaveProfileOwner {
     int active;
     int default_initialized;
     int everything_initialized;
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    int online_initialized;
+#endif
 };
 
 static MeleeWebSaveProfileOwner* owner;
@@ -736,6 +739,10 @@ int melee_web_save_profile_owner_initialize_default(
     return ok(error, error_size);
 }
 
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+#include "slippi_profile/fresh_online_baseline.inc"
+#endif
+
 int melee_web_save_profile_owner_initialize_everything(
     MeleeWebSaveProfileOwner* candidate, char* error, size_t error_size)
 {
@@ -749,6 +756,10 @@ int melee_web_save_profile_owner_initialize_everything(
     if (!candidate->default_initialized)
         return fail(error, error_size,
                     "Everything unlocked requires a fresh original profile");
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    if (candidate->online_initialized)
+        return fail(error, error_size, "Fresh online baseline is already initialized");
+#endif
     if (candidate->everything_initialized)
         return fail(error, error_size,
                     "Everything unlocked baseline is already initialized");
@@ -900,6 +911,9 @@ int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner* candidate,
     candidate->fresh_state_snapshot = NULL;
     candidate->default_initialized = 0;
     candidate->everything_initialized = 0;
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    candidate->online_initialized = 0;
+#endif
     candidate->active = 0;
     return ok(error, error_size);
 }

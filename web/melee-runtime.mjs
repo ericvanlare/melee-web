@@ -26,7 +26,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
   readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
   diagnosticIdentity = null, onStartupProfile = () => {}, recordDiagnostics = true, stagingDiagnosticsOrigin = null,
-  loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
+  loaderUrl = new URL('./gameplay_public.js', import.meta.url), loaderIntegrity = null, startupTimeout = 60000} = {}) {
   let packagedIdentity = diagnosticIdentity;
   if (!packagedIdentity) {
     try { packagedIdentity = JSON.parse(document.getElementById?.('runtime-diagnostic-identity')?.content || 'null'); }
@@ -1345,6 +1345,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     window.Module = Module;
     publish();
     const loader = document.createElement('script'); loader.src = String(loaderUrl);
+    if(loaderIntegrity!==null){
+      if(typeof loaderIntegrity!=='string'||!/^sha256-[A-Za-z0-9+/]{43}=$/.test(loaderIntegrity))
+        throw Error('Player loader integrity is invalid.');
+      loader.integrity=loaderIntegrity;loader.crossOrigin='anonymous';
+    }
     loader.onload = () => profileCall('loaderLoaded');
     loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'), 'loader_failure');
     if (!fatal && !destroyed && !(ready && startupCacheReady && graphicsPreparationReady()))

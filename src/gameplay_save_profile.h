@@ -104,6 +104,12 @@ int melee_web_save_profile_owner_apply_card_data(
 int melee_web_save_profile_owner_initialize_default(
     MeleeWebSaveProfileOwner*, char* error, size_t error_size);
 
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+/* Apply the authored stage unlocks to the original fresh online profile. */
+int melee_web_save_profile_owner_initialize_fresh_online(
+    MeleeWebSaveProfileOwner*, char* error, size_t error_size);
+#endif
+
 /* Build the original source-owned completed/unlocked profile from a fresh
  * original default. The inventory is constrained to source-authored unlock
  * tables, trophy IDs, event-clear bits, eligible challenge-completion IDs,

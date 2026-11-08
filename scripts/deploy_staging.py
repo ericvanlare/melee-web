@@ -40,6 +40,17 @@ DIAGNOSTICS_ADMIN_SECRET = 'DIAGNOSTICS_ADMIN_TOKEN'
 DIAGNOSTICS_ADMIN_SECRET_MIN_LENGTH = 16
 DIAGNOSTICS_ENV_KEYS = DIAGNOSTICS_ENV_VARS | {DIAGNOSTICS_ADMIN_SECRET}
 DIAGNOSTICS_BINDING = 'DIAGNOSTICS_DB'
+DIAGNOSTICS_DATABASE_NAME = 'webmelee-staging-diagnostics'
+DIAGNOSTICS_DATABASE_ID = '2a94860d-c09a-46a3-883b-00af5308b0b1'
+COMPATIBILITY_DATES = {'production': '2026-10-01', 'preview': '2026-09-13'}
+PAGES_CONFIG_METADATA = {
+    'fail_open': True,
+    'always_use_latest_compatibility_date': False,
+    'compatibility_flags': [],
+    'build_image_major_version': 3,
+    'usage_model': 'standard',
+    'placement': {},
+}
 DIAGNOSTICS_FUNCTION_ROUTES = ('/api/diagnostics', '/api/diagnostics/*')
 D1_DATABASE_ID_RE = re.compile(
     r'(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'
@@ -67,7 +78,8 @@ def _plain_env_vars(value, *, require_admin_secret=False):
                     set(item) in ({'type'}, {'type', 'value'}) and
                     item.get('type') == 'secret_text',
                     'Diagnostics admin token must be the configured secret_text')
-            if 'value' in item:
+            # The Pages API also uses an empty string to redact a configured secret.
+            if 'value' in item and item['value'] != '':
                 require(isinstance(item['value'], str) and
                         DIAGNOSTICS_ADMIN_SECRET_MIN_LENGTH <= len(item['value']) <= 64 * 1024,
                         'Diagnostics admin token metadata must be at least 16 characters')
@@ -91,6 +103,7 @@ def _d1_databases(value):
         for binding, item in value.items():
             require(isinstance(item, dict), 'Diagnostics D1 binding must be an object')
             entry = dict(item)
+            require('binding' not in entry, 'Diagnostics D1 map entry repeats its binding')
             entry['binding'] = binding
             if 'id' in entry and 'database_id' not in entry:
                 entry['database_id'] = entry.pop('id')
@@ -155,7 +168,30 @@ def immutable_origin(value):
     return 'https://' + parsed.netloc
 
 
-def validate_project(project):
+def _diagnostics_databases(config, authenticated_database):
+    databases = _d1_databases(config.get('d1_databases') or [])
+    require(len(databases) == 1 and databases[0].get('binding') == DIAGNOSTICS_BINDING,
+            'Staging must expose exactly the diagnostics D1 binding')
+    database = databases[0]
+    if authenticated_database is not None:
+        require(database.get('database_id') == authenticated_database['database_id'] and
+                database.get('database_name', authenticated_database['database_name']) ==
+                authenticated_database['database_name'],
+                'Pages D1 binding differs from the authenticated staging database')
+        # Pages returns the ID but may omit the name needed by Wrangler.
+        database.setdefault('database_name', authenticated_database['database_name'])
+    require(set(database) == {'binding', 'database_id', 'database_name'},
+            'Diagnostics D1 binding contains unallowlisted configuration or lacks an authenticated name')
+    require(isinstance(database['database_id'], str)
+            and D1_DATABASE_ID_RE.fullmatch(database['database_id']),
+            'Diagnostics D1 database ID is invalid')
+    require(isinstance(database['database_name'], str) and
+            re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,62}', database['database_name']),
+            'Diagnostics D1 database name is invalid')
+    return databases
+
+
+def validate_project(project, *, authenticated_database=None):
     require(project.get('name') == PROJECT and project.get('production_branch') == BRANCH and
             project.get('subdomain') == urlsplit(PAGES).netloc,
             'Staging project identity or branch changed; refusing deployment')
@@ -168,22 +204,21 @@ def validate_project(project):
             'Staging analytics must be disabled')
     configurations = project.get('deployment_configs') or {}
     require(set(configurations) == {'preview', 'production'}, 'Missing staging environment configuration')
-    for config in configurations.values():
-        require(set(config) <= {'env_vars', 'd1_databases'},
+    for environment, config in configurations.items():
+        metadata = {**PAGES_CONFIG_METADATA, 'compatibility_date': COMPATIBILITY_DATES[environment]}
+        require(isinstance(config, dict) and
+                set(config) <= {'env_vars', 'd1_databases', 'wrangler_config_hash', *metadata},
                 'Staging has an unallowlisted Functions binding or configuration')
+        for key, expected in metadata.items():
+            if key in config:
+                actual = config[key]
+                require(type(actual) is type(expected) and actual == expected,
+                        f'Staging Pages metadata differs for {environment}.{key}')
+        if 'wrangler_config_hash' in config:
+            require(environment == 'production' and isinstance(config['wrangler_config_hash'], str) and
+                    bool(config['wrangler_config_hash']), 'Staging Wrangler config hash metadata is invalid')
         _plain_env_vars(config.get('env_vars') or {}, require_admin_secret=True)
-        databases = _d1_databases(config.get('d1_databases') or [])
-        require(isinstance(databases, list) and len(databases) == 1 and
-                isinstance(databases[0], dict) and databases[0].get('binding') == DIAGNOSTICS_BINDING,
-                'Staging must expose exactly the diagnostics D1 binding')
-        require(set(databases[0]) == {'binding', 'database_id', 'database_name'},
-                'Diagnostics D1 binding contains unallowlisted configuration')
-        require(isinstance(databases[0]['database_id'], str)
-                and D1_DATABASE_ID_RE.fullmatch(databases[0]['database_id']),
-                'Diagnostics D1 database ID is invalid')
-        require(isinstance(databases[0]['database_name'], str) and
-                re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,62}', databases[0]['database_name']),
-                'Diagnostics D1 database name is invalid')
+        _diagnostics_databases(config, authenticated_database)
 
 
 def validate_deployment(deployment, sha):
@@ -228,11 +263,31 @@ class Pages:
         require(body.get('success'), 'Cloudflare staging API request failed')
         return body['result']
 
+    def diagnostics_database(self):
+        _validate_wrangler_version(self.wrangler)
+        result = subprocess.run([self.wrangler, 'd1', 'info', DIAGNOSTICS_DATABASE_NAME, '--json'],
+                                cwd=ROOT, env=self.env, stdin=subprocess.DEVNULL, capture_output=True,
+                                text=True, timeout=30, check=False)
+        require(result.returncode == 0, 'Authenticated staging D1 identity could not be read')
+        try:
+            database = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            raise ValueError('Authenticated staging D1 identity could not be decoded') from None
+        require(isinstance(database, dict) and database.get('uuid') == DIAGNOSTICS_DATABASE_ID and
+                database.get('name') == DIAGNOSTICS_DATABASE_NAME,
+                'Authenticated D1 identity differs from the frozen staging database')
+        return {'database_id': database['uuid'], 'database_name': database['name']}
 
-def verify_http(source_root, origin, manifest):
+
+def verify_http(source_root, origin, manifest, *, rollback_staging=False, base_audio_manifest=None):
     require(origin in (STABLE, PAGES) or immutable_origin(origin), 'Invalid staging origin')
     verifier = load_module(source_root / 'scripts/verify_public_http.py', '_staging_http')
-    report = verifier.verify(origin, manifest)
+    if base_audio_manifest is not None:
+        report = verifier.verify(origin, manifest, rollback_staging=True, base_audio_manifest=base_audio_manifest)
+    elif rollback_staging:
+        report = verifier.verify(origin, manifest, rollback_staging=True)
+    else:
+        report = verifier.verify(origin, manifest)
     records = json.loads(manifest.read_text())['files']
     maps = tuple('/' + record['path'] + '.map' for record in records
                  if record['path'].endswith(('.wasm', '.js', '.mjs')))
@@ -341,7 +396,7 @@ def validate_functions_graph(functions_root, wrangler, scratch_parent=None):
     }
 
 
-def diagnostics_wrangler_config(project):
+def diagnostics_wrangler_config(project, *, authenticated_database=None):
     """Return the narrow generated config used for this direct upload.
 
     The repository template contains placeholders and migration paths for
@@ -352,13 +407,11 @@ def diagnostics_wrangler_config(project):
     # The Pages secret is intentionally validated and omitted.  Wrangler keeps
     # the existing project secret when this generated config is uploaded.
     env_vars = _plain_env_vars(production.get('env_vars') or {}, require_admin_secret=True)
-    databases = _d1_databases(production.get('d1_databases') or [])
-    require(len(databases) == 1, 'Diagnostics D1 configuration is unavailable')
-    database = databases[0]
+    database, = _diagnostics_databases(production, authenticated_database)
     return {
         '$schema': 'node_modules/wrangler/config-schema.json',
         'name': PROJECT,
-        'compatibility_date': '2026-10-01',
+        'compatibility_date': COMPATIBILITY_DATES['production'],
         'pages_build_output_dir': './public',
         'd1_databases': [{
             'binding': DIAGNOSTICS_BINDING,
@@ -399,6 +452,10 @@ def main():
     parser.add_argument('--deployment-id')
     parser.add_argument('--immutable-url')
     parser.add_argument('--previous-record', type=Path)
+    parser.add_argument('--rollback-build', type=Path)
+    parser.add_argument('--rollback-linked', type=Path)
+    parser.add_argument('--rollback-linked-receipt-sha256')
+    parser.add_argument('--frozen-audio-proof', type=Path)
     parser.add_argument('--verify-custom-domain', action='store_true',
                         help='Also require the optional staging.webmelee.gg hostname to pass')
     args = parser.parse_args()
@@ -407,6 +464,19 @@ def main():
     require(re.fullmatch(r'[0-9a-f]{64}', args.manifest_sha256) and
             hashlib.sha256(args.manifest.read_bytes()).hexdigest() == args.manifest_sha256,
             'Frozen staging manifest identity mismatch')
+    rollback_values = (args.rollback_build, args.rollback_linked, args.rollback_linked_receipt_sha256)
+    rollback_staging = all(value is not None for value in rollback_values)
+    require(rollback_staging or not any(value is not None for value in rollback_values),
+            'Rollback staging producer inputs are all-or-none')
+    audit_options = (dict(rollback_build=args.rollback_build.resolve(),
+                          rollback_linked=args.rollback_linked.resolve(),
+                          rollback_linked_receipt_sha256=args.rollback_linked_receipt_sha256)
+                     if rollback_staging else {})
+    base_audio_manifest = None
+    if args.frozen_audio_proof is not None:
+        require(rollback_staging, 'Frozen audio proof requires all rollback staging producer inputs')
+        audit_options['frozen_audio_proof'] = args.frozen_audio_proof.resolve()
+        base_audio_manifest = args.base_manifest.resolve()
     args.report_dir = args.report_dir.resolve()
     require(not args.report_dir.is_relative_to(args.output.resolve()) and
             not args.report_dir.is_relative_to(args.base_output.resolve()),
@@ -414,7 +484,8 @@ def main():
     args.report_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     stage = load_module(ROOT / 'scripts/stage_public.py', '_staging_package')
     evidence = stage.audit_staging(args.source_root.resolve(), args.sha, args.base_output.resolve(),
-        args.base_manifest.resolve(), args.base_manifest_sha256, args.output.resolve(), args.manifest.resolve())
+        args.base_manifest.resolve(), args.base_manifest_sha256, args.output.resolve(), args.manifest.resolve(),
+        **audit_options)
     write_json(args.report_dir / 'preflight.json', evidence)
     manifest_value = json.loads(args.manifest.read_text())
     backend = manifest_value.get('backend')
@@ -423,7 +494,8 @@ def main():
     if backend is not None:
         require(isinstance(backend, dict) and isinstance(backend.get('directory'), str),
                 'Diagnostics backend manifest metadata is invalid')
-        backend_sidecar = args.output.parent / backend['directory']
+        backend_sidecar = ((args.base_output if base_audio_manifest is not None else args.output).parent
+                           / backend['directory'])
         if not backend_sidecar.is_dir():
             base_candidate = args.base_output.parent / backend['directory']
             if base_candidate.is_dir():
@@ -446,9 +518,13 @@ def main():
         require(args.wrangler and args.account_id, 'Deployment requires Wrangler and explicit account ID')
         api = Pages(args.account_id, args.wrangler)
         project = api.request()
-        validate_project(project)
+        database = api.diagnostics_database()
+        validate_project(project, authenticated_database=database)
         previous = project.get('canonical_deployment')
         record['previous_staging_deployment_id'] = previous.get('id') if previous else None
+        if base_audio_manifest is not None and args.action == 'deploy':
+            require((previous or {}).get('id') == stage.FROZEN_AUDIO_BASE['deployment_id'],
+                    'Canonical staging deployment differs from the frozen audio base')
         if previous and args.action == 'deploy':
             require(args.previous_record, 'Preserve the previous staging deployment record before replacing it')
             previous_record = json.loads(args.previous_record.read_text())
@@ -456,6 +532,9 @@ def main():
                     previous_record.get('project') == PROJECT and
                     re.fullmatch(r'[0-9a-f]{64}', previous_record.get('manifest_sha256', '')),
                     'Previous staging record does not match the current rollback target')
+            if base_audio_manifest is not None:
+                require(previous_record['manifest_sha256'] == stage.FROZEN_AUDIO_BASE['manifest_sha256'],
+                        'Previous staging receipt does not bind the frozen audio manifest')
             write_json(args.report_dir / 'previous-staging-deployment.json', previous_record)
         write_json(args.report_dir / 'operation-started.json', record)
         if args.action == 'rollback':
@@ -464,19 +543,29 @@ def main():
             record.update(validate_deployment(target, args.sha))
             immutable = record['immutable_url']
             write_json(args.report_dir / 'rollback-target-http.json',
-                       verify_http(args.source_root, immutable, args.manifest))
+                       verify_http(args.source_root, immutable, args.manifest, rollback_staging=rollback_staging,
+                                   base_audio_manifest=base_audio_manifest))
             api.request('/deployments/' + args.deployment_id, rollback=True)
         else:
             with tempfile.TemporaryDirectory(prefix='webmelee-staging-upload-') as directory:
                 upload = Path(directory) / 'public'
                 shutil.copytree(args.output, upload)
                 stage.audit_staging(args.source_root.resolve(), args.sha, args.base_output.resolve(),
-                    args.base_manifest.resolve(), args.base_manifest_sha256, upload, args.manifest.resolve())
+                    args.base_manifest.resolve(), args.base_manifest_sha256, upload, args.manifest.resolve(),
+                    **audit_options)
                 if backend_sidecar is not None:
                     shutil.copytree(backend_sidecar / 'functions', Path(directory) / 'functions')
                     shutil.copy2(backend_sidecar / '_routes.json', upload / '_routes.json')
+                    if base_audio_manifest is not None:
+                        copied = {'functions/' + name: data for name, data in
+                                  stage._walk_files(Path(directory) / 'functions', 'upload Functions').items()}
+                        copied['_routes.json'] = (upload / '_routes.json').read_bytes()
+                        expected = [{key: item[key] for key in ('path', 'size', 'sha256')}
+                                    for item in backend['files']]
+                        require(stage._records(copied) == sorted(expected, key=lambda item: item['path']),
+                                'Frozen audio Functions bytes changed before upload')
                 config_path = Path(directory) / 'wrangler.json'
-                write_json(config_path, diagnostics_wrangler_config(project))
+                write_json(config_path, diagnostics_wrangler_config(project, authenticated_database=database))
                 command = [api.wrangler, 'pages', 'deploy', str(upload), '--project-name', PROJECT,
                            '--branch', BRANCH, '--commit-hash', args.sha,
                            '--commit-message', 'staging ' + args.sha, '--commit-dirty=false', '--no-bundle']
@@ -495,7 +584,7 @@ def main():
             require(len(matches) == 1, 'Cannot resolve unique staging deployment')
             record.update(validate_deployment(matches[0], args.sha))
         current = api.request()
-        validate_project(current)
+        validate_project(current, authenticated_database=database)
         require((current.get('canonical_deployment') or {}).get('id') == record['deployment_id'],
                 'Staging canonical deployment differs from the requested operation')
     record['immutable_url'] = immutable
@@ -504,7 +593,8 @@ def main():
     if args.verify_custom_domain:
         origins.append(('custom', STABLE))
     for name, origin in origins:
-        write_json(args.report_dir / (name + '-http.json'), verify_http(args.source_root, origin, args.manifest))
+        write_json(args.report_dir / (name + '-http.json'), verify_http(args.source_root, origin, args.manifest,
+                        rollback_staging=rollback_staging, base_audio_manifest=base_audio_manifest))
     write_json(args.report_dir / 'verified.json', {**record, 'http_result': 'pass',
                 'custom_domain_verified': args.verify_custom_domain,
                 'browser_result': 'separate headed lifecycle check required'})

@@ -215,7 +215,7 @@ void publish_runtime_timing(RuntimeTimingSample s){
 #endif
 }
 extern "C" {
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME) && !defined(MELEE_WEB_ROLLBACK_STAGING)
 EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
  // Read-only observer: serialize copied diagnostic storage, never live source
  // globals. KEEPALIVE exports only this getter; there is no injection endpoint.
@@ -223,15 +223,26 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
  try{json=results_entry_packet.json();return json.c_str();}
  catch(...){return "{\"error\":\"Results entry packet serialization failed\"}";}
 }
-EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
+#endif
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+#if !defined(MELEE_WEB_ROLLBACK_STAGING)
+EMSCRIPTEN_KEEPALIVE
+#endif
+const char* melee_web_native_menu_results_pad_trace(){
  static std::string json;
  json.clear();
+#if !defined(MELEE_WEB_ROLLBACK_STAGING)
  if(results){
   try{results_camera_entry_snapshot=results->camera_entry_snapshot();}
   catch(...){/* Preserve the last copied observer packet after source failure. */}
  }
  json.reserve(128+results_pad_trace_count*1024+
               results_camera_entry_snapshot.source_camera_subject_event_count*512);
+#else
+ // Staging needs only the existing bounded source PAD/Results-state trace.
+ // Keep detailed camera-owner diagnostics outside the player export surface.
+ json.reserve(128+results_pad_trace_count*1024);
+#endif
  json+="{";
  json+="\"schema\":\"melee-web-results-pad-trace-v1\"";
  json+=",\"source_frame_semantics\":\"zero-based Results source frame immediately before this tick attempt\"";
@@ -239,7 +250,9 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
  json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
  json+=",\"capacity\":";json+=std::to_string(kResultsPadTraceCapacity);
  json+=",\"overflow\":";json+=results_pad_trace_overflow?"true":"false";
+#if !defined(MELEE_WEB_ROLLBACK_STAGING)
  append_camera_entry_json(json);
+#endif
  json+=",\"samples\":[";
  for(size_t index=0;index<results_pad_trace_count;++index){
   if(index)json+=',';

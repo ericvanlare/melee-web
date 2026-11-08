@@ -129,6 +129,116 @@ test('indexed suffix reads touch only the new fixed-workload rows', async () => 
   });
 });
 
+async function readyStreamingPair(core, inputTicks) {
+  const wire = {alpha: [], beta: []}, frames = {alpha: [], beta: []};
+  const make = role => new core.LockstepPeer({role, sourceTicks: inputTicks + 2,
+    inputTicks, streaming: true,
+    pushFrame: async (firstTick, bytes) => {
+      for (let offset = 0; offset < bytes.length; offset += core.NET_FRAME_BYTES)
+        frames[role].push({tick:firstTick+offset/core.NET_FRAME_BYTES,
+          bytes:bytes.slice(offset,offset+core.NET_FRAME_BYTES)});
+    }});
+  const peers = {alpha:make('alpha'), beta:make('beta')};
+  for (const role of ['alpha','beta']) peers[role].attach(async text=>wire[role].push(text));
+  const agreement = {build:'same', scope:'stream-test', match_final:1, streaming:1};
+  await Promise.all([peers.alpha.start(agreement),peers.beta.start(agreement)]);
+  let alphaRead=0,betaRead=0;
+  const exchange = async () => {
+    for(let round=0;round<32;++round){
+      const before=[alphaRead,betaRead,wire.alpha.length,wire.beta.length].join(':');
+      while(alphaRead<wire.alpha.length) await peers.beta.receive(wire.alpha[alphaRead++]);
+      while(betaRead<wire.beta.length) await peers.alpha.receive(wire.beta[betaRead++]);
+      if(before===[alphaRead,betaRead,wire.alpha.length,wire.beta.length].join(':'))return;
+    }
+    assert.fail('stream peer-state exchange did not settle within its finite bound');
+  };
+  await exchange();
+  return {peers,wire,frames,agreement,exchange};
+}
+
+test('opt-in streaming lockstep keeps transport storage bounded as prefixes retire', async()=>{
+  const core=portableCore??await import('../scripts/net_lockstep_core.mjs');
+  const {peers,frames,exchange}=await readyStreamingPair(core,96);
+  for(let first=0;first<96;first+=8){
+    for(let tick=first;tick<first+8;++tick) await Promise.all([
+        peers.alpha.addLocalInput(tick,sample(tick+1)),
+        peers.beta.addLocalInput(tick,sample(tick+101)),
+      ]);
+    for(const peer of [peers.alpha,peers.beta])
+      assert(peer.nextSequence-(peer.remoteAckSequence+1)>=8,
+        'each batch creates actual outstanding sends while the peer ACK trails');
+    await exchange();
+  }
+  for(const role of ['alpha','beta']){
+    const peer=peers[role],summary=peer.summary();
+    assert.equal(peer.terminal,null);
+    assert.equal(summary.streaming,true);
+    assert.equal(summary.local_input_ticks,96);
+    assert.equal(summary.remote_input_ticks,96);
+    assert.equal(summary.remote_contiguous_input,95);
+    assert.equal(summary.next_source_frame,98);
+    assert.equal(summary.retained_local_input_rows,0);
+    assert.equal(summary.retained_native_local_rows,0);
+    assert.equal(summary.retained_remote_input_rows,0);
+    assert(summary.remote_ack_advertised_input>=95,
+      'a delayed acknowledgement retires its exact sent ACK watermark');
+    assert(summary.retained_ack_watermarks<=core.LOCKSTEP_WINDOW,
+      'unacknowledged packet watermarks remain bounded until a later peer packet');
+    const expectedPendingSequences=Array.from({length:peer.nextSequence-peer.remoteAckSequence-1},
+      (_,index)=>peer.remoteAckSequence+1+index);
+    assert.deepEqual([...peer.ackAdvertisedBySequence.keys()],expectedPendingSequences,
+      'retained ACK snapshots are exactly the sent sequences still awaiting acknowledgment');
+    assert(frames[role].length<=98);
+  }
+  for(const peer of [peers.alpha,peers.beta]){
+    await peer.disconnect('stream test teardown');
+    assert.equal(peer.ackAdvertisedBySequence.size,0,
+      'terminal teardown releases pending ACK snapshots');
+  }
+});
+
+test('streaming capacity refuses the first extra input and a missing stream agreement', async()=>{
+  const core=portableCore??await import('../scripts/net_lockstep_core.mjs');
+  const peer=new core.LockstepPeer({role:'alpha',sourceTicks:3,inputTicks:1,streaming:true,
+    pushFrame:async()=>{}});
+  peer.attach(async()=>{});
+  await assert.rejects(peer.start({build:'same'}),/explicitly agreed/);
+  const invalidPeer=new core.LockstepPeer({role:'alpha',sourceTicks:3,inputTicks:1,streaming:false,
+    pushFrame:async()=>{}});
+  invalidPeer.attach(async()=>{});
+  await assert.rejects(invalidPeer.start({build:'same',streaming:0}),/exactly 1 when present/);
+  const {peers,exchange}=await readyStreamingPair(core,1);
+  await assert.rejects(peers.alpha.addLocalInput(0,sample(8),{deferSend:true}),
+    /does not permit deferred/);
+  await Promise.all([peers.alpha.addLocalInput(0,sample(1)),peers.beta.addLocalInput(0,sample(2))]);
+  await exchange();
+  await assert.rejects(peers.alpha.addLocalInput(1,sample(3)),/capacity 1 was exhausted/);
+  assert.equal(peers.alpha.terminal.kind,'protocol');
+  assert.equal(peers.alpha.terminal.reason,'stream_input_capacity_exhausted');
+});
+
+test('streaming retention refuses progress past the existing 32-row transport window', async()=>{
+  const core=portableCore??await import('../scripts/net_lockstep_core.mjs');
+  const peer=new core.LockstepPeer({role:'alpha',sourceTicks:98,inputTicks:96,streaming:true,
+    pushFrame:async()=>{}});
+  const sent=[];
+  peer.attach(async text=>sent.push(text));
+  const agreement={build:'same',scope:'stream-test',match_final:1,streaming:1};
+  await peer.start(agreement);
+  await peer.receive(JSON.stringify({type:'hello',version:core.LOCKSTEP_VERSION,
+    role:'beta',local_port:1,remote_port:0,agreement}));
+  for(let tick=0;tick<32;++tick) await peer.addLocalInput(tick,sample(tick+1));
+  assert.equal(peer.local.size,32);
+  assert.equal(peer.nativeLocal.size,32);
+  await assert.rejects(peer.addLocalInput(32,sample(33)),/32-row protocol window/);
+  assert.equal(peer.terminal.kind,'protocol');
+  assert.equal(peer.terminal.reason,'stream_local_retention_window_exhausted');
+  assert.equal(peer.local.size,32,'refusal happens before another retained PAD row is written');
+  assert.equal(peer.nativeLocal.size,32);
+  assert.equal(sent.map(text=>JSON.parse(text)).filter(packet=>packet.type==='state').length,32,
+    'the refused 33rd input is never published');
+});
+
 test('compact peer health matches summary counters after rejected and terminal input paths', async () => {
   const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
   const peer = await readyAlpha(core);

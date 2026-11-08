@@ -41,6 +41,7 @@ const TERMINAL_TAIL_FIELDS=['schema','requestSequence','preSourceFrame','preOrdi
   'selectedPollSerial','sourceFrame','consumedOrdinal','completedTick','incarnation',
   'localPort','remotePort','suffixCount','suffixCursor','worldGeneration','contextEpoch'];
 const TERMINAL_FINAL_SCHEMA='melee-web-runtime-terminal-final-v1';
+const STAGING_JOURNAL_LIMITS=Object.freeze({commands:256,pacing:256,networkWaits:64});
 const TERMINAL_FINAL_FIELDS=['schema','firstSourceFrame','firstOrdinal','firstCompletedTick',
   'selectedSourceFrame','selectedOrdinal','selectedCompletedTick','sourceFrame',
   'consumedOrdinal','lastInputOrdinal','completedTick','ticketId','requestSequence',
@@ -413,17 +414,23 @@ export function decodeRuntimeMatchHistoryInput(bytes){
   return result;
 }
 
-export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=5000}={}){
+export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=5000,mode='diagnostic'}={}){
   if(!module||!(module.HEAPU8 instanceof Uint8Array)||
     !Number.isInteger(commandTimeoutMs)||commandTimeoutMs<1||commandTimeoutMs>5000)
     throw Error('Runtime history requires its loaded Module and bounded command deadline');
-  const names=['take_over','configure','remote_pad','request','status','status_bytes','input','input_bytes',
-    'error','identity_json','cpu_endpoint_begin','cpu_endpoint_record','cpu_endpoint_data','cpu_endpoint_bytes',
-    'cpu_endpoint_end','motor_data','motor_bytes','motor_commit_data','motor_commit_bytes','pcm_data','pcm_bytes'];
-  if(names.some(name=>typeof module[PREFIX+name]!=='function')||
+  if(!['diagnostic','staging'].includes(mode))
+    throw Error('Runtime history controller mode must be diagnostic or staging');
+  const diagnosticMode=mode==='diagnostic';
+  const commonNames=['take_over','configure','request','status','status_bytes','error','identity_json'];
+  const diagnosticNames=['remote_pad','input','input_bytes','cpu_endpoint_begin','cpu_endpoint_record',
+    'cpu_endpoint_data','cpu_endpoint_bytes','cpu_endpoint_end','motor_data','motor_bytes',
+    'motor_commit_data','motor_commit_bytes','pcm_data','pcm_bytes'];
+  const requiredNames=[...commonNames,...(diagnosticMode?diagnosticNames:['cpu_endpoint_admit'])];
+  if(requiredNames.some(name=>typeof module[PREFIX+name]!=='function')||
     ['_malloc','_free','_melee_web_net_validate_pad','UTF8ToString'].some(name=>typeof module[name]!=='function'))
     throw Error('Private runtime history exports are unavailable');
-  if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||module[PREFIX+'input_bytes']()!==INPUT_BYTES)
+  if(module[PREFIX+'status_bytes']()!==STATUS_BYTES||
+    (diagnosticMode&&module[PREFIX+'input_bytes']()!==INPUT_BYTES))
     throw Error('Private runtime history ABI differs from its controller');
   let busy=false,failed=null,terminal=false,captured=false,episodeMode=false,arenaMode=false;
   let inlineMode=false,nativeCallPending=false;
@@ -432,6 +439,21 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   let lastPolledEpisodeTicket=null,terminalCandidate=null,terminalTailActive=false;
   let terminalTailLastTicket=null,terminalTailFinalCopy=null,terminalTailAgreementConfirmed=false;
   const journal=[],pacingJournal=[],pacingWaitJournal=[];
+  const journalDropped={commands:0,pacing:0,networkWaits:0};
+  const appendJournal=(kind,entry)=>{
+    const target=kind==='commands'?journal:kind==='pacing'?pacingJournal:pacingWaitJournal;
+    const limit=diagnosticMode?Infinity:STAGING_JOURNAL_LIMITS[kind];
+    if(target.length>=limit){target.shift();journalDropped[kind]++;}
+    target.push(entry);
+  };
+  const journalRetention=()=>Object.freeze({
+    commands:Object.freeze({retained:journal.length,dropped:journalDropped.commands,
+      limit:diagnosticMode?null:STAGING_JOURNAL_LIMITS.commands}),
+    pacing:Object.freeze({retained:pacingJournal.length,dropped:journalDropped.pacing,
+      limit:diagnosticMode?null:STAGING_JOURNAL_LIMITS.pacing}),
+    networkWaits:Object.freeze({retained:pacingWaitJournal.length,dropped:journalDropped.networkWaits,
+      limit:diagnosticMode?null:STAGING_JOURNAL_LIMITS.networkWaits}),
+  });
   let activePacingWait=null;
   let pacingStarted=false;
   const queueCompletionWindow=globalThis.window??null;
@@ -863,7 +885,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
         if(pointer){
           const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
           if(receipt.stalled){
-            pacingJournal.push({budget:0,...receipt});
+            appendJournal('pacing',{budget:0,...receipt});
             const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
             error.pacingSample=receipt;
             throw latch(error);
@@ -891,7 +913,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
          receipt.totalExcludedMs!==expectedTotal+receipt.excludedMs)))
       throw latch(Error('Native pacing network wait receipt changed owner, duration, or debt'));
     activePacingWait=begin?receipt:null;
-    pacingWaitJournal.push(receipt);
+    appendJournal('networkWaits',receipt);
     return {...receipt};
   };
   const inlineCall=async(name,...args)=>{
@@ -1005,10 +1027,12 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     padArgument=allocatedPadArgument;
     installQueueCompletionObserver();
     return Object.freeze({
+    mode,
     status,
     journal:()=>structuredClone(journal),
     pacingJournal:()=>structuredClone(pacingJournal),
     pacingWaitJournal:()=>structuredClone(pacingWaitJournal),
+    journalRetention,
     pacingWaitBegin(kind,inputOrdinal){return pacingWaitTransition(true,kind,inputOrdinal);},
     pacingWaitEnd(kind,inputOrdinal){return pacingWaitTransition(false,kind,inputOrdinal);},
 
@@ -1033,7 +1057,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       // Preserve the clock's first failure before status() can turn it into a
       // generic native owner error. The clock itself never auto-resumes.
       const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
-      pacingJournal.push({budget,...receipt});
+      appendJournal('pacing',{budget,...receipt});
       if(receipt.stalled){
         const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
         error.pacingSample=receipt;throw latch(error);
@@ -1094,8 +1118,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(episodeMode)throw Error('Runtime episode mode is already enabled');
       check(status());
       episodeExport('arena_enable');
-      episodeExport('cpu_arena_endpoint_data');
-      episodeExport('cpu_arena_endpoint_bytes');
+      if(diagnosticMode){
+        episodeExport('cpu_arena_endpoint_data');
+        episodeExport('cpu_arena_endpoint_bytes');
+      }
       allocateFrameArgument();
       requireEpisodeSuccess('arena_enable');
       episodeMode=true;arenaMode=true;
@@ -1266,9 +1292,9 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       active();const bytes=pad(value);const pointer=writePadArgument(bytes);
       return module._melee_web_net_validate_pad(pointer,PAD_BYTES)===1;
     },
-    remotePad(value){active();if(episodeMode)throw Error('Legacy remote PAD injection is disabled in episode mode');
+    ...(diagnosticMode?{remotePad(value){active();if(episodeMode)throw Error('Legacy remote PAD injection is disabled in episode mode');
       const bytes=pad(value);const pointer=writePadArgument(bytes);
-      requireSuccess('remote_pad',pointer,PAD_BYTES);},
+      requireSuccess('remote_pad',pointer,PAD_BYTES);}}:{}),
     ticket(){
       active();if(!episodeMode)throw Error('Episode poll tickets require explicit episode mode');
       if(unclaimedPrefixTicket||adoptedPrefixTicket)
@@ -1349,15 +1375,14 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       active();
       return readTerminalReceipt();
     },
-    input(){
+    ...(diagnosticMode?{input(){
       active();if(episodeMode)throw Error('Episode mode exposes retained poll tickets and input receipts');
       const snapshot=check(status());
       const result=decodeRuntimeMatchHistoryInput(read(module[PREFIX+'input'](),INPUT_BYTES));
       if(result.pollSerial!==snapshot.metadata.pollSerial||result.localPort!==snapshot.localPort||result.remotePort!==snapshot.remotePort)
         throw latch(Error('Native input receipt differs from its live owner'));
       return result;
-    },
-    endpoint(request){
+    },endpoint(request){
       active();check(status());
       if(arenaMode){
         if(request?.arenaHistoryEndpoint===false||request?.particleCellEndpoint===false)
@@ -1367,7 +1392,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       }
       if(request?.arenaHistoryEndpoint)throw Error('Arena history was not enabled before capture');
       return collectCpuEndpointInPage(request,{runtime:'match-history',module});
-    },
+    }}:{}),
     admitEndpoint({view,provenance}){
       active();
       const terminalEndpoint=view===4&&provenance===4&&terminalCandidate&&
@@ -1395,9 +1420,11 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
           elapsedMs:performance.now()-started,before,after};
       }catch(error){throw latch(error);}
     },
-    motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
-    motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
-    pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},
+    ...(diagnosticMode?{
+      motor(){active();const size=module[PREFIX+'motor_bytes']();if(size!==1016)throw Error('Runtime motor evidence ABI');return read(module[PREFIX+'motor_data'](),size);},
+      motorCommit(){active();const size=module[PREFIX+'motor_commit_bytes']();if(size!==64)throw Error('Runtime motor commit ABI');return read(module[PREFIX+'motor_commit_data'](),size);},
+      pcm(){active();const size=module[PREFIX+'pcm_bytes']();if(!Number.isInteger(size)||size<8||size>1068*4||size%8)throw Error('Runtime emitted stereo PCM extent');return read(module[PREFIX+'pcm_data'](),size);},
+    }:{}),
     checksum({postDraw=false}={}){
       active();
       if(typeof postDraw!=='boolean')throw Error('Checksum endpoint kind must be explicit');
@@ -1577,7 +1604,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       const entry={command,name,started,status:'pending'};
       if(waitForRenderer)entry.queueWait={target:null,eventWakeCount:0,poll5msWakeCount:0,
         waitCount:0,elapsedMs:0,lastWake:null};
-      journal.push(entry);
+      appendJournal('commands',entry);
       if(name==='rebase'||name==='finishPrefix'||name==='rebaseConfirmedPrefix')
         entry.confirmedEnd=confirmedEnd;
       try{

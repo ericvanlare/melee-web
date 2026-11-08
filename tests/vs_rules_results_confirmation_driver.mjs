@@ -22,20 +22,32 @@ function checkHostReadinessShape(host) {
       !Number.isSafeInteger(host.phase) || ![0, 1].includes(host.running))
     return 'native host phase/running state is missing or malformed';
   if (host.error) return `native runtime error: ${host.error}`;
-  if (host.pause_present !== true || typeof host.pause_disabled !== 'boolean')
+  if ('owner_capabilities' in host) {
+    const capabilities = host.owner_capabilities;
+    if (!capabilities || typeof capabilities !== 'object' || Array.isArray(capabilities) ||
+        Object.keys(capabilities).length !== 2 || capabilities.schema !== 'ordinary-runtime-v1' ||
+        typeof capabilities.canPause !== 'boolean' ||
+        'pause_present' in host || 'pause_disabled' in host)
+      return 'ordinary runtime Pause capability is missing, malformed, or ambiguous';
+  } else if (host.pause_present !== true || typeof host.pause_disabled !== 'boolean') {
     return 'development pause-control presence/disabled state is missing';
+  }
   return null;
+}
+
+function canPause(host) {
+  return host.owner_capabilities ? host.owner_capabilities.canPause : !host.pause_disabled;
 }
 
 function activeOwner(host, phase, message, owner) {
   if (host.phase !== phase || host.running !== 1 || host.message !== message ||
-      host.pause_disabled !== false) return null;
+      !canPause(host)) return null;
   return {kind: 'active', owner, phase};
 }
 
 function stoppedPreparation(host, phase, nativeMessage, reason) {
   if (host.phase !== phase || host.running !== 0 || host.message !== nativeMessage ||
-      host.pause_disabled !== true) return null;
+      canPause(host)) return null;
   return {kind: 'preparing', phase, reason, message: nativeMessage,
     status: host.status};
 }

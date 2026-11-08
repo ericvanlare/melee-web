@@ -166,6 +166,23 @@ class SourceStateManifestTests(unittest.TestCase):
         lines.extend(f"{name}:BOOL={value}" for name, value in options.items())
         self.cache.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    def test_staging_manifest_requires_exact_exclusive_history_profile(self):
+        self._enable_match_history_cache()
+        private = self.cache.read_text(encoding="utf-8")
+        staging = private.replace("MATCH_HISTORY_DIAGNOSTIC:BOOL=ON",
+                                  "MATCH_HISTORY_DIAGNOSTIC:BOOL=OFF")
+        staging += "MELEE_WEB_ROLLBACK_STAGING:BOOL=ON\n"
+        self.cache.write_text(staging, encoding="utf-8")
+        manifest._validate_match_history_cmake_profile(self.cache, rollback_staging=True)
+        with self.assertRaises(manifest.ManifestError):
+            manifest._validate_match_history_cmake_profile(self.cache)
+        for invalid in (private, private + "MELEE_WEB_ROLLBACK_STAGING:BOOL=ON\n",
+                        staging.replace("PARTICLE_PRESENTATION_CACHE:BOOL=ON",
+                                        "PARTICLE_PRESENTATION_CACHE:BOOL=OFF")):
+            self.cache.write_text(invalid, encoding="utf-8")
+            with self.assertRaises(manifest.ManifestError):
+                manifest._validate_match_history_cmake_profile(self.cache, rollback_staging=True)
+
     def _move_to_profile_source_tree(self):
         self._enable_match_history_cache()
         profile_root = self.root / "build/gameplay-source-slippi-profile"

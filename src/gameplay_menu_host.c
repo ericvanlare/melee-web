@@ -1722,9 +1722,13 @@ MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
 
     if(owner||!seed_ptr){fail(e,n,"A menu host already exists or source RNG is unavailable");return NULL;}
     if((save_mode!=MELEE_WEB_SAVE_MODE_EVERYTHING&&
-        save_mode!=MELEE_WEB_SAVE_MODE_PERSONAL)||
+        save_mode!=MELEE_WEB_SAVE_MODE_PERSONAL
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+        &&save_mode!=MELEE_WEB_SAVE_MODE_FRESH_ONLINE
+#endif
+       )||
        (card_data_size!=0&&(!card_data||card_data_size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES))||
-       (save_mode==MELEE_WEB_SAVE_MODE_EVERYTHING&&card_data_size!=0)){
+       (save_mode!=MELEE_WEB_SAVE_MODE_PERSONAL&&card_data_size!=0)){
         fail(e,n,"Save mode/profile payload is not a supported source profile");return NULL;
     }
     MeleeWebMenuHost* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate native menu host");return NULL;}
@@ -1783,7 +1787,14 @@ int melee_web_menu_host_initialize_profile_baseline(
         return fail(e,n,"Original TyDatai trophy archive is absent from menu RuntimeFiles");
     Toy_803124BC();
 
-    if(!melee_web_save_profile_owner_initialize_everything(h->profile,e,n)||
+    int initialized;
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    if(h->save_mode==MELEE_WEB_SAVE_MODE_FRESH_ONLINE)
+        initialized=melee_web_save_profile_owner_initialize_fresh_online(h->profile,e,n);
+    else
+#endif
+        initialized=melee_web_save_profile_owner_initialize_everything(h->profile,e,n);
+    if(!initialized||
        !melee_web_save_profile_owner_snapshot_card_data(
            h->profile,h->baseline_profile,sizeof(h->baseline_profile),e,n)||
        (h->save_mode==MELEE_WEB_SAVE_MODE_PERSONAL&&

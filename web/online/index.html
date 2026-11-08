@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebMelee · Online staging</title><link rel="icon" href="data:,">
+<link rel="stylesheet" href="./web/online/online.css">
+<link rel="stylesheet" href="./web/controller-settings.css">
+<link rel="stylesheet" href="./web/controller-panel.css">
+<link rel="stylesheet" href="./web/touch-controls.css">
+<script src="./web/runtime-cache.js"></script><script type="module" src="./web/online/online-shell.mjs"></script></head>
+<body><main>
+<header><a href="/">WebMelee</a><span>Online staging · experimental</span></header>
+<h1>Play a rollback match</h1>
+<p>Slippi-compatible rules (unofficial). Initial slice: Mario vs. Mario, four stocks, Final Destination.</p>
+<p class="muted">This profile is incomplete. This project is not affiliated with or endorsed by Project Slippi.</p>
+<section class="room" aria-label="Room setup">
+<button id="choose-disc" disabled>Choose local disc</button><input id="disc-file" type="file" accept=".iso,.gcm,.ciso" hidden>
+<button id="host" disabled>Host match</button><label>Room code <input id="room-code" autocomplete="off" spellcheck="false" maxlength="64"></label>
+<button id="join" disabled>Join match</button><button id="copy" disabled>Copy invite</button><button id="leave" disabled>Leave</button>
+</section>
+<p id="room-status" role="status" aria-live="polite">Preparing the player…</p>
+<p id="instructions">Choose your own unmodified USA 1.02 disc. Your disc and game data stay on this device.</p>
+<div id="runtime-host"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas>
+<div id="loading-panel"><p id="loading-label">Preparing graphics…</p><progress id="loading-progress"></progress></div>
+<div id="touch-controls" hidden></div></div>
+<div class="toolbar"><button id="controls-open">Controls</button><button id="report">Export session report</button><span id="runtime-status"></span></div>
+<p id="error" role="alert" hidden></p>
+<footer><a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> · <a href="/notices">Notices</a> · <a href="./source.html">Profile source and license</a></footer>
+</main>
+<dialog id="disc-dialog"><h2>Choose your game copy</h2><p>Select a copy you are legally authorized to use. By choosing a file you agree to the <a href="/terms">Terms of Use</a> and acknowledge the <a href="/privacy">Privacy Notice</a> and <a href="/notices">legal disclosures</a>. Your selected file is never uploaded.</p><button id="disc-cancel">Cancel</button><button id="disc-confirm">Choose file</button></dialog>
+<dialog id="controls-dialog" aria-label="Controls"></dialog>
+</body></html>

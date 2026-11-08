@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Page-owned two-input peer transport for the private ordinary-runtime
 // retained-history diagnostic. This module has no native/game input path.
-import {LockstepPeer, LOCKSTEP_VERSION, lockstepConstants, parseNetChecksum, validateMatchFinalOutcome}
+import {LockstepPeer, LOCKSTEP_VERSION, LOCKSTEP_WINDOW, LOCKSTEP_STREAM_MAX_INPUT_TICKS, lockstepConstants,
+  parseNetChecksum, validateMatchFinalOutcome}
   from '../../scripts/net_lockstep_core.mjs';
 import {createRoomRelayPeerEndpoint} from '../../scripts/net_lockstep_websocket_relay.mjs';
 
@@ -17,6 +18,7 @@ export const RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS = 8;
 export const RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS = 120;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS = 600;
 export const RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS = 3600;
+export const RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS = LOCKSTEP_STREAM_MAX_INPUT_TICKS;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS = Object.freeze([26, 226, 426]);
 export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS =
   Object.freeze(['ArrowRight', 'ArrowLeft', 'ArrowRight']);
@@ -26,6 +28,8 @@ export const RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE =
   'melee-web-runtime-paced-600-respawn-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE =
   'melee-web-runtime-match-final-3600-history-peer-v1';
+export const RUNTIME_MATCH_HISTORY_STREAM_PEER_SCOPE =
+  'melee-web-runtime-match-until-terminal-stream-v1';
 const SUPPORTED_INPUT_TICKS = [1, RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
@@ -154,18 +158,25 @@ function validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame)
  * against the source serializer output; this function does not establish their
  * provenance. */
 export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
-  loadedIdentity, sourceFrame, inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
-  matchFinal = false} = {}) {
-  requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
+  loadedIdentity, sourceFrame, inputTicks, matchFinal = false, streaming = false} = {}) {
+  requireCondition(typeof streaming === 'boolean',
+    'Runtime history streaming mode must be a boolean');
+  inputTicks ??= streaming ? RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS :
+    RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS;
+  requireCondition(streaming ? inputTicks === RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS :
+    SUPPORTED_INPUT_TICKS.includes(inputTicks),
     'Runtime history peer supports one, two, four, eight, 120, 600, or 3600 indexed input samples');
   requireCondition(typeof matchFinal === 'boolean',
     'Runtime history match_final opt-in must be a boolean');
+  requireCondition(!streaming || matchFinal,
+    'Streaming match mode requires the final checksum and outcome exchange');
   requireCondition(inputTicks !== RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS || matchFinal,
     'The fixed 3600-input full-match scope requires match_final opt-in');
   validateSourceIdentity(sourceIdentityJson, loadedIdentity, sourceFrame);
   return Object.freeze({
     protocol: 'melee-web-local-lockstep-a2-v1',
-    scope: inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE :
+    scope: streaming ? RUNTIME_MATCH_HISTORY_STREAM_PEER_SCOPE :
+      inputTicks === RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS ? RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ? PACED_SCOPE :
       inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ? REBASE_SCOPE :
@@ -180,6 +191,7 @@ export function buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson,
     profile_identity: loadedIdentity.profile_identity,
     source_match_identity_json: sourceIdentityJson,
     ...(matchFinal ? {match_final: 1} : {}),
+    ...(streaming ? {streaming: 1} : {}),
   });
 }
 
@@ -207,8 +219,9 @@ function withDeadline(promise, timeoutMs, label) {
  * game or native input API. */
 export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs = RUNTIME_MATCH_HISTORY_PEER_TIMEOUT_MS,
   sampleTimeoutMs = timeoutMs, sourceIdentityJson, loadedIdentity, sourceFrame,
-  inputTicks = RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS,
+  inputTicks,
   matchFinal = false,
+  streaming = false,
   deferredLocalTick = null,
   deferredLocalTicks: deferredLocalTicksOption = null,
   validateNativePad, createEndpoint = createRoomRelayPeerEndpoint} = {}) {
@@ -225,10 +238,19 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   requireCondition(typeof createEndpoint === 'function',
     'Runtime history peer requires the existing room relay endpoint factory');
 
-  requireCondition(SUPPORTED_INPUT_TICKS.includes(inputTicks),
+  requireCondition(typeof streaming === 'boolean',
+    'Runtime history streaming mode must be a boolean');
+  inputTicks ??= streaming ? RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS :
+    RUNTIME_MATCH_HISTORY_PROTOCOL_INPUT_TICKS;
+  requireCondition(streaming ? inputTicks === RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS :
+    SUPPORTED_INPUT_TICKS.includes(inputTicks),
     'Runtime history peer supports one, two, four, eight, 120, 600, or 3600 indexed input samples');
   requireCondition(typeof matchFinal === 'boolean',
     'Runtime history match_final opt-in must be a boolean');
+  requireCondition(!streaming || matchFinal,
+    'Streaming match mode requires the final checksum and outcome exchange');
+  requireCondition(!streaming || (deferredLocalTick === null && deferredLocalTicksOption === null),
+    'Streaming match mode does not accept diagnostic deferred input ticks');
   requireCondition(deferredLocalTicksOption === null || deferredLocalTick === null,
     'Runtime history peer cannot mix single and multiple deferred tick options');
   let configuredDeferredTicks;
@@ -248,12 +270,13 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   } else configuredDeferredTicks = new Set();
   const sourceTicks = inputTicks + 2;
   const agreement = buildRuntimeMatchHistoryPeerAgreement({sourceIdentityJson, loadedIdentity, sourceFrame,
-    inputTicks, matchFinal});
+    inputTicks, matchFinal, streaming});
   const localPort = role === 'alpha' ? 0 : 1;
   const remotePort = role === 'alpha' ? 1 : 0;
   const remoteRole = role === 'alpha' ? 'beta' : 'alpha';
   const readyGate = deferred();
   const protocolFrameRows = [];
+  let protocolFrameCount = 0;
   const neutralPad = fromHex(lockstepConstants.neutralPad);
   const noControllerPad = fromHex(lockstepConstants.noControllerPad);
   let peer = null, endpoint = null, startOperation = null, closeOperation = null;
@@ -263,7 +286,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   const deferredLocalReleasePending = new Set();
   const localPublishPending = new Set();
   const remoteWaiters = new Set();
-  let matchFinalPublished = false;
+  let matchFinalPublished = false, matchedFinal = null;
+  let localPublishedThrough = -1, remoteAcceptedThrough = -1, prunedThrough = -1;
 
   const wakeRemoteWaiters = () => {
     for (const waiter of [...remoteWaiters]) waiter.wake();
@@ -275,6 +299,12 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     return failure;
   };
   const throwIfFailed = () => { if (failure) throw failure; };
+  const closedPeerError = message => {
+    if (failure) return failure;
+    const error = Error(message);
+    if (intentionalClose) error.code = 'RUNTIME_MATCH_PEER_CLOSED';
+    return error;
+  };
   const expectedProtocolFrame = protocolTick => {
     const expected = new Uint8Array(FRAME_BYTES);
     if (protocolTick < 2) {
@@ -294,7 +324,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   };
   const captureProtocolFrames = async (firstTick, input) => {
     const bytes = copyFrameBytes(input);
-    requireCondition(Number.isSafeInteger(firstTick) && firstTick === protocolFrameRows.length &&
+    const expectedFirst = streaming ? protocolFrameCount : protocolFrameRows.length;
+    requireCondition(Number.isSafeInteger(firstTick) && firstTick === expectedFirst &&
       bytes.length > 0 && bytes.length % FRAME_BYTES === 0,
       'Lockstep protocol frame callback is not a contiguous 44-byte sequence');
     const count = bytes.length / FRAME_BYTES;
@@ -316,13 +347,15 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         bytes_hex: toHex(frame),
       }));
     }
-    protocolFrameRows.push(...staged);
+    if (streaming) protocolFrameCount += staged.length;
+    else protocolFrameRows.push(...staged);
   };
 
   peer = new LockstepPeer({
     role,
     sourceTicks,
     inputTicks,
+    streaming,
     pushFrame: captureProtocolFrames,
     onReady: () => readyGate.resolve(),
     onTerminal: terminal => {
@@ -339,9 +372,11 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         batch.packetSequence >= 0,
         'Accepted remote PAD batch differs from agreed peer, role, port, or packet identity');
       requireCondition(Array.isArray(batch.inputs) && batch.inputs.length > 0 &&
-        batch.inputs.length <= inputTicks - remoteReceipts.size,
+        batch.inputs.length <= inputTicks - (remoteAcceptedThrough + 1),
         `Runtime history peer remote PAD batch exceeded its ${inputTicks}-input bound`);
-      let nextTick = remoteReceipts.size;
+      requireCondition(!streaming || remoteReceipts.size + batch.inputs.length <= LOCKSTEP_WINDOW,
+        `Runtime history streaming remote receipts exceeded the ${LOCKSTEP_WINDOW}-row retention window`);
+      let nextTick = remoteAcceptedThrough + 1;
       const staged = [];
       for (const input of batch.inputs) {
         requireCondition(input?.tick === nextTick && nextTick < inputTicks,
@@ -359,6 +394,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         ++nextTick;
       }
       for (const receipt of staged) remoteReceipts.set(receipt.protocol_input_tick, receipt);
+      remoteAcceptedThrough = nextTick - 1;
       wakeRemoteWaiters();
     },
   });
@@ -367,12 +403,13 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     if (!peer) throw Error('Runtime history peer receive arrived before LockstepPeer ownership');
     return peer.receive(text);
   }
-  async function onDisconnect(disconnectedRole, reason) {
+  function onDisconnect(disconnectedRole, reason) {
+    if (streaming && matchedFinal && !failure && !peer.terminal && disconnectedRole === role &&
+        reason === '4001: peer disconnected') return 'expected-final-disconnect';
     if (intentionalClose) return;
     const error = Error(`Runtime history ${disconnectedRole} relay disconnected: ${reason}`);
     latch(error);
-    try { await peer.disconnect(String(reason || 'room relay closed')); }
-    catch (terminalError) { latch(terminalError); }
+    return peer.disconnect(String(reason || 'room relay closed')).catch(error => { latch(error); });
   }
   function onEndpointError(errorRole, error) {
     if (intentionalClose) return;
@@ -382,7 +419,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   function start() {
     if (startOperation) return startOperation;
-    if (closed) return Promise.reject(Error('Runtime history peer is closed'));
+    if (closed) return Promise.reject(closedPeerError('Runtime history peer is closed'));
     if (failure) return Promise.reject(failure);
     startOperation = (async () => {
       try {
@@ -398,10 +435,17 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
           'Runtime history peer identity agreement');
         await withDeadline(peer.pump, timeoutMs, 'Runtime history peer preroll assembly');
         throwIfFailed();
-        requireCondition(protocolFrameRows.length === 2 &&
-          protocolFrameRows.every((row, index) => row.protocol_source_tick === index &&
-          row.protocol_preroll_neutral && row.match_source_frame === null && row.not_for_gameplay),
-          'Runtime history peer did not retain exactly two neutral protocol preroll frames');
+        if (streaming) {
+          // Streaming mode validates each frame in captureProtocolFrames and
+          // retains only this count, not an unbounded protocol-frame journal.
+          requireCondition(protocolFrameCount === 2,
+            'Runtime history peer did not assemble exactly two neutral protocol preroll frames');
+        } else {
+          requireCondition(protocolFrameRows.length === 2 &&
+            protocolFrameRows.every((row, index) => row.protocol_source_tick === index &&
+            row.protocol_preroll_neutral && row.match_source_frame === null && row.not_for_gameplay),
+            'Runtime history peer did not retain exactly two neutral protocol preroll frames');
+        }
         return snapshot();
       } catch (error) {
         const cause = latch(error);
@@ -419,6 +463,22 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   async function publishLocal({port, tick, pollSerial, pad, deferSend = false} = {}) {
     throwIfFailed();
+    if (streaming && Number.isSafeInteger(tick) && tick >= inputTicks) {
+      const error = Error(`Streaming input capacity ${inputTicks} was exhausted before native terminal`);
+      try { await peer.fail('protocol', {reason: 'stream_input_capacity_exhausted',
+        input_capacity: inputTicks, local_contiguous_input: localPublishedThrough}); }
+      catch (failureError) { latch(failureError); }
+      latch(error);
+      throw failure;
+    }
+    if (streaming && localReceipts.size >= LOCKSTEP_WINDOW) {
+      const error = Error(`Streaming local receipts reached the ${LOCKSTEP_WINDOW}-row retention window`);
+      try { await peer.fail('protocol', {reason:'stream_local_receipt_window_exhausted',
+        retained_rows:localReceipts.size}); }
+      catch (failureError) { latch(failureError); }
+      latch(error);
+      throw failure;
+    }
     requireCondition(!matchFinalPublished,
       'Runtime history final checksum was published; new local PAD publication is closed');
     requireCondition(typeof deferSend === 'boolean',
@@ -428,7 +488,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     requireCondition(!closed && peer?.ready,
       'Runtime history local PAD requires a ready, open peer');
     requireCondition(Number.isSafeInteger(tick) && tick >= 0 &&
-      tick < inputTicks && tick === localReceipts.size &&
+      tick < inputTicks && tick === localPublishedThrough + 1 &&
       localPublishPending.size === 0 &&
       !localReceipts.has(tick) && !localPublishPending.has(tick),
       `Runtime history peer accepts local PAD publications once, in contiguous index order 0..${inputTicks-1}`);
@@ -456,6 +516,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         pad: Object.freeze(Array.from(bytes)),
       });
       localReceipts.set(tick, receipt);
+      localPublishedThrough = tick;
       if (deferSend) deferredLocalTicks.add(tick);
       return frozenReceipt(receipt);
     } catch (error) {
@@ -493,6 +554,8 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   }
 
   function inputTick(value) {
+    if (streaming && Number.isSafeInteger(value) && value >= inputTicks)
+      throw Error(`Streaming input capacity ${inputTicks} was exhausted before native terminal`);
     requireCondition(Number.isSafeInteger(value) && value >= 0 &&
       value < inputTicks,
       `Runtime history peer input tick is outside the ${inputTicks}-sample bound`);
@@ -507,12 +570,14 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     tick = inputTick(tick);
     timeoutValue(waitTimeoutMs, 'Runtime history remote sample wait');
     throwIfFailed();
-    if (closed) throw Error('Runtime history peer closed before remote PAD acceptance');
+    if (closed) throw closedPeerError('Runtime history peer closed before remote PAD acceptance');
+    if (streaming && tick <= prunedThrough)
+      throw Error(`Runtime history remote PAD ${tick} is older than the retained stream window`);
     if (remoteReceipts.has(tick)) {
       const receipt = remoteSnapshot(tick);
       await Promise.resolve();
       throwIfFailed();
-      if (closed) throw Error('Runtime history peer closed before remote PAD acceptance');
+      if (closed) throw closedPeerError('Runtime history peer closed before remote PAD acceptance');
       return receipt;
     }
     let resolve, reject, timer;
@@ -522,7 +587,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     });
     const waiter = {wake: () => {
       if (failure) reject(failure);
-      else if (closed) reject(Error('Runtime history peer closed before remote PAD acceptance'));
+      else if (closed) reject(closedPeerError('Runtime history peer closed before remote PAD acceptance'));
       else if (remoteReceipts.has(tick)) resolve(remoteSnapshot(tick));
     }};
     remoteWaiters.add(waiter);
@@ -532,7 +597,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
       waiter.wake();
       const receipt = await promise;
       throwIfFailed();
-      if (closed) throw Error('Runtime history peer closed before remote PAD acceptance');
+      if (closed) throw closedPeerError('Runtime history peer closed before remote PAD acceptance');
       return receipt;
     } finally {
       clearTimeout(timer);
@@ -552,11 +617,18 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
     'Runtime history final source frame must be an unsigned 32-bit integer');
     requireCondition(localPublishPending.size === 0,
       'Runtime history final checksum cannot overtake a pending local PAD publication');
-    for (let tick = 0; tick <= inputOrdinal; ++tick) {
-      requireCondition(localReceipts.has(tick) && remoteReceipts.has(tick),
-        `Runtime history final checksum requires actual local and remote PAD receipts through ${inputOrdinal}`);
-      requireCondition(!deferredLocalTicks.has(tick),
-        `Runtime history final checksum cannot include unreleased deferred PAD tick ${tick}`);
+    if (streaming) {
+      requireCondition(localPublishedThrough >= inputOrdinal && remoteAcceptedThrough >= inputOrdinal,
+        `Runtime history final checksum requires actual local and remote PAD prefixes through ${inputOrdinal}`);
+      requireCondition(![...deferredLocalTicks].some(tick => tick <= inputOrdinal),
+        'Runtime history final checksum cannot include unreleased deferred PAD input');
+    } else {
+      for (let tick = 0; tick <= inputOrdinal; ++tick) {
+        requireCondition(localReceipts.has(tick) && remoteReceipts.has(tick),
+          `Runtime history final checksum requires actual local and remote PAD receipts through ${inputOrdinal}`);
+        requireCondition(!deferredLocalTicks.has(tick),
+          `Runtime history final checksum cannot include unreleased deferred PAD tick ${tick}`);
+      }
     }
     let bytes;
     try {
@@ -580,10 +652,11 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
         sourceFrame: finalSourceFrame, checksum: bytes, outcome, winner}), timeoutMs,
       'Runtime history final checksum agreement');
       throwIfFailed();
-      return Object.freeze({accepted_by:'lockstep-match-final', role,
+      matchedFinal = Object.freeze({accepted_by:'lockstep-match-final', role,
         input_ordinal:result.input_ordinal, source_frame:result.source_frame,
         agreement_hash:result.agreement_hash, outcome:result.outcome,
         winner:result.winner, matched_bytes:result.matched_bytes});
+      return matchedFinal;
     } catch (error) {
       latch(error);
       if (!peer.terminal) {
@@ -595,7 +668,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
   }
 
   function snapshot() {
-    return Object.freeze({
+    const result = {
       schema: 'melee-web-runtime-match-history-peer-snapshot-v1',
       scope: agreement.scope,
       execution_scope: 'page-peer-transport-only; module code is not execution evidence',
@@ -618,7 +691,42 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
       failure: failure ? String(failure.message || failure) : null,
       closed,
       transport_type: endpoint?.transport?.type ?? 'room-websocket',
-    });
+    };
+    if (streaming) Object.assign(result, {streaming: true,
+      local_published_through: localPublishedThrough,
+      remote_accepted_through: remoteAcceptedThrough,
+      protocol_frame_count: protocolFrameCount,
+      retained_local_receipts: localReceipts.size,
+      retained_remote_receipts: remoteReceipts.size,
+      pruned_through: prunedThrough});
+    return Object.freeze(result);
+  }
+
+  function prune({confirmedThrough, retainedFrom, nativeConsumedThrough, planFrom = null} = {}) {
+    throwIfFailed();
+    requireCondition(streaming,
+      'Runtime history receipt pruning is available only in terminal streaming mode');
+    requireCondition(Number.isSafeInteger(confirmedThrough) && confirmedThrough >= -1 &&
+      Number.isSafeInteger(retainedFrom) && retainedFrom >= 0 &&
+      Number.isSafeInteger(nativeConsumedThrough) && nativeConsumedThrough >= -1 &&
+      (planFrom === null || (Number.isSafeInteger(planFrom) && planFrom >= 0)),
+    'Runtime history stream pruning requires exact timeline/native cursors');
+    if (planFrom !== null || localPublishPending.size || deferredLocalReleasePending.size ||
+        peer.receiveQueueCount !== 0)
+      return Object.freeze({pruned_through: prunedThrough, frozen: true});
+    const localAckThrough = Math.min(localPublishedThrough, peer.remoteAckInput);
+    const remoteAckThrough = Math.min(remoteAcceptedThrough, peer.remoteAckAdvertisedInput);
+    const protocolConsumedThrough = protocolFrameCount - 1 - 2;
+    const pruneThrough = Math.min(confirmedThrough, retainedFrom - 1, nativeConsumedThrough,
+      localAckThrough, remoteAckThrough, protocolConsumedThrough);
+    if (pruneThrough <= prunedThrough)
+      return Object.freeze({pruned_through: prunedThrough, frozen: false});
+    for (const tick of localPads.keys()) if (tick <= pruneThrough) localPads.delete(tick);
+    for (const tick of localReceipts.keys()) if (tick <= pruneThrough) localReceipts.delete(tick);
+    for (const tick of remoteReceipts.keys()) if (tick <= pruneThrough) remoteReceipts.delete(tick);
+    prunedThrough = pruneThrough;
+    wakeRemoteWaiters();
+    return Object.freeze({pruned_through: prunedThrough, frozen: false});
   }
 
   function close() {
@@ -655,6 +763,7 @@ export function createRuntimeMatchHistoryPeer({role, relayUrl, roomId, timeoutMs
 
   return Object.freeze({start, publishLocal, releaseDeferredLocal, remoteSnapshot, waitForRemoteSample,
     publishMatchFinal, snapshot, close,
+    ...(streaming ? {prune} : {}),
     get failure() { return failure; }, get closed() { return closed; }});
 }
 

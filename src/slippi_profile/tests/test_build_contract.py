@@ -32,11 +32,17 @@ class SlippiSynctestBuildContractTests(unittest.TestCase):
     def test_profile_wiring_is_explicitly_opt_in_and_separate(self):
         cmake = (ROOT / "CMakeLists.txt").read_text()
         fighter_cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text()
-        for option in ('MELEE_WEB_SLIPPI_SYNCTEST', 'MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC'):
+        for option in ('MELEE_WEB_SLIPPI_SYNCTEST', 'MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC',
+                       'MELEE_WEB_ROLLBACK_STAGING'):
             self.assertRegex(cmake, rf'option\({option}\s+"[^"]+" OFF\)')
         self.assertIn(
+            'set(MELEE_WEB_MATCH_HISTORY_CORE OFF)\n'
+            'if(MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC OR MELEE_WEB_ROLLBACK_STAGING)\n'
+            '  set(MELEE_WEB_MATCH_HISTORY_CORE ON)\n'
+            'endif()', cmake)
+        self.assertIn(
             'set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED OFF)\n'
-            'if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC)\n'
+            'if(MELEE_WEB_SLIPPI_SYNCTEST OR MELEE_WEB_MATCH_HISTORY_CORE)\n'
             '  set(MELEE_WEB_SLIPPI_PROFILE_SOURCE_ENABLED ON)\n'
             'endif()', cmake)
         self.assertIn('if(MELEE_WEB_SLIPPI_SYNCTEST)', fighter_cmake)

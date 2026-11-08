@@ -184,12 +184,17 @@ int melee_web_native_asset_abort(unsigned generation){try{
 int melee_web_native_menu_set_save_profile(int mode,const uint8_t* data,unsigned size){try{
  check(!host&&!world&&!match&&!results&&!prize&&!host_entered,
        "Unload source owners before changing the staged save profile");
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+ check(mode==MELEE_WEB_SAVE_MODE_FRESH_ONLINE&&!size&&!data,
+       "Fresh online baseline does not accept external save data");
+#else
  check(mode==MELEE_WEB_SAVE_MODE_EVERYTHING||mode==MELEE_WEB_SAVE_MODE_PERSONAL,
        "Unsupported save mode");
  check((size==0&&!data)||(size==kSaveProfileBytes&&data),
        "Save profile must be empty or the exact original card-manifest extent");
  check(mode!=MELEE_WEB_SAVE_MODE_EVERYTHING||size==0,
        "Everything unlocked uses its original source baseline");
+#endif
  std::vector<uint8_t> next;
  if(size)next.assign(data,data+size);
  configured_save_profile=std::move(next);configured_save_mode=mode;

@@ -27,6 +27,8 @@ AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET = "runtime-match-draw-discard"
 MATCH_HISTORY_DIAGNOSTIC_TARGET = "runtime-match-history-diagnostic"
 MATCH_HISTORY_DIAGNOSTIC_BUILD_DIR = "build/browser-match-history-release"
+ROLLBACK_STAGING_TARGET = "runtime-rollback-staging"
+ROLLBACK_STAGING_BUILD_DIR = "build/browser-rollback-staging-release"
 FMA_DIAGNOSTIC_TARGET = "runtime-fma-diagnostic"
 FMA_COLLISION_OPERATION_INVENTORY = (
     ("80006e80", "broadphase_radius"),
@@ -102,6 +104,9 @@ BUILD_TARGETS = {
     MATCH_HISTORY_DIAGNOSTIC_TARGET: (
         "gameplay_menu_browser", "gameplay_menu_browser_match_history_source_manifest",
     ),
+    ROLLBACK_STAGING_TARGET: (
+        "gameplay_menu_browser", "gameplay_menu_browser_match_history_source_manifest",
+    ),
     FMA_DIAGNOSTIC_TARGET: ("gameplay_menu_browser",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
@@ -141,16 +146,18 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
-    if target == MATCH_HISTORY_DIAGNOSTIC_TARGET:
+    if target in {MATCH_HISTORY_DIAGNOSTIC_TARGET, ROLLBACK_STAGING_TARGET}:
         if configuration != "Release":
-            raise ValueError("runtime-match-history-diagnostic is Release-only; pass --configuration Release")
+            raise ValueError(f"{target} is Release-only; pass --configuration Release")
         if (pipeline_provenance or selective_pipelines or aurora_staging_shadow_diagnostic or
                 stage_arena_owner_diagnostic or slippi_logical_frame_clock or
                 slippi_lobj_presentation_cache or slippi_tobj_presentation_cache or
                 slippi_particle_presentation_cache or stadium_c1a_diagnostic or
                 fma_collision_diagnostic or fma_velocity_y_diagnostic):
-            raise ValueError("runtime-match-history-diagnostic uses its fixed isolated private profile")
-        return root / MATCH_HISTORY_DIAGNOSTIC_BUILD_DIR
+            profile = "private" if target == MATCH_HISTORY_DIAGNOSTIC_TARGET else "staging"
+            raise ValueError(f"{target} uses its fixed isolated {profile} profile")
+        return root / (MATCH_HISTORY_DIAGNOSTIC_BUILD_DIR if target == MATCH_HISTORY_DIAGNOSTIC_TARGET
+                       else ROLLBACK_STAGING_BUILD_DIR)
     if aurora_staging_shadow_diagnostic and (
             target != "gameplay_slippi_synctest" or configuration != "Release"):
         raise ValueError("Aurora staging-shadow diagnostics require the Release Slippi synctest")
@@ -1021,16 +1028,19 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("gameplay_slippi_synctest must be the only --trace-target")
     slippi_synctest = trace_targets == ("gameplay_slippi_synctest",)
     match_history_diagnostic = target == MATCH_HISTORY_DIAGNOSTIC_TARGET
-    if match_history_diagnostic:
+    rollback_staging = target == ROLLBACK_STAGING_TARGET
+    match_history_core = match_history_diagnostic or rollback_staging
+    if match_history_core:
         if configuration != "Release":
-            raise ValueError("runtime-match-history-diagnostic is Release-only; pass --configuration Release")
+            raise ValueError(f"{target} is Release-only; pass --configuration Release")
         if (pipeline_provenance or selective_pipelines or stadium_c1a_diagnostic or
                 fma_collision_diagnostic or fma_velocity_y_diagnostic or trace_targets or
                 gameplay_bootstrap_state or aurora_staging_shadow_diagnostic or
                 stage_arena_owner_diagnostic or slippi_logical_frame_clock or
                 slippi_lobj_presentation_cache or slippi_tobj_presentation_cache or
                 slippi_particle_presentation_cache):
-            raise ValueError("runtime-match-history-diagnostic uses its fixed isolated private profile")
+            profile = "private" if target == MATCH_HISTORY_DIAGNOSTIC_TARGET else "staging"
+            raise ValueError(f"{target} uses its fixed isolated {profile} profile")
     if slippi_tobj_presentation_cache and not slippi_lobj_presentation_cache:
         raise ValueError("TObj presentation cache requires the private v7 light owner profile")
     if slippi_tobj_presentation_cache and not aurora_staging_shadow_diagnostic:
@@ -1107,7 +1117,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         # bytes. Fail on source drift before compiling an outdated binding table.
         subprocess.run([sys.executable, str(root / "scripts/generate_fighter_registry.py"), "--check"],
                        cwd=root, check=True)
-        if slippi_synctest or match_history_diagnostic:
+        if slippi_synctest or match_history_core:
             gameplay_source = prepare_sources(root, lock, slippi_profile=True)
         else:
             gameplay_source = prepare_sources(root, lock)
@@ -1174,10 +1184,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
         )
         configure.append(
-            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic or match_history_diagnostic else 'OFF'}"
+            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic or match_history_core else 'OFF'}"
         )
         configure.append(
-            f"-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic or match_history_diagnostic else 'OFF'}"
+            f"-DMELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic or match_history_core else 'OFF'}"
         )
         configure.append(
             f"-DMELEE_WEB_STAGE_ARENA_OWNER_INVENTORY={'ON' if stage_arena_owner_diagnostic else 'OFF'}"
@@ -1189,6 +1199,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_MATCH_HISTORY_DIAGNOSTIC={'ON' if match_history_diagnostic else 'OFF'}"
         )
         configure.append(
+            f"-DMELEE_WEB_ROLLBACK_STAGING={'ON' if rollback_staging else 'OFF'}"
+        )
+        configure.append(
             f"-DMELEE_WEB_FMA_COLLISION_DIAGNOSTIC={'ON' if fma_collision_diagnostic else 'OFF'}"
         )
         configure.append(
@@ -1197,10 +1210,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
-        configure.append(f"-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK={'ON' if slippi_logical_frame_clock or match_history_diagnostic else 'OFF'}")
-        configure.append(f"-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE={'ON' if slippi_lobj_presentation_cache or match_history_diagnostic else 'OFF'}")
-        configure.append(f"-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE={'ON' if slippi_tobj_presentation_cache or match_history_diagnostic else 'OFF'}")
-        configure.append(f"-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE={'ON' if slippi_particle_presentation_cache or match_history_diagnostic else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_LOGICAL_FRAME_CLOCK={'ON' if slippi_logical_frame_clock or match_history_core else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_LOBJ_PRESENTATION_CACHE={'ON' if slippi_lobj_presentation_cache or match_history_core else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE={'ON' if slippi_tobj_presentation_cache or match_history_core else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE={'ON' if slippi_particle_presentation_cache or match_history_core else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST={'ON' if slippi_synctest else 'OFF'}")
         if slippi_synctest:
             configure.append(f"-DMELEE_WEB_SLIPPI_SYNCTEST_ASSET_ROOT={assets_root}")
@@ -1241,7 +1254,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
                                               MATCH_DRAW_DISCARD_DIAGNOSTIC_TARGET,
-                                              MATCH_HISTORY_DIAGNOSTIC_TARGET,
+                                              MATCH_HISTORY_DIAGNOSTIC_TARGET, ROLLBACK_STAGING_TARGET,
                                               FMA_DIAGNOSTIC_TARGET,
                                               "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
