@@ -44,7 +44,7 @@ function matchesBytes(value, expected){
 }
 
 export async function waitForLateRemotePairAndResume({tick,sourcePoll,
-  requireFollowingNeutral=false,waitForRemoteSample,resumeLateFrontier}={}){
+  requireFollowingNeutral=false,waitForRemoteSample,resumeLateFrontier,admitRemoteSample}={}){
   if(!Number.isSafeInteger(tick)||tick<0||
       !sourcePoll||sourcePoll.sourceFrame!==tick||sourcePoll.localPort!==1||
       sourcePoll.remotePort!==0||
@@ -56,23 +56,34 @@ export async function waitForLateRemotePairAndResume({tick,sourcePoll,
     throw Error('Late target receipt requires the retained actual beta native source poll');
 
   const actualPad=sourcePoll.raw.slice(sourcePoll.localPort*11,(sourcePoll.localPort+1)*11);
-  const targetPromise=Promise.resolve().then(()=>waitForRemoteSample(tick));
-  const followingPromise=requireFollowingNeutral
-    ?Promise.resolve().then(()=>waitForRemoteSample(tick+1)):Promise.resolve(null);
-  const [targetValue,followingValue]=await Promise.all([targetPromise,followingPromise]);
-  const receiptOf=value=>value?.receipt??value;
-  const target=receiptOf(targetValue),following=receiptOf(followingValue);
   const validReceipt=(receipt,sourceTick,pad)=>receipt&&
     receipt.accepted_by==='lockstep-protocol'&&receipt.sender_role==='beta'&&
     receipt.remote_port===1&&receipt.protocol_input_tick===sourceTick&&
     matchesBytes(receipt.pad,pad);
-  if(!validReceipt(target,tick,actualPad))
-    throw Error('Late target receipt differs from the retained actual beta native source poll');
-  if(requireFollowingNeutral&&!validReceipt(following,tick+1,new Array(11).fill(0)))
-    throw Error('Following beta receipt is not the actual neutral source poll');
-
+  const read=async(sourceTick,pad,error)=>{
+    const value=await waitForRemoteSample(sourceTick);
+    const receipt=value?.receipt??value;
+    if(!validReceipt(receipt,sourceTick,pad))throw Error(error);
+    if(admitRemoteSample)await admitRemoteSample(sourceTick,receipt);
+    return {receipt,timing:value?.timing??null};
+  };
+  const readTarget=()=>read(tick,actualPad,'Late target receipt differs from the retained actual beta native source poll');
+  const readFollowing=()=>requireFollowingNeutral
+    ?read(tick+1,new Array(11).fill(0),'Following beta receipt is not the actual neutral source poll')
+    :null;
+  let targetValue,followingValue;
+  if(admitRemoteSample){
+    // Timeline admission advances the earliest hole before the next native wait.
+    targetValue=await readTarget();
+    followingValue=await readFollowing();
+  }else{
+    [targetValue,followingValue]=await Promise.all([
+      Promise.resolve().then(readTarget),Promise.resolve().then(readFollowing)]);
+  }
+  const target=targetValue.receipt,following=followingValue?.receipt??null;
   await resumeLateFrontier(target);
-  return {target:structuredClone(target),followingNeutral:following?structuredClone(following):null};
+  return {target:structuredClone(target),followingNeutral:following?structuredClone(following):null,
+    ...(admitRemoteSample?{networkWaits:[targetValue.timing,followingValue?.timing].filter(Boolean)}:{})};
 }
 
 export function installRuntimePacedHistoryProbe({role,
@@ -133,14 +144,17 @@ export function installRuntimePacedHistoryProbe({role,
   };
   let networkWait=null;
   if(fullMatch)report.network_wait={count:0,elapsed_ms:0,by_kind:{},events:[]};
+  const recordNetworkWait=event=>{
+    const totals=report.network_wait;
+    const kind=totals.by_kind[event.kind]??={count:0,elapsed_ms:0};
+    totals.count++;totals.elapsed_ms+=event.elapsed_ms;
+    kind.count++;kind.elapsed_ms+=event.elapsed_ms;
+    totals.events.push(event);
+  };
   const finishNetworkWait=(interrupted=false)=>{
     if(!networkWait)return;
     const elapsed_ms=performance.now()-networkWait.started_at_ms;
-    const totals=report.network_wait;
-    const kind=totals.by_kind[networkWait.kind]??={count:0,elapsed_ms:0};
-    totals.count++;totals.elapsed_ms+=elapsed_ms;
-    kind.count++;kind.elapsed_ms+=elapsed_ms;
-    totals.events.push({...networkWait,elapsed_ms,interrupted});
+    recordNetworkWait({...networkWait,elapsed_ms,interrupted});
     networkWait=null;
   };
   const beginNetworkWait=(kind,details)=>{
@@ -338,6 +352,15 @@ export function installRuntimePacedHistoryProbe({role,
     const rebased=await call('episodeRebase',end);report.rebases.push(rebased);
     await capture();
   };
+  const admitRemoteTick=async tick=>{
+    if(tick!==remoteNext)throw Error('Remote admission differs from the next actual input');
+    const admission=await call('episodeAdmit',{tick});
+    const event=lateEvents.get(tick);
+    if(event&&role==='alpha')
+      event.scenario.remote_admission={tick,receipt:admission.receipt,timeline:admission.timeline};
+    remoteNext++;
+    return admission;
+  };
   const admitAvailable=async()=>{
     while(remoteNext<targetFrame){
       const active=await timeline();
@@ -345,12 +368,7 @@ export function installRuntimePacedHistoryProbe({role,
       if(remoteNext-nextLocal>=active.max_lookahead_ticks)break;
       const receipt=await call('peerRemoteSnapshot',{tick:remoteNext});
       if(!receipt)break;
-      const admission=await call('episodeAdmit',{tick:remoteNext});
-      const event=lateEvents.get(remoteNext);
-      if(event&&role==='alpha')
-        event.scenario.remote_admission={tick:remoteNext,receipt:admission.receipt,
-          timeline:admission.timeline};
-      remoteNext++;
+      await admitRemoteTick(remoteNext);
     }
   };
   let selectedTerminal=null;
@@ -571,10 +589,37 @@ export function installRuntimePacedHistoryProbe({role,
       scenario.remote_receipt=structuredClone(receipt);
       frontier.release();
     },
-    waitLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral=false}={}){
+    waitLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral=false,released=null}={}){
       if(role!=='alpha')throw Error('Only alpha owns the delayed-input frontier');
+      if(networkBackpressure){
+        const {frontier}=lateEvent(tick);
+        if(!frontier.entered||frontier.resumed||lateAborted||!requireFollowingNeutral||
+           released?.source_tick!==tick||released.poll_serial!==sourcePoll?.pollSerial||
+           released.local_port!==1||released.source_poll?.ticketId!==sourcePoll?.ticketId||
+           released.source_poll?.sourceFrame!==tick||!Array.isArray(sourcePoll?.raw)||
+           !matchesBytes(released.actual_local_pad,sourcePoll.raw.slice(11,22)))
+          throw Error('Late network wait requires the exact completed beta packet release');
+      }
       return waitForLateRemotePairAndResume({tick,sourcePoll,requireFollowingNeutral,
-        waitForRemoteSample:sourceTick=>peer.call('peerWaitRemote',{tick:sourceTick,timeoutMs:5000}),
+        waitForRemoteSample:async sourceTick=>{
+          if(!networkBackpressure)return peer.call('peerWaitRemote',{tick:sourceTick,timeoutMs:5000});
+          const result=await call('episodeAwaitNetworkInput',{kind:1,tick:sourceTick,requiredThrough:tick+1});
+          if(result.excluded){
+            const {startedAt,observedAt,endedAt,excludedMs}=result.timing;
+            recordNetworkWait({kind:'released-late-input',input_ordinal:sourceTick,
+              required_input_through:tick+1,started_at_ms:startedAt,observed_at_ms:observedAt,
+              ended_at_ms:endedAt,elapsed_ms:observedAt-startedAt,native_excluded_ms:excludedMs,
+              interrupted:false});
+          }
+          return result;
+        },
+        ...(networkBackpressure?{admitRemoteSample:async(sourceTick,receipt)=>{
+          if(lateAborted)throw Error('Late frontier was aborted before remote admission');
+          const admission=await admitRemoteTick(sourceTick);
+          if(admission.receipt.packet_sequence!==receipt.packet_sequence||
+             !matchesBytes(admission.receipt.pad,receipt.pad))
+            throw Error('Late frontier admitted a different receipt');
+        }}:{}),
         resumeLateFrontier:receipt=>api.resumeLateFrontier(receipt)});
     },
     waitForWalkStart(){return walkStart.wait();},

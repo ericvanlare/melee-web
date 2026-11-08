@@ -561,12 +561,18 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
               throw Error('Network wait received an unrelated peer PAD receipt');
             return receipt;
           };
+          const startedAt=performance.now();
           const available=peer.remoteSnapshot(tick);
-          if(available)return {receipt:validate(available),excluded:false};
+          if(available){
+            const receipt=validate(available),observedAt=performance.now();
+            return {receipt,excluded:false,timing:{tick,startedAt,observedAt,endedAt:observedAt,excludedMs:0}};
+          }
           owner.pacingWaitBegin(kind,tick);
           const receipt=validate(await peer.waitForRemoteSample({tick}));
+          const observedAt=performance.now();
           const clock=owner.pacingWaitEnd(kind,tick);
-          return {receipt,excluded:true,clock};
+          return {receipt,excluded:true,clock,timing:{tick,startedAt,observedAt,
+            endedAt:performance.now(),excludedMs:clock.excludedMs}};
         }
         case 'episodeTimeline': return timeline.status();
         default: throw Error(`Unknown episode operation ${operation}`);

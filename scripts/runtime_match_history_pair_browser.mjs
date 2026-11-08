@@ -1813,16 +1813,24 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         if(stockoutScenario)await timedCoordination(event,'beta-release-key',async()=>{
           await beta.page.keyboard.up(inputKey);beta.keyToRelease=null;
         });
-        const alphaReceiptTask=timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
+        const receiveAlpha=released=>timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
           alpha.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.waitLateRemotePairAndResume(args),{
-            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:stockoutScenario}),
+            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:stockoutScenario,released}),
           'Late target and following-neutral receipts'));
-        const betaReleaseTask=timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
+        const releaseBeta=()=>timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
           beta.page.evaluate(async tick=>{
             const api=globalThis.__meleeRuntimePacedHistory;
             const released=await api.releaseLatePacket(tick);api.resumeLatePacket(tick);return released;
           },tick),'Late beta packet release and source resume'));
-        const [received,released]=await Promise.all([alphaReceiptTask,betaReleaseTask]);
+        let received,released;
+        if(networkBackpressure){
+          // Deliberate hold, keyboard and release coordination remain charged.
+          released=await releaseBeta();
+          received=await receiveAlpha(released);
+          event.post_release_network_waits=received.networkWaits;
+        }else{
+          [received,released]=await Promise.all([receiveAlpha(null),releaseBeta()]);
+        }
         const remote=received.target;
         assert.deepEqual(Buffer.from(remote.pad),Buffer.from(betaEvidence.poll.raw).subarray(11,22),
           'Released peer packet differs from the actual beta poll');

@@ -1428,3 +1428,58 @@ test('default peer wire remains dense and does not send final control packets',a
         packet.type==='match_final'||packet.type==='match_final_ack'),false);
   }finally{await Promise.allSettled([alpha.close(),beta.close()]);}
 });
+
+test('released late waits exclude only actual missing receipts in admitted input order',async()=>{
+  const source=await readFile(new URL(
+    '../src/slippi_profile/tests/runtime_peer_history_probe.mjs',import.meta.url),'utf8');
+  const start=source.indexOf("        case 'episodeAwaitNetworkInput': {");
+  const end=source.indexOf("        case 'episodeTimeline':",start);
+  assert(start>=0&&end>start);
+  const run=new Function('networkBackpressure','arenaEnabled','timeline','inputTicks',
+    'terminalTailPublished','peer','owner','localPort','performance',
+    'return async value=>{switch("episodeAwaitNetworkInput"){'+source.slice(start,end)+'}}');
+  const sourcePoll=actualBetaPoll(),pad=sourcePoll.raw.slice(11,22),neutral=new Array(11).fill(0);
+  const receipts=new Map([[26,remotePadReceipt(26,pad)],[27,remotePadReceipt(27,neutral)]]);
+  const ready=new Set([27]); // Following neutral arrived before the required target.
+  const events=[];let through=25,time=100,releaseTarget;
+  const timeline={status:()=>({remote_contiguous_through:through})};
+  const peer={remoteSnapshot:tick=>ready.has(tick)?receipts.get(tick):null,
+    waitForRemoteSample:({tick})=>{
+      assert.equal(tick,26);
+      events.push(['wait',tick]);
+      return new Promise(resolve=>{releaseTarget=()=>{ready.add(tick);resolve(receipts.get(tick));};});
+    }};
+  const owner={pacingWaitBegin:(kind,tick)=>events.push(['begin',kind,tick,time]),
+    pacingWaitEnd:(kind,tick)=>{events.push(['end',kind,tick,time]);time+=3;return {excludedMs:39};}};
+  const wait=run(true,true,timeline,3600,null,peer,owner,0,{now:()=>time});
+  await assert.rejects(wait({kind:1,tick:27,requiredThrough:27}),/earliest required/);
+  assert.deepEqual(events,[]);
+  // The harness completed its deliberate hold and beta release before starting alpha's wait.
+  time=140;
+  const pacedSource=await readFile(new URL(
+    '../src/slippi_profile/tests/runtime_paced_history_probe.mjs',import.meta.url),'utf8');
+  const callbackStart=pacedSource.indexOf('async sourceTick=>{');
+  const callbackEnd=pacedSource.indexOf('},\n        ...(networkBackpressure?',callbackStart);
+  assert(callbackStart>=0&&callbackEnd>callbackStart);
+  const recorded=[];
+  const waitForRemoteSample=new Function('networkBackpressure','call','tick','recordNetworkWait',
+    'return '+pacedSource.slice(callbackStart,callbackEnd+1))(
+    true,(_operation,value)=>wait(value),26,event=>recorded.push(event));
+  const handoff=waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample,
+    admitRemoteSample(tick){assert.equal(tick,++through);events.push(['admit',tick]);},
+    resumeLateFrontier(){events.push(['resume']);},
+  });
+  assert.deepEqual(events,[['begin',1,26,140],['wait',26]]);
+  time=180;releaseTarget();
+  const result=await handoff;
+  assert.deepEqual(events,[['begin',1,26,140],['wait',26],['end',1,26,180],
+    ['admit',26],['admit',27],['resume']]);
+  assert.deepEqual(recorded,[{kind:'released-late-input',input_ordinal:26,
+    required_input_through:27,started_at_ms:140,observed_at_ms:180,ended_at_ms:183,
+    elapsed_ms:40,native_excluded_ms:39,interrupted:false}]);
+  assert.deepEqual(result.networkWaits,[
+    {tick:26,startedAt:140,observedAt:180,endedAt:183,excludedMs:39},
+    {tick:27,startedAt:183,observedAt:183,endedAt:183,excludedMs:0},
+  ]);
+});

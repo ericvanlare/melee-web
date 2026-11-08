@@ -15334,6 +15334,28 @@
                 "freeze_sha256": "97ccb27c14947f2d6883017dfc4f0368c8ea5dc4efb3dbdc24711bbed871f1ef",
                 "scope": "Reuses ordinary token-zero draw scope already used by source menu, with exact fresh-world generation and active CPU-interval refusal. Native source order unchanged. Actual extracted Results/Prize draws + scheduler focused lifecycle control and both real private compile-command syntax checks pass. No new build/capture yet.",
                 "next": "New v6 producer and same-bounds complete public route; prepared v5 was not captured because retained v4 already exposed this failure."
+              },
+              "public_v6": {
+                "source_head": "0390130e87d5592d7cacd7c3f8a97a56e891c74f",
+                "harness_head": "0390130e87d5592d7cacd7c3f8a97a56e891c74f",
+                "result": "FAIL alpha F28 clock debt10 exceeds unchanged8; beta timeout is secondary",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v6/result-summary.json",
+                "summary_sha256": "19f1e86ca89d14ebeae990e856fe8ecbebc2f37260078419d973617a45c9267e",
+                "independent_pacing_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v6/independent-pacing-analysis-v1.json",
+                "independent_pacing_review_sha256": "b49756c635e42cb41bcc67fa6487f8d96ec46daabc3f5e32d3a1cb3dd8b5a85b",
+                "raw_report_sha256": "4cf9818d93021ea7849fac4bd377e83f74059eeb68bf4e55f5662b3c7f758072",
+                "native_cleanup_passed": true,
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 17,
+                "scope": "Early timing refusal, Results/Prize fixes not reached. H1 exports retained but native guard failure absent from recorder incident projection; not a timing acceptance pass.",
+                "next": "Source-only reduced released-input gate repair: charge intentional hold and source work, exclude only genuinely absent required received PAD under existing native wait ownership."
+              },
+              "released_late_wait_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-late-released-wait-host-v2/freeze.json",
+                "freeze_sha256": "1fc2308fc8144da39038978a1f6eaeeac590a03c33d3b711557bb146a3897609",
+                "focused": "42 JS controls on v1, followed by the focused actual-accounting control on v2; syntax/diff checks pass.",
+                "scope": "External full-match diagnostic only. Validate exact sender release before starting required-input wait; serially validate/admit actual target then following-neutral using unchanged earliest-hole/native owner checks. Per-receipt arrival/end and host/native wait values retained. Intentional hold/CDP/source work charged. Native clock, guards and wire protocol unchanged.",
+                "next": "Reviewed clean v7 producer and same-bounds public complete-route capture."
               }
             }
           }
