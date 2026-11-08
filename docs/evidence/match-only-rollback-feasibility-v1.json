@@ -15312,7 +15312,15 @@
                 "outcome": 2,
                 "pre_close_winner": -1,
                 "terminal_agreement": "Both peers matched exact pre-close checksum and elimination outcome, acknowledged on wire; native command30 released both owners. Winner is intentionally unavailable until canonical finish_vs publishes original MatchEnd.",
-                "scope": "No Results/CSS success observed; not complete functional route or player-ready integration. No source order changes authorized to satisfy a premature harness assertion."
+                "scope": "No Results/CSS success observed; not complete functional route or player-ready integration. No source order changes authorized to satisfy a premature harness assertion.",
+                "independent_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v4/independent-result-review.json",
+                "independent_review_sha256": "8b98d32861608608193698440212d05f10fc5615a31b61c34d412fe60bbb41b1",
+                "native_cleanup_passed": false,
+                "native_cleanup_failures": [
+                  "alpha/beta Particle presentation owner failed before teardown"
+                ],
+                "h1_export": "Missing: native cleanup failed, recorder export skipped",
+                "first_results_failure": "Unexpected source camera begin: fresh Results world omitted ordinary token-zero particle draw scope already used by CSS. Not stale source owner reuse."
               },
               "published_winner_harness_repair": {
                 "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-published-winner-harness-v2/freeze.json",
@@ -15320,6 +15328,12 @@
                 "offline_replay_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-retained-v4-assertion-replay-v2/result.json",
                 "offline_replay_sha256": "930d47e8cbad3034110c9a747eecde8030cbaad5166edf4708add0e3a7602b8e",
                 "scope": "Harness-only source-boundary repair: unpublished winner before original close; published winner at Results; exact Fall29 after one-poll platform exit. No native or wire change. Two focused controls and actual assertion-tail replay pass; neither establishes new browser route completion."
+              },
+              "results_prize_draw_scope_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-results-prize-particle-scope-v1/freeze.json",
+                "freeze_sha256": "97ccb27c14947f2d6883017dfc4f0368c8ea5dc4efb3dbdc24711bbed871f1ef",
+                "scope": "Reuses ordinary token-zero draw scope already used by source menu, with exact fresh-world generation and active CPU-interval refusal. Native source order unchanged. Actual extracted Results/Prize draws + scheduler focused lifecycle control and both real private compile-command syntax checks pass. No new build/capture yet.",
+                "next": "New v6 producer and same-bounds complete public route; prepared v5 was not captured because retained v4 already exposed this failure."
               }
             }
           }

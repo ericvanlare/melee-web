@@ -1384,6 +1384,73 @@ static void test_devtext_receipt_and_exact_dispatch(void)
     assert(slippi_particle_source_devtext_constructing(21, 24, 0, 17, 11));
 }
 
+/* The actual scene functions drive the actual particle scope. Model only
+ * their unrelated scene owner, GX, and clock leaves. */
+typedef struct { uint64_t generation; int scene_entered, drawing, transition; }
+    FixtureResultScene;
+typedef FixtureResultScene MeleeWebResultsContext;
+typedef FixtureResultScene MeleeWebPrizeContext;
+typedef struct { unsigned mode; } GXRenderModeObj;
+static GXRenderModeObj result_video={9};
+static const GXRenderModeObj GXNtsc480IntDf={1};
+static unsigned result_draws,result_presents;
+enum { HSD_RP_SCREEN=1, HSD_STATE_ALL=0 };
+static GXRenderModeObj* HSD_VIGetRenderMode(void){return &result_video;}
+static void GXInvalidateVtxCache(void){}
+static void GXInvalidateTexAll(void){}
+static void HSD_StartRender(int pass){assert(pass==HSD_RP_SCREEN);}
+static void HSD_StateInvalidate(int mask){assert(mask==HSD_STATE_ALL);}
+static void HSD_Init_803755A8(void){}
+static int live(const FixtureResultScene* scene,char* message,size_t size)
+{(void)message;(void)size;return scene&&scene->generation;}
+static int camera_pool_owned(const FixtureResultScene* scene,const char* boundary,
+                             void* out,char* message,size_t size)
+{(void)boundary;(void)out;return live(scene,message,size);}
+static int ok(char* message,size_t size)
+{if(message&&size)message[0]=0;return 1;}
+static int fail(char* message,size_t size,const char* reason)
+{if(message&&size)snprintf(message,size,"%s",reason);return 0;}
+static int melee_web_menu_clock_present(void){++result_presents;return 1;}
+static void fixture_result_camera_traversal(void)
+{
+    assert(result_video.mode==1);
+    ++result_draws;
+    assert(slippi_particle_source_camera_begin(&main_camera,error,sizeof(error)));
+    assert(slippi_particle_source_camera_end(&main_camera,error,sizeof(error)));
+}
+#define HSD_GObj_80390FC0 fixture_result_camera_traversal
+ACTUAL_RESULT_SCENE_DRAWS
+#undef HSD_GObj_80390FC0
+
+static void test_result_scene_draw_scopes(void)
+{
+    int (*const draws[])(FixtureResultScene*,char*,size_t)={
+        melee_web_results_context_draw,melee_web_prize_context_draw
+    };
+    for(unsigned i=0;i<2;++i){
+        reset_fixture();
+        FixtureResultScene scene={.generation=880+i,.scene_entered=1};
+        result_draws=result_presents=0;
+        assert(slippi_particle_source_world_begin(scene.generation));
+        assert(draws[i](&scene,error,sizeof(error)));
+        assert(draws[i](&scene,error,sizeof(error)));
+        assert(result_draws==2&&result_presents==2&&result_video.mode==9&&!scene.drawing);
+        scene.transition=2;
+        assert(draws[i](&scene,error,sizeof(error)));
+        assert(result_draws==2&&result_presents==2);
+        assert(slippi_particle_source_world_end(scene.generation));
+
+        reset_fixture();
+        scene.transition=0;
+        assert(slippi_particle_source_world_begin(scene.generation));
+        cpu_active=1;cpu_token=17;
+        assert(!draws[i](&scene,error,sizeof(error)));
+        assert(result_draws==2&&result_presents==2&&result_video.mode==9&&!scene.drawing);
+        cpu_active=0;
+        assert(!slippi_particle_source_world_end(scene.generation));
+    }
+}
+
 int main(int argc, char** argv)
 {
     if (argc > 1 && !strcmp(argv[1], "first-error")) {
@@ -1412,6 +1479,7 @@ int main(int argc, char** argv)
     test_refusals_and_zero_camera_identities();
     test_source_registration_order_control();
     test_source_schedule_and_ordinary_wrappers();
+    test_result_scene_draw_scopes();
     test_source_schedule_revalidation_and_ptcl_refusal();
     return 0;
 }

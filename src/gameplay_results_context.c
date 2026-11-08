@@ -6,6 +6,7 @@
 #include "gameplay_match_clock.h"
 #include "gameplay_stage_map.h"
 #include "hsd_native_joint.h"
+#include "slippi_profile/particle_source_schedule.h"
 
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
@@ -640,6 +641,8 @@ int melee_web_results_context_draw(MeleeWebResultsContext* context,
         return fail(error, error_size, "Results draw requires a live idle scene");
     if (!camera_pool_owned(context, "draw entry", NULL, error, error_size)) return 0;
     if (context->transition == 2) return ok(error, error_size);
+    if (!slippi_particle_source_draw_begin(context->generation, 0, error, error_size))
+        return 0;
     context->drawing = 1;
     GXRenderModeObj saved_mode = *HSD_VIGetRenderMode();
     *HSD_VIGetRenderMode() = GXNtsc480IntDf;
@@ -651,6 +654,7 @@ int melee_web_results_context_draw(MeleeWebResultsContext* context,
     HSD_Init_803755A8();
     *HSD_VIGetRenderMode() = saved_mode;
     context->drawing = 0;
+    if (!slippi_particle_source_draw_end(error, error_size)) return 0;
     if (!camera_pool_owned(context, "source draw", NULL, error, error_size)) return 0;
     if (!melee_web_menu_clock_present())
         return fail(error, error_size, "Results presentation clock lost ownership");
