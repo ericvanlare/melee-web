@@ -14729,6 +14729,303 @@
                   "expected_skips": 2
                 }
               }
+            },
+            "issue_372_repeated_respawn_v1": {
+              "issue": 372,
+              "status": "PACED_600_RESPAWN_COMPLETE; LOCAL_INTEGRATION_VALIDATION_PASS",
+              "scope": "Bounded local headless two-peer 600-input trace. Not full-match, public-relay, or sustained-60Hz acceptance.",
+              "producer": {
+                "native": "6ced91e3a418ac752dc6db0ad62072e99fb64ede",
+                "harness": "6ced91e3a418ac752dc6db0ad62072e99fb64ede",
+                "archive": {
+                  "path": "runtime372-tev-scratch-producer-v1/archive.json",
+                  "sha256": "5332b7ccaa8c139b0b961bfd4cc79a87bd550adeb53551bc0ee0102f15edf12b"
+                },
+                "source_manifest_sha256": "86361153b190dcd1d07af2c21eb0b87ef44449a0d4ab0e4fc4f559b23123b014",
+                "runtime_wasm_sha256": "1d8ad7cfa49e6d8ce12f3db5550348bd0aeeeb2377aa849d893a8ff411ec599b"
+              },
+              "linked_configuration": {
+                "path": "runtime372-tev-scratch-catalog-v1/final-linked-configuration-v1.json",
+                "sha256": "c5eb67750d4a7ca5c5c7d166b186e46310ab680ba96c60152db87b0389a929c4",
+                "reviewed_policy_sha256": "c579d09a8b4abe6a4bb442e050eedb920ddf8110339a8f1b31e97c321e8e7daf",
+                "independent_policy_review": {
+                  "path": "runtime372-tev-scratch-policy-v1/independent-review.json",
+                  "sha256": "4facfd75bb6dcb381fe9e7d6f654a3982a8b532d8907d9edde4290f342926dfe"
+                }
+              },
+              "private_release_build": {
+                "path": "runtime372-tev-scratch-build-v1/result.json",
+                "sha256": "862c569e2d7d11631105959bdf15d5fd119d8e627cc2119f2808de6f5086b025",
+                "exit_code": 0,
+                "log_sha256": "5e3538b36ba9c486d1c989fe15598700f9040685b8e875f010f144aa1531daaa"
+              },
+              "source_review": {
+                "path": "runtime372-tev-scratch-root-review-v1.json",
+                "sha256": "a9f054dc8895c07424c60f8232f1c3aa565ab27f5f489879036d94890a7d788c",
+                "decision": "GO_FOCUSED_AND_BUILD"
+              },
+              "focused_controls": [
+                {
+                  "path": "runtime372-shadow-view-control-candidate-v3/focused.log",
+                  "sha256": "03bba5107dd87651283cb12daf29dd8016d5151d25f4a7741726ad9e0dcf57b4"
+                },
+                {
+                  "path": "runtime372-shadow-tev-permanent-control-v1/focused.log",
+                  "sha256": "54f3e7d87e4a2e74232a87b4d6505ae10a41ec026cf819a5ae5fc35b1ff6c8ea"
+                }
+              ],
+              "capture": {
+                "run": "runtime-peer-repeated-respawn-tev-scratch-v1",
+                "result": "PACED_600_RESPAWN_COMPLETE",
+                "summary": {
+                  "path": "runtime-peer-repeated-respawn-tev-scratch-v1/result-summary.json",
+                  "sha256": "9b735f2fe4c78a784e1a82ef198aa853eca4f89f1528dd630fac450407e28bbe"
+                },
+                "browser_report_sha256": "de095c4ec252ee3b3b3401af6d87dd4d60854844f00d955fdb8f464a96283471",
+                "owner_report_sha256": "3e171f04baaa3469bbad44f7ff6cb4f443ce3c4e04d8db2a68736593a4ac101f",
+                "native_clock_receipts": {
+                  "alpha": "eb2ca94e467230718f6254649db63546bb79ba45f63ce7795b0fb52542ad201a",
+                  "beta": "52f8e29fe8f56e7ff6617facdee2a573b98bd59c1f072e795d04bba9074ac730"
+                },
+                "incident_exports": {
+                  "alpha": "13c3fc98550e72abe38e890745da5f3b64b77a257e34287e74c7f66baa9e7a9a",
+                  "beta": "33fae7e68c81381d11456584a1023cdf30e33281f0f7097eff0adee7abc5fdc5"
+                },
+                "relay_receipt_sha256": "951c43ec33d1c048596ebca9326ac20ab2e1fe227b5609efbafcf94e188ff7fd"
+              },
+              "independent_review": {
+                "path": "runtime-peer-repeated-respawn-tev-scratch-v1/independent-result-review.json",
+                "sha256": "2a7a06109beff5fdf4bc37c031a67bf31276ccfa4ae6c27870b14690bda8209d",
+                "decision": "PASS"
+              },
+              "observed": {
+                "actual_input_ticks": 600,
+                "authoritative_pad_rows": {
+                  "alpha": 600,
+                  "beta": 600,
+                  "bytes_per_row": 44,
+                  "all_rows_equal": true
+                },
+                "late_corrections": [
+                  {
+                    "source_tick": 26,
+                    "key": "ArrowRight",
+                    "pre": 21,
+                    "frontier": 28,
+                    "confirmed": 28,
+                    "actual_local_pad_hex": "00007f0000000000000000",
+                    "following_neutral_tick": 27
+                  },
+                  {
+                    "source_tick": 226,
+                    "key": "ArrowLeft",
+                    "pre": 221,
+                    "frontier": 228,
+                    "confirmed": 228,
+                    "actual_local_pad_hex": "0000810000000000000000",
+                    "following_neutral_tick": 227
+                  },
+                  {
+                    "source_tick": 426,
+                    "key": "ArrowRight",
+                    "pre": 421,
+                    "frontier": 428,
+                    "confirmed": 428,
+                    "actual_local_pad_hex": "00007f0000000000000000",
+                    "following_neutral_tick": 427
+                  }
+                ],
+                "final_checksum": {
+                  "view": "confirmed post-draw END600",
+                  "bytes_per_page": 64,
+                  "equal_locally": true,
+                  "exchanged_on_wire": false
+                },
+                "stock_respawn": {
+                  "p1_initial_stocks": 4,
+                  "p1_stocks_after_loss": 3,
+                  "grounded_wait14_at_frame": 408,
+                  "still_grounded_after_32_more_inputs_at_frame": 440,
+                  "actual_inputs_after_respawn": 192,
+                  "p1_final_stocks": 3,
+                  "p2_stocks_through_end": 4,
+                  "first_observed_stock_loss_frame": 220,
+                  "observation_scope": "Sparse post-present idle samples; exact transition ticks unobserved."
+                },
+                "platform_exit": {
+                  "frame": 340,
+                  "actual_key": "KeyA",
+                  "following_neutral_poll_frame": 341,
+                  "alpha_source_sample_retained_and_matched": true
+                },
+                "native_clock": {
+                  "alpha_stalled_samples": 0,
+                  "beta_stalled_samples": 0,
+                  "threshold_ticks": 8,
+                  "alpha_max_pending_ticks": 6.3592,
+                  "beta_max_pending_ticks": 6.2028
+                },
+                "h1": {
+                  "incident_exports_retained": true,
+                  "alpha_incidents": 0,
+                  "beta_incidents": 0,
+                  "alpha_retained_records": 0,
+                  "beta_retained_records": 0,
+                  "projection": "missing",
+                  "native_clock_is_not_h1_evidence": true
+                },
+                "cleanup": {
+                  "native_owners_retired": true,
+                  "local_relay_disposed_exit_code": 0,
+                  "owned_browser_pids_absent": 18,
+                  "remaining_owned_pids": 0
+                }
+              },
+              "retained_attempts": [
+                {
+                  "run": "runtime-peer-repeated-respawn-v1",
+                  "native": "37a9617b1ee977f7756611418779d2de6f34df54",
+                  "harness": "71ef0768a2c2350ae4322165f9d1069c0e5ee495",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-v1/result-summary.json",
+                    "sha256": "42e56746cf235572e80371454b0efd8fbb288615e5bcc5294fb568804d6709c5"
+                  },
+                  "observed": "F201 SourceFilesBusy; initial attempt before typed HPS attribution."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-source-busy-v1",
+                  "native": "8b11fcba8f1c27d49ab4e5b6f1a0444062b9eaa4",
+                  "harness": "8b11fcba8f1c27d49ab4e5b6f1a0444062b9eaa4",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-source-busy-v1/result-summary.json",
+                    "sha256": "39dbe9972bc22ffc078fe588b1371a0c1a3a1180899b4802066a8642c4ac5174"
+                  },
+                  "observed": "F201 owned pending HPS source identified by failure-only diagnostic."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-interior-hps-v1",
+                  "native": "97aeba59129b13abde762913b3a3ddf5617b34fd",
+                  "harness": "97aeba59129b13abde762913b3a3ddf5617b34fd",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-interior-hps-v1/result-summary.json",
+                    "sha256": "2f8dfe0f968daf0a417d38de1fd5d17d5dc2a54bad1d5f7cad05e81ad865985d"
+                  },
+                  "observed": "F218 original shadow-membership refusal. Native cleanup timed out; outer cleanup passed; H1 unavailable."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-shadow-view-v1",
+                  "native": "3a470ddfc76d6b5db5779e515412a54dcfbce9ac",
+                  "harness": "3a470ddfc76d6b5db5779e515412a54dcfbce9ac",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-shadow-view-v1/result-summary.json",
+                    "sha256": "4a6a27aba9a8e8c8fcfd796001cf57e7410f5d791f7bf1153fd1a5253d184a62"
+                  },
+                  "observed": "F228 clock refusal after second correction/rebase; native clock distinct from empty H1 projection."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-atomic-admission-v1",
+                  "native": "06bfe19b4d2c0b7d0675c0dcba6b2436d2c6a889",
+                  "harness": "06bfe19b4d2c0b7d0675c0dcba6b2436d2c6a889",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-atomic-admission-v1/result-summary.json",
+                    "sha256": "cee47d6020127f6286ea270d318c89500a56439d262969a7221193c98bc21caf"
+                  },
+                  "observed": "P2 first observed at three stocks at F524 after four at F520; all three corrections completed, no stuck key."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-platform-input-v1",
+                  "native": "06bfe19b4d2c0b7d0675c0dcba6b2436d2c6a889",
+                  "harness": "dea19a91e200c248416390bca5250d4ea46a7760",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-platform-input-v1/result-summary.json",
+                    "sha256": "7243fc1b14b71027927a8daa28222bdc4737030f3887d4463f07fdd7cf7fc6a7"
+                  },
+                  "observed": "First beta CloseEndpoint refusal after real P1 platform-exit correction PRE340 to F341; alpha subsequent clock failure is secondary."
+                },
+                {
+                  "run": "runtime-peer-repeated-respawn-close-diagnostic-v1",
+                  "native": "7438567c4626184582405aaf417a053ca423c8ba",
+                  "harness": "7438567c4626184582405aaf417a053ca423c8ba",
+                  "summary": {
+                    "path": "runtime-peer-repeated-respawn-close-diagnostic-v1/result-summary.json",
+                    "sha256": "710cf183bafa1a57b6a150e32058e3e8e7f77e717f0925064d95c83de40bf69e"
+                  },
+                  "observed": "Same F341 close refusal identifies TObjSetupTevModulateShadow.tevdesc stage byte 02 to03."
+                }
+              ],
+              "integration_validation": {
+                "capture_source": "6ced91e3a418ac752dc6db0ad62072e99fb64ede",
+                "validation_source": "5353ef0129c7d49482f23059ae2eafe406b1c582",
+                "source_relationship": "The capture producer is unchanged. Validation-only source edits update the test_perf_measurement shadow source pin; no browser recapture occurred.",
+                "full_regression": {
+                  "status": "PASS",
+                  "prior_attempt": {
+                    "source": "6ced91e3a418ac752dc6db0ad62072e99fb64ede",
+                    "status": "FAIL_STALE_TEST_SOURCE_PIN_ONLY",
+                    "tests": 3112,
+                    "skips": 242,
+                    "result_path": "runtime372-integration-validation-v2/full-regression-result.json",
+                    "result_sha256": "ef907cf606d024d69034324d743a81c6bcd8195ed28d50744d579a8963550664",
+                    "log_sha256": "516aad012c4f76f2c97e8048f3852dd0d1e8d3ad4d7c0243ffbc67e940b40878",
+                    "reconstruction": "Old source hash independently reproduced by removing exactly four reviewed shadow-hook insertions."
+                  },
+                  "result": {
+                    "path": "runtime372-integration-validation-v3/full-regression-result.json",
+                    "sha256": "e1a990250b2698a8809162a3987e3784a61ba443c3fe9048eba526c162f90587"
+                  },
+                  "log_sha256": "a01b74e55941429e86f666ac26590902a5cb6dd0e09a24783aac072680fabeb2",
+                  "tests": 3112,
+                  "skips": 242
+                },
+                "ordinary_release_build": {
+                  "status": "PASS",
+                  "result": {
+                    "path": "runtime372-integration-validation-v3/ordinary-release-result.json",
+                    "sha256": "2348b5c523000070e5d061a48972f48f5321e150c485e6884de01691750f482d"
+                  },
+                  "log_sha256": "505fd8bc29220c84b2d56ece75a4113cfc114dc6b5349270bc338258238ffae9"
+                },
+                "test_pin_review": {
+                  "path": "runtime372-shadow-perf-pin-review-v1.json",
+                  "sha256": "9c2c0ef6c7b767b57d102913fe4b783c4f62dddc3ae799a40098b0b51f629630"
+                },
+                "focused_pin_control": {
+                  "path": "runtime372-shadow-perf-pin-focused-result.json",
+                  "sha256": "9202b32931d05f6a0cb2d34cc637add8056db60ea202039c39eb5a6b7bc2274e"
+                },
+                "publication_tracking_issue": 372
+              },
+              "limits": [
+                "Locally owned Worker only; deployed staging Worker/public browser origin were not tested.",
+                "No checksum was sent over the network.",
+                "No full-match, public-relay, or sustained 60 Hz claim."
+              ],
+              "component_reviews": [
+                {
+                  "path": "runtime372-interior-hps-root-review-v1.json",
+                  "sha256": "d0d00d60767cee2de1a1a8eb4077c90c3fee10f36747c3f9752003074e353f93"
+                },
+                {
+                  "path": "runtime372-shadow-view-root-review-v1.json",
+                  "sha256": "1d442d4aef43d7535c7219bf2005b90ffcccebb5b181cf0e92fef08f365aa81f"
+                },
+                {
+                  "path": "runtime372-atomic-admission-root-review-v1.json",
+                  "sha256": "ed37fd5aa110e9ca6eac00f8563f1d82d5e103b0f83f03a1cd7ee7bfca6127fb"
+                },
+                {
+                  "path": "runtime372-respawn-platform-independent-review-v2.json",
+                  "sha256": "1a5335fc5471641b5a059ac175edd684f0dce9e6e1c205e7e38edf5527d67383"
+                },
+                {
+                  "path": "runtime372-close-diagnostic-root-review-v1.json",
+                  "sha256": "ee6e09575d8dbe46dc07422dcc75eb73acb9ab5c9e1600dc3021bce4a9157e77"
+                },
+                {
+                  "path": "runtime372-shadow-tev-permanent-control-v1/freeze.json",
+                  "sha256": "7c8d66468587ceeb11ab0bb62d19770a223ae0e11911af62952319db7d601128"
+                }
+              ]
             }
           }
         }
