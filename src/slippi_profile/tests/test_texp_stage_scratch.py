@@ -106,13 +106,18 @@ class TExpStageScratchTests(OwnedWorkspaceTests):
         commit = lock["repositories"]["melee"]["commit"]
         relative = "src/sysdolphin/baselib/texp.c"
         tev_relative = "src/sysdolphin/baselib/tev.c"
+        tobj_relative = "src/sysdolphin/baselib/tobj.c"
         original_texp = subprocess.check_output(
             ["git", "show", commit + ":" + relative], cwd=melee, text=True)
         original_tev = subprocess.check_output(
             ["git", "show", commit + ":" + tev_relative], cwd=melee, text=True)
 
+        original_tobj = subprocess.check_output(
+            ["git", "show", commit + ":" + tobj_relative], cwd=melee, text=True)
+        includes = ["--include=" + item for item in (relative, tobj_relative)]
+
         # Compose and apply the same transformed base plus private overlay used
-        # by source preparation. Only this exact source file is materialized.
+        # by source preparation. Only the two relevant files are materialized.
         base_patch = composed_patch(melee, ROOT / "patches/melee-gameplay.patch")
         combined_patch = compose_slippi_profile_patch(
             melee, base_patch, ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch")
@@ -120,30 +125,34 @@ class TExpStageScratchTests(OwnedWorkspaceTests):
         source_file = source_tree / relative
         source_file.parent.mkdir(parents=True)
         source_file.write_text(original_texp)
+        (source_tree / tobj_relative).write_text(original_tobj)
         env = dict(os.environ, GIT_CEILING_DIRECTORIES=str(self.work))
         for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR"):
             env.pop(key, None)
-        self.command("base-check", ["git", "apply", "--check", "--include=" + relative,
+        self.command("base-check", ["git", "apply", "--check", *includes,
                                     base_patch], source_tree, env)
-        self.command("base-apply", ["git", "apply", "--include=" + relative,
+        self.command("base-apply", ["git", "apply", *includes,
                                     base_patch], source_tree, env)
-        self.command("profile-check", ["git", "apply", "--check", "--include=" + relative,
+        self.command("profile-check", ["git", "apply", "--check", *includes,
                                        ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch"],
                      source_tree, env)
-        self.command("profile-apply", ["git", "apply", "--include=" + relative,
+        self.command("profile-apply", ["git", "apply", *includes,
                                        ROOT / "src/slippi_profile/patches/melee-profile-hooks.patch"],
                      source_tree, env)
         combined_root = source_tree / "combined"
         composed = combined_root / relative
         composed.parent.mkdir(parents=True)
         composed.write_text(original_texp)
-        self.command("combined-check", ["git", "apply", "--check", "--include=" + relative,
+        (combined_root / tobj_relative).write_text(original_tobj)
+        self.command("combined-check", ["git", "apply", "--check", *includes,
                                          combined_patch], combined_root, env)
-        self.command("combined-apply", ["git", "apply", "--include=" + relative,
+        self.command("combined-apply", ["git", "apply", *includes,
                                          combined_patch], combined_root, env)
         candidate_text = source_file.read_text()
         self.assertEqual(composed.read_text(), candidate_text,
                          "sequential and canonical patch composition must match")
+        candidate_tobj = (source_tree / tobj_relative).read_text()
+        self.assertEqual((combined_root / tobj_relative).read_text(), candidate_tobj)
 
         original_setup = function(original_texp, "HSD_TExpSetupTev").replace(
             "HSD_TExpSetupTev(", "reference_HSD_TExpSetupTev(", 1)
@@ -154,6 +163,13 @@ class TExpStageScratchTests(OwnedWorkspaceTests):
         fixture = template.replace("ORIGINAL_SETUP", "void " + original_setup)
         fixture = fixture.replace("CANDIDATE_SETUP", "void " + candidate_setup)
         fixture = fixture.replace("ACTUAL_SETUP_STAGE", "void " + actual_stage)
+        descriptor_functions = ("TObjSetupTevModulateShadow", "SetupEmbossBumpTev")
+        actual_tobj_functions = "\n".join(
+            "static void " + function(source, name).replace(name + "(", lane + "_" + name + "(", 1)
+            for lane, source in (("reference", original_tobj), ("candidate", candidate_tobj))
+            for name in descriptor_functions)
+        fixture = fixture.replace("ACTUAL_TOBJ_SETUP", actual_tobj_functions)
+        self.assertNotIn("ACTUAL_TOBJ_SETUP", fixture)
         self.assertNotIn("ORIGINAL_SETUP", fixture)
         self.assertNotIn("CANDIDATE_SETUP", fixture)
         self.assertNotIn("ACTUAL_SETUP_STAGE", fixture)
@@ -166,20 +182,31 @@ class TExpStageScratchTests(OwnedWorkspaceTests):
         self.assertTrue((prepared / "sysdolphin/baselib/texp.h").is_file(),
                         "prepared source headers unavailable")
         common = [
-            "-std=gnu11", "-O1", "-ffp-contract=off", "-DTARGET_PC", "-DAURORA",
+            "-std=gnu11", "-O0", "-ffp-contract=off", "-DTARGET_PC", "-DAURORA",
             "-I" + str(ROOT / "src"), "-I" + str(prepared),
             "-I" + str(ROOT / ".deps/aurora/include"),
             "-I" + str(ROOT / ".deps/melee/extern/dolphin/include"),
             "-include", str(ROOT / "src/gameplay_compat.h"), str(control),
-            "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sWASM_ASYNC_COMPILATION=0",
         ]
         runs = []
         for label, enabled in (("private", True), ("vanilla", False)):
             output = self.work / (label + ".js")
-            argv = [emcc, *common]
-            argv.insert(4, "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=" + ("1" if enabled else "0"))
-            argv.extend(["-o", str(output)])
-            self.command("compile-" + label, argv, ROOT, env)
+            obj = output.with_suffix(".o")
+            value = "1" if enabled else "0"
+            self.command("compile-" + label, [
+                emcc, *common, "-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=" + value,
+                "-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=" + value, "-c", "-o", obj,
+            ], ROOT, env)
+            nm = emcc.parent.parent / "bin/llvm-nm"
+            symbols = self.command("symbols-" + label, [nm, obj], ROOT, env).stdout
+            names = {line.split()[-1] for line in symbols.splitlines() if line.split()}
+            for name in descriptor_functions:
+                self.assertIn("reference_" + name + ".tevdesc", names)
+                self.assertEqual("candidate_" + name + ".tevdesc" in names, not enabled)
+            self.command("link-" + label, [
+                emcc, obj, "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1",
+                "-sWASM_ASYNC_COMPILATION=0", "-o", output,
+            ], ROOT, env)
             execution = self.command("run-" + label,
                                      [node_runtime(ROOT), output], ROOT, env)
             self.assertIn("TExp stage source control passed", execution.stdout)
@@ -193,12 +220,12 @@ class TExpStageScratchTests(OwnedWorkspaceTests):
             ROOT / "src/slippi_profile/texp_stage_scratch.h",
             ROOT / "src/slippi_profile/tests/texp_stage_scratch_control.c.in",
             Path(__file__), melee / "src/sysdolphin/baselib/texp.c",
-            melee / "src/sysdolphin/baselib/tev.c",
+            melee / tev_relative, melee / tobj_relative,
             prepared / "sysdolphin/baselib/texp.h",
             prepared / "sysdolphin/baselib/tobj.h",
         ]
         report = {
-            "scope": "actual source HSD_TExpSetupTev and HSD_SetupTevStage; modeled State/GX sinks",
+            "scope": "actual source TExp/shadow/emboss TEV setup and HSD_SetupTevStage; modeled State/GX sinks",
             "source_commit": commit,
             "source_sha256": {
                 str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()

@@ -1339,7 +1339,31 @@ diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
      int i;
  
      if (tobj_coord(tobj) == TEX_COORD_TOON) {
-@@ -1524,6 +1561,9 @@
+@@ -582,6 +619,11 @@
+ 
+ static void TObjSetupTevModulateShadow(HSD_TObj* shadow)
+ {
+-    static HSD_TevDesc tevdesc = {
++    /* GX consumes the descriptor synchronously. The private draw cannot
++     * publish stage/coordinate/map selection into canonical source data. */
++#if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++    static
++#endif
++    HSD_TevDesc tevdesc = {
+         NULL,           TEVCONF_MODE,  (GXTevStageID) (-1), GX_TEXCOORD_NULL,
+         GX_TEXMAP_NULL, GX_COLOR_NULL, GX_TEV_ADD,          GX_CC_ZERO,
+@@ -604,6 +646,9 @@
+ 
+ static void SetupEmbossBumpTev(HSD_TObj* bump)
+ {
+-    static HSD_TevDesc tevdesc = {
++#if !(defined(MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE) && MELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE)
++    static
++#endif
++    HSD_TevDesc tevdesc = {
+         NULL,           TEVCONF_MODE, (GXTevStageID) (-1), GX_TEXCOORD_NULL,
+         GX_TEXMAP_NULL, GX_COLOR0A0,  GX_TEV_SUB,          GX_CC_ZERO,
+@@ -1524,6 +1569,9 @@
  {
      HSD_TObj* new = hsdNew((HSD_ClassInfo*) HSD_TObjGetDefaultClass());
      HSD_ASSERT(2040, new);
