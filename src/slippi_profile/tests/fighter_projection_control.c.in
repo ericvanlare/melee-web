@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 #include <melee/ft/types.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -611,11 +612,65 @@ static void run_private_canonical_carry(void)
  assert(melee_web_cpu_interval_end(token));
  assert(slippi_fighter_projection_world_end(identity.world));
 }
+/* Exercise actual Results draw orchestration and its prepared Fighter
+ * projection hook. The scene owner and GX leaves are fixture models. */
+#include "slippi_profile/particle_source_schedule.h"
+typedef struct {uint64_t generation;int scene_entered,drawing,transition;}
+    MeleeWebResultsContext;
+typedef struct {int value;} GXRenderModeObj;
+static const GXRenderModeObj GXNtsc480IntDf={1};
+static GXRenderModeObj results_mode={2};
+static HSD_GObj* results_fighter;
+static unsigned results_draws,results_presents;
+enum {HSD_RP_SCREEN=1,HSD_STATE_ALL=0};
+static GXRenderModeObj* HSD_VIGetRenderMode(void){return &results_mode;}
+static void GXInvalidateVtxCache(void){}
+static void GXInvalidateTexAll(void){}
+static void HSD_StartRender(int pass){assert(pass==HSD_RP_SCREEN);}
+static void HSD_StateInvalidate(int mask){assert(mask==HSD_STATE_ALL);}
+static void HSD_Init_803755A8(void){}
+static void HSD_GObj_80390FC0(void)
+{
+ assert(results_mode.value==1);
+ assert(ftLib_80086A8C(results_fighter));
+ ++results_draws;
+}
+static int melee_web_menu_clock_present(void){++results_presents;return 1;}
+static int live(const MeleeWebResultsContext* context,char* error,size_t size)
+{(void)error;(void)size;return context&&context->generation==identity.world;}
+static int camera_pool_owned(const MeleeWebResultsContext* context,const char* label,
+                            void* out,char* error,size_t size)
+{(void)label;(void)out;return live(context,error,size);}
+static int ok(char* error,size_t size){if(error&&size)error[0]=0;return 1;}
+static int fail(char* error,size_t size,const char* reason)
+{if(error&&size)snprintf(error,size,"%s",reason);return 0;}
+ACTUAL_RESULTS_DRAW
+
+static void run_results_fighter_draw(void)
+{
+ Fighter fp={0};HSD_GObj fighter={0};int descriptor=1;
+ MeleeWebResultsContext context={.generation=20,.scene_entered=1};
+ char error[192]={0};
+ init_fixture(&fp,&fighter);
+ identity.world=context.generation;
+ assert(slippi_fighter_projection_world_begin(context.generation));
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ results_fighter=&fighter;
+ fp.x2188=(S32Vec2){70,90};fp.x221F_b0=1;
+ for(int i=0;i<2;++i) {
+  assert(melee_web_results_context_draw(&context,error,sizeof(error)));
+  assert(!context.drawing&&results_mode.value==2);
+  assert(fp.x2188.x==70&&fp.x2188.y==90&&fp.x221F_b0);
+ }
+ assert(results_draws==2&&results_presents==2);
+ assert(slippi_fighter_projection_world_end(context.generation));
+}
 int main(int argc,char** argv)
 {
  Fighter fp={0}; CmSubject subject={0}; HSD_GObj fighter={0};
  assert(!melee_web_cpu_interval_active());
  if(argc>1) {
+  if(strcmp(argv[1],"results-fighter-draw")==0){run_results_fighter_draw();return 0;}
   if(strcmp(argv[1],"private-canonical-carry")==0){run_private_canonical_carry();return 0;}
   int handled=run_topology_mode(argv[1]);
 #ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS

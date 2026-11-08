@@ -15356,6 +15356,31 @@
                 "focused": "42 JS controls on v1, followed by the focused actual-accounting control on v2; syntax/diff checks pass.",
                 "scope": "External full-match diagnostic only. Validate exact sender release before starting required-input wait; serially validate/admit actual target then following-neutral using unchanged earliest-hole/native owner checks. Per-receipt arrival/end and host/native wait values retained. Intentional hold/CDP/source work charged. Native clock, guards and wire protocol unchanged.",
                 "next": "Reviewed clean v7 producer and same-bounds public complete-route capture."
+              },
+              "public_v7": {
+                "source_head": "fe0fa683255acb3af3fee2ece98cb0d88620f4de",
+                "harness_head": "fe0fa683255acb3af3fee2ece98cb0d88620f4de",
+                "result": "FAIL original Results draw traps in ftLib_80086A8C; no source fighter projection drawing scope",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v7/result-summary.json",
+                "summary_sha256": "300a9a9cf26203b5892ce41ea76d0ae0648fd638c479846f866892b367b6dbf9",
+                "raw_report_sha256": "8d44dcd2765d2bcf719de43321bb26c1401146f27699ad51a9c9861afbb5986f",
+                "actual_input_traversals_each": 1237,
+                "terminal_source_frame": 1123,
+                "terminal_checksum_agreement": "Both peers completed and acknowledged exact64bytes/outcome2 with unpublishedwinner-1; cmd30 released each native owner.",
+                "native_cleanup_passed": false,
+                "native_cleanup_failures": [
+                  "beta native/source cleanup: Browser driver development/unload: unreachable",
+                  "alpha native/source cleanup: Browser driver development/unload: unreachable"
+                ],
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 19,
+                "scope": "Released-input wait path traversed without native timing refusal. Results route/cleanup still fails; no complete functional route or acceptance claim."
+              },
+              "results_fighter_scope_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-results-fighter-scope-v1/freeze.json",
+                "freeze_sha256": "c413d3a2ca8cf288d50381a4863ac848df6a88613792eeac13886f1f780991ba",
+                "scope": "Actual extracted Results draw + prepared ftLib hook + production fighter owner with modeled provenance/scene/GX leaves reproduces SIGTRAP before repair and passes repeated ordinary draws/restored carry afterward. Existing projection scope only; no native source arithmetic/order or guard changes. Fighter2 and particle1 focused controls plus actual TU syntax pass. Failed fixture/signal evidence retained.",
+                "next": "Reviewed fresh v8 producer and unchanged-bounds complete route"
               }
             }
           }

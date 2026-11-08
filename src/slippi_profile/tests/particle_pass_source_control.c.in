@@ -1394,6 +1394,11 @@ typedef struct { unsigned mode; } GXRenderModeObj;
 static GXRenderModeObj result_video={9};
 static const GXRenderModeObj GXNtsc480IntDf={1};
 static unsigned result_draws,result_presents;
+/* Actual projection coverage lives in the fighter owner control. */
+static int slippi_fighter_projection_draw_begin(void){return 1;}
+static int slippi_fighter_projection_draw_end(void){return 1;}
+static const char* slippi_fighter_projection_failure_reason(void){return "fixture projection";}
+
 enum { HSD_RP_SCREEN=1, HSD_STATE_ALL=0 };
 static GXRenderModeObj* HSD_VIGetRenderMode(void){return &result_video;}
 static void GXInvalidateVtxCache(void){}
