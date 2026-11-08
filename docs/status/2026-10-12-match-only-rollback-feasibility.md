@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**Issue #373 now has a bounded public functional witness: two headless pages completed a four-stock Mario/Final Destination match through the existing staging relay, with 1,237 aligned actual 44-byte PAD records per peer and 3 alpha / 10 beta fully confirmed corrections. Both peers acknowledged the same terminal checksum and outcome over the wire; after canonical source publication, both reported winner 1, completed local original Results confirmation, and returned to CSS. This remains an experimental diagnostic route: its Node driver supplies shared start coordination and scripted control of both pages. It does not provide the player-facing Host/Join rollback path, a complete Slippi profile, or human, two-machine, or foreground-performance acceptance. Official-service cross-play remains parked indefinitely by owner decision; no official-service traffic occurred. The next boundary is [issue #375](https://github.com/ericvanlare/melee-web/issues/375).**
+**The experimental staging Host/Join route now has a reviewed complete public-relay functional witness for the owner-reported lobby failure in [#378](https://github.com/ericvanlare/melee-web/issues/378): shared progress, constrained Mario/FD choices, guest input routing, match-only rollback, original local Results/CSS and clean disconnect. The current boundary below preserves the separate runtime, harness and validation identities and earlier failures. Complete-profile, human/two-machine and performance acceptance remain open; official-service cross-play remains parked.**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -2397,7 +2397,56 @@ This capture establishes a bounded public-relay functional route through local R
 
 The first required full regression against producer `5527e7f3` is retained at `runtime373-integration-validation-v7/full-regression-result.json` (SHA-256 `500269f8dde6dcf165f5eb4d8f994cb664a0f8b10efccc0f504e3add40711b03`) and `full-regression.log` (SHA-256 `7a65fbbcc30b1f9b6e93487ad0039cd8a6a2df74e57230afb968c41ed8957890`). It ran 3,117 tests with 242 skips and failed three stale fixture contracts. The bounded three-fixture repair is independently reviewed, and its focused controls pass. Final validation on exact source head `f958906f7318ff4a0ee4f647f523305c3e65e17d` passes: the full regression ran 3,117 tests with 242 skips in 717.458 seconds (result `runtime373-integration-validation-v8/full-regression-result.json`; log SHA-256 `c0ffd7c9e80f87dbf0b6e7e84fe6eed493ab77ad245f6921a173191b3928ceff`), and the ordinary Release runtime build passed in 21.664 seconds (result `runtime373-integration-validation-v8/ordinary-release-result.json`; log SHA-256 `8dd298e8a58edf432d301e06c1d280c474e6f0cb8a86e773ac0f09e75c668844`). The validation source is the fixture-only repair; the capture producer and evidence remain the pinned v8 identities above.
 
-### Current #375 boundary: hosted staging UI and source-idle reducer
+### Current #375/#378 boundary: coordinated staging lobby and complete route
+
+The owner-reported different-stage workflow is covered by #378. The staging lobby shares each peer’s
+menu progress/readiness, the original menus reject unsupported fighter/stage confirmations for this
+experimental Mario/FD room, and the guest’s local P1 keyboard or Gamepad sample routes to logical P2
+after the strict start gate. Menus and Results remain local; this does not add menu lockstep. The
+actual four-port startup PAD-byte comparison and start identity are unchanged. The fighter guard is
+covered by focused source controls; the hosted refusal exercised Battlefield.
+
+The latest stable Pages run is FULL_MATCH_UI_PASS with a passing outer process/CDP/cleanup receipt.
+The guest attempted to confirm Battlefield and stayed in SSS without an offer; the guest then
+observed the host ready for FD and recovered by selecting FD. Both pages completed the four-stock
+Mario/FD match, local original Results/Prize/CSS and normal UI Leave. The browser Gamepad fixture
+produced an actual native local-P1-to-network-P2 sample and neutral release; physical-controller and
+human/two-machine gates remain unrun.
+
+Runtime producer f75670cfa3b4883d0c31818933380fad78f74146 is deployed as Pages
+0f61658e-9218-46c0-be83-772278a97805. The passing harness is separately pinned to
+09d81082a31a80bcc7939f70c7dd6e6790c0e074. Both peers recorded 1,224 actual polls and matched the
+64-byte terminal checksum at input ordinal 1,223/source frame 1,110. Independent review verified all
+11 retained non-vacuous dirty replay records (alpha 2, beta 9), and all eight retained terminal
+44-byte PAD rows across peers and against each actual local ticket. The streaming journals are
+bounded; this is not a claim that every full-session state or PAD row was retained and compared.
+
+The original HPS leaf reproduced the pending refill at a seven-tick endpoint. Across 6,000
+source-audio ticks, all 18 observed pending boundaries settled on the next ordinary render; that is
+scoped audio evidence. The reviewed staging scheduler confirms/rebases quiet windows at six ticks
+and reserves the seventh for a token-owned refill, retaining incoming literal peer receipts until
+the next normal tick. Native seal/restore, timing and seven-tick guards are unchanged. Repeated
+pending-refill ticks or terminal selection during the reserved tick still fail closed; those cases
+are not admitted by this witness. In the passing run each peer settled three scheduled
+pending-refill ticks, including alpha 307→308 and beta 308→309; no source failure or H1 incident was
+retained. Host waits were 14,300.485/14,331.270 ms and native excluded waits 14,117.515/14,145.065
+ms, respectively. These measurements are distinct and do not establish smooth 60 Hz play; no new RTT
+probe or input-delay tuning is claimed.
+
+The failed local start outer receipt (wrong report path), original frame-308 hosted refusal,
+subsequent Results-driver refusal and held-input timeout remain retained. The Results driver now
+admits the exact stopped retirement state only after the original P2 completion trace proves it.
+Both retained v1 phase-8 traces passed that reducer with a modeled active destination; v3 observed
+phase-5/9 preparation rather than the phase-8 state. Continuous walk-off input and stock outcome
+share the existing 15-second action deadline; short-pulse limits and runtime guards remain
+unchanged. The isolated relay remains deployed and these owned sockets/browsers closed; server-wide
+idle/usage is unmeasured. The unchanged offline frozen package and source/linked-table/package
+review remain separately pinned. Full-profile, combat breadth, foreground timing, audible-output and
+physical/two-machine acceptance remain open.
+
+The retained run is `online-lobby-recovery-20261108-114053-2ecf2c7c`. Exact artifacts and digests are in [the existing evidence record](../evidence/match-only-rollback-feasibility-v1.json) under `staging_lobby_recovery_378`. Final source `09d81082` passed the full regression (3,145 tests, 244 skips) and ordinary Release build; the affected staging Release build passed at runtime producer `f75670cf`. Independent source, linked-package, raw-browser and reduced-driver reviews passed. Complete publication-head CI and the reviewed current-main merge are tracked in the milestone PR.
+
+**Historical #375 checkpoint (preserved).** The following records the original pre-integration evidence; PR #377 subsequently merged it. The current #378 repair and its limits are above.
 
 The hosted staging Pages UI completed a two-page four-stock Mario/Final Destination match through native terminal agreement, original Results, CSS return, and UI Leave on both pages. The browser result is `FULL_MATCH_UI_PASS`; the strict outer capture-owner receipt remains `FAIL` solely because its report lacked a CDP process inventory. A separate scan found all 22 browser launch-lineage identities absent and both capture/server process groups absent, with native/UI cleanup completed. The prospective CDP collector control later passed with 14 attributed rows joined to 18 observed OS browser identities, all absent, and cleanup passed; that static control loaded no game or relay and does not retroactively change the hosted receipt. The narrow functional UI milestone is achieved pending reviewed integration; cadence, complete-profile, and broader acceptance remain open.
 
