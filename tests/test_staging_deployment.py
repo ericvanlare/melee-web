@@ -154,6 +154,17 @@ class StagingDeploymentTests(unittest.TestCase):
         })
         self.assertEqual(project, self.redacted_pages_project())
 
+    def test_provider_placement_accepts_only_an_empty_object(self):
+        project = self.project()
+        production = project['deployment_configs']['production']
+        production['placement'] = {}
+        staging.validate_project(project)
+        for placement in ({'mode': 'smart'}, [], None):
+            with self.subTest(placement=placement):
+                production['placement'] = placement
+                with self.assertRaisesRegex(ValueError, r'production\.placement'):
+                    staging.validate_project(project)
+
     def test_provider_metadata_and_d1_identity_changes_fail_closed(self):
         database = {'database_id': '2a94860d-c09a-46a3-883b-00af5308b0b1',
                     'database_name': 'webmelee-staging-diagnostics'}

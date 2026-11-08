@@ -4232,7 +4232,7 @@
           2,
           4
         ],
-        "packet_wording_correction": "The frozen packet shorthand saying \u201csecond admission\u201d is incomplete; source performs three admissions, at commands 1, 2 and 4. The command sequence is authoritative."
+        "packet_wording_correction": "The frozen packet shorthand saying “second admission” is incomplete; source performs three admissions, at commands 1, 2 and 4. The command sequence is authoritative."
       },
       "observed": {
         "profile": {
@@ -7016,7 +7016,7 @@
           "bytes": 1704,
           "sha256": "196b46e8680183fe4206144d46cc17d16772c995d9a74c48c21e03fe53494a3b"
         },
-        "interpretation": "The saved class descriptor joins to hsdLObj and the observed piece offset 60 is consistent with the saved descriptor layout\u2019s lvec.x byte. This is a saved PRE hypothesis only. The source reduction finds named lvec reads in specular rendering (lobj.c:329/335) and view-space cache writes in setup (lobj.c:393\u2013399); it does not establish a live simulation consumer or uninterrupted HSD_LObj/piece lifetime. The source-plan artifact remains proposal-only."
+        "interpretation": "The saved class descriptor joins to hsdLObj and the observed piece offset 60 is consistent with the saved descriptor layout’s lvec.x byte. This is a saved PRE hypothesis only. The source reduction finds named lvec reads in specular rendering (lobj.c:329/335) and view-space cache writes in setup (lobj.c:393–399); it does not establish a live simulation consumer or uninterrupted HSD_LObj/piece lifetime. The source-plan artifact remains proposal-only."
       },
       "limits": [
         "Strict two-tick command-11 payload mismatch remains; later CPU domains, commands12/13 and final present were not reached.",
@@ -7062,7 +7062,7 @@
     },
     "lobj_complete_cache_source_reducer_v1": {
       "status": "REFUSED_FRESH_SEED_EQUIVALENCE_FIRST_SUBSTANTIVE_DIVERGENCE; SCENARIO6; NO_PRODUCTION_CACHE_REGISTRY",
-      "scope": "Read-only actual-source comparison of retained 64-byte GXLightObj call arguments and ordered operations, with selected service leaves modeled. This reducer did not produce the later observer\u2019s 69-byte FIFO record.",
+      "scope": "Read-only actual-source comparison of retained 64-byte GXLightObj call arguments and ordered operations, with selected service leaves modeled. This reducer did not produce the later observer’s 69-byte FIFO record.",
       "freeze": {
         "path": "lobj-complete-cache-actual-source-reducer-v1/freeze-v1.json",
         "bytes": 858,
@@ -7101,7 +7101,7 @@
           "3f00160c"
         ]
       },
-      "scenario_coverage": "Scenarios 0,1,2,3,5 matched and 4 refused as expected. Scenario 6 is the first substantive mismatch; 7\u201313 and the final omitted-hook loop did not run.",
+      "scenario_coverage": "Scenarios 0,1,2,3,5 matched and 4 refused as expected. Scenario 6 is the first substantive mismatch; 7–13 and the final omitted-hook loop did not run.",
       "source_causality": "HSD_LObjSetupSpecularInit writes the direction into spec_lightobj; repeated SetupInit clears active slots and the setup helpers refresh other fields but do not rewrite direction before HSD_LObjSetup submits the dirty record. The fresh-seeded proposal replaces this retained direction with its cold seed.",
       "limits": "The comparison is over 64-byte GXLightObj call arguments and ordered source operations; it did not produce or execute a 69-byte FIFO stream. Selected leaves are modeled. It establishes neither browser object lifetime nor visual impact and does not approve a persistent cache registry."
     },
@@ -7172,7 +7172,7 @@
         "bytes": 3622,
         "sha256": "a4949893a6ff57f3958e6d725cb1b8547af517572b40e7630b4f7d3684dade15"
       },
-      "next": "Instrument only actual setup_spec_lightobj lvec producer at lobj.c:393\u2013399 with one allocation-free exact 12-byte before/after record around the unchanged original getter/math sequence. Preserve original call order and strict comparisons.",
+      "next": "Instrument only actual setup_spec_lightobj lvec producer at lobj.c:393–399 with one allocation-free exact 12-byte before/after record around the unchanged original getter/math sequence. Preserve original call order and strict comparisons.",
       "required_join": "Bind the actual operand span to the current outer allocation ledger and full immutable PRE row/piece/header identities; after unchanged strict 1216, join the same execution first-difference span plus expected/live endpoint bytes. Missing/overflow/phase mismatch or unresolved reuse stays UNKNOWN.",
       "identity_limit": "A matching writer proves a write occurred at that address/value only. PRE table membership is capture-time evidence, not uninterrupted live piece lifetime or class/member ownership.",
       "release_limit": "Freeze the exact diagnostic ABI and controls, then obtain separate review/release before a browser run. No restore admission/comparison change or persistent cache implementation is authorized."
@@ -7564,7 +7564,7 @@
         },
         "pairs": {
           "sample300": {
-            "source_frame": "176\u2192177",
+            "source_frame": "176→177",
             "raw_five_channels": "MATCH",
             "channels": {
               "observation_bytes": 1280,
@@ -7576,7 +7576,7 @@
             "literal_pad": "MATCH"
           },
           "sample301": {
-            "source_frame": "177\u2192178",
+            "source_frame": "177→178",
             "raw_five_channels": "MATCH",
             "channels": {
               "observation_bytes": 1280,
@@ -9587,7 +9587,7 @@
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-particle-v16-v9-independent-result-review.json",
             "sha256": "f8807e0a40a844dd42743a0e56a4d09646e539d4a4076fe2e47a731e9abbeb72"
           },
-          "reviewed_scope": "Both written raw tick pairs match all five exact categories; no-draw diagnostic records4/5/6 equal. Commit0,frames176\u2192178; strict endpoint domain9 still fails HSD_PerfCurrentStat.nb_mtx_load. Final present unrun. Snapshot/renderer shutdown1, sticky CPU CLOSE1216, all PIDs absent."
+          "reviewed_scope": "Both written raw tick pairs match all five exact categories; no-draw diagnostic records4/5/6 equal. Commit0,frames176→178; strict endpoint domain9 still fails HSD_PerfCurrentStat.nb_mtx_load. Final present unrun. Snapshot/renderer shutdown1, sticky CPU CLOSE1216, all PIDs absent."
         }
       }
     },
@@ -9630,7 +9630,7 @@
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/performance-v17-browser-archive/archive.json",
           "sha256": "c52288e77d1c4d5dbf14ea483f089f6f42c041404f947358769a573ade8064d4"
         },
-        "scope": "Commands8..13 pass, two source ticks176\u2192178 corrected without draw, all checked CPU and drawn domains0x3fe match, all three written raw evidence pairs match five byte categories, actual final draw and GPU idle pass. Added Last144/start8 full strict restore+compare, all2169prior modes unchanged,2171declared/2167wire. Source/renderer/CPU close pass, all recordedPIDs absent. Independent raw review passes all three written raw pairs, no-draw slots4/5/6, final present slot7 and live final state against drawn replay. Seven-tick delayed input, live rollback, network, full profile and acceptance remain unrun.",
+        "scope": "Commands8..13 pass, two source ticks176→178 corrected without draw, all checked CPU and drawn domains0x3fe match, all three written raw evidence pairs match five byte categories, actual final draw and GPU idle pass. Added Last144/start8 full strict restore+compare, all2169prior modes unchanged,2171declared/2167wire. Source/renderer/CPU close pass, all recordedPIDs absent. Independent raw review passes all three written raw pairs, no-draw slots4/5/6, final present slot7 and live final state against drawn replay. Seven-tick delayed input, live rollback, network, full profile and acceptance remain unrun.",
         "independent_result_review": {
           "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/browser-two-tick-performance-v17-v1-independent-result-review.json",
           "sha256": "d49d50fe04f598bbf976b5a4b36a2fe11d8e345957cbcebdfd3cd57326332132"
@@ -9721,7 +9721,7 @@
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/linked-config-seven-tick-v17-v2/row-review.json",
             "sha256": "7b0640c2593b7f3f72ce40fea87a1a6db89cab6bef47f6b557daf1ecb813c718"
           },
-          "result": "Commands14\u201331 all0; seven baseline raw steps/draws, typed restore, seven no-draw same-authoritative replay ticks and actual final present. Strict CPU/drawn endpoint masks1022 match, all8raw5 pairs match; diagnostics slots7\u201314 unchanged and15 finaldraw. Both300prefixes agree; separate predicted remote fighter motion14 versus authoritative60 across all7; attempted prediction307 blocked without source tick. CPUclose0/source1/renderer1, bothpagesclosed, allownedPIDsabsent, all9producersarchived.",
+          "result": "Commands14–31 all0; seven baseline raw steps/draws, typed restore, seven no-draw same-authoritative replay ticks and actual final present. Strict CPU/drawn endpoint masks1022 match, all8raw5 pairs match; diagnostics slots7–14 unchanged and15 finaldraw. Both300prefixes agree; separate predicted remote fighter motion14 versus authoritative60 across all7; attempted prediction307 blocked without source tick. CPUclose0/source1/renderer1, bothpagesclosed, allownedPIDsabsent, all9producersarchived.",
           "limitations": "Not wrong-predicted-branch restoration. No live/network/repeated rollback, full-match, seven-tick frame budget or profile acceptance.",
           "independent_result_review": {
             "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/seven-tick-v17-browser-v2-independent-result-review.json",
@@ -11784,7 +11784,7 @@
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-ordinary-admission-v11/browser/result.json",
               "sha256": "364c5348011923160746f6d6edbdd298e3f8a30023d547dad4cadd20445fab59"
             },
-            "observed": "The ordinary GO prefix contains 124 actual source tick/draw pairs, and held frame-zero takeover and identity checks pass. Terminal cleanup refuses because native code treats Emscripten\u2019s opaque animation-frame handle as EMSCRIPTEN_RESULT.",
+            "observed": "The ordinary GO prefix contains 124 actual source tick/draw pairs, and held frame-zero takeover and identity checks pass. Terminal cleanup refuses because native code treats Emscripten’s opaque animation-frame handle as EMSCRIPTEN_RESULT.",
             "repair_control": {
               "path": "rollback-renderer-resume-20261028-155740-eef0524c/runtime-owned-raf-fix-v1/receipt.json",
               "sha256": "41e3c34cc30dfb02755f8455c03be5f97a3e4ddedd39f7cb4313fa1aa3ee73a2"
@@ -14292,7 +14292,7 @@
                     },
                     "scope_limits": [
                       "One successful restore per page at PRE0/F1 with dirty=0; no restore after frame 28.",
-                      "Later whole-END rebases at 8, 15, \u2026, 113 are clean; they do not exercise late piece restoration.",
+                      "Later whole-END rebases at 8, 15, …, 113 are clean; they do not exercise late piece restoration.",
                       "Functional 120-input trace only; no sustained 60 Hz, full-match, complete-profile or public-relay rollback claim."
                     ]
                   },
@@ -15511,7 +15511,7 @@
                     "beta": 0
                   },
                   "threshold_ticks": 8,
-                  "separate_rtt_summary": "prior public WSS probe median approximately 41\u201342 ms and p95 approximately 128 ms; not gameplay latency"
+                  "separate_rtt_summary": "prior public WSS probe median approximately 41–42 ms and p95 approximately 128 ms; not gameplay latency"
                 },
                 "h1": {
                   "recorder_exports_retained": true,
@@ -15595,8 +15595,8 @@
   },
   "staging_rollback_ui_375": {
     "issue": 375,
-    "status": "SOURCE_IDLE_REDUCER_PASS_FULL_UI_MATCH_PENDING",
-    "boundary": "Two actual staging UI pages through the existing deployed staging relay reached source frame 320 without gameplay key injection; zero corrections and zero native source failures. This does not establish a full match or hosted Pages result.",
+    "status": "HOSTED_FULL_MATCH_FUNCTIONAL_PASS_REVIEWED_INTEGRATION_PENDING_ACCEPTANCE_OPEN",
+    "boundary": "The hosted Pages two-page full UI route completed a four-stock Mario/Final Destination match through native terminal agreement, original Results, CSS return, and UI Leave. The narrow functional UI milestone is achieved pending reviewed integration. The historical strict capture-owner receipt remains FAIL solely because its report lacked CDP process inventory; an independent prospective collector control passed, and the original run’s native/UI cleanup and process absence are observed. Full acceptance remains open.",
     "producer": {
       "source_sha": "15b6a654ddd623b1d7bd41cd139dc38d5f225f6b",
       "profile_identity": "slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20",
@@ -15656,6 +15656,187 @@
         "cleanup": "Retained by its original capture; the later source-idle reducer does not close this failure."
       }
     ],
-    "next": "Complete focused terminal/disconnect/Results adapter, review the full UI harness, run required integration validation and exact-head CI, then run a separate hosted staging capture. Final UI full-match witness is pending."
+    "next": "The hosted functional UI milestone is achieved pending reviewed integration in PR #377. Final regression and exact-head CI remain tracked there. Preserve the frame-308 SourceFilesBusy refusal as unresolved; do not repeat the full match without a changed runtime hypothesis. Broader profile, timing, foreground, and human/two-machine acceptance remain open.",
+    "hosted_pages_full_match_v1": {
+      "result": "FULL_MATCH_UI_PASS",
+      "capture": {
+        "path": "runtime375-hosted-fullmatch-v1/browser/result.json",
+        "sha256": "ebf8de5a4855f392fcb88e2bb6126676424ef35bd3b5fb52ad34671e6cee056a",
+        "independent_review_path": "runtime375-hosted-fullmatch-v1/independent-review.json",
+        "independent_review_sha256": "644fa7a854dbd7ce8cb4f7472ab2bcb6038f45db83c8f94614a56d7dbf1b0a4e",
+        "capture_log_path": "runtime375-hosted-fullmatch-v1/capture.log",
+        "capture_log_sha256": "e439f9dabf30bc04d4f481381773e2fab2a86a584f15ee5e4c2915d79163550b",
+        "inputs_path": "runtime375-hosted-fullmatch-v1/inputs.json",
+        "inputs_sha256": "0bc96dbd69551bd4f054694fefa85beb893b829110fc7b7f587929a5d3808495",
+        "alpha_match_final_diagnostics_sha256": "96f35819c3a98e6359e7e223d4a1eafd7d60b5899e6649f6ecf774ceec7346eb",
+        "alpha_after_leave_diagnostics_sha256": "4bd187d018ca6b29ab0e5b55c6f7f1301a217fa440c9f52a5f1d477d069271d8",
+        "beta_match_final_diagnostics_sha256": "7c6d3d1b521daf88898218cac0fe89e41fd440d5763f38465d4b065071b94033",
+        "beta_after_leave_diagnostics_sha256": "2f8b7f4c26fa7993fb61ac239ce328ae7003742d0793bb188e917e0f7a951159",
+        "owner_report_path": "runtime375-hosted-fullmatch-v1/owner-report.json",
+        "owner_report_sha256": "ab0ec5dcbff44249e8b0e85992329d4c654cf9516c561427b73f68ef1327434c"
+      },
+      "producers": {
+        "runtime_source_sha": "36f99c741f8246b5385b10a0e721b15368204b27",
+        "runtime_profile": "slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20",
+        "wasm_sha256": "14f2673e25a8010ad6384a95635c54abc74c666ce6e5a308bc5417ca340da3d9",
+        "linked_table_sha256": "031bfd2c9db93bd4e0c6f14dffb2de1b9b8cc06fc55188d51063de2ce733c95a",
+        "policy_sha256": "fb44c0a5e3d82db09665459499c2a69222ce4ea952db49a8e758ddb0a2e5fd95",
+        "capture_harness_sha256": "ba82ddf1ad71510c3f1e7061b8609a7dba504c66d3eb9cf5b0e7b2d405464401",
+        "pages_source_sha": "36f99c741f8246b5385b10a0e721b15368204b27",
+        "pages_package_version": "v4",
+        "pages_manifest_sha256": "c3080887fbdaa15e50f8ec38d35f4b8d99df3a46132813fe5b66d5a254aa0340"
+      },
+      "deployment": {
+        "verified_path": "runtime375-pages-deployment-v1/verified.json",
+        "verified_sha256": "d7a5bc9c0adc3dae1b782fcc54a1e03fd53785ce70716ff694090216d037775a",
+        "deployment_id": "96d352c6-0bff-4d61-b680-bf7bf9ab6ca9",
+        "stable_url": "https://webmelee-staging.pages.dev",
+        "immutable_url": "https://96d352c6.webmelee-staging.pages.dev",
+        "http_result": "pass",
+        "postflight": "Original deployer postflight failed; verification used a read-only explicit-empty deployment_configs.production.placement normalization. This recovery is recorded in the verification receipt."
+      },
+      "relay": {
+        "provider_receipt_path": "runtime375-relay-pages-origin-v1/provider-receipt.json",
+        "provider_receipt_sha256": "40338b1c0c2f0176d024e7a5c12ef2bde354c155033ce827a5f4ebbe7fbfa97f",
+        "worker_version": "740fba57-2c56-47a8-9acc-91d05dd6dcee",
+        "origin_probe_path": "runtime375-relay-pages-origin-v1/origin-probe-result.json",
+        "origin_probe_sha256": "b21a1929313fcaa07986079528cf96bd9390075a6039845f4f536e3b420e89af",
+        "origin_probe_scope": "Separate Node WebSocket transport and Origin-policy probe only; not browser gameplay or cadence.",
+        "rtt_median_ms": 36.2524795,
+        "rtt_max_ms": 45.214833
+      },
+      "ui_and_match": {
+        "route": "Hosted staging Pages; two headless, muted pages; original CSS, original SSS to Final Destination, page-owned Host/Join, four-stock Mario match, native match-final agreement, original Results, return to CSS, and UI Leave on both pages.",
+        "actual_polls_per_role": 1242,
+        "terminal_input_ordinals": "0–1241",
+        "matched_terminal_checksum_bytes": 64,
+        "terminal_checksum_sha256": "1779992ae540477a908cd123f8574094b4c512813586e9e622bba465a0e3261f",
+        "agreement_hash": "bcc1eca96eb49d0fc42d98cd52b367aa2ca1c8e87882265d4b6bee6f44274b76",
+        "outcome": 2,
+        "pre_results_winner": -1,
+        "original_results_winner": 1,
+        "results_winner": "P2",
+        "css_phase_per_role": 1,
+        "ui_leave_per_role": true,
+        "native_source_boundary_failures_per_role": 0,
+        "reported_h1_incidents_per_role": 0,
+        "h1_retained_records_per_role": 0,
+        "retained_clock_samples_per_role": 64,
+        "retained_clock_stalls_per_role": 0,
+        "retained_clock_max_pending_ticks": {
+          "alpha": 1.2636006546020326,
+          "beta": 1.334299640655471
+        },
+        "timing_scope": "Bounded retained clock and native wait journals only; not uninterrupted cadence or H1 desktop acceptance.",
+        "retained_native_network_wait_rows_per_role": 256
+      },
+      "rollback": {
+        "retained_corrections": {
+          "alpha": 1,
+          "beta": 8,
+          "total": 9
+        },
+        "alpha_dirty_correction": {
+          "kind": "fully-confirmed-correction",
+          "dirty": 11,
+          "pre": 7,
+          "frontier": 14,
+          "confirmed": 14,
+          "remote_source": "actual",
+          "ticket_id": 53,
+          "poll_serial": "667",
+          "actual_remote_pad": [
+            0,
+            0,
+            127,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "predicted_remote_pad": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "native_row_sha256": "81f6627089fc35ec0c2e78bb274e707c04b014c6355f980e8483b5a871507329"
+        },
+        "existing_stream_bounds": {
+          "max_prediction_ticks": 7,
+          "max_history_ticks": 8,
+          "max_lookahead_ticks": 8
+        },
+        "additional_input_buffer_ticks": 0,
+        "input_delay": "No added input buffer; the existing bounded stream plan was used."
+      },
+      "waits": {
+        "alpha": {
+          "host_wait_count": 634,
+          "host_wait_ms": 14979.060001373291,
+          "native_cumulative_excluded_ms": 14747.539988517761
+        },
+        "beta": {
+          "host_wait_count": 344,
+          "host_wait_ms": 14959.825009346008,
+          "native_cumulative_excluded_ms": 14846.180003166199
+        },
+        "interpretation": "Host wait wall time and native excluded time are separate measurements; neither is a cadence claim."
+      },
+      "capture_owner": {
+        "result": "FAIL",
+        "reason": "Strict capture-owner attribution gate failed because the capture report contained no CDP process inventory. The independent process scan found 22 browser launch-lineage identities absent and both capture/server process groups absent; native/UI cleanup completed, but the owner receipt remains FAIL.",
+        "cdp_inventory_count": 0,
+        "observed_browser_pid_identities": 22,
+        "observed_browser_pids_absent": 22,
+        "capture_process_group_absent": true,
+        "server_process_group_absent": true,
+        "process_observation_passed": true,
+        "cleanup_passed": false,
+        "claim": "Do not label this capture owner-cleanup PASS.",
+        "prospective_collector_control": {
+          "result": "CDP_COLLECTOR_PASS",
+          "scope": "Separate static two-document collector control; no game or relay loaded, so it does not retroactively change the hosted capture owner receipt.",
+          "path": "runtime375-cdp-collector-control-v1/browser/result.json",
+          "sha256": "d724885e91f291e9a39b294ccc075110cf4e235b9d7815650cb4896642af224f",
+          "owner_report_path": "runtime375-cdp-collector-control-v1/owner-report.json",
+          "owner_report_sha256": "f3c3c2252fd44eba46767487eeabe58a5e643216e71c8c9480ac38f4f1dbe3e3",
+          "cdp_inventory_count": 14,
+          "os_browser_identities_observed": 18,
+          "os_browser_identities_absent": 18,
+          "cdp_attribution_complete": true,
+          "cleanup_passed": true,
+          "independent_review_path": "runtime375-cdp-collector-control-v1/independent-review.json",
+          "independent_review_sha256": "978177bbed96ab95e945b03a82f4ddd4c610c6eb60e7975cdc7fcedf85236f69"
+        }
+      },
+      "retained_blockers_and_validation": {
+        "sourcefilesbusy_308": "Prior v2 SourceFilesBusy at boundary 18, frame 308 (PRE 301 on both peers) remains unresolved; no fix is claimed.",
+        "collector": "The separate prospective CDP collector control passed with a complete CDP-to-OS inventory join and cleanup. It loaded no game or relay and does not change the hosted capture owner receipt. No full repeat is included; do not repeat absent a changed runtime hypothesis.",
+        "first_required_full_regression": {
+          "tests": 3112,
+          "failures": 4,
+          "errors": 1,
+          "skipped": 248
+        },
+        "corrected_focused_controls_passed": 5,
+        "final_regression": "Tracked in PR #377; this receipt preserves the hosted capture producer independently.",
+        "exact_head_ci": "Tracked in PR #377; this receipt preserves the hosted capture producer independently.",
+        "integration_validation": "Tracked in PR #377; this receipt preserves the hosted capture producer independently.",
+        "final_integration_validation": "Tracked in PR #377; this receipt preserves the hosted capture producer independently."
+      }
+    },
+    "historical_source_idle_scope": "The top-level producer, ui_path and result describe the earlier local-served source-idle reducer only. The current hosted full-match producer and evidence are in hosted_pages_full_match_v1."
   }
 }

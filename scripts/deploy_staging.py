@@ -49,6 +49,7 @@ PAGES_CONFIG_METADATA = {
     'compatibility_flags': [],
     'build_image_major_version': 3,
     'usage_model': 'standard',
+    'placement': {},
 }
 DIAGNOSTICS_FUNCTION_ROUTES = ('/api/diagnostics', '/api/diagnostics/*')
 D1_DATABASE_ID_RE = re.compile(

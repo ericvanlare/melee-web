@@ -44,14 +44,16 @@ retained failures are recorded in the [scoped H1 status entry](status/2026-10-13
 ### Track A: match-only rollback online
 
 **Current execution — [#375](https://github.com/ericvanlare/melee-web/issues/375).**
-The bounded #373 public diagnostic now completes the four-stock Mario/Final
+The bounded #373 public diagnostic completes the four-stock Mario/Final
 Destination route through matched terminal checksum/outcome, original local
-Results and CSS. Its [rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md)
-pins the v8 capture and retained failures; it is not a player-facing route. The
-diagnostic still supplies shared start coordination from Node and scripts both
-pages. The #375 milestone connects this work to the staging Host/Join UI: each
-page must offer its actual source-owned selection and agree on a versioned start
-context over the existing room transport. Native code must retain ownership of
+Results and CSS, but still scripts both pages from Node. A first hosted Pages
+capture of the player-facing Host/Join UI also completed that route; its
+functional result and failed outer process-attribution gate are pinned in the
+[rollback receipt](status/2026-10-12-match-only-rollback-feasibility.md). The
+separate prospective CDP collector control passes, but does not repair or
+retroactively clear the hosted capture's owner-gate failure. This completes the
+narrow functional UI milestone; integration validation is tracked in PR #377.
+Preserve both receipts without repeating the match absent a new hypothesis. Native code must retain ownership of
 selection, match construction and outcome; mismatches refuse before play.
 Results remain local. Keep Vanilla offline-only and the experimental profile
 separate from the ordinary player. Reuse the merged

@@ -16,6 +16,7 @@ import {performance} from 'node:perf_hooks';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
+import {validateBrowserProcessInfo} from './net_lockstep_browser_handshake_probe.mjs';
 import {confirmTwoHumanResults} from '../tests/vs_rules_results_confirmation_driver.mjs';
 import {returnFromCompetitivePrize} from '../tests/vs_rules_timeout_route_helpers.mjs';
 
@@ -82,6 +83,8 @@ const report = {
   server: hostedUrl ? {hosted: true, owned: false, url: hostedUrl} :
     {host: SERVER_HOST, port: SERVER_PORT, owned: false, closed: false},
   pages: {alpha: null, beta: null},
+  browser_process_info_by_role: {},
+  browser_process_info: [],
   checks: [],
   timing: {
     live_match_screenshots: false,
@@ -307,6 +310,38 @@ async function withinBound(action, stopAt) {
       timer = setTimeout(() => reject(Error('Bounded browser operation expired.')), ms);
     })]);
   } finally { clearTimeout(timer); }
+}
+
+async function collectBrowserProcessInfo(browser, role, stopAt) {
+  assert(typeof browser?.newBrowserCDPSession === 'function', `${role} lacks an owned browser CDP session`);
+  const session = await withinBound(() => browser.newBrowserCDPSession(), stopAt);
+  try {
+    const response = await withinBound(() => session.send('SystemInfo.getProcessInfo'), stopAt);
+    const rows = validateBrowserProcessInfo(response?.processInfo);
+    assert.equal(rows.filter(row => row.type === 'browser').length, 1,
+      `${role} Chrome CDP inventory must identify exactly one browser root`);
+    return rows;
+  } finally {
+    await withinBound(() => session.detach(), stopAt);
+  }
+}
+
+function flattenBrowserProcessInfo(byRole) {
+  const roles = ['alpha', 'beta'];
+  const browserRoots = {};
+  const seen = new Set();
+  const rows = roles.flatMap(role => {
+    const inventory = validateBrowserProcessInfo(byRole[role]);
+    const roots = inventory.filter(row => row.type === 'browser');
+    assert.equal(roots.length, 1, `${role} Chrome CDP inventory must identify exactly one browser root`);
+    browserRoots[role] = roots[0].id;
+    return inventory.map(row => {
+      assert(!seen.has(row.id), `Chrome CDP PID ${row.id} overlaps the two browser owners`);
+      seen.add(row.id);
+      return {...row, owner_role: role};
+    });
+  });
+  return {rows, browserRoots};
 }
 
 async function settlePair(actions) {
@@ -1041,6 +1076,23 @@ try {
     try { item.driver?.dispose();report.cleanup.driversDisposed[item.role] = true; }
     catch (error) { report.cleanup.driversDisposed[item.role] = false;
       (report.cleanup.errors ||= []).push(`${item.role} driver: ${error.message || error}`); }
+  }
+  // Sample both still-live browser owners before either can close or reuse a PID.
+  const inventoryDeadline = Math.min(hardDeadline - 1500, Date.now() + 2500);
+  await Promise.all(pages.map(async item => {
+    try {
+      report.browser_process_info_by_role[item.role] =
+        await collectBrowserProcessInfo(item.browser, item.role, inventoryDeadline);
+    } catch (error) {
+      (report.cleanup.errors ||= []).push(`${item.role} Chrome CDP inventory: ${error.message || error}`);
+    }
+  }));
+  try {
+    const inventory = flattenBrowserProcessInfo(report.browser_process_info_by_role);
+    report.browser_process_info = inventory.rows;
+    report.browser_process_roots_by_role = inventory.browserRoots;
+  } catch (error) {
+    (report.cleanup.errors ||= []).push(`Chrome CDP owner attribution: ${error.message || error}`);
   }
   for (const item of pages) {
     if (!item.browser) { report.cleanup.browsersClosed[item.role] = true;continue; }
