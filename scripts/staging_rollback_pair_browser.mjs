@@ -371,8 +371,11 @@ const gamepadActions = {
 };
 
 async function pressGamepad(item, key, observation, releaseMs) {
-  const action = gamepadActions[key];
-  assert(action, `No authored browser Gamepad action for ${key}`);
+  assert(gamepadActions[key], `No authored browser Gamepad action for ${key}`);
+  const action = {...gamepadActions[key]};
+  // A half-stick menu movement reaches the source tile without oscillating
+  // across its center. Gameplay is logical P2 and retains the full-stick pulse.
+  if (action.axis !== undefined && observation.port === 0) action.value *= 0.5;
   assert(SOURCE_KEY_TIMEOUT_MS + releaseMs < remaining(), 'Gamepad sequence exceeds remaining wall-time bound');
   await item.page.locator('#canvas').focus({timeout: remaining()});
   const set = (pressed, bound) => withinBound(() => item.page.evaluate(({action, pressed}) => {
