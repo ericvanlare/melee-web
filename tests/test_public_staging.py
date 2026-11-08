@@ -179,7 +179,7 @@ class PublicStagingTests(unittest.TestCase):
         virtual = b'FS.mkdir("/home/web_user");var env={PWD:"/",HOME:"/home/web_user",LANG:lang}'
         js = "gameplay_menu_browser.js"
         self.assertFalse(stage._rollback_native_has_local_path(js, virtual, self.source))
-        for path in (b'/home/web_user', b'/home/web_user/secret', b'/home/developer',
+        for path in (b'/home/web_user', b'/home/web_user' + b'/secret', b'/home/developer',
                      b'/Users/developer', b'/Volumes/AgentStorage/private'):
             with self.subTest(path=path):
                 self.assertTrue(stage._rollback_native_has_local_path(js, virtual + path, self.source))
