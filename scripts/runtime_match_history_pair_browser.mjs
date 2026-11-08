@@ -14,7 +14,8 @@ import {parseArgs} from 'node:util';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseNetChecksum} from './net_lockstep_core.mjs';
 import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS}
+  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS}
   from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
@@ -32,6 +33,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
 // SDL two-keyboard layout: KeyD is P1 right; ArrowLeft/ArrowRight are P2 left/right.
 const P1_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
+const P1_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
@@ -203,7 +205,7 @@ const report={schema:paced?(pacedRespawn?'melee-web-runtime-paced-600-respawn-v1
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:pacedRespawn?'600 actual source inputs with three held one-poll beta pulses and one native grounded respawn; bounded local headless trace':pacedLatePiece?'120 actual source input ticks with one real beta keyboard change at tick 26, one deferred/released actual peer packet, alpha restore across that late tick and final confirmed checksum; no changed-piece restoration claim without the matched retained-producer control':paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
+  scope:pacedRespawn?'600 actual source inputs with one-poll P2 RIGHT/LEFT/RIGHT corrections, actual P1 respawn-platform exit and four-stock P2 guard; bounded local headless trace':pacedLatePiece?'120 actual source input ticks with one real beta keyboard change at tick 26, one deferred/released actual peer packet, alpha restore across that late tick and final confirmed checksum; no changed-piece restoration claim without the matched retained-producer control':paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
     (presentForward?
       'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
       twoArenaEpisodes?
@@ -1510,19 +1512,20 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const items=[alpha,beta],targetFrame=inputTicks,paced120=inputTicks===120;
   const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
   const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:latePiece?[26]:[];
+  const lateKeys=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const neutral=Buffer.alloc(11);
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
   if(!respawn)assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
     'Both scripted first local inputs must differ from the actual held-prefix prediction');
-  const proof=report.peer_correction={claim:respawn?'bounded 600-input paced local trace, three late inputs and original stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
+  const proof=report.peer_correction={claim:respawn?'bounded 600-input paced local trace, RIGHT/LEFT/RIGHT late inputs, P1 platform exit and stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
       'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
     scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
     checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
     ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
       key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{}),
-    ...(respawn?{late_corrections:[]}:{})};
+    ...(respawn?{late_corrections:[],respawn_recovery:null}:{})};
   await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},latePiece?26:null,respawn?lateTicks:undefined);
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
@@ -1578,6 +1581,10 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       const beta=items.find(item=>item.role==='beta'),alpha=items.find(item=>item.role==='alpha');
       for(const tick of lateTicks){
         const event=respawn?{target_source_tick:tick}:proof.late_class_piece;
+        const lateIndex=lateTicks.indexOf(tick);
+        const inputKey=respawn?lateKeys[lateIndex]:'ArrowRight';
+        const expectedBetaPad=inputKey==='ArrowLeft'?P2_LEFT:P2_RIGHT;
+        if(respawn)event.expected_key=inputKey;
         if(respawn)proof.late_corrections.push(event);
         event.coordination??=[];
         const inputGate=await timedCoordination(event,'beta-input-gate',()=>awaitGate(
@@ -1587,13 +1594,13 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         assert(inputGate.pre_frame<=tick,'Late keyboard target is already before beta PRE');
         await timedCoordination(event,'beta-key-transition',async()=>{
           if(beta.keyToRelease){await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;}
-          await beta.page.keyboard.down('ArrowRight');beta.keyToRelease='ArrowRight';
+          await beta.page.keyboard.down(inputKey);beta.keyToRelease=inputKey;
         });
         const keyboardChange=await timedCoordination(event,'beta-note-and-resume-key',()=>
           beta.page.evaluate(args=>{
             const api=globalThis.__meleeRuntimePacedHistory;
             const change=api.noteLateKeyChange(args);api.resumeLateKeyChange(args.tick);return change;
-          },{tick,from:respawn?null:'ArrowLeft',to:'ArrowRight'}));
+          },{tick,from:respawn?null:'ArrowLeft',to:inputKey}));
         event.keyboard_change=keyboardChange;
         const [betaReleaseGate,alphaFrontier]=await Promise.all([
           timedCoordination(event,'beta-packet-gate',()=>awaitGate(
@@ -1621,17 +1628,17 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         assert.equal(alphaBeforePacket,null,'Actual beta tick escaped before its held release');
         assert.deepEqual([betaReleaseGate.frontier,betaEvidence.poll?.sourceFrame,betaEvidence.poll?.localPort],
           [tick+1,tick,1]);
-        assert.deepEqual(Buffer.from(betaEvidence.poll.raw).subarray(11,22),P2_RIGHT,
-          'Beta native poll did not read the actual Playwright key change');
+        assert.deepEqual(Buffer.from(betaEvidence.poll.raw).subarray(11,22),expectedBetaPad,
+          'Beta native poll did not read the actual Playwright direction change');
         assert.equal(betaEvidence.scenario.held_packet?.deferred_send,true,
           'Actual beta tick was not withheld by the existing transport primitive');
-        assert.deepEqual(Buffer.from(betaEvidence.scenario.held_packet.actual_local_pad),P2_RIGHT);
+        assert.deepEqual(Buffer.from(betaEvidence.scenario.held_packet.actual_local_pad),expectedBetaPad);
         event.input_gate=inputGate;
         event.beta_release_gate=betaReleaseGate;
         event.alpha_frontier=alphaFrontier;
         event.beta_native_poll=betaEvidence.poll;
         if(respawn)await timedCoordination(event,'beta-release-key',async()=>{
-          await beta.page.keyboard.up('ArrowRight');beta.keyToRelease=null;
+          await beta.page.keyboard.up(inputKey);beta.keyToRelease=null;
         });
         const alphaReceiptTask=timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
           alpha.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.waitLateRemotePairAndResume(args),{
@@ -1671,6 +1678,42 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
             assert.deepEqual(stop.players.map(player=>player.stocks),[3,4]);
             await alpha.page.keyboard.up('KeyD');alpha.keyToRelease=null;
             await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeWalkStop());
+            const platform=await awaitGate(alpha.page.evaluate(()=>
+              globalThis.__meleeRuntimePacedHistory.waitForRespawnRecoveryStart()),
+            'Actual P1 respawn platform sample');
+            const p1=platform.players?.[0];
+            assert.equal(platform.kind,'post-present-idle');
+            assert(p1&&p1.stocks===3&&p1.motion===13&&p1.groundAir===1,
+              'P1 platform exit requires an actual stock-three motion-13 airborne sample');
+            assert(Number.isFinite(p1.facing_direction)&&[-1,1].includes(p1.facing_direction)&&
+              Number.isFinite(p1.x)&&Number.isFinite(p1.y),
+            'P1 platform exit requires actual finite facing and source position');
+            const exitKey=p1.facing_direction===-1?'KeyA':'KeyD';
+            const exitPad=p1.facing_direction===-1?P1_LEFT:P1_RIGHT;
+            await alpha.page.keyboard.down(exitKey);alpha.keyToRelease=exitKey;
+            await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeRespawnRecoveryStart());
+            const completion=await awaitGate(alpha.page.evaluate(()=>
+              globalThis.__meleeRuntimePacedHistory.waitForRespawnRecoveryStop()),
+            'P1 one-poll platform exit completion');
+            assert.equal(completion.sample?.frame,platform.frame+1,
+              'P1 platform input did not stop at the next completed source frontier');
+            assert.equal(completion.poll?.sourceFrame,platform.frame,
+              'P1 platform input poll did not match the observed source frame');
+            assert.equal(completion.poll?.localPort,0);
+            const actualExitPad=Buffer.from(completion.poll.raw).subarray(0,11);
+            assert.deepEqual(actualExitPad,exitPad,
+              'P1 platform exit poll differs from the actual facing-directed Playwright key');
+            await alpha.page.keyboard.up(exitKey);alpha.keyToRelease=null;
+            await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeRespawnRecoveryStop());
+            proof.respawn_recovery={platform_sample:platform,
+              beta_same_frame_sample:null,
+              key:exitKey,direction:p1.facing_direction,
+              source_tick:completion.poll.sourceFrame,
+              input_poll:{sourceFrame:completion.poll.sourceFrame,ticketId:completion.poll.ticketId,
+                pollSerial:completion.poll.pollSerial,localPort:completion.poll.localPort,
+                actual_local_pad:[...actualExitPad]},
+              completed_frontier:completion.sample.frame,
+              keyup_before_source_tick:completion.sample.frame};
             return null;
           })().catch(walkError=>{
             signalWalkFailure({walkError});
@@ -1714,8 +1757,12 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,targetFrame);
     for(const row of run.polls){
       const expectedPad=respawn
-        ? item.role==='beta'?(lateTicks.includes(row.sourceFrame)?P2_RIGHT:neutral)
-          :row.sourceFrame>=proof.walk_off.start.frame&&row.sourceFrame<proof.walk_off.stop.frame?P1_RIGHT:neutral
+        ? item.role==='beta'?(lateTicks.includes(row.sourceFrame)
+            ?(lateKeys[lateTicks.indexOf(row.sourceFrame)]==='ArrowLeft'?P2_LEFT:P2_RIGHT):neutral)
+          :row.sourceFrame===proof.respawn_recovery?.source_tick
+            ?(proof.respawn_recovery.direction===-1?P1_LEFT:P1_RIGHT)
+            :row.sourceFrame>=proof.walk_off.start.frame&&row.sourceFrame<proof.walk_off.stop.frame
+              ?P1_RIGHT:neutral
         :latePiece&&item.role==='beta'&&row.sourceFrame>=26?P2_RIGHT:
         item.role==='alpha'?P1_RIGHT:P2_LEFT;
       assert.deepEqual(Buffer.from(row.raw).subarray(row.localPort*11,(row.localPort+1)*11),
@@ -1774,9 +1821,10 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     const replayed=rows?.find(entry=>(entry.row??entry).sourceFrame===tick)?.row??
       rows?.find(entry=>(entry.row??entry).sourceFrame===tick);
     assert(replayed,'Late correction did not return the native late source row');
+    const correctedPad=respawn&&lateKeys[lateTicks.indexOf(tick)]==='ArrowLeft'?P2_LEFT:P2_RIGHT;
     assert.deepEqual(Buffer.from(replayed.forward).subarray(11,22),respawn?neutral:P2_LEFT,
       'Late tick forward PAD does not show the real earlier prediction');
-    assert.deepEqual(Buffer.from(replayed.selected).subarray(11,22),P2_RIGHT,
+    assert.deepEqual(Buffer.from(replayed.selected).subarray(11,22),correctedPad,
       'Late tick corrected selection does not show the actual late beta PAD');
     assert.equal(replayed.state,2,'Late tick was not retained as a completed replay row');
     event.alpha_correction={kind:correction.kind,pre:correction.pre,
@@ -1789,6 +1837,43 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   if(respawn){
     const byFrame=run=>new Map(run.stock_samples.map(sample=>[sample.frame,sample]));
     const alphaSamples=byFrame(a),betaSamples=byFrame(b);
+    const recovery=proof.respawn_recovery;
+    assert(recovery&&recovery.platform_sample?.kind==='post-present-idle'&&
+      recovery.platform_sample.frame===recovery.source_tick&&
+      recovery.input_poll?.sourceFrame===recovery.source_tick&&
+      recovery.completed_frontier===recovery.source_tick+1&&
+      recovery.keyup_before_source_tick===recovery.completed_frontier,
+    'P1 platform exit lost its observed post-idle source tick or pre-poll key release');
+    const expectedExitPad=recovery.direction===-1?P1_LEFT:P1_RIGHT;
+    const recoveryPoll=a.polls.find(row=>row.sourceFrame===recovery.source_tick);
+    assert(recoveryPoll&&recoveryPoll.pollSerial===recovery.input_poll.pollSerial&&
+      recoveryPoll.ticketId===recovery.input_poll.ticketId,
+    'P1 platform exit poll no longer matches its retained native ticket');
+    assert.deepEqual(Buffer.from(recoveryPoll.raw).subarray(0,11),expectedExitPad,
+      'P1 platform exit input was not the one real facing-directed poll');
+    const followingNeutralPoll=a.polls.find(row=>row.sourceFrame===recovery.completed_frontier);
+    assert(followingNeutralPoll,'P1 platform exit has no following original native poll');
+    const actualFollowingPad=Buffer.from(followingNeutralPoll.raw).subarray(0,11);
+    assert.deepEqual(actualFollowingPad,neutral,
+      'P1 key-up did not produce neutral before the following native poll');
+    recovery.following_neutral_poll={sourceFrame:followingNeutralPoll.sourceFrame,
+      ticketId:followingNeutralPoll.ticketId,pollSerial:followingNeutralPoll.pollSerial,
+      local_port:followingNeutralPoll.localPort,actual_local_pad:[...actualFollowingPad]};
+    const betaPlatform=betaSamples.get(recovery.platform_sample.frame)??null;
+    const retainedAlphaPlatform=alphaSamples.get(recovery.platform_sample.frame)??null;
+    assert(retainedAlphaPlatform,
+      'P1 platform gate sample was invalidated and is absent from retained alpha observations');
+    const platformFields=({stocks,fighter,motion,groundAir,facing_direction,x,y})=>
+      ({stocks,fighter,motion,groundAir,facing_direction,x,y});
+    assert.deepEqual(platformFields(retainedAlphaPlatform.players[0]),
+      platformFields(recovery.platform_sample.players[0]),
+    'P1 platform gate sample differs from the retained same-frame alpha source observation');
+    recovery.beta_same_frame_sample=betaPlatform;
+    if(betaPlatform){
+      assert.deepEqual(platformFields(betaPlatform.players[0]),
+        platformFields(recovery.platform_sample.players[0]),
+      'Same-frame beta source sample disagrees with alpha P1 platform ownership');
+    }
     const paired=[...alphaSamples.keys()].filter(frame=>betaSamples.has(frame)).sort((x,y)=>x-y)
       .map(frame=>[alphaSamples.get(frame),betaSamples.get(frame)]);
     const baseline=paired.find(rows=>rows[0].frame===28&&rows.every(row=>row.players[0].stocks===4));

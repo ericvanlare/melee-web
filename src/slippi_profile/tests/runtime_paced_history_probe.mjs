@@ -3,20 +3,34 @@
 // snapshots, renderer submission and idle. No CDP operation drives this loop.
 import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS} from '../runtime_match_history_peer.mjs';
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS} from '../runtime_match_history_peer.mjs';
 
 function pauseGate(label){
-  let resolveReady,resolveResume,entered=false,resumed=false;
+  const aborted=Symbol(`${label}-aborted`);
+  let resolveReady,resolveResume,entered=false,resumed=false,wasAborted=false;
   const ready=new Promise(resolve=>{resolveReady=resolve;});
   const resume=new Promise(resolve=>{resolveResume=resolve;});
   return Object.freeze({
     pause(value){
       if(entered)throw Error(`${label} gate was entered more than once`);
-      entered=true;resolveReady(value);return resume;
+      entered=true;resolveReady(value);
+      return resume.then(()=>{
+        if(wasAborted)throw Error(`${label} gate was aborted`);
+      });
     },
-    wait(){return ready;},
+    wait(){return ready.then(value=>{
+      if(value===aborted)throw Error(`${label} gate was aborted before entry`);
+      return value;
+    });},
     release(){
       if(!entered||resumed)throw Error(`${label} gate release is stale or duplicated`);
+      resumed=true;resolveResume();
+    },
+    abort(){
+      if(resumed)return;
+      wasAborted=true;
+      if(!entered){entered=true;resolveReady(aborted);}
       resumed=true;resolveResume();
     },
     get entered(){return entered;},get resumed(){return resumed;},
@@ -72,6 +86,7 @@ export function installRuntimePacedHistoryProbe({role,
   const paced120=inputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
   const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
   const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:lateClassPiece?[26]:[];
+  const lateKeys=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const lateEvents=new Map(lateTicks.map(tick=>[tick,{
     scenario:{target_source_tick:tick,anchor:null,keyboard_change:null,held_packet:null,
       release_gate:null,alpha_frontier:null,network_release:null},
@@ -79,14 +94,17 @@ export function installRuntimePacedHistoryProbe({role,
     frontier:pauseGate('late-alpha-frontier'),
   }]));
   const walkStart=pauseGate('respawn-walk-start'),walkStop=pauseGate('respawn-walk-stop');
-  const report={scope:respawn?'600 actual source inputs, three deferred actual peer packets and one stock respawn':
+  const recoveryStart=pauseGate('respawn-platform-sample');
+  const recoveryStop=pauseGate('respawn-platform-input-complete');
+  const report={scope:respawn?'600 actual source inputs, three deferred directional peer packets, and one sampled P1 respawn-platform exit':
       lateClassPiece?'120 actual source inputs with one deferred actual peer packet at source tick 26; existing clock and rollback bounds':
       paced120?'120 actual source inputs; functional pacing clock trace with native-sized rollback windows':
       'eight actual source inputs; native admission and measured headless cadence',
     input_ticks:inputTicks,role,result:'pending',events:[],presentations:[],admissions:[],polls:[],
     authoritativeInputs:[],corrections:[],rebases:[],callbacks:[],failure:null,
     ...(lateClassPiece?{late_class_piece:lateEvents.get(26).scenario}:{}),
-    ...(respawn?{late_corrections:[...lateEvents.values()].map(event=>event.scenario),stock_samples:[]}:{}),
+    ...(respawn?{late_corrections:[...lateEvents.values()].map(event=>event.scenario),stock_samples:[],
+      respawn_recovery:null}:{}),
   };
   let lateAborted=false;
   const pauseScenario=async(gate,value,label)=>{
@@ -141,7 +159,8 @@ export function installRuntimePacedHistoryProbe({role,
         ![3,4].includes(match.players[0].stocks)||match.players[1].stocks!==4)
       throw Error(`Unexpected source stock observation: ${JSON.stringify(match)}`);
     const sample={frame:match.frame,kind:'post-present-idle',incarnation:metadata.incarnation,
-      players:match.players.map(({stocks,fighter,motion,groundAir})=>({stocks,fighter,motion,groundAir}))};
+      players:match.players.map(({stocks,fighter,motion,groundAir,facing_direction,x,y})=>
+        ({stocks,fighter,motion,groundAir,facing_direction,x,y}))};
     report.stock_samples.push(sample);
     return sample;
   };
@@ -154,12 +173,35 @@ export function installRuntimePacedHistoryProbe({role,
       throw Error('Paced presentation lost its native frame or serial');
     const row={kind,receipt};report.presentations.push(row);
     row.idle=await command('idle');
+    const recoveryFollow=respawn&&role==='alpha'&&recoveryStart.resumed&&
+      !recoveryStop.entered&&
+      row.idle.metadata.currentFrame===report.respawn_recovery?.platform_sample?.frame+1;
     if(respawn&&row.idle.metadata.currentFrame>=28&&
-        (row.idle.metadata.currentFrame%4===0||kind!=='forward'||row.idle.metadata.currentFrame===targetFrame)){
+        (row.idle.metadata.currentFrame%4===0||kind!=='forward'||
+          row.idle.metadata.currentFrame===targetFrame||recoveryFollow)){
       const sample=observeStock(state());
       if(role==='alpha'&&walkStart.resumed&&!walkStop.entered&&sample.players[0].stocks===3){
         report.walk_stop_frame=sample.frame;
         await pauseScenario(walkStop,sample,'Respawn walk-stop');
+      }
+      const p1=sample.players[0];
+      if(respawn&&role==='alpha'&&walkStop.resumed&&!recoveryStart.entered&&
+          p1.stocks===3&&p1.motion===13&&p1.groundAir===1){
+        if(!Number.isFinite(p1.facing_direction)||![-1,1].includes(p1.facing_direction)||
+            !Number.isFinite(p1.x)||!Number.isFinite(p1.y))
+          throw Error('Respawn platform control requires actual finite P1 facing and position');
+        report.respawn_recovery={platform_sample:sample,input_poll:null,
+          following_neutral_poll:null};
+        await pauseScenario(recoveryStart,sample,'Respawn platform sample');
+      }
+      if(recoveryFollow){
+        const startFrame=report.respawn_recovery.platform_sample.frame;
+        const poll=report.polls.find(item=>item.sourceFrame===startFrame);
+        if(!poll||poll.localPort!==0||poll.remotePort!==1||
+            typeof poll.pollSerial!=='string'||!Array.isArray(poll.raw)||poll.raw.length!==44)
+          throw Error('Respawn platform input lost its exact following native P1 poll');
+        report.respawn_recovery.input_poll=structuredClone(poll);
+        await pauseScenario(recoveryStop,{sample,poll},'Respawn platform input completion');
       }
     }
   };
@@ -262,9 +304,10 @@ export function installRuntimePacedHistoryProbe({role,
     waitForLateKeyChange(tick){if(role!=='beta')throw Error('Only beta owns the late key-change gate');return lateEvent(tick).key.wait();},
     noteLateKeyChange({tick=26,from,to}={}){
       const {key,scenario}=lateEvent(tick);
+      const targetKey=respawn?lateKeys[lateTicks.indexOf(tick)]:'ArrowRight';
       if(role!=='beta'||!key.entered||key.resumed||scenario.keyboard_change||
-          from!==(respawn?null:'ArrowLeft')||to!=='ArrowRight')
-        throw Error('Late key change must be the configured Playwright ArrowRight transition');
+          from!==(respawn?null:'ArrowLeft')||to!==targetKey)
+        throw Error('Late key change must match the configured Playwright direction transition');
       const {preFrame,currentFrame}=state().metadata;
       if(currentFrame!==tick)throw Error('Late key change lost its source frame');
       scenario.keyboard_change={source_tick:tick,from,to,pre_frame:preFrame,
@@ -316,10 +359,29 @@ export function installRuntimePacedHistoryProbe({role,
     resumeWalkStart(){walkStart.release();},
     waitForWalkStop(){return walkStop.wait();},
     resumeWalkStop(){walkStop.release();},
+    waitForRespawnRecoveryStart(){
+      if(role!=='alpha')throw Error('Only alpha owns the actual P1 respawn platform sample');
+      return recoveryStart.wait();
+    },
+    resumeRespawnRecoveryStart(){
+      if(role!=='alpha'||!recoveryStart.entered||recoveryStart.resumed)
+        throw Error('P1 recovery input requires its actual post-idle platform sample');
+      recoveryStart.release();
+    },
+    waitForRespawnRecoveryStop(){
+      if(role!=='alpha')throw Error('Only alpha owns the P1 recovery input completion gate');
+      return recoveryStop.wait();
+    },
+    resumeRespawnRecoveryStop(){
+      if(role!=='alpha'||!recoveryStop.entered||recoveryStop.resumed)
+        throw Error('P1 recovery completion gate is stale or duplicated');
+      recoveryStop.release();
+    },
     abortLateScenario(){
       lateAborted=true;
-      for(const gate of [walkStart,walkStop,...[...lateEvents.values()].flatMap(event=>[event.key,event.packet,event.frontier])])
-        if(gate.entered&&!gate.resumed)gate.release();
+      for(const gate of [walkStart,walkStop,recoveryStart,recoveryStop,
+        ...[...lateEvents.values()].flatMap(event=>[event.key,event.packet,event.frontier])])
+        gate.abort();
       return {aborted:true,role};
     },
     async prepare(){
@@ -436,6 +498,9 @@ export function installRuntimePacedHistoryProbe({role,
             }
             if(respawn&&role==='alpha'&&(!walkStart.resumed||!walkStop.resumed))
               throw Error('Respawn source run lost its owned walk-off gates');
+            if(respawn&&role==='alpha'&&(!recoveryStart.resumed||!recoveryStop.resumed||
+                !report.respawn_recovery?.input_poll))
+              throw Error('Respawn source run lost its actual P1 platform-exit input');
             report.result=respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';break;
           }
           const fullWindow=frame-current.preFrame===7;

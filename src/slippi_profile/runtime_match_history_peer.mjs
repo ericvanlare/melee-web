@@ -16,6 +16,8 @@ export const RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS = 8;
 export const RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS = 120;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS = 600;
 export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS = Object.freeze([26, 226, 426]);
+export const RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS =
+  Object.freeze(['ArrowRight', 'ArrowLeft', 'ArrowRight']);
 const REBASE_SCOPE = 'melee-web-runtime-two-episode-arena-history-peer-v1';
 const PACED_SCOPE = 'melee-web-runtime-paced-120-inputs-history-peer-v1';
 export const RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE =

@@ -13,6 +13,7 @@ import {
   RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS,
   RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
@@ -742,9 +743,11 @@ test('finite 120-input peer session preserves its protocol pre-roll and refuses 
   }
 });
 
-test('finite 600-input peer session releases only the fixed deferred source polls once',async()=>{
+test('finite 600-input peer session releases only the fixed directional deferred source polls once',async()=>{
   assert.equal(RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,600);
   assert.deepEqual(RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,[26,226,426]);
+  assert.deepEqual(RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS,
+    ['ArrowRight','ArrowLeft','ArrowRight']);
   const bus=createEndpointBus();
   assert.throws(()=>makePeer(bus,'alpha',{inputTicks:600,
     deferredLocalTicks:[26,226,426,526]}),/fixed ticks 26, 226, and 426/);
@@ -889,4 +892,40 @@ test('late packet handoff refuses a non-neutral following receipt before resumin
     resumeLateFrontier(){++resumed;},
   }),/Following beta receipt is not the actual neutral source poll/);
   assert.equal(resumed,0);
+});
+
+test('actual paced gate abort settles both pre-entry and paused owners',async()=>{
+  const source=await readFile(new URL(
+    '../src/slippi_profile/tests/runtime_paced_history_probe.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('function pauseGate('),end=source.indexOf('\nfunction matchesBytes(',start);
+  assert(start>=0&&end>start);
+  const gate=new Function(source.slice(start,end)+'\nreturn pauseGate;')();
+  const future=gate('future');
+  const waiting=assert.rejects(future.wait(),/aborted before entry/);
+  future.abort();
+  await waiting;
+  assert.throws(()=>future.pause('late'),/entered more than once/);
+
+  const entered=gate('entered');
+  const paused=assert.rejects(entered.pause('ready'),/gate was aborted/);
+  assert.equal(await entered.wait(),'ready');
+  entered.abort();
+  await paused;
+  assert.throws(()=>entered.release(),/stale or duplicated/);
+});
+
+test('actual final recovery guard refuses invalidated or changed platform samples',async()=>{
+  const source=await readFile(new URL(
+    '../scripts/runtime_match_history_pair_browser.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('    const betaPlatform=betaSamples.get(');
+  const end=source.indexOf('    const paired=',start);
+  assert(start>=0&&end>start);
+  const validate=new Function('assert','recovery','alphaSamples','betaSamples',source.slice(start,end));
+  const sample={frame:340,players:[{stocks:3,fighter:0,motion:13,groundAir:1,facing_direction:-1,x:0,y:9}]};
+  const recovery={platform_sample:sample};
+  assert.throws(()=>validate(assert,recovery,new Map(),new Map()),/invalidated/);
+  const changed={...sample,players:[{...sample.players[0],motion:29}]};
+  assert.throws(()=>validate(assert,recovery,new Map([[340,changed]]),new Map()),/differs from the retained/);
+  assert.doesNotThrow(()=>validate(assert,recovery,new Map([[340,structuredClone(sample)]]),new Map()));
+  assert.equal(recovery.beta_same_frame_sample,null);
 });
