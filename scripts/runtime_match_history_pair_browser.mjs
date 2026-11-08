@@ -1586,6 +1586,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
   const fullMatch=inputTicks===RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS;
   const stockoutScenario=respawn||fullMatch;
+  const networkBackpressure=fullMatch&&relayMode.mode==='external';
   const lateTicks=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:latePiece?[26]:[];
   const lateKeys=stockoutScenario?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
   const neutral=Buffer.alloc(11);
@@ -1602,16 +1603,16 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
     ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
       key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{}),
     ...(respawn?{late_corrections:[],respawn_recovery:null}:{}),
-    ...(fullMatch?{late_corrections:[],full_match_stockouts:null,network_wait:{}}: {})};
+    ...(fullMatch?{late_corrections:[],full_match_stockouts:null,network_wait:{},native_network_wait:{}}: {})};
   await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},
     latePiece?26:null,stockoutScenario?lateTicks:undefined,fullMatch);
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
-    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece,fullMatch})=>{
+    proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece,fullMatch,networkBackpressure})=>{
       const {installRuntimePacedHistoryProbe}=await import(moduleUrl);
-      installRuntimePacedHistoryProbe({role,inputTicks,lateClassPiece:latePiece,matchFinal:fullMatch});
+      installRuntimePacedHistoryProbe({role,inputTicks,lateClassPiece:latePiece,matchFinal:fullMatch,networkBackpressure});
       return globalThis.__meleeRuntimePacedHistory.prepare();
-    },{moduleUrl,role:item.role,inputTicks,latePiece,fullMatch});
+    },{moduleUrl,role:item.role,inputTicks,latePiece,fullMatch,networkBackpressure});
   }));
   for(const item of items){
     await item.page.locator('#canvas').focus();
@@ -1952,6 +1953,13 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         `${item.role} has malformed ${kind} network-wait measurements`);
       proof.network_wait[item.role]={count:networkWait.count,elapsed_ms:networkWait.elapsed_ms,
         by_kind:structuredClone(networkWait.by_kind)};
+      const nativeWait=run.native_network_wait;
+      assert(Array.isArray(nativeWait)&&nativeWait.length%2===0&&
+        nativeWait.every((row,index)=>row.active===(index%2===0?1:0)));
+      assert(networkBackpressure||nativeWait.length===0);
+      proof.native_network_wait[item.role]={count:nativeWait.length/2,
+        excluded_ms:nativeWait.at(-1)?.totalExcludedMs??0,
+        scope:'admitted source-time backpressure; excluded wall time is not cadence evidence'};
       assert(Number.isSafeInteger(consumedTicks)&&consumedTicks>0&&consumedTicks<=targetFrame,
         'Full match must finish within its fixed 3600-input capacity');
       const final=run.terminal_final?.receipt;
@@ -2259,7 +2267,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       matched_bytes:a.terminal_final.agreement.matched_bytes,
       agreement_hash:a.terminal_final.agreement.agreement_hash,
       stock_cycles:proof.full_match_stockouts.native_cycles.length,
-      network_wait:proof.network_wait});
+      network_wait:proof.network_wait,native_network_wait:proof.native_network_wait});
   if(latePiece)addCheck('actual tick-26 late input, deferred packet release, bounded native restore and final-120 checksum agreement',
     {changed_piece_restoration:'requires matched retained-producer control'});
 }

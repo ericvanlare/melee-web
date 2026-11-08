@@ -431,7 +431,8 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
   let adoptedPrefixTicket=null,unclaimedPrefixTicket=false,confirmedPrefixActive=false;
   let lastPolledEpisodeTicket=null,terminalCandidate=null,terminalTailActive=false;
   let terminalTailLastTicket=null,terminalTailFinalCopy=null,terminalTailAgreementConfirmed=false;
-  const journal=[],pacingJournal=[];
+  const journal=[],pacingJournal=[],pacingWaitJournal=[];
+  let activePacingWait=null;
   let pacingStarted=false;
   const queueCompletionWindow=globalThis.window??null;
   let queueCompletionInstalled=false,queueCompletionClosed=false;
@@ -842,6 +843,57 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     terminalTailFinalCopy=Object.freeze({receipt,checksum:checksum.slice(),ticket});
     return Object.freeze({receipt,checksum:checksum.slice(),ticket});
   };
+  const pacingWaitTransition=(begin,kind,inputOrdinal)=>{
+    active();
+    u32(inputOrdinal,'Network wait input ordinal');
+    if(!pacingStarted||!arenaMode||!inlineMode||![1,2,3,4].includes(kind)||
+       begin===Boolean(activePacingWait)||
+       (!begin&&(activePacingWait.kind!==kind||activePacingWait.inputOrdinal!==inputOrdinal)))
+      throw Error('Network wait requires the exact active native pacing owner and missing input');
+    const name=begin?'pacing_wait_begin':'pacing_wait_end';
+    const transition=episodeExport(name),getReceipt=episodeExport('pacing_wait_json');
+    const before=check(status());
+    if(before.ownerState!==1||before.pendingCommand||before.gpuPending||before.endpointActive||
+       before.requestSequence!==before.completeSequence)
+      throw Error('Network wait requires a completed quiescent native owner');
+    if(transition(kind,inputOrdinal)!==1){
+      if(begin){
+        const sample=module[PREFIX+'pacing_sample'];
+        const pointer=typeof sample==='function'?sample(0):0;
+        if(pointer){
+          const receipt=decodeRuntimeMatchHistoryPacing(read(pointer,64));
+          if(receipt.stalled){
+            pacingJournal.push({budget:0,...receipt});
+            const error=Error(`Native pacing clock stalled: reason ${receipt.stallReason}, value ${receipt.triggeringValue}, threshold ${receipt.threshold}`);
+            error.pacingSample=receipt;
+            throw latch(error);
+          }
+        }
+      }
+      throw latch(Error(`Native pacing network wait ${begin?'begin':'end'} refused: ${errorText()}`));
+    }
+    const pointer=getReceipt();
+    if(!Number.isInteger(pointer)||pointer<=0||pointer>UINT32_MAX)
+      throw latch(Error('Native pacing network wait receipt is unavailable'));
+    let receipt;
+    try{receipt=JSON.parse(module.UTF8ToString(pointer));}
+    catch(error){throw latch(Error('Native pacing network wait receipt is malformed',{cause:error}));}
+    const after=check(status());
+    const expectedTotal=pacingWaitJournal.at(-1)?.totalExcludedMs??0;
+    if(!hasExactKeys(receipt,['schema','active','kind','inputOrdinal','sourceFrame','phase',
+      'requestSequence','excludedMs','totalExcludedMs','pendingTicks'])||receipt.schema!==1||
+      receipt.active!==Number(begin)||receipt.kind!==kind||receipt.inputOrdinal!==inputOrdinal||
+      receipt.sourceFrame!==before.metadata.currentFrame||receipt.phase!==before.metadata.phase||
+      receipt.requestSequence!==before.completeSequence||!sameJsonValue(before,after)||
+      ![receipt.excludedMs,receipt.totalExcludedMs,receipt.pendingTicks].every(value=>Number.isFinite(value)&&value>=0)||
+      (begin?(receipt.excludedMs!==0||receipt.totalExcludedMs!==expectedTotal):
+        (receipt.pendingTicks!==activePacingWait.pendingTicks||
+         receipt.totalExcludedMs!==expectedTotal+receipt.excludedMs)))
+      throw latch(Error('Native pacing network wait receipt changed owner, duration, or debt'));
+    activePacingWait=begin?receipt:null;
+    pacingWaitJournal.push(receipt);
+    return {...receipt};
+  };
   const inlineCall=async(name,...args)=>{
     nativeCallPending=true;
     try{return await module.ccall(PREFIX.slice(1)+name,'number',args.map(()=>'number'),args,{async:true});}
@@ -956,6 +1008,10 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     status,
     journal:()=>structuredClone(journal),
     pacingJournal:()=>structuredClone(pacingJournal),
+    pacingWaitJournal:()=>structuredClone(pacingWaitJournal),
+    pacingWaitBegin(kind,inputOrdinal){return pacingWaitTransition(true,kind,inputOrdinal);},
+    pacingWaitEnd(kind,inputOrdinal){return pacingWaitTransition(false,kind,inputOrdinal);},
+
     pacingStart(){
       active();
       if(pacingStarted||!arenaMode||!inlineMode||!captured)
@@ -968,6 +1024,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
     pacingSample(budget){
       active();
       if(!pacingStarted||![0,1].includes(budget))throw Error('Pacing requires a started owner and zero/one budget');
+      if(activePacingWait)throw Error('Pacing sample is unavailable during an owned network wait');
       const sample=module[PREFIX+'pacing_sample'],size=module[PREFIX+'pacing_sample_bytes'];
       if(typeof sample!=='function'||typeof size!=='function'||size()!==64)
         throw latch(Error('Native pacing exports or receipt extent unavailable'));
@@ -1492,6 +1549,7 @@ export function createRuntimeMatchHistoryController(module,{commandTimeoutMs=500
       if(unclaimedPrefixTicket&&name!=='cleanup')
         throw Error('Adopted prefix ticket must be copied before another command');
       if(name!=='cleanup')active();else if(terminal||busy)throw Error('Runtime history cleanup owner unavailable');
+      if(activePacingWait&&name!=='cleanup')throw Error('Native commands are disabled during an owned network wait');
       if(terminalTailActive&&!terminalTailCommands.has(name)&&name!=='idle'&&name!=='cleanup')
         throw Error('Ordinary episode continuation is disabled after terminal-tail admission');
       if(name==='terminalTailBegin'&&(!terminalCandidate||terminalOrdinal!==terminalCandidate.inputOrdinal))

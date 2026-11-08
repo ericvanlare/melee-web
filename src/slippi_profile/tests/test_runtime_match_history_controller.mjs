@@ -1585,3 +1585,37 @@ test('terminal tail and final records preserve independent first and selected an
       firstCompletedTick:tick(firstOrdinal+1)})),/selected anchor/);
   }
 });
+
+test('paced network wait binds the missing row and keeps the original fractional debt',async()=>{
+  const f=inlineFixture(),{owner,module}=f;
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();await owner.command('capture');f.put(56,21);
+  module[prefix+'pacing_start']=()=>1;owner.pacingStart();
+  const pointer=24576;
+  let active=0,excludedMs=0,totalExcludedMs=0,pendingTicks=2.375;
+  const calls=[];
+  module[prefix+'pacing_wait_begin']=(kind,tick)=>{
+    calls.push(['begin',kind,tick]);active=1;excludedMs=0;return 1;
+  };
+  module[prefix+'pacing_wait_end']=(kind,tick)=>{
+    calls.push(['end',kind,tick]);active=0;excludedMs=113.5;totalExcludedMs+=excludedMs;return 1;
+  };
+  module[prefix+'pacing_wait_json']=()=>{
+    module.HEAPU8.set(new TextEncoder().encode(JSON.stringify({schema:1,active,kind:1,
+      inputOrdinal:6,sourceFrame:0,phase:21,requestSequence:1,excludedMs,totalExcludedMs,
+      pendingTicks})+'\0'),pointer);
+    return pointer;
+  };
+  assert.equal(owner.pacingWaitBegin(1,6).pendingTicks,2.375);
+  await assert.rejects(owner.command('recordingPresent'),/owned network wait/);
+  assert.throws(()=>owner.pacingSample(1),/owned network wait/);
+  assert.throws(()=>owner.pacingWaitEnd(1,7),/exact active native pacing owner/);
+  const ended=owner.pacingWaitEnd(1,6);
+  assert.equal(ended.excludedMs,113.5);
+  assert.equal(ended.pendingTicks,2.375);
+  assert.deepEqual(calls,[['begin',1,6],['end',1,6]]);
+  owner.pacingWaitBegin(1,6);
+  pendingTicks=0;
+  assert.throws(()=>owner.pacingWaitEnd(1,6),/changed owner, duration, or debt/);
+});

@@ -43,6 +43,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   // bounded peer receipts, and only this serialized owner admits them to the
   // timeline between operations.
   const deferred = new Set(deferredLocalTicks ?? (deferredLocalTick === null ? [] : [deferredLocalTick]));
+  const networkBackpressure=matchFinal&&new URL(relayUrl).protocol==='wss:';
   const localPort = role === 'alpha' ? 0 : 1;
   const arenaHistoryScope = inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ||
     inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ||
@@ -543,6 +544,29 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
             throw Error('Native terminal-tail finish did not return control to the original Results flow');
           return {status,receipt,checksum:[...final.checksum],agreement,
             timeline:timeline.status(),peer:peer.snapshot()};
+        }
+        case 'episodeAwaitNetworkInput': {
+          const {kind,tick,requiredThrough}=value;
+          const input=timeline.status();
+          if(!networkBackpressure||!arenaEnabled||input.plan_outstanding||input.terminal||input.disposed||
+             ![1,2,3,4].includes(kind)||!Number.isSafeInteger(tick)||tick<0||tick>=inputTicks||
+             !Number.isSafeInteger(requiredThrough)||requiredThrough<tick||requiredThrough>=inputTicks||
+             tick!==input.remote_contiguous_through+1||
+             (kind===4&&(requiredThrough!==tick||terminalTailPublished?.tick!==tick||
+               owner.status().metadata.phase!==37)))
+            throw Error('Network wait does not bind the earliest required actual input');
+          const validate=receipt=>{
+            if(receipt?.accepted_by!=='lockstep-protocol'||receipt.protocol_input_tick!==tick||
+               receipt.remote_port!==1-localPort)
+              throw Error('Network wait received an unrelated peer PAD receipt');
+            return receipt;
+          };
+          const available=peer.remoteSnapshot(tick);
+          if(available)return {receipt:validate(available),excluded:false};
+          owner.pacingWaitBegin(kind,tick);
+          const receipt=validate(await peer.waitForRemoteSample({tick}));
+          const clock=owner.pacingWaitEnd(kind,tick);
+          return {receipt,excluded:true,clock};
         }
         case 'episodeTimeline': return timeline.status();
         default: throw Error(`Unknown episode operation ${operation}`);

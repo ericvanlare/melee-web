@@ -267,6 +267,7 @@ struct MatchHistoryControl {
   bool arena_enabled=false;
   bool inline_dispatch=false;
   bool terminal_tail_handoff_ready=false;
+  struct {bool active=false;} pacing_wait;
   uint32_t requested_rebase_end=0;
   Capsule* capsule=nullptr;
   std::array<char,512> error{};
@@ -406,6 +407,7 @@ struct Session { uint32_t frame=50; uint32_t source_frames() const { return fram
 struct Capsule { bool endpoint_active() const { return false; } };
 struct Control { Status status{};bool dispatching=false,identity_ready=true,remote_ready=false,
  episode_enabled=false,arena_enabled=false,inline_dispatch=false,terminal_tail_handoff_ready=false;Capsule* capsule=nullptr;
+ struct {bool active=false;} pacing_wait;
  int* statics=nullptr;uint32_t requested_rebase_end{};
  Session* match_owner=nullptr;std::array<char,512> error{}; };
 Control match_history{};
@@ -1096,7 +1098,7 @@ int main() {
             section('void match_history_before_close() noexcept {',
                     'void match_history_after_match_close()'),
             section('int melee_web_native_menu_match_history_start_enable()',
-                    'int melee_web_native_menu_match_history_pacing_start('),
+                    'bool history_pacing_metadata_equal('),
         ]))
         source = self.work / 'start.cpp'
         binary = self.work / 'start'
@@ -1151,6 +1153,7 @@ struct {
   uint64_t submitted_frame=7,cache_flush_frame=0,presentation_serial=0;
   uint32_t presentation_command=0,presentation_request_sequence=0;
   bool dispatching=false,episode_enabled=true,arena_enabled=true;
+  struct {bool active=false;} pacing_wait;
   std::array<char,2048> renderer_preparation{};
 } match_history;
 struct MatchHandle {

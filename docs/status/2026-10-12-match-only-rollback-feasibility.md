@@ -2363,3 +2363,12 @@ predicates and private-history lifetime, opaque `Binary/m-ex.bin` provenance,
 pairing and backend activation. No code was ported by that inventory checkpoint;
 its source review does not establish online match activation, release
 executable correspondence, peer agreement or profile acceptance.
+
+
+### Current full-match public relay boundary, issue #373
+
+The first public attempt uses clean native/harness producer `ba55fca8` and the retained frontend producer `3d9c8d99`. The private Release build and focused native/JavaScript controls pass. The exact deployed staging version and origin policy were verified without deployment or configuration changes; a separate two-browser outbound WSS RTT/origin probe passes. That probe establishes transport observations only.
+
+The full-match attempt stops before the first correction: beta reaches source frame 21 and the original pacing clock reports debt 9 above threshold 8. Its observed remote-input waits total 150.23 ms; alpha reaches frame 28 with 117.105 ms of observed waits before the paired abort. These are wall wait observations, not an exclusion already applied by the captured runtime. Independent review also identifies the initial walk gate occurring before the late-frontier gate that its driver awaits. Neither a stock cycle nor a complete public rollback match passes. The original reports, source identities, incident exports and native clock journal are retained. Owned cleanup passes and all 20 recorded browser PIDs are absent. The Worker remains deployed; owned sockets closed, while server-wide idle and usage were not independently measured.
+
+The reduced repair must preserve already accrued fractional clock debt and the unchanged guard while excluding only an explicitly admitted remote-input wait at an unchanged quiescent native boundary. Rendering, simulation, restoration and keyboard scenario gates remain charged. The original first-failure and complete-match capacity/deadline remain unchanged. This would establish source-time backpressure behavior, not uninterrupted wall-clock cadence. The structured receipt's `continuous_366.issue_373_complete_match_v1` owns the retained attempt and producer pins; full-match completion and local Results/CSS remain unproved.

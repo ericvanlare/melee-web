@@ -77,14 +77,15 @@ export async function waitForLateRemotePairAndResume({tick,sourcePoll,
 
 export function installRuntimePacedHistoryProbe({role,
   inputTicks=RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,lateClassPiece=false,
-  matchFinal=false}={}){
+  matchFinal=false,networkBackpressure=false}={}){
   const owner=globalThis.__meleeRuntimeMatchHistory;
   const peer=globalThis.__meleeRuntimePeerHistoryProbe;
   if(!owner||!peer||!['alpha','beta'].includes(role)||globalThis.__meleeRuntimePacedHistory||
       ![RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS,RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
         RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS].includes(inputTicks) ||
       typeof lateClassPiece!=='boolean' || (lateClassPiece&&inputTicks!==RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS)||
-      typeof matchFinal!=='boolean' ||
+      typeof matchFinal!=='boolean' || typeof networkBackpressure!=='boolean'||
+      (networkBackpressure&&!matchFinal)||
       (inputTicks===RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS&&matchFinal!==true))
     throw Error('Paced probe requires the existing exclusive owners and an explicit supported finite horizon');
   const targetFrame=inputTicks;
@@ -170,6 +171,14 @@ export function installRuntimePacedHistoryProbe({role,
     finally{event.elapsedMs=performance.now()-event.started;}
   };
   const command=name=>call('command',name);
+  const waitForRequiredInput=async(kind,tick,requiredThrough)=>{
+    if(!networkBackpressure)return;
+    const reason={'source-input':1,'full-frontier-confirmation':2,
+      'terminal-confirmation':3,'terminal-input':4}[kind];
+    await call('episodeAwaitNetworkInput',{kind:reason,tick,requiredThrough});
+    finishNetworkWait();
+    if(lateAborted)throw Error('Network wait was aborted by its external owner');
+  };
   const admit=(view,provenance)=>{
     const receipt=owner.admitEndpoint({view,provenance});report.admissions.push(receipt);return receipt;
   };
@@ -261,10 +270,6 @@ export function installRuntimePacedHistoryProbe({role,
       }
       if(fullMatch&&role==='alpha'){
         const p1=sample.players[0];
-        if(!fullMatchWalkStart.entered&&sample.frame>=28&&p1.stocks===4){
-          report.full_match_initial_walk_start=sample;
-          await pauseScenario(fullMatchWalkStart,sample,'Full-match initial P1 walk-off');
-        }
         if(fullMatchWalkStock!==null&&fullMatchWalkStock>1){
           if(p1.stocks===fullMatchWalkStock-1){
             const cycle=fullMatchCycles.get(fullMatchWalkStock);
@@ -416,6 +421,14 @@ export function installRuntimePacedHistoryProbe({role,
         ...(lateScenario?{restore_event_index:restoreEventIndex,restore_status:restoreStatus}:{})});
       if(frontier!==targetFrame)await closeRebase(frontier);
     }
+    if(fullMatch&&role==='alpha'&&snapshot.dirty_from===lateTicks[0]&&!fullMatchWalkStart.entered){
+      const baseline=report.stock_samples.at(-1);
+      if(pre!==21||frontier!==28||baseline?.frame!==frontier||
+         baseline.players[0].stocks!==4||baseline.players[1].stocks!==4)
+        throw Error('Full-match walk-off requires the actual corrected four-stock F28 draw');
+      report.full_match_initial_walk_start=baseline;
+      await pauseScenario(fullMatchWalkStart,baseline,'Full-match initial P1 walk-off');
+    }
     if(respawn&&role==='alpha'&&snapshot.dirty_from===lateTicks[0]&&!walkStart.entered){
       if(pre!==21||frontier!==28)throw Error('Walk-off requires the first exact late correction');
       report.walk_start_frame=frontier;
@@ -463,12 +476,15 @@ export function installRuntimePacedHistoryProbe({role,
       if(applied.waiting){
         if(adopting||applied.tick!==tick)throw Error('Terminal tail lost its pending actual input');
         beginNetworkWait('terminal-input',{input_ordinal:tick,source_frame:descriptor.sourceFrame});
-        do {
-          callback=await newCallback();
-          if(lateAborted)throw Error('Terminal tail was aborted while awaiting confirmed input');
-          owner.pacingSample(0);
-        } while(!await peer.call('peerRemoteSnapshot',{tick}));
-        finishNetworkWait();
+        if(networkBackpressure)await waitForRequiredInput('terminal-input',tick,tick);
+        else{
+          do {
+            callback=await newCallback();
+            if(lateAborted)throw Error('Terminal tail was aborted while awaiting confirmed input');
+            owner.pacingSample(0);
+          } while(!await peer.call('peerRemoteSnapshot',{tick}));
+          finishNetworkWait();
+        }
         applied=await call('episodeTerminalTailForward');
         if(applied.waiting)throw Error('Observed terminal remote input became unavailable');
       }
@@ -706,6 +722,7 @@ export function installRuntimePacedHistoryProbe({role,
               beginNetworkWait('terminal-confirmation',{source_frame:frame,
                 required_input_through:selectedTerminal.selectedOrdinal-1});
               report.events.push({operation:'terminal-confirmation-wait',frame,confirmed});
+              await waitForRequiredInput('terminal-confirmation',remoteNext,selectedTerminal.selectedOrdinal-1);
               continue;
             }
             finishNetworkWait();
@@ -730,6 +747,7 @@ export function installRuntimePacedHistoryProbe({role,
             if(inputs.confirmed_through<lateAnchorFrame-1){
               beginNetworkWait('source-input',{source_frame:frame,required_input_through:lateAnchorFrame-1});
               report.events.push({operation:'late-anchor-network-wait',frame,confirmed});
+              await waitForRequiredInput('source-input',remoteNext,lateAnchorFrame-1);
               continue;
             }
             if(current.preFrame===lateAnchorFrame)
@@ -752,6 +770,7 @@ export function installRuntimePacedHistoryProbe({role,
                 beginNetworkWait('source-input',{source_frame:frame,required_input_through:target-1});
                 report.events.push({operation:'late-prefix-network-wait',frame,
                   remote_contiguous_through:inputs.remote_contiguous_through,dirty_from:inputs.dirty_from});
+                await waitForRequiredInput('source-input',remoteNext,target-1);
                 continue;
               }
               if(inputs.remote_contiguous_through!==target-1||inputs.dirty_from!==null)
@@ -821,6 +840,7 @@ export function installRuntimePacedHistoryProbe({role,
             if(fullMatch&&inputs.dirty_from!==null&&confirmed<frame){
               beginNetworkWait('full-frontier-confirmation',{source_frame:frame,required_input_through:frame-1});
               report.events.push({operation:'full-match-replay-confirmation-wait',frame,confirmed});
+              await waitForRequiredInput('full-frontier-confirmation',remoteNext,frame-1);
               continue;
             }
             finishNetworkWait();
@@ -836,7 +856,10 @@ export function installRuntimePacedHistoryProbe({role,
           // transport/timeline; only actual simulated inputs can become anchors.
           if(frame===targetFrame||frame-current.preFrame>=7||frame-inputs.remote_contiguous_through>7){
             beginNetworkWait('source-input',{source_frame:frame});
-            report.events.push({operation:'network-wait',frame,confirmed});continue;
+            report.events.push({operation:'network-wait',frame,confirmed});
+            const requiredThrough=frame===targetFrame||frame-current.preFrame>=7?frame-1:frame-7;
+            if(remoteNext<=requiredThrough)await waitForRequiredInput('source-input',remoteNext,requiredThrough);
+            continue;
           }
           finishNetworkWait();
           if(callback.grants===8)continue;
@@ -877,6 +900,7 @@ export function installRuntimePacedHistoryProbe({role,
       }finally{
         finishNetworkWait(true);
         report.finishedAt=performance.now();report.clock=owner.pacingJournal();
+        if(fullMatch)report.native_network_wait=owner.pacingWaitJournal();
         report.commands=owner.journal();
       }
       return structuredClone(report);
