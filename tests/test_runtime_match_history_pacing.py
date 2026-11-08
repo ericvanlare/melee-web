@@ -111,6 +111,7 @@ MatchHistoryControl match_history{};
 bool match_history_terminal=true,match_history_in_tick=false;
 bool runtime_idle=true,renderer_idle=true,boundary_admitted=true;
 unsigned boundary_calls=0,refusal_calls=0;
+Gate last_boundary_gate=Gate::CapturePre;
 double now_ms=0;
 melee_web::FixedTickClock menu_clock{melee_web::FixedTickClock::OverrunPolicy::Pause};
 bool history_refuse(const char* text) noexcept {
@@ -127,8 +128,9 @@ bool history_start_export_idle() noexcept {
   return runtime_idle&&!match_history_in_tick&&!match_history.dispatching&&
          !match_history.status.pending_command;
 }
-Result history_boundary(const Match& owner,Gate,uint32_t expected,void*) noexcept {
+Result history_boundary(const Match& owner,Gate point,uint32_t expected,void*) noexcept {
   ++boundary_calls;
+  last_boundary_gate=point;
   return boundary_admitted&&const_cast<Match&>(owner).source_frames()==expected
       ?Result::Admitted:Result::WrongFrame;
 }
@@ -162,12 +164,17 @@ int main() {
   now_ms+=1000.0/60.0;
   const auto* receipt=melee_web_native_menu_match_history_pacing_sample(1);
   assert(receipt&&receipt->steps==1&&receipt->pending_steps==0);
+  assert(last_boundary_gate==Gate::ForwardBefore);
   capsule.phase_=Phase::EpisodeRecording;capsule.frame_=1;capsule.forward_=1;session.frame=1;
   match_history.status.last_completed_command=5;
   match_history.status.request_seq=match_history.status.complete_seq=19;
   now_ms+=1000.0/60.0;
+  receipt=melee_web_native_menu_match_history_pacing_sample(0);
+  assert(receipt&&receipt->steps==0&&last_boundary_gate==Gate::InteriorPoll);
+  now_ms+=1000.0/60.0;
   receipt=melee_web_native_menu_match_history_pacing_sample(1);
-  assert(receipt&&receipt->steps==1&&receipt->current_frame==1);
+  assert(receipt&&receipt->steps==1&&receipt->current_frame==1&&
+         last_boundary_gate==Gate::InteriorPoll);
 
   // A retired-to-rebased interval has no capsule and consumes no due debt.
   // The next valid PRE sample receives one grant and leaves the remaining debt.

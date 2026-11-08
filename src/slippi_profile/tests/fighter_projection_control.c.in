@@ -7,7 +7,9 @@
 #include "slippi_profile/fighter_projection.h"
 #include "gameplay_source_memory_runtime.h"
 typedef int32_t s32;
+typedef uint32_t u32;
 typedef uint16_t u16;
+typedef int melee_source_bool;
 #define GET_FIGHTER(g) ((Fighter*)(g)->user_data)
 #define GET_COBJ(g) ((HSD_CObj*)(g)->hsd_obj)
 #define PAD_STACK(n)
@@ -21,9 +23,11 @@ static HSD_TObj shadow_texture;
 static HSD_ImageDesc shadow_image;
 static HSD_Shadow shadow;
 static HSD_SList shadow_object;
+static HSD_SList shadow_accessory_object;
 static HSD_WObj other_eye;
-static unsigned char fighter_model;
-static unsigned char other_model;
+static HSD_JObj fighter_model;
+static HSD_JObj other_model;
+static HSD_JObj foreign_model;
 static unsigned char shadow_pixels[256];
 static HSD_GObj camera_gobj={0,0,&camera};
 static HSD_GObj* current_camera=&camera_gobj;
@@ -72,6 +76,79 @@ static void init_shadow(Fighter* fp)
  fp->x20A4.shadow=&shadow;
 }
 ORIGINAL_FUNCTIONS
+#ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS
+#define RENDER_SPECULAR (1u<<3)
+#define RENDER_TOON (1u<<12)
+#define RENDER_SHADOW (1u<<26)
+#define HSD_TE_ALL 7
+HSD_TObj* tobj_shadows;
+HSD_TObj* tobj_toon;
+static HSD_GObj material_gobj;
+HSD_GObj* HSD_GObj_804D7814=&material_gobj;
+static unsigned list_allocations,list_removals,jobj_refs,jobj_unrefs;
+static HSD_SList list_pool[16];
+static unsigned list_pool_cursor;
+static HSD_TObj* setup_seen[16];
+static unsigned setup_count;
+static unsigned tevdesc_frees,texp_frees,resource_assignments,tev_compiles;
+static HSD_TObj ordinary_a,ordinary_b,toon_tobj,foreign_tobj;
+static HSD_ImageDesc toon_image;
+static HSD_Material fixture_material;
+static HSD_MObj fixture_mobj;
+static HSD_Shadow foreign_shadow;
+struct HSD_TExp { unsigned marker; };
+static HSD_TExp fixture_tev;
+static void fixture_setup_tev(HSD_MObj* m,HSD_TObj* t,uint32_t r)
+{(void)m;(void)t;(void)r;}
+static HSD_TExp* fixture_make_texp(HSD_MObj* m,HSD_TObj* t,HSD_TExp** list)
+{(void)m;(void)t;*list=&fixture_tev;return &fixture_tev;}
+typedef struct {
+ void (*setup_tev)(HSD_MObj*,HSD_TObj*,uint32_t);
+ HSD_TExp* (*make_texp)(HSD_MObj*,HSD_TObj*,HSD_TExp**);
+} FixtureMObjInfo;
+static FixtureMObjInfo fixture_mobj_info={fixture_setup_tev,fixture_make_texp};
+#define HSD_MOBJ_METHOD(mobj) (&fixture_mobj_info)
+void HSD_ShadowSetActive(HSD_Shadow*,int);
+void HSD_MObjAddShadowTexture(HSD_TObj*);
+void HSD_MObjDeleteShadowTexture(HSD_TObj*);
+HSD_SList* HSD_SListAllocAndPrepend(HSD_SList* list,void* value)
+{
+ assert(list_pool_cursor<16);HSD_SList* node=&list_pool[list_pool_cursor++];
+ node->next=list;node->data=value;list_allocations++;return node;
+}
+HSD_SList* HSD_SListRemove(HSD_SList* node)
+{assert(node);list_removals++;return node->next;}
+void HSD_JObjRef(HSD_JObj* jobj){assert(jobj);jobj_refs++;jobj->refs++;}
+void HSD_JObjUnref(HSD_JObj* jobj){assert(jobj);jobj_unrefs++;jobj->refs--;}
+void HSD_ShadowSetSize(HSD_Shadow* value,uint16_t w,uint16_t h)
+{(void)value;(void)w;(void)h;assert(!"projection must not allocate a shadow image");}
+bool ftLib_80086960(HSD_GObj* g){return g!=NULL;}
+LbShadow* ftLib_800872B0(HSD_GObj* g){return g?&GET_FIGHTER(g)->x20A4:NULL;}
+bool ftLib_800872BC(HSD_GObj* g){return g!=NULL;}
+void HSD_StateInitTev(void){}
+void HSD_SetMaterialColor(void*a,void*b,void*c,float d){(void)a;(void)b;(void)c;(void)d;}
+void HSD_SetMaterialShininess(float x){(void)x;}
+void HSD_TExpFreeTevDesc(HSD_TExp* x){assert(x);tevdesc_frees++;}
+void HSD_TExpFreeList(HSD_TExp* x,int all,int free_nodes)
+{assert(x&&all==HSD_TE_ALL&&free_nodes==1);texp_frees++;}
+void HSD_TObjAssignResources(HSD_TObj* t){(void)t;resource_assignments++;}
+void HSD_TExpCompile(HSD_TExp* x,HSD_TExp** d,HSD_TExp** list)
+{assert(x&&d&&list);*d=x;tev_compiles++;}
+void HSD_TObjSetup(HSD_TObj* head)
+{
+ setup_count=0;
+ while(head){assert(setup_count<16);setup_seen[setup_count++]=head;head=head->next;}
+}
+void HSD_TObjSetupTextureCoordGen(HSD_TObj* t){(void)t;}
+void HSD_TExpSetupTev(HSD_TExp* d,HSD_TExp* e){(void)d;(void)e;}
+void HSD_TObjSetupVolatileTev(HSD_TObj* t,uint32_t r){(void)t;(void)r;}
+void HSD_SetupRenderModeWithCustomPE(uint32_t r,void* p){(void)r;(void)p;}
+static void fn_801C8EF8_inline(Ground* g,HSD_MObj* m){(void)g;(void)m;}
+ORIGINAL_SHADOW_FUNCTIONS
+ORIGINAL_SELECTOR_MEMBERS
+ORIGINAL_MOBJ_FUNCTIONS
+ORIGINAL_MOBJ_CONSUMER
+#endif
 static void set_shadow_values(Fighter* fp, int marker)
 {
  Vec3 eye={marker+1,marker+2,marker+3};
@@ -127,6 +204,9 @@ static void init_fixture(Fighter* fp, HSD_GObj* fighter)
  memset(fp,0,sizeof(*fp));
  init_shadow(fp);fighter->next=0;fighter->user_data=fp;fighter->hsd_obj=&fighter_model;
  entities.fighters=fighter;
+#ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS
+ tobj_shadows=&shadow_texture;tobj_toon=NULL;
+#endif
 }
 static int run_topology_mode(const char* mode)
 {
@@ -156,8 +236,8 @@ static int run_topology_mode(const char* mode)
   shadow.objects=NULL;shadow.active=0;
   assert(!slippi_fighter_projection_draw_end());
   assert(strcmp(slippi_fighter_projection_failure_reason(),
-                "shadow member count changed (members 1->0; active 1->0)")==0);
-  assert(shadow.objects==NULL&&shadow.active==0);
+                "shadow canonical member node changed")==0);
+  assert(shadow.objects==&shadow_object&&shadow.active==1);
   assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
   assert(slippi_fighter_projection_world_end(world_id));
   return 1;
@@ -169,8 +249,14 @@ static int run_topology_mode(const char* mode)
   }
   assert(slippi_fighter_projection_draw_begin());
   replacement.data=&fighter_model;shadow.objects=&replacement;
-  assert(slippi_fighter_projection_draw_end());
-  assert(shadow.objects==&replacement&&shadow.active==1);
+  if(token) {
+   assert(!slippi_fighter_projection_draw_end());
+   assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow canonical member node changed")==0);
+   assert(shadow.objects==&shadow_object&&shadow.active==1);
+  } else {
+   assert(slippi_fighter_projection_draw_end());
+   assert(shadow.objects==&replacement&&shadow.active==1);
+  }
   assert_shadow_values(&fp,0);
   if(token) {assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());}
   assert(slippi_fighter_projection_world_end(world_id));
@@ -182,7 +268,7 @@ static int run_topology_mode(const char* mode)
   shadow_object.data=&other_model;
   assert(!slippi_fighter_projection_draw_end());
   assert(strcmp(slippi_fighter_projection_failure_reason(),
-                "shadow member order changed (members 1->1; active 1->1)")==0);
+                "shadow canonical member node changed")==0);
   assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
   assert(slippi_fighter_projection_world_end(world_id));
   return 1;
@@ -197,10 +283,10 @@ static int run_topology_mode(const char* mode)
   assert(!slippi_fighter_projection_draw_end());
   assert(strcmp(slippi_fighter_projection_failure_reason(),
                 "CPU interval armed state changed during draw")==0);
-  assert(shadow.objects==NULL&&shadow.active==0);
+  assert(shadow.objects==(arm?NULL:&shadow_object)&&shadow.active==(arm?0:1));
   if(token) assert(melee_web_cpu_interval_end(token));
   assert(!melee_web_cpu_interval_active());
-  /* Terminal refusal leaves the active draw owned until process exit. */
+  assert(slippi_fighter_projection_world_end(world_id));
   return 1;
  }
  if(strcmp(mode,"tuple-active")==0) {
@@ -229,17 +315,283 @@ static int run_topology_mode(const char* mode)
   assert(!slippi_fighter_projection_draw_end());
   assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow camera inverse appeared")==0);
   assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
-  /* Terminal refusal leaves drawing state owned until process exit. */
+  assert(slippi_fighter_projection_world_end(world_id));
   return 1;
  }
  return 0;
 }
+#ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS
+static void init_source_fixture(Fighter* fp,HSD_GObj* fighter,
+                                unsigned canonical_members,int active,
+                                int image_present)
+{
+ memset(fp,0,sizeof(*fp));memset(fighter,0,sizeof(*fighter));
+ init_fixture(fp,fighter);
+ identity.world=41;identity.fighter=42;
+ fighter->hsd_obj=&fighter_model;fighter->user_data=fp;
+ entities.fighters=fighter;
+ fighter_model.refs=3;other_model.refs=7;foreign_model.refs=11;
+ fp->x21FC_flag.b7=1;fp->x5AC.xC[1]=&fixture_scissor;
+ fp->x20A0_accessory=&other_model;
+ fp->x20A4.x0_b0=fp->x20A4.x0_b1=fp->x20A4.x0_b2=0;
+ fp->x20A4.x0_b3=fp->x20A4.x0_b4=fp->x20A4.x0_b5=0;
+ shadow_image.image_ptr=image_present?shadow_pixels:NULL;
+ shadow.active=!!active;
+ shadow_object.data=&fighter_model;
+ shadow_object.next=canonical_members>1?&shadow_accessory_object:NULL;
+ shadow_accessory_object.data=&other_model;shadow_accessory_object.next=NULL;
+ shadow.objects=canonical_members?&shadow_object:NULL;
+ memset(&foreign_shadow,0,sizeof(foreign_shadow));
+ memset(&foreign_tobj,0,sizeof(foreign_tobj));
+ shadow_texture.next=NULL;tobj_shadows=active?&shadow_texture:NULL;tobj_toon=NULL;
+ list_allocations=list_removals=jobj_refs=jobj_unrefs=0;list_pool_cursor=0;
+ tevdesc_frees=texp_frees=resource_assignments=tev_compiles=0;
+ setup_count=0;memset(&ordinary_a,0,sizeof(ordinary_a));
+ memset(&ordinary_b,0,sizeof(ordinary_b));memset(&toon_tobj,0,sizeof(toon_tobj));
+ memset(&toon_image,0,sizeof(toon_image));
+ memset(&fixture_material,0,sizeof(fixture_material));memset(&fixture_mobj,0,sizeof(fixture_mobj));
+ material_gobj.user_data=&fixture_scissor;
+ assert(slippi_fighter_projection_world_begin(identity.world));
+ int descriptor=1;
+ assert(slippi_fighter_projection_created(fp,&descriptor,sizeof(*fp)));
+}
+static unsigned projected_shadow_count(void)
+{
+ unsigned count=0;HSD_SList* node=shadow.objects;
+ while(node){assert(count<3);count++;node=node->next;}
+ return count;
+}
+static void assert_source_canonical(unsigned members,int active)
+{
+ assert(shadow.objects==(members?&shadow_object:NULL));
+ assert(shadow_object.data==&fighter_model);
+ assert(shadow_object.next==(members>1?&shadow_accessory_object:NULL));
+ if(members>1){assert(shadow_accessory_object.data==&other_model);
+                assert(shadow_accessory_object.next==NULL);}
+ assert(shadow.active==!!active);
+ assert(tobj_shadows==(active?&shadow_texture:NULL));
+ assert(shadow_texture.next==NULL);
+ assert(fighter_model.refs==3&&other_model.refs==7&&foreign_model.refs==11);
+ assert(list_allocations==0&&list_removals==0&&jobj_refs==0&&jobj_unrefs==0);
+}
+static void source_draw_finish(uint64_t token,int expected,unsigned members,int active)
+{
+ int result=slippi_fighter_projection_draw_end();
+ assert(result==expected);
+ assert_source_canonical(members,active);
+ assert(melee_web_cpu_interval_end(token));assert(!melee_web_cpu_interval_active());
+ assert(slippi_fighter_projection_world_end(identity.world));
+}
+static int run_source_control(const char* mode)
+{
+ Fighter fp={0};HSD_GObj fighter={0};uint64_t token;
+ if(strcmp(mode,"source-root")==0||strcmp(mode,"source-accessory")==0||
+    strcmp(mode,"source-dedup")==0) {
+  unsigned canonical=strcmp(mode,"source-dedup")==0?1:
+                     strcmp(mode,"source-root")==0?1:1;
+  init_source_fixture(&fp,&fighter,canonical,1,1);
+  if(strcmp(mode,"source-root")==0)fp.x20A0_accessory=NULL;
+  if(strcmp(mode,"source-accessory")==0)fp.invisible=1;
+  if(strcmp(mode,"source-dedup")==0)fp.x20A0_accessory=&fighter_model;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());original_shadow_selector_members();
+  assert(projected_shadow_count()==(strcmp(mode,"source-accessory")==0?1:
+                                    strcmp(mode,"source-dedup")==0?1:1));
+  assert(shadow.objects&&shadow.objects->data==
+         (strcmp(mode,"source-accessory")==0?&other_model:&fighter_model));
+  assert(shadow.objects->next==NULL&&shadow.active==1);
+  source_draw_finish(token,1,canonical,1);return 1;
+ }
+ if(strcmp(mode,"source-visibility")==0) {
+  init_source_fixture(&fp,&fighter,2,1,1);
+  token=melee_web_cpu_interval_begin();assert(token);
+  for(unsigned frame=0;frame<3;frame++){
+   fp.x21FC_flag.b7=frame==1?0:1;
+   assert(slippi_fighter_projection_draw_begin());
+   original_shadow_selector_members();
+   if(frame==1){assert(projected_shadow_count()==0&&shadow.objects==NULL);
+                assert(shadow.active==0&&tobj_shadows==NULL);}
+   else {assert(projected_shadow_count()==2);
+         assert(shadow.objects->data==&other_model);
+         assert(shadow.objects->next->data==&fighter_model);
+         assert(shadow.active==1&&tobj_shadows==&shadow_texture);}
+   assert(slippi_fighter_projection_draw_end());
+   assert_source_canonical(2,1);
+  }
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-late-consumer")==0) {
+  init_source_fixture(&fp,&fighter,1,0,1);fp.x20A0_accessory=NULL;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  original_shadow_selector_members();
+  assert(shadow.active==1&&tobj_shadows==&shadow_texture);
+  lbShadow_8000EEE0(&fighter);assert(shadow.active==1);
+  fp.x20A4.x0_b4=1;lbShadow_8000EEE0(&fighter);
+  assert(shadow.active==0&&tobj_shadows==NULL);
+  fp.x20A4.x0_b4=0;lbShadow_8000EEE0(&fighter);
+  assert(shadow.active==1&&tobj_shadows==&shadow_texture);
+  ordinary_a.next=&ordinary_b;fixture_material.alpha=1.0f;
+  fixture_mobj.rendermode=RENDER_SHADOW;fixture_mobj.mat=&fixture_material;
+  fixture_mobj.tobj=&ordinary_a;fixture_mobj.tevdesc=&fixture_tev;
+  fixture_mobj.texp=&fixture_tev;HSD_GObj_804D7814=&material_gobj;
+  setup_count=0;fn_801C8EF8(&fixture_mobj,0);
+  assert(setup_count==3&&setup_seen[0]==&ordinary_a&&
+         setup_seen[1]==&ordinary_b&&setup_seen[2]==&shadow_texture);
+  assert(ordinary_a.next==&ordinary_b&&ordinary_b.next==NULL);
+  assert(shadow_texture.next==NULL&&tobj_shadows==&shadow_texture);
+  source_draw_finish(token,1,1,0);return 1;
+ }
+ if(strcmp(mode,"source-setup-toon")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  HSD_TObj* const opaque_old_link=(HSD_TObj*)(uintptr_t)1;
+  toon_tobj.imagedesc=&toon_image;toon_tobj.next=opaque_old_link;
+  tobj_toon=&toon_tobj;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  ordinary_a.next=&ordinary_b;fixture_material.alpha=1.0f;
+  fixture_mobj.rendermode=RENDER_SHADOW|RENDER_TOON;
+  fixture_mobj.mat=&fixture_material;fixture_mobj.tobj=&ordinary_a;
+  HSD_MObjSetup(&fixture_mobj,0);
+  assert(setup_count==4&&setup_seen[0]==&toon_tobj&&
+         setup_seen[1]==&ordinary_a&&setup_seen[2]==&ordinary_b&&
+         setup_seen[3]==&shadow_texture);
+  fixture_mobj.tobj=NULL;fixture_mobj.tevdesc=&fixture_tev;fixture_mobj.texp=&fixture_tev;
+  fn_801C8EF8(&fixture_mobj,0);
+  assert(setup_count==2&&setup_seen[0]==&toon_tobj&&setup_seen[1]==&shadow_texture);
+  assert(slippi_fighter_projection_draw_end());
+  assert(ordinary_a.next==&ordinary_b&&ordinary_b.next==NULL);
+  assert(toon_tobj.next==opaque_old_link&&shadow_texture.next==NULL);
+  assert_source_canonical(1,1);
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-toon-alias")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  toon_tobj.imagedesc=&toon_image;tobj_toon=&toon_tobj;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  ordinary_a.next=&toon_tobj;
+  fixture_mobj.rendermode=RENDER_SHADOW|RENDER_TOON;
+  fixture_mobj.mat=&fixture_material;fixture_mobj.tobj=&ordinary_a;
+  HSD_MObjSetup(&fixture_mobj,0);
+  assert(setup_count==0&&ordinary_a.next==&toon_tobj&&toon_tobj.next==NULL);
+  source_draw_finish(token,0,1,1);return 1;
+ }
+ if(strcmp(mode,"source-raw-active")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  HSD_SList* const projected=shadow.objects;
+  shadow.active=0;
+  assert(shadow.objects==projected&&tobj_shadows==&shadow_texture&&shadow_texture.next==NULL);
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow texture chain changed")==0);
+  assert_source_canonical(1,1);
+  assert(!slippi_fighter_projection_draw_end());
+  assert(strcmp(slippi_fighter_projection_failure_reason(),"shadow texture chain changed")==0);
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-compile-refusal")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  fixture_mobj.rendermode=RENDER_SHADOW;fixture_mobj.tobj=&ordinary_a;
+  fixture_mobj.tevdesc=&fixture_tev;fixture_mobj.texp=&fixture_tev;
+  HSD_MObjCompileTev(&fixture_mobj);
+  assert(tevdesc_frees==0&&texp_frees==0&&resource_assignments==0&&tev_compiles==0);
+  assert(fixture_mobj.tevdesc==&fixture_tev&&fixture_mobj.texp==&fixture_tev);
+  source_draw_finish(token,0,1,1);return 1;
+ }
+ if(strcmp(mode,"source-compile-ordinary")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  fixture_mobj.rendermode=RENDER_SHADOW;fixture_mobj.tobj=&ordinary_a;
+  fixture_mobj.tevdesc=&fixture_tev;fixture_mobj.texp=&fixture_tev;
+  ordinary_a.next=&ordinary_b;HSD_MObjCompileTev(&fixture_mobj);
+  assert(tevdesc_frees==1&&texp_frees==1&&resource_assignments==1&&tev_compiles==1);
+  assert(ordinary_a.next==&ordinary_b&&ordinary_b.next==NULL);
+  assert(tobj_shadows==&shadow_texture&&shadow_texture.next==NULL);
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-refuse-foreign")==0||
+    strcmp(mode,"source-refuse-owner")==0) {
+  init_source_fixture(&fp,&fighter,2,1,1);
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  if(strcmp(mode,"source-refuse-foreign")==0)
+   HSD_ShadowAddObject(&shadow,&foreign_model);
+  else HSD_ShadowAddObject(&foreign_shadow,&foreign_model);
+  assert(foreign_model.refs==11&&list_allocations==0&&jobj_refs==0);
+  if(strcmp(mode,"source-refuse-owner")==0)assert(foreign_shadow.objects==NULL);
+  source_draw_finish(token,0,2,1);return 1;
+ }
+ if(strcmp(mode,"source-refuse-image")==0) {
+  init_source_fixture(&fp,&fighter,1,0,1);fp.x20A0_accessory=NULL;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  shadow_image.image_ptr=NULL;
+  original_shadow_selector_members();
+  assert(shadow.active==0&&tobj_shadows==NULL);
+  source_draw_finish(token,0,1,0);return 1;
+ }
+ if(strcmp(mode,"source-texture-alias")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(slippi_fighter_projection_draw_begin());
+  fixture_mobj.rendermode=RENDER_SHADOW;fixture_mobj.tobj=&shadow_texture;
+  fixture_mobj.mat=&fixture_material;fixture_mobj.tevdesc=&fixture_tev;
+  HSD_MObjSetup(&fixture_mobj,0);
+  assert(setup_count==0&&shadow_texture.next==NULL);
+  source_draw_finish(token,0,1,1);return 1;
+ }
+ if(strcmp(mode,"source-unowned-texture")==0) {
+  init_source_fixture(&fp,&fighter,1,0,1);
+  tobj_shadows=&foreign_tobj;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(!slippi_fighter_projection_draw_begin());
+  assert(shadow.objects==&shadow_object&&shadow_object.data==&fighter_model);
+  assert(tobj_shadows==&foreign_tobj&&foreign_tobj.next==NULL);
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-inactive-texture-link")==0) {
+  init_source_fixture(&fp,&fighter,1,0,1);
+  shadow_texture.next=&foreign_tobj;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(!slippi_fighter_projection_draw_begin());
+  assert(shadow.objects==&shadow_object&&shadow_object.data==&fighter_model);
+  assert(shadow.active==0&&tobj_shadows==NULL);
+  assert(shadow_texture.next==&foreign_tobj&&foreign_tobj.next==NULL);
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ if(strcmp(mode,"source-refuse-initial-owner")==0) {
+  init_source_fixture(&fp,&fighter,1,1,1);
+  shadow_object.data=&foreign_model;
+  token=melee_web_cpu_interval_begin();assert(token);
+  assert(!slippi_fighter_projection_draw_begin());
+  assert(shadow.objects==&shadow_object&&shadow_object.data==&foreign_model);
+  assert(shadow.active==1&&tobj_shadows==&shadow_texture);
+  assert(shadow_texture.next==NULL&&foreign_model.refs==11);
+  assert(melee_web_cpu_interval_end(token));
+  assert(slippi_fighter_projection_world_end(identity.world));return 1;
+ }
+ return 0;
+}
+#endif
 int main(int argc,char** argv)
 {
  Fighter fp={0}; CmSubject subject={0}; HSD_GObj fighter={0};
- HSD_SList extra_shadow_node={0};
  assert(!melee_web_cpu_interval_active());
- if(argc>1) {assert(run_topology_mode(argv[1]));return 0;}
+ if(argc>1) {
+  int handled=run_topology_mode(argv[1]);
+#ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS
+  if(!handled)handled=run_source_control(argv[1]);
+#endif
+  assert(handled);return 0;
+ }
  init_fixture(&fp,&fighter);fp.x890_cameraBox=&subject;
  fp.x2188=(S32Vec2){123,456};fp.neighbor=1;
  set_shadow_values(&fp,0);camera.flags&=~0xC0000000u;
@@ -319,57 +671,6 @@ int main(int argc,char** argv)
  assert(!slippi_fighter_projection_draw_begin());
  assert(fp.x2188.x==31&&fp.x2188.y==32);
  assert(slippi_fighter_projection_world_end(4));
-
- /* Source-authored active changes are distinguished from member changes. */
- identity.world=5;identity.fighter=9;
- assert(slippi_fighter_projection_world_begin(5));
- init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
- assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
- uint64_t topology_token=melee_web_cpu_interval_begin();
- assert(topology_token&&melee_web_cpu_interval_active());
- assert(slippi_fighter_projection_draw_begin());
- shadow.active=0;
- assert(!slippi_fighter_projection_draw_end());
- assert(strcmp(slippi_fighter_projection_failure_reason(),
-               "shadow active state changed (members 1->1; active 1->0)")==0);
- assert(shadow.active==0&&shadow.objects==&shadow_object);
- assert(!slippi_fighter_projection_draw_end());
- assert(strcmp(slippi_fighter_projection_failure_reason(),
-               "shadow active state changed (members 1->1; active 1->0)")==0);
- assert(shadow.active==0&&shadow.objects==&shadow_object);
- assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
- assert(slippi_fighter_projection_world_end(5));
-
- /* The ordered JObj value list is checked without constraining node identity. */
- identity.world=6;identity.fighter=10;
- assert(slippi_fighter_projection_world_begin(6));
- init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
- assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
- topology_token=melee_web_cpu_interval_begin();assert(topology_token);
- assert(slippi_fighter_projection_draw_begin());
- shadow_object.data=&other_model;
- assert(!slippi_fighter_projection_draw_end());
- assert(strcmp(slippi_fighter_projection_failure_reason(),
-               "shadow member order changed (members 1->1; active 1->1)")==0);
- assert(shadow.objects==&shadow_object&&shadow_object.data==&other_model);
- assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
- assert(slippi_fighter_projection_world_end(6));
-
- /* A source-valid second accessory member is reported with exact bounded count. */
- identity.world=7;identity.fighter=11;
- assert(slippi_fighter_projection_world_begin(7));
- init_fixture(&fp,&fighter);set_shadow_values(&fp,0);
- assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
- topology_token=melee_web_cpu_interval_begin();assert(topology_token);
- assert(slippi_fighter_projection_draw_begin());
- extra_shadow_node.data=&other_model;extra_shadow_node.next=&shadow_object;
- shadow.objects=&extra_shadow_node;
- assert(!slippi_fighter_projection_draw_end());
- assert(strcmp(slippi_fighter_projection_failure_reason(),
-               "shadow member count changed (members 1->2; active 1->1)")==0);
- assert(shadow.objects==&extra_shadow_node&&extra_shadow_node.next==&shadow_object);
- assert(melee_web_cpu_interval_end(topology_token));assert(!melee_web_cpu_interval_active());
- assert(slippi_fighter_projection_world_end(7));
 
  /* Image layout mismatch is reported before draw admission mutates any values. */
  identity.world=8;identity.fighter=12;

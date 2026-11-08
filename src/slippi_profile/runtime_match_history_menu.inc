@@ -700,11 +700,50 @@ const char* history_source_idle_failure(const GameplayMatchSession& session) noe
  if(!melee_web_source_memory_healthy())return "Match source memory is unhealthy";
  return nullptr;
 }
+const char* history_source_idle_failure_owned_hps(const GameplayMatchSession& session) noexcept {
+ if(!session.diagnostic_source_files_quiescent())return "Match source file scope is not quiescent";
+ if(melee_web_source_file_drive_busy())return "Match source file drive is busy";
+ if(melee_web_audio_bank_transport_busy())return "Match audio bank transport is busy";
+ const int dvd_state=DVDGetDriveStatus();
+ if(dvd_state!=DVD_STATE_END&&dvd_state!=DVD_STATE_BUSY)
+  return "Match DVD drive is not at DVD_STATE_END or owned DVD_STATE_BUSY";
+ if(!melee_web_source_memory_healthy())return "Match source memory is unhealthy";
+ return nullptr;
+}
 bool history_source_idle(const GameplayMatchSession& session) noexcept {
  return !history_source_idle_failure(session);
 }
+bool history_interior_hps_point(melee_web::RuntimeMatchHistoryGatePoint point) noexcept {
+ using Gate=melee_web::RuntimeMatchHistoryGatePoint;
+ switch(point){
+  case Gate::InteriorPoll:case Gate::InteriorForwardBefore:case Gate::InteriorForwardAfter:
+  case Gate::InteriorReplayBefore:case Gate::InteriorReplayAfter:
+  case Gate::InteriorPresentSubmit:case Gate::InteriorPresentComplete:
+  case Gate::InteriorRendererPrepare:return true;
+  default:return false;
+ }
+}
+bool history_interior_hps_authorized(const GameplayMatchSession& session,
+ melee_web::RuntimeMatchHistoryGatePoint point,uint32_t frame) noexcept {
+ auto& c=match_history;
+ return history_interior_hps_point(point)&&c.episode_enabled&&c.arena_enabled&&c.capsule&&
+     c.capsule->interior_hps_pending(session,frame);
+}
+bool history_renderer_prepare_hps_authorized(const GameplayMatchSession& session,
+ unsigned command,uint32_t frame) noexcept {
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ auto& c=match_history;
+ return command==5&&c.episode_enabled&&c.arena_enabled&&c.capsule&&
+     c.status.last_completed_command==19&&c.presentation_command==19&&
+     c.presentation_serial&&c.submitted_frame&&c.presentation_request_sequence&&
+     c.status.request_seq==c.presentation_request_sequence&&
+     c.status.complete_seq==c.presentation_request_sequence&&c.status.history.current_frame==frame&&
+     c.capsule->phase()==Phase::EpisodePresentPending&&
+     history_interior_hps_authorized(session,
+       melee_web::RuntimeMatchHistoryGatePoint::InteriorRendererPrepare,frame);
+}
 melee_web::RuntimeMatchHistoryGateResult history_source_boundary(
- const GameplayMatchSession& session,uint32_t frame) noexcept {
+ const GameplayMatchSession& session,uint32_t frame,bool owned_hps_interior=false) noexcept {
  using G=melee_web::RuntimeMatchHistoryGateResult;
  auto& c=match_history;
  try {
@@ -717,7 +756,13 @@ melee_web::RuntimeMatchHistoryGateResult history_source_boundary(
   if(!session.construction_complete()||session.paused()||session.ending()||session.complete()||
      std::memcmp(&c.selection,&session.start_selection(),sizeof(c.selection))!=0)
    return G::IdentityRefused;
-  if(!history_source_idle(session))return G::SourceFilesBusy;
+  const char* source_failure=owned_hps_interior?
+      history_source_idle_failure_owned_hps(session):history_source_idle_failure(session);
+  if(source_failure){
+   std::fprintf(stderr,"MATCH_HISTORY_SOURCE_BOUNDARY_REFUSED expected_frame=%u reason=%s\n",
+       frame,source_failure);
+   return G::SourceFilesBusy;
+  }
   if(!history_runtime_idle())return G::RuntimeBusy;
   return G::Admitted;
  }catch(...){return G::IdentityRefused;}
@@ -726,10 +771,12 @@ melee_web::RuntimeMatchHistoryGateResult history_boundary(
  const GameplayMatchSession& session,melee_web::RuntimeMatchHistoryGatePoint point,
  uint32_t frame,void*) noexcept {
  using G=melee_web::RuntimeMatchHistoryGateResult;
- const auto source=history_source_boundary(session,frame);
+ const bool owned_hps_interior=history_interior_hps_authorized(session,point,frame);
+ const auto source=history_source_boundary(session,frame,owned_hps_interior);
  if(source!=G::Admitted)return source;
  if(!history_gpu_idle())return G::RendererBusy;
- if(point==melee_web::RuntimeMatchHistoryGatePoint::PresentComplete){
+ if(point==melee_web::RuntimeMatchHistoryGatePoint::PresentComplete||
+    point==melee_web::RuntimeMatchHistoryGatePoint::InteriorPresentComplete){
   const auto* d=static_cast<const AuroraBrowserQuiescenceDescriptor*>(aurora_browser_quiescence_observe_descriptor());
   if(!d||d->lastEndFrameId!=match_history.submitted_frame)return G::RendererBusy;
  }
@@ -1010,7 +1057,7 @@ EM_BOOL history_dispatch(double,void*) {
     if(!c.episode_enabled||!c.capsule){history_refuse("Episode poll ticket requires explicit pre-capture mode");break;}
     const auto poll_admitted=[&]{
      return c.capsule->can_admit_poll_ticket(c.status.request_seq,c.status.local_port,c.status.remote_port)&&
-      history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::ForwardBefore,
+      history_boundary(*match,melee_web::RuntimeMatchHistoryGatePoint::InteriorPoll,
        c.capsule->current_frame(),nullptr)==melee_web::RuntimeMatchHistoryGateResult::Admitted;
     };
     if(!poll_admitted()){history_refuse("Episode poll ticket preflight refused before Aurora service");break;}
@@ -1316,7 +1363,8 @@ const MatchHistoryPacingSample* melee_web_native_menu_match_history_pacing_sampl
   if(!history_runtime_idle()||!history_gpu_idle()||
      !c.capsule->can_admit_poll_ticket(c.status.request_seq+1u,
           c.status.local_port,c.status.remote_port)||
-     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+     history_boundary(*match,phase==Phase::EpisodeRecording?Gate::InteriorPoll:Gate::ForwardBefore,
+          current,nullptr)!=Result::Admitted){
    history_refuse("Pacing due step failed native input, owner, or renderer admission");
    return nullptr;
   }
@@ -1325,7 +1373,8 @@ const MatchHistoryPacingSample* melee_web_native_menu_match_history_pacing_sampl
   // Budget zero is an intentional network/host wait, but it must not disguise
   // an owner or renderer failure at an otherwise live recording boundary.
   if(!history_runtime_idle()||!history_gpu_idle()||
-     history_boundary(*match,Gate::ForwardBefore,current,nullptr)!=Result::Admitted){
+     history_boundary(*match,phase==Phase::EpisodeRecording?Gate::InteriorPoll:Gate::ForwardBefore,
+          current,nullptr)!=Result::Admitted){
    history_refuse("Pacing wait detected a native owner or renderer failure");
    return nullptr;
   }
@@ -1488,7 +1537,9 @@ const char* melee_web_native_menu_match_history_renderer_prepare_json(unsigned c
  using Gate=melee_web::RuntimeMatchHistoryGateResult;
  const bool runtime_idle=history_runtime_idle();
  const uint32_t frame=runtime_idle&&c.capsule?c.capsule->current_frame():c.status.history.current_frame;
- const auto owner=runtime_idle&&match?history_source_boundary(*match,frame):Gate::RuntimeBusy;
+ const auto owner=runtime_idle&&match?
+     history_source_boundary(*match,frame,history_renderer_prepare_hps_authorized(*match,command,frame)):
+     Gate::RuntimeBusy;
  auto before=runtime_idle?history_renderer_sample():MatchHistoryRendererSample{};
  MatchHistoryRendererSample after{};
  bool after_observed=false;
@@ -1498,7 +1549,8 @@ const char* melee_web_native_menu_match_history_renderer_prepare_json(unsigned c
     history_renderer_can_flush(before,c.submitted_frame,c.cache_flush_frame)){
   c.cache_flush_frame=c.submitted_frame;
   const bool flushed=aurora_flush_pipeline_cache();
-  const bool still_owned=match&&history_source_boundary(*match,frame)==Gate::Admitted;
+  const bool still_owned=match&&history_source_boundary(*match,frame,
+      history_renderer_prepare_hps_authorized(*match,command,frame))==Gate::Admitted;
   if(still_owned){after=history_renderer_sample();after_observed=true;}
   action=flushed&&still_owned&&!after.strict_failure&&
       after.cache_status==AURORA_PIPELINE_CACHE_READY&&
@@ -1625,6 +1677,12 @@ int melee_web_native_menu_match_history_cpu_endpoint_begin(unsigned view,unsigne
  auto& c=match_history;
  if(!c.capsule||c.dispatching||c.status.pending_command||c.status.first_failure||
     !c.capsule->begin_endpoint_batch(static_cast<RuntimeMatchHistory::View>(view),static_cast<RuntimeMatchHistory::Provenance>(provenance))){history_refuse("Endpoint begin refused");return 1;}return 0;
+}
+int melee_web_native_menu_match_history_cpu_endpoint_admit(unsigned view,unsigned provenance){
+ auto& c=match_history;
+ if(!c.episode_enabled||!c.arena_enabled||!c.inline_dispatch||!c.capsule||
+    c.dispatching||c.status.pending_command||match_history_in_tick||!history_runtime_idle()||c.status.first_failure||
+    !c.capsule->admit_endpoint_batch(static_cast<RuntimeMatchHistory::View>(view),static_cast<RuntimeMatchHistory::Provenance>(provenance))){history_refuse("Endpoint admission refused");return 1;}history_sync();return 0;
 }
 int melee_web_native_menu_match_history_cpu_endpoint_record(unsigned domain,unsigned kind,unsigned index){
  auto& c=match_history;c.record={};

@@ -130,6 +130,8 @@ CANDIDATE_SETUP
 
 ACTUAL_SETUP_STAGE
 
+ACTUAL_TOBJ_SETUP
+
 static void init_node(HSD_TExpTevDesc* node, HSD_TExpTevDesc* next,
                       HSD_TObj* tobj, unsigned index, unsigned flags)
 {
@@ -221,6 +223,22 @@ static void verify_round(HSD_TExpTevDesc* reference,
 #endif
 }
 
+static void verify_tobj(void (*reference)(HSD_TObj*), void (*candidate)(HSD_TObj*),
+                        HSD_TObj* texture, size_t stages)
+{
+    TevEvent reference_events[128];
+    reset_events();
+    assigned_stage = 2;
+    reference(texture);
+    const size_t expected_count = event_count;
+    memcpy(reference_events, events, sizeof(reference_events));
+    reset_events();
+    assigned_stage = 2;
+    candidate(texture);
+    assert(event_count == expected_count && assigned_stage == 2 + (int) stages);
+    assert(memcmp(events, reference_events, sizeof(events)) == 0);
+}
+
 int main(void)
 {
     HSD_TObj textures[2];
@@ -254,6 +272,17 @@ int main(void)
 #else
     assert(memcmp(candidate, candidate_initial, sizeof(candidate)) != 0);
 #endif
+    textures[0].flags = textures[1].flags = TEX_COORD_SHADOW;
+    textures[0].next = &textures[1];
+    verify_tobj(reference_TObjSetupTevModulateShadow, candidate_TObjSetupTevModulateShadow,
+                textures, 2);
+    verify_tobj(reference_TObjSetupTevModulateShadow, candidate_TObjSetupTevModulateShadow,
+                NULL, 0);
+    textures[1].flags = 0;
+    verify_tobj(reference_TObjSetupTevModulateShadow, candidate_TObjSetupTevModulateShadow,
+                textures, 1);
+    verify_tobj(reference_SetupEmbossBumpTev, candidate_SetupEmbossBumpTev, &textures[0], 2);
+    verify_tobj(reference_SetupEmbossBumpTev, candidate_SetupEmbossBumpTev, &textures[1], 2);
     puts("TExp stage source control passed");
     return 0;
 }

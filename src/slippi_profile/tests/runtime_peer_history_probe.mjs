@@ -3,7 +3,7 @@
 // owns the existing WebSocket peer; all native source work stays with the
 // existing runtime-history controller.
 import {createRuntimeMatchHistoryPeer, RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS,
-  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
+  RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS, RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS} from '../runtime_match_history_peer.mjs';
 import {MatchInputTimeline, ROLLBACK_MAX_PREDICTION_TICKS}
   from '../../../scripts/net_rollback_input_timeline.mjs';
 
@@ -22,7 +22,7 @@ function bytes(value, label) {
 
 export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
   sourceIdentityJson, loadedIdentity, inputTicks = 1, initialRemotePad,
-  deferredLocalTick = null} = {}) {
+  deferredLocalTick = null, deferredLocalTicks} = {}) {
   if (globalThis.__meleeRuntimePeerHistoryProbe)
     throw Error('Runtime peer-history bridge is already installed');
   const owner = globalThis.__meleeRuntimeMatchHistory;
@@ -31,16 +31,17 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
       (inputTicks !== RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS ||
        !Number.isSafeInteger(deferredLocalTick) || deferredLocalTick < 0 || deferredLocalTick >= inputTicks))
     throw Error('Deferred peer publication requires one explicit in-range tick of the paced-120 session');
-  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,deferredLocalTick,
+  const peer = createRuntimeMatchHistoryPeer({role, relayUrl, roomId, inputTicks,deferredLocalTick,deferredLocalTicks,
     timeoutMs: 5000, sampleTimeoutMs: 5000, sourceIdentityJson, loadedIdentity,
     sourceFrame: 0, validateNativePad: sample => owner.validatePad(sample)});
 
   // The transport may receive while native work is in flight. It retains its
   // bounded peer receipts, and only this serialized owner admits them to the
   // timeline between operations.
+  const deferred = new Set(deferredLocalTicks ?? (deferredLocalTick === null ? [] : [deferredLocalTick]));
   const localPort = role === 'alpha' ? 0 : 1;
   const arenaHistoryScope = inputTicks === RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS ||
-    inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
+    inputTicks === RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS || inputTicks === RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
   const timelineLookaheadTicks = inputTicks === RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
     ? RUNTIME_MATCH_HISTORY_EPISODE_INPUT_TICKS
     : RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
@@ -117,7 +118,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         case 'episodePublish': {
           const ordinal = ordinalAt(value.tick, preFrame());
           const deferSend = value?.deferSend === true;
-          if (deferSend !== (deferredLocalTick === value.tick))
+          if (deferSend !== deferred.has(value.tick))
             throw Error('Episode publication defer policy differs from its explicitly configured source tick');
           const row = owner.receipt(ordinal);
           if (row.ordinal !== ordinal || row.sourceFrame !== value.tick ||
@@ -129,7 +130,7 @@ export function installRuntimePeerHistoryProbe({role, relayUrl, roomId,
         }
         case 'episodeReleaseLocal': {
           const tick = value?.tick;
-          if (tick !== deferredLocalTick || !Number.isSafeInteger(tick))
+          if (!deferred.has(tick) || !Number.isSafeInteger(tick))
             throw Error('Episode deferred publication release differs from its configured source tick');
           const origin = actualOrigins.get(tick);
           if (!origin || origin.sourceFrame !== tick || origin.localPort !== localPort ||

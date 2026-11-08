@@ -78,7 +78,8 @@ public:
     CpuStaticEndpointHeader history_endpoint_header() const noexcept;
     CpuStaticEndpointRow history_endpoint_row(std::uint64_t index) const noexcept;
     bool history_close_endpoint(std::uint64_t incarnation,
-                                std::uint32_t actual_end) noexcept;
+                                std::uint32_t actual_end, char* refusal=nullptr,
+                                std::size_t refusal_bytes=0) noexcept;
     bool history_prepare_commit(std::uint64_t incarnation,
                                 std::uint32_t actual_end) noexcept;
     bool history_admit_commit(std::uint64_t incarnation,

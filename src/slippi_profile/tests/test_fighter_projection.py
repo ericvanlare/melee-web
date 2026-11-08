@@ -2,11 +2,14 @@
 """Projection view control plus exact pinned WObj/CObj setter leaves; no runtime claim."""
 from pathlib import Path
 import os, shutil, subprocess, tempfile, unittest
+import sys
 ROOT = Path(__file__).resolve().parents[3]
 MELEE = ROOT / '.deps/melee'
+sys.path.insert(0, str(ROOT / 'scripts'))
+from gameplay_sources import prepare_sources
 
-def function(source, signature):
-    start = source.index(signature)
+def function(source, signature, *, last=False):
+    start = source.rindex(signature) if last else source.index(signature)
     opening = source.index('{', start)
     depth = 0
     for i in range(opening, len(source)):
@@ -14,6 +17,32 @@ def function(source, signature):
         if not depth:
             return source[start:i+1]
     raise AssertionError(signature)
+
+def shadow_selector_members(source):
+    """Extract the original per-Fighter selector/active block only.
+
+    The surrounding source callback performs camera and GX work unrelated to
+    this control. Keeping the exact selection block avoids reimplementing the
+    authored predicates while keeping the fixture on the shadow boundary.
+    """
+    body=function(source,'void lbShadow_8000F38C(')
+    start=body.index('        for (gobj = HSD_GObj_Entities->fighters;')
+    end=body.index('            if (fp->x20A4.shadow != NULL && cm != NULL',start)
+    selected=body[start:end]
+    selected=selected.replace('CmSubject* cm = fp->x890_cameraBox;',
+                              'CmSubject* cm = fp->x890_cameraBox; (void)cm;')
+    for marker in ['HSD_ShadowDeleteObject(fp2->x20A4.shadow, NULL);',
+                   'fp2->x21FC_flag.b7','fp2->x20A0_accessory',
+                   'HSD_ShadowSetActive(lbs->shadow, 1);']:
+        if marker not in selected:
+            raise AssertionError(f'original selector block lacks {marker}')
+    # The original only casts a 0/1 pointer sentinel to s32. Keep the source
+    # expression in the host control and suppress that one portability warning.
+    return ('#pragma GCC diagnostic push\n'
+            '#pragma GCC diagnostic ignored "-Wpointer-to-int-cast"\n'
+            'static void original_shadow_selector_members(void) {\n'
+            '    HSD_GObj* gobj; HSD_LObj* lobj; int noLight=0;\n'
+            +selected+'    }\n}\n#pragma GCC diagnostic pop')
 
 class FighterProjectionTests(unittest.TestCase):
     def test_actual_view_and_original_projection_branches(self):
@@ -57,9 +86,10 @@ typedef struct HSD_ImageDesc {
  void* image_ptr; uint16_t width,height; GXTexFmt format; uint32_t mipmap;
 } HSD_ImageDesc;
 typedef struct HSD_TObj {
- uint32_t flags,mtxid; Mtx mtx; HSD_ImageDesc* imagedesc;
+ struct HSD_TObj* next; uint32_t flags,mtxid; Mtx mtx; HSD_ImageDesc* imagedesc;
 } HSD_TObj;
 typedef struct HSD_SList { struct HSD_SList* next; void* data; } HSD_SList;
+typedef struct HSD_JObj { int refs; } HSD_JObj;
 typedef struct HSD_Shadow {
  HSD_SList* objects; HSD_CObj* camera; HSD_TObj* texture;
  float scaleS,scaleT,transS,transT; bool active; unsigned char intensity;
@@ -68,6 +98,16 @@ typedef struct LbShadow {
  unsigned char x0_b0:1,x0_b1:1,x0_b2:1,x0_b3:1,x0_b4:1,x0_b5:1,x0_b6:1,x0_b7:1;
  HSD_Shadow* shadow;
 } LbShadow;
+typedef struct HSD_Material {
+ void *ambient,*diffuse,*specular; float alpha,shininess;
+} HSD_Material;
+typedef struct HSD_TExp HSD_TExp;
+typedef struct HSD_MObj {
+ uint32_t rendermode; HSD_Material* mat; HSD_TObj* tobj;
+ HSD_TExp *tevdesc,*texp; void *pe;
+} HSD_MObj;
+typedef struct Ground Ground;
+typedef struct HSD_LObj HSD_LObj;
 #define TEX_COORD_MASK 0x0fu
 #define TEX_COORD_SHADOW 3u
 #define TEX_MTX_DIRTY (1u << 31)
@@ -85,7 +125,11 @@ typedef struct { int32_t x,y; } S32Vec2;
 typedef struct { Vec3 bone_pos; } CmSubject;
 typedef struct Fighter { S32Vec2 x2188; unsigned char x221F_b0:1;
  unsigned char neighbor:1; unsigned char other:6; LbShadow x20A4;
- int x2229_b3,x2220_b7; CmSubject* x890_cameraBox; } Fighter;
+ int x2229_b3,x2220_b7; CmSubject* x890_cameraBox;
+ struct { unsigned b7:1; } x21FC_flag;
+ int invisible,x221E_b5;
+ struct { void* xC[2]; } x5AC;
+ void* x20A0_accessory; } Fighter;
 #endif
 ''')
             for header in ['cobj.h','list.h','shadow.h','tobj.h','wobj.h']:
@@ -98,6 +142,7 @@ typedef struct Fighter { S32Vec2 x2188; unsigned char x221F_b0:1;
 typedef struct HSD_GObj { struct HSD_GObj* next; void* user_data; void* hsd_obj; } HSD_GObj;
 typedef struct { HSD_GObj* fighters; } FixtureEntities;
 extern FixtureEntities* HSD_GObj_Entities;
+extern HSD_GObj* HSD_GObj_804D7814;
 #endif
 ''')
             (stubs/'sysdolphin/baselib/gobjplink.h').write_text('#include "gobj.h"\n')
@@ -105,6 +150,15 @@ extern FixtureEntities* HSD_GObj_Entities;
             camera=(MELEE/'src/melee/cm/camera.c').read_text()
             cobj=(MELEE/'src/sysdolphin/baselib/cobj.c').read_text()
             wobj=(MELEE/'src/sysdolphin/baselib/wobj.c').read_text()
+            # Prepare the exact composed profile source tree. This exercises
+            # the original selector and HSD/MObj consumers with the reviewed
+            # hook patch applied; pristine .deps sources are used only by the
+            # existing scalar-leaf controls above.
+            profile_src=Path(prepare_sources(ROOT,slippi_profile=True))
+            lbshadow=(profile_src/'melee/lb/lbshadow.c').read_text()
+            shadow=(profile_src/'sysdolphin/baselib/shadow.c').read_text()
+            mobj=(profile_src/'sysdolphin/baselib/mobj.c').read_text()
+            grmaterial=(profile_src/'melee/gr/grmaterial.c').read_text()
             leaves='\n'.join([function(wobj,'void HSD_WObjSetPosition('),
                 function(cobj,'HSD_WObj* HSD_CObjGetInterestWObj('),
                 function(cobj,'HSD_WObj* HSD_CObjGetEyePositionWObj('),
@@ -121,11 +175,46 @@ extern FixtureEntities* HSD_GObj_Entities;
                 function(ft,'bool ftLib_80086A8C('),
                 function(ft,'bool ftLib_80086A58('),
                 function(ft,'bool ftLib_80086B64(')])
+            shadow_functions='\n'.join([
+                function(lbshadow,'void lbShadow_8000EEE0('),
+                function(shadow,'void HSD_ShadowDeleteObject('),
+                function(shadow,'void HSD_ShadowAddObject('),
+                function(shadow,'void HSD_ShadowSetActive('),
+                function(mobj,'void HSD_MObjAddShadowTexture('),
+                function(mobj,'void HSD_MObjDeleteShadowTexture(')])
+            selector_members=shadow_selector_members(lbshadow)
+            mobj_functions='\n'.join([
+                function(mobj,'void HSD_MObjSetup('),
+                function(mobj,'void HSD_MObjCompileTev(')])
+            material_consumer=function(grmaterial,'static void fn_801C8EF8(',last=True)
+            direct_consumers=[material_consumer,
+                function((profile_src/'melee/ft/ftmaterial.c').read_text(),'void ftMaterial_800BF2B8(',last=True),
+                function((profile_src/'melee/it/itmaterial.c').read_text(),'void fn_80277D8C(',last=True)]
+            for body in direct_consumers:
+                self.assertIn('slippi_fighter_projection_mobj_preflight',body)
+                self.assertIn('slippi_fighter_projection_mobj_toon_link',body)
+            # The original ground setup callback's second parameter is unused.
+            material_consumer=('#pragma GCC diagnostic push\n'
+                '#pragma GCC diagnostic ignored "-Wunused-parameter"\n'
+                +material_consumer+'\n#pragma GCC diagnostic pop')
+            for body, hook in [(shadow_functions,'slippi_fighter_projection_shadow_members'),
+                               (shadow_functions,'slippi_fighter_projection_shadow_active'),
+                               (shadow_functions,'slippi_fighter_projection_shadow_texture_operation'),
+                               (mobj_functions,'slippi_fighter_projection_mobj_compile'),
+                               (mobj_functions,'slippi_fighter_projection_mobj_toon_link'),
+                               (mobj_functions,'slippi_fighter_projection_mobj_preflight')]:
+                self.assertIn(hook,body,f'prepared source lacks {hook}')
             fixture=(ROOT/'src/slippi_profile/tests/fighter_projection_control.c.in').read_text()
-            (scratch/'control.c').write_text(fixture.replace('ORIGINAL_FUNCTIONS',leaves))
+            fixture=fixture.replace('ORIGINAL_FUNCTIONS',leaves)
+            fixture=fixture.replace('ORIGINAL_SHADOW_FUNCTIONS',shadow_functions)
+            fixture=fixture.replace('ORIGINAL_SELECTOR_MEMBERS',selector_members)
+            fixture=fixture.replace('ORIGINAL_MOBJ_FUNCTIONS',mobj_functions)
+            fixture=fixture.replace('ORIGINAL_MOBJ_CONSUMER',material_consumer)
+            (scratch/'control.c').write_text(fixture)
             cmd=[os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror',
                  '-DMELEE_WEB_SLIPPI_TOBJ_PRESENTATION_CACHE=1',
-                 '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-I'+str(stubs),
+                 '-DMELEE_WEB_CPU_INTERVAL_ENABLED=1',
+                 '-DMELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS=1','-I'+str(stubs),
                  '-I'+str(ROOT/'src'),str(ROOT/'src/gameplay_cpu_interval.c'),
                  str(ROOT/'src/slippi_profile/fighter_projection.c'),
                  str(scratch/'control.c'),'-o',str(scratch/'control')]
@@ -134,7 +223,13 @@ extern FixtureEntities* HSD_GObj_Entities;
                     subprocess.run(command,check=True,stdout=out,stderr=err)
             for mode in ['active-topology','failed-active','active-rebuilt','inactive-rebuilt',
                          'active-order','arm-mid-draw','disarm-mid-draw','tuple-active',
-                         'image-active','inverse-active']:
+                         'image-active','inverse-active','source-root','source-accessory',
+                         'source-dedup','source-visibility','source-late-consumer',
+                         'source-texture-alias','source-setup-toon','source-toon-alias',
+                         'source-raw-active','source-compile-refusal','source-compile-ordinary',
+                         'source-refuse-foreign','source-refuse-owner',
+                         'source-refuse-image','source-unowned-texture',
+                         'source-inactive-texture-link','source-refuse-initial-owner']:
                 result=subprocess.run([str(scratch/'control'),mode],capture_output=True,
                                       text=True,timeout=30)
                 (scratch/(mode+'.log')).write_text(result.stdout+result.stderr)

@@ -12,9 +12,15 @@ import {
   RUNTIME_MATCH_HISTORY_PROTOCOL_MAX_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_PROTOCOL_SOURCE_TICKS,
   RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
+import {waitForLateRemotePairAndResume}
+  from '../src/slippi_profile/tests/runtime_paced_history_probe.mjs';
 
 const loadedIdentity = Object.freeze({
   runtime_sha256: '1'.repeat(64),
@@ -165,11 +171,11 @@ function createEndpointBus() {
 
 function makePeer(bus, role, {sourceFrame = 120, sourceJson = identityText(sourceFrame),
   identity = loadedIdentity, validateNativePad = () => true, inputTicks = 1, timeoutMs = 1000,
-  sampleTimeoutMs = timeoutMs,deferredLocalTick = null} = {}) {
+  sampleTimeoutMs = timeoutMs,deferredLocalTick = null,deferredLocalTicks = null} = {}) {
   return createRuntimeMatchHistoryPeer({
     role, relayUrl: 'ws://local.test/room', roomId: 'R'.repeat(24), timeoutMs, sampleTimeoutMs,
     sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks,
-    validateNativePad,deferredLocalTick,createEndpoint: bus.createEndpoint,
+    validateNativePad,deferredLocalTick,deferredLocalTicks,createEndpoint: bus.createEndpoint,
   });
 }
 
@@ -700,7 +706,7 @@ test('eight actual contributions keep one peer transport across the episode boun
 test('finite 120-input peer session preserves its protocol pre-roll and refuses tick 120',async()=>{
   assert.equal(RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,120);
   const bus=createEndpointBus();
-  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:119}),/supports one, two, four, eight, or 120/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:119}),/supports one, two, four, eight, 120, or 600/);
   const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
   const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS});
   try{
@@ -731,6 +737,70 @@ test('finite 120-input peer session preserves its protocol pre-roll and refuses 
         [null,null,...Array.from({length:120},(_,tick)=>tick)]);
     }
     await assert.rejects(alpha.publishLocal({port:0,tick:120,pollSerial:'520',pad:validPad(90)}),
+      /contiguous index order/);
+  }finally{
+    await Promise.allSettled([alpha.close(),beta.close()]);
+  }
+});
+
+test('finite 600-input peer session releases only the fixed directional deferred source polls once',async()=>{
+  assert.equal(RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,600);
+  assert.deepEqual(RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,[26,226,426]);
+  assert.deepEqual(RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS,
+    ['ArrowRight','ArrowLeft','ArrowRight']);
+  const bus=createEndpointBus();
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:600,
+    deferredLocalTicks:[26,226,426,526]}),/fixed ticks 26, 226, and 426/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:120,
+    deferredLocalTicks:[26,226,426]}),/fixed ticks 26, 226, and 426/);
+  assert.throws(()=>makePeer(bus,'alpha',{inputTicks:600,deferredLocalTick:26,
+    deferredLocalTicks:[26,226,426]}),/cannot mix single and multiple/);
+  const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS});
+  const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,
+    deferredLocalTicks:[...RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS]});
+  try{
+    const [startedAlpha,startedBeta]=await Promise.all([alpha.start(),beta.start()]);
+    for(const started of [startedAlpha,startedBeta]){
+      assert.equal(started.input_ticks_protocol_only,600);
+      assert.equal(started.source_ticks_protocol_only,602);
+      assert.equal(started.scope,RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE);
+    }
+    assert.equal(startedAlpha.agreement_hash,startedBeta.agreement_hash);
+    for(let tick=0;tick<600;++tick){
+      const alphaPad=validPad(10+tick),betaPad=validPad(30+tick);
+      await alpha.publishLocal({port:0,tick,pollSerial:String(400+tick),pad:alphaPad});
+      const deferred=RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS.includes(tick);
+      await beta.publishLocal({port:1,tick,pollSerial:String(900+tick),pad:betaPad,
+        deferSend:deferred});
+      if(deferred){
+        assert.equal(alpha.remoteSnapshot(tick),null,
+          `Beta deferred tick ${tick} escaped before release`);
+        const released=await beta.releaseDeferredLocal(tick);
+        assert.deepEqual(released.pad,[...betaPad]);
+        assert.equal(released.protocol_input_tick,tick);
+        assert.equal(released.poll_serial,String(900+tick));
+        assert.equal(released.local_port,1);
+        await assert.rejects(beta.releaseDeferredLocal(tick),
+          /requires its retained original publication/);
+      }
+      const [alphaRemote,betaRemote]=await Promise.all([
+        alpha.waitForRemoteSample({tick}),beta.waitForRemoteSample({tick}),
+      ]);
+      assert.deepEqual(alphaRemote.pad,[...betaPad]);
+      assert.deepEqual(betaRemote.pad,[...alphaPad]);
+      assert.equal(alphaRemote.protocol_input_tick,tick);
+      assert.equal(betaRemote.protocol_input_tick,tick);
+    }
+    await Promise.all([bus.flush('alpha'),bus.flush('beta')]);
+    for(const peer of [alpha,beta]){
+      const snapshot=peer.snapshot();
+      assert.equal(snapshot.input_ticks_protocol_only,600);
+      assert.deepEqual(snapshot.protocol_only_frames.map(row=>row.protocol_input_tick),
+        [null,null,...Array.from({length:600},(_,tick)=>tick)]);
+    }
+    await assert.rejects(alpha.publishLocal({port:0,tick:600,pollSerial:'1000',pad:validPad(90)}),
+      /contiguous index order/);
+    await assert.rejects(beta.publishLocal({port:1,tick:600,pollSerial:'1500',pad:validPad(91)}),
       /contiguous index order/);
   }finally{
     await Promise.allSettled([alpha.close(),beta.close()]);
@@ -771,4 +841,91 @@ test('arena bridge refuses rebase outside the fully confirmed page timeline',asy
   await assert.rejects(bridge.call('episodeRebase',4),/fully confirmed selected END/);
   assert.equal(commands,0);
   assert.equal((await bridge.call('episodeTimeline')).confirmed_through,-1);
+});
+
+function actualBetaPoll(tick=26){
+  const raw=new Array(44).fill(0);
+  raw.splice(11,11,0,0,127,0,0,0,0,0,0,0,0);
+  return {sourceFrame:tick,localPort:1,remotePort:0,pollSerial:'492',raw};
+}
+
+function remotePadReceipt(tick,pad){
+  return {accepted_by:'lockstep-protocol',sender_role:'beta',remote_port:1,
+    protocol_input_tick:tick,pad:[...pad]};
+}
+
+test('late packet handoff arms target and neutral receipts before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),actualPad=sourcePoll.raw.slice(11,22),neutral=new Array(11).fill(0);
+  const pending=new Map(),started=[];let resumed=0;
+  const handoff=waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample(tick){
+      started.push(tick);
+      return new Promise(resolve=>pending.set(tick,resolve));
+    },
+    resumeLateFrontier(receipt){++resumed;assert.deepEqual(receipt,remotePadReceipt(26,actualPad));},
+  });
+  await Promise.resolve();
+  assert.deepEqual(started,[26,27],'both remote waits are armed before the first receipt resolves');
+  pending.get(26)(remotePadReceipt(26,actualPad));
+  await Promise.resolve();
+  assert.equal(resumed,0,'the target receipt alone cannot release alpha');
+  pending.get(27)(remotePadReceipt(27,neutral));
+  const result=await handoff;
+  assert.equal(resumed,1);
+  assert.deepEqual(result.target,remotePadReceipt(26,actualPad));
+  assert.deepEqual(result.followingNeutral,remotePadReceipt(27,neutral));
+});
+
+test('late packet handoff refuses an incorrect target before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),neutral=new Array(11).fill(0);let resumed=0;
+  await assert.rejects(waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample:async tick=>remotePadReceipt(tick,neutral),
+    resumeLateFrontier(){++resumed;},
+  }),/Late target receipt differs/);
+  assert.equal(resumed,0);
+});
+
+test('late packet handoff refuses a non-neutral following receipt before resuming alpha',async()=>{
+  const sourcePoll=actualBetaPoll(),actualPad=sourcePoll.raw.slice(11,22);let resumed=0;
+  await assert.rejects(waitForLateRemotePairAndResume({tick:26,sourcePoll,requireFollowingNeutral:true,
+    waitForRemoteSample:async tick=>remotePadReceipt(tick,tick===26?actualPad:[0,0,1,0,0,0,0,0,0,0,0]),
+    resumeLateFrontier(){++resumed;},
+  }),/Following beta receipt is not the actual neutral source poll/);
+  assert.equal(resumed,0);
+});
+
+test('actual paced gate abort settles both pre-entry and paused owners',async()=>{
+  const source=await readFile(new URL(
+    '../src/slippi_profile/tests/runtime_paced_history_probe.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('function pauseGate('),end=source.indexOf('\nfunction matchesBytes(',start);
+  assert(start>=0&&end>start);
+  const gate=new Function(source.slice(start,end)+'\nreturn pauseGate;')();
+  const future=gate('future');
+  const waiting=assert.rejects(future.wait(),/aborted before entry/);
+  future.abort();
+  await waiting;
+  assert.throws(()=>future.pause('late'),/entered more than once/);
+
+  const entered=gate('entered');
+  const paused=assert.rejects(entered.pause('ready'),/gate was aborted/);
+  assert.equal(await entered.wait(),'ready');
+  entered.abort();
+  await paused;
+  assert.throws(()=>entered.release(),/stale or duplicated/);
+});
+
+test('actual final recovery guard refuses invalidated or changed platform samples',async()=>{
+  const source=await readFile(new URL(
+    '../scripts/runtime_match_history_pair_browser.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('    const betaPlatform=betaSamples.get(');
+  const end=source.indexOf('    const paired=',start);
+  assert(start>=0&&end>start);
+  const validate=new Function('assert','recovery','alphaSamples','betaSamples',source.slice(start,end));
+  const sample={frame:340,players:[{stocks:3,fighter:0,motion:13,groundAir:1,facing_direction:-1,x:0,y:9}]};
+  const recovery={platform_sample:sample};
+  assert.throws(()=>validate(assert,recovery,new Map(),new Map()),/invalidated/);
+  const changed={...sample,players:[{...sample.players[0],motion:29}]};
+  assert.throws(()=>validate(assert,recovery,new Map([[340,changed]]),new Map()),/differs from the retained/);
+  assert.doesNotThrow(()=>validate(assert,recovery,new Map([[340,structuredClone(sample)]]),new Map()));
+  assert.equal(recovery.beta_same_frame_sample,null);
 });

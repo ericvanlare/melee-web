@@ -32,6 +32,10 @@ enum class RuntimeMatchHistoryGatePoint : std::uint32_t {
     EndpointComplete=5, ForwardBefore=6, ForwardAfter=7,
     RestoreBefore=8, RestoreAfter=9, CorrectBefore=10, CorrectAfter=11,
     PresentSubmit=12, PresentComplete=13, Close=14, Retire=15,
+    InteriorPoll=16, InteriorForwardBefore=17, InteriorForwardAfter=18,
+    InteriorReplayBefore=19, InteriorReplayAfter=20,
+    InteriorPresentSubmit=21, InteriorPresentComplete=22,
+    InteriorRendererPrepare=23,
 };
 
 enum class RuntimeMatchHistoryGateResult : std::uint32_t {
@@ -181,6 +185,10 @@ public:
     bool begin_episode() noexcept;
     bool can_admit_poll_ticket(std::uint32_t ticket_id,
                                unsigned local_port, unsigned remote_port) const noexcept;
+    /* Narrow evidence for servicing already-owned HPS work at a strict
+     * interior source frame. This does not admit an endpoint or pump audio. */
+    bool interior_hps_pending(const GameplayMatchSession&,
+                              std::uint32_t expected_source_frame) const noexcept;
     bool admit_poll_ticket(std::uint32_t ticket_id,
                            const PADStatus raw[PAD_MAX_CONTROLLERS],
                            std::uint64_t poll_serial,
@@ -236,6 +244,8 @@ public:
     bool endpoint_particle_row(std::uint32_t kind, std::uint32_t index,
                                SlippiParticleCellEndpointRow&) const noexcept;
     bool end_endpoint_batch() noexcept;
+    /* Same-stack admission for callers that publish no endpoint rows. */
+    bool admit_endpoint_batch(View, Provenance) noexcept;
 
     bool close_selected_endpoint() noexcept;
     bool retire_confirmed() noexcept;
@@ -282,6 +292,7 @@ private:
         None, CapturedPre, ArmedPre, PredictedCpu, PredictedDraw,
         RestoredPre, CorrectedCpu, CorrectedDraw, PrefixCpu, PresentedFrontier,
     };
+    enum class EndpointCompletionMode : std::uint32_t { CopiedRows, ImmediateAdmission };
 
     RuntimeMatchHistory(GameplayMatchSession&, RuntimeMatchHistoryBoundaryCheck,
                         RuntimeMatchHistoryPresentSubmit, RuntimeMatchHistoryAudioStep, unsigned&, void*) noexcept;
@@ -290,6 +301,7 @@ private:
     bool fail(RuntimeMatchHistoryFailure, const char* message=nullptr) noexcept;
     bool checkpoint_failure(RuntimeMatchHistoryFailure,const char*) noexcept;
     bool endpoint_role_allowed(View,Provenance,EndpointRole&) const noexcept;
+    bool end_endpoint_batch_impl(EndpointCompletionMode) noexcept;
 
     GameplayMatchSession& session_;
     RuntimeMatchHistoryBoundaryCheck boundary_{};

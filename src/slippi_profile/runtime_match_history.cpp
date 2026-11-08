@@ -146,9 +146,17 @@ bool RuntimeMatchHistory::gate(RuntimeMatchHistoryGatePoint point,
     const auto result=boundary_?boundary_(session_,point,expected,callback_context_):
         RuntimeMatchHistoryGateResult::OtherOwnerRefused;
     if(result!=RuntimeMatchHistoryGateResult::Admitted){
-        char message[128]{};
-        std::snprintf(message,sizeof(message),"Runtime history boundary refused: point=%u reason=%u expected=%u",
-            static_cast<unsigned>(point),static_cast<unsigned>(result),expected);
+        char message[160]{};
+        if(result==RuntimeMatchHistoryGateResult::SourceFilesBusy){
+            const bool owned_pending_hps=interior_hps_pending(session_,expected);
+            std::snprintf(message,sizeof(message),
+                "Runtime history boundary refused: point=%u reason=%u expected=%u owned_pending_hps=%u",
+                static_cast<unsigned>(point),static_cast<unsigned>(result),expected,
+                owned_pending_hps?1u:0u);
+        }else{
+            std::snprintf(message,sizeof(message),"Runtime history boundary refused: point=%u reason=%u expected=%u",
+                static_cast<unsigned>(point),static_cast<unsigned>(result),expected);
+        }
         return fail(RuntimeMatchHistoryFailure::Boundary,message);
     }
     return true;
@@ -208,6 +216,14 @@ bool RuntimeMatchHistory::begin_episode() noexcept
     return true;
 }
 
+bool RuntimeMatchHistory::interior_hps_pending(
+    const GameplayMatchSession& session,std::uint32_t expected) const noexcept
+{
+    return &session==&session_&&episode_mode_&&arena_mode_&&checkpoint_&&
+        session.source_frames()==expected&&live_owner(expected)&&
+        checkpoint_->interior_hps_pending(session);
+}
+
 bool RuntimeMatchHistory::can_admit_poll_ticket(
     std::uint32_t ticket_id,unsigned local_port,unsigned remote_port) const noexcept
 {
@@ -234,7 +250,7 @@ bool RuntimeMatchHistory::admit_poll_ticket(
     const auto current=session_.source_frames();
     if(!raw||!poll_serial||poll_serial<=poll_serial_||
        !can_admit_poll_ticket(ticket_id,local_port,remote_port)||
-       !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current))
+       !gate(RuntimeMatchHistoryGatePoint::InteriorPoll,current))
         return fail(RuntimeMatchHistoryFailure::Input,"Episode poll ticket admission refused");
 
     auto& row=episode_rows_[ticket_count_];
@@ -265,7 +281,7 @@ bool RuntimeMatchHistory::forward_ticket(
        (phase_!=RuntimeMatchHistoryPhase::Armed&&phase_!=RuntimeMatchHistoryPhase::EpisodeRecording)||
        current<pre_frame_||current-pre_frame_>=7u||
        forward_steps_>=7u||!live_owner(current)||
-       !gate(RuntimeMatchHistoryGatePoint::ForwardBefore,current))
+       !gate(RuntimeMatchHistoryGatePoint::InteriorForwardBefore,current))
         return fail(RuntimeMatchHistoryFailure::Input,"Episode forward ticket is stale or out of order");
     if(prefix_adoption_pending_&&
        (!prefix_handoff_imported_||!prefix_handoff_||!prefix_handoff_->active_||
@@ -317,7 +333,7 @@ bool RuntimeMatchHistory::forward_ticket(
     const std::uint32_t actual_frame=session_.source_frames();
     if(actual_frame==current+1u)++forward_steps_;
     if(actual_frame!=current+1u||actual_frame-pre_frame_>7u||!live_owner(actual_frame)||
-       !gate(RuntimeMatchHistoryGatePoint::ForwardAfter,actual_frame))
+       !gate(RuntimeMatchHistoryGatePoint::InteriorForwardAfter,actual_frame))
         return fail(RuntimeMatchHistoryFailure::SourceTick,"Episode forward source frame boundary refused");
     if(prefix_adoption_pending_){
         ++prefix_handoff_->suffix_cursor_;
@@ -353,7 +369,7 @@ bool RuntimeMatchHistory::replay_ticket(
        phase_!=RuntimeMatchHistoryPhase::Restored||
        current<pre_frame_||current>=replay_target_end_||current-pre_frame_>=episode_rows_.size()||
        replay_steps_>=7u||!live_owner(current)||
-       !gate(RuntimeMatchHistoryGatePoint::CorrectBefore,current))
+       !gate(RuntimeMatchHistoryGatePoint::InteriorReplayBefore,current))
         return fail(RuntimeMatchHistoryFailure::Input,"Episode replay step admission refused");
     if(!checkpoint_->interval_boundary(session_))
         return checkpoint_failure(RuntimeMatchHistoryFailure::Owner,"Episode replay interval admission refused");
@@ -392,7 +408,7 @@ bool RuntimeMatchHistory::replay_ticket(
     const std::uint32_t actual_frame=session_.source_frames();
     if(actual_frame==current+1u)++replay_steps_;
     if(actual_frame!=current+1u||!live_owner(actual_frame)||
-       !gate(RuntimeMatchHistoryGatePoint::CorrectAfter,actual_frame))
+       !gate(RuntimeMatchHistoryGatePoint::InteriorReplayAfter,actual_frame))
         return fail(RuntimeMatchHistoryFailure::Correction,"Episode replay source frame boundary refused");
     return true;
 }
@@ -817,7 +833,7 @@ bool RuntimeMatchHistory::submit_recording_present() noexcept
        ticket_count_>episode_rows_.size()||current<=pre_frame_||
        current-pre_frame_!=forward_steps_||!live_owner(current)||
        (last_present_source_frame_valid_&&last_present_source_frame_==current)||
-       recording_present_count_==UINT32_MAX||!gate(RuntimeMatchHistoryGatePoint::PresentSubmit,current))
+       recording_present_count_==UINT32_MAX||!gate(RuntimeMatchHistoryGatePoint::InteriorPresentSubmit,current))
         return fail(RuntimeMatchHistoryFailure::Phase,"Recording present requires one unpresented committed arena forward");
 
     const auto& latest=episode_rows_[ticket_count_-1u];
@@ -848,8 +864,10 @@ bool RuntimeMatchHistory::admit_present_completion() noexcept
     }else if(phase_==RuntimeMatchHistoryPhase::EpisodePresentPending&&last_present_source_frame_valid_){
         expected=last_present_source_frame_;idle=RuntimeMatchHistoryPhase::EpisodeRecording;
     }else return fail(RuntimeMatchHistoryFailure::Phase);
-    if(!live_owner(expected)||
-       !gate(RuntimeMatchHistoryGatePoint::PresentComplete,expected))
+    const auto completion_gate=phase_==RuntimeMatchHistoryPhase::EpisodePresentPending?
+        RuntimeMatchHistoryGatePoint::InteriorPresentComplete:
+        RuntimeMatchHistoryGatePoint::PresentComplete;
+    if(!live_owner(expected)||!gate(completion_gate,expected))
         return fail(RuntimeMatchHistoryFailure::Boundary);
     phase_=idle;
     return true;
@@ -989,13 +1007,28 @@ bool RuntimeMatchHistory::endpoint_particle_row(
 
 bool RuntimeMatchHistory::end_endpoint_batch() noexcept
 {
+    return end_endpoint_batch_impl(EndpointCompletionMode::CopiedRows);
+}
+
+bool RuntimeMatchHistory::admit_endpoint_batch(View view,
+                                               Provenance provenance) noexcept
+{
+    if(!begin_endpoint_batch(view,provenance))return false;
+    return end_endpoint_batch_impl(EndpointCompletionMode::ImmediateAdmission);
+}
+
+bool RuntimeMatchHistory::end_endpoint_batch_impl(
+    EndpointCompletionMode mode) noexcept
+{
     if(!reader_.active()||endpoint_role_==EndpointRole::None)
         return fail(RuntimeMatchHistoryFailure::Phase);
     const EndpointRole role=endpoint_role_;
     const std::uint32_t expected=(role==EndpointRole::CapturedPre||
         role==EndpointRole::ArmedPre||role==EndpointRole::RestoredPre)?
         pre_frame_:sealed_end_;
-    if(endpoint_read_failure_||!reader_.revalidate()||!live_owner(expected)||
+    if(endpoint_read_failure_||
+       !(mode==EndpointCompletionMode::ImmediateAdmission?
+             reader_.complete_immediate():reader_.revalidate())||!live_owner(expected)||
        !gate(RuntimeMatchHistoryGatePoint::EndpointComplete,expected))
         return fail(RuntimeMatchHistoryFailure::Endpoint);
     reader_=GameplayCpuEndpointReader{};
@@ -1032,14 +1065,21 @@ bool RuntimeMatchHistory::close_selected_endpoint() noexcept
     const bool presented_frontier=phase_==RuntimeMatchHistoryPhase::PresentedComplete;
     const std::uint32_t required=presented_frontier?PresentedFrontier:
         (corrected?(CorrectedCpu|CorrectedDraw):(PredictedCpu|PredictedDraw));
-    if((!corrected&&!reference&&!presented_frontier)||!checkpoint_||
-       (endpoint_mask_&required)!=required||
-       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||reader_.active()||
-       !live_owner(sealed_end_)||
-       (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
-       !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_)||
-       !checkpoint_->close_history_endpoint(session_))
+    if(!corrected&&!reference&&!presented_frontier)
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint phase refused");
+    if(!checkpoint_)
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint owner refused");
+    if((endpoint_mask_&required)!=required||
+       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||reader_.active())
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint receipt or reader refused");
+    if(!live_owner(sealed_end_))
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint owner refused");
+    if((presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
+       !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Close);
+    char refusal[192]{};
+    if(!checkpoint_->close_history_endpoint(session_,refusal,sizeof(refusal)))
+        return fail(RuntimeMatchHistoryFailure::Close,refusal[0]?refusal:"Close checkpoint endpoint refused");
     phase_=RuntimeMatchHistoryPhase::Closed;
     return true;
 }

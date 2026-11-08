@@ -1,6 +1,6 @@
 # Match-only rollback feasibility
 
-**A private fixed-seven-tick component now passes two separate wrong-input correction windows on one persistent timeline, including the neutral bridge, both final presents, and checked capsule retirement. This remains bounded component evidence; continuous rollback and full-match acceptance are unproven.**
+**Issue #372 now has a finite 600-input local two-peer run with three actual late corrections and an observed stock loss and grounded respawn. All 600 authoritative PAD rows and the final 64-byte post-draw checksums match locally; this is bounded evidence, not full-match, public-relay, or sustained 60 Hz acceptance. The complete confirmed ending and deployed-relay match remain [issue #373](https://github.com/ericvanlare/melee-web/issues/373).**
 
 [Milestone #318](https://github.com/ericvanlare/melee-web/issues/318) and
 [merged #319](https://github.com/ericvanlare/melee-web/pull/319) implement the
@@ -10,13 +10,13 @@ offline/online, with distinct pinned references; the toggle/profile are not yet
 implemented. The [structured receipt](../evidence/match-only-rollback-feasibility-v1.json)
 binds current producer and retained failure identities.
 
-## Same-instance browser restore, issue #341 (in progress)
+## Historical same-instance browser restore, issue #341
 
-[Issue #341](https://github.com/ericvanlare/melee-web/issues/341) owns the next
-browser boundary. Private components capture the source allocation mirror,
+[Issue #341](https://github.com/ericvanlare/melee-web/issues/341) records the earlier
+browser boundary described in this historical section. Private components capture the source allocation mirror,
 bootstrap/context/flow values, decoded DAT allocations, native audio/effect
 buffers, match clock/cadence, and the bounded active-action closure under owner
-and lifetime guards. The latest successful same-browser result completes a fixed sample-300
+and lifetime guards. That earlier same-browser result completes a fixed sample-300
 drawn-reference comparison: it records a baseline source draw, restores and
 replays the CPU tick without a corrective draw, then checks one final source
 present. The strict CPU
@@ -2273,7 +2273,22 @@ projection leaves event coverage unestablished.
 
 Bounded local result only: no complete source-world bytes, full match, public relay,
 human acceptance, or sustained 60 Hz claim. Full regression and ordinary/private
-diagnostic Release builds pass at `37a9617b`; issue #369 CI remains pending.
+diagnostic Release builds pass at `37a9617b`. PR #371 merged this result as
+`a70cabdb` after all 15 publication-head checks completed (13 successes,
+two expected skips).
+
+### Current repeated respawn and late corrections, issue #372
+
+The bounded local headless capture uses native and harness producer `6ced91e3a418ac752dc6db0ad62072e99fb64ede` for 600 actual input ticks. Three real P2 key changes at ticks 26, 226 and 426 are admitted after restores from PRE21/F28, PRE221/F228 and PRE421/F428. Each corrected row carries the actual one-poll RIGHT/LEFT/RIGHT input, followed by a separately observed neutral poll. The seven-row replay bound and existing timing guards remain in force.
+
+Both peers first observe P1 at three stocks at sampled frame 220 and grounded Wait14 at sampled frame 408. They also observe grounded Wait14 at frames 440 and 600; 192 actual inputs follow the frame-408 observation. P2 stays at four stocks in the retained observations. These sparse samples do not identify the exact transition ticks. All 600 authoritative 44-byte rows match between peers, and the final 64-byte post-draw checksums match locally; no checksum is exchanged over the relay.
+
+The native clock receipts report no stalled samples, with maxima below the unchanged eight-tick threshold. Incident exports are retained with zero incidents/records; the H1 projection is missing, so this is not H1 timing coverage. Native cleanup retires both owners, the locally owned relay disposes with exit 0, and all 18 owned browser processes are absent.
+
+The runtime fixes reuse the existing owned music-refill boundary, isolate draw-authored shadow topology and TEV descriptor scratch, and combine immediate native endpoint admission to avoid redundant collection. Original arithmetic, input order, seven-row history bounds and timing limits stay unchanged. Reduced original-source controls compare the graphics command stream; they do not establish whole-game pixel equivalence.
+
+The capture remains a bounded local trace. It does not establish a complete match, public relay behavior, or sustained 60 Hz performance. The private Release build passes at `6ced91e3`. The full 3,112-test regression (242 skips) and ordinary Release build pass on validation-only source `5353ef01`. Its sole change updates a stale whole-file source pin after independent reconstruction of the reviewed shadow edits. The preceding stale-pin test failure is retained. The captured native/harness producer remains `6ced91e3` and was not recaptured. Publication checks and integration are recorded on [issue #372](https://github.com/ericvanlare/melee-web/issues/372).
+The structured receipt's `continuous_366.issue_372_repeated_respawn_v1` records exact producer, capture, review, build and retained-failure pins.
 
 ## Stage decision dependencies, issue #333
 

@@ -68,9 +68,23 @@ int main()
     track_allocations=false;
     assert(allocations==0&&releases==0&&values[0]==10&&values[1]==20&&values[2]==30);
 
-    /* Correct the same incarnation to its exact END before advancing. */
+    /* Corrected CPU END is sealed before DRAW. Its typed header can still
+     * admit a live mutable row that the exact END close must refuse. */
     values[0]=11;values[2]=31;
     assert(history->history_seal_endpoint(1,102));
+    char refusal[192]{}, expected[192]{};
+    assert(!history->history_close_endpoint(2,102,refusal,sizeof(refusal)));
+    assert(std::strcmp(refusal,"leaf=statics-close reason=identity")==0);
+    auto* bytes=reinterpret_cast<unsigned char*>(&values[2]);
+    const unsigned sealed=bytes[1];
+    bytes[1]^=0x80;
+    assert(history->history_endpoint_header().status==CpuStaticEndpointStatus::Ok);
+    assert(!history->history_close_endpoint(1,102,refusal,sizeof(refusal)));
+    std::snprintf(expected,sizeof(expected),
+        "leaf=statics-close reason=row-drift ordinal=2 address=0x%08x byte=1 sealed=%02x live=%02x",
+        row(2).address,sealed,static_cast<unsigned>(bytes[1]));
+    assert(std::strcmp(refusal,expected)==0&&bytes[1]==(sealed^0x80u));
+    bytes[1]=static_cast<unsigned char>(sealed);
     assert(history->history_close_endpoint(1,102));
 
     /* The same immutable PRE and restore authority serve incarnation two. */

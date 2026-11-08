@@ -13,7 +13,9 @@ import {fileURLToPath} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseNetChecksum} from './net_lockstep_core.mjs';
-import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS}
+import {RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS, RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS,RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS,
+  RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS}
   from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
@@ -31,6 +33,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const PROFILE='slippi-render-dependencies-logical-frame-lobj-tobj-camera-history-v20';
 // SDL two-keyboard layout: KeyD is P1 right; ArrowLeft/ArrowRight are P2 left/right.
 const P1_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
+const P1_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_LEFT=Buffer.from([0,0,129,0,0,0,0,0,0,0,0]);
 const P2_RIGHT=Buffer.from([0,0,127,0,0,0,0,0,0,0,0]);
 const CARD_BYTES=0x1790+7*0x1f2c;
@@ -42,21 +45,23 @@ const {values}=parseArgs({options:{...Object.fromEntries(optionNames.map(name=>[
 for(const name of optionNames.filter(name=>name!=='windows'))if(!values[name])throw Error(`--${name} is required`);
 values.windows??='1';
 assert(['1','2'].includes(values.windows),'Supported peer-correction windows are 1 or 2');
-assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),
+assert(['held-statics','peer-correction','four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),
   'Unsupported bounded runtime history phase');
 const repeatPrefix=values.phase==='repeated-confirmed-prefix';
 const pacedLatePiece=values.phase==='paced-120-late-piece';
-const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs'||pacedLatePiece;
-const pacedInputTicks=values.phase==='paced-120-inputs'||pacedLatePiece?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
+const pacedRespawn=values.phase==='paced-600-respawn';
+const paced=values.phase==='paced-eight-inputs'||values.phase==='paced-120-inputs'||pacedLatePiece||pacedRespawn;
+const pacedInputTicks=pacedRespawn?RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS:
+  values.phase==='paced-120-inputs'||pacedLatePiece?RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS:
   RUNTIME_MATCH_HISTORY_REBASE_INPUT_TICKS;
 const paced120=pacedInputTicks===RUNTIME_MATCH_HISTORY_PACED_INPUT_TICKS;
 const confirmedPrefix=values.phase==='confirmed-prefix'||repeatPrefix;
 const twoArenaEpisodes=values.phase==='four-tick-correction'&&values['arena-history']&&values.windows==='2';
 if(values.phase!=='peer-correction'&&!twoArenaEpisodes)
   assert.equal(values.windows,'1','--windows 2 requires peer-correction or four-tick-correction with --arena-history');
-if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),'--arena-history requires an arena episode');
+if(values['arena-history'])assert(['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),'--arena-history requires an arena episode');
 const presentForward=values['present-forward'];
-if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece'].includes(values.phase),
+if(presentForward)assert(values['arena-history']&&['four-tick-correction','confirmed-prefix','repeated-confirmed-prefix','paced-eight-inputs','paced-120-inputs','paced-120-late-piece','paced-600-respawn'].includes(values.phase),
   '--present-forward requires four-tick-correction with --arena-history');
 const inlineDispatch=values['inline-dispatch'];
 if(inlineDispatch)assert(presentForward,'--inline-dispatch requires --present-forward');
@@ -193,14 +198,14 @@ for(const binding of diagnosticBindings){
   }
 }
 
-const report={schema:paced?(pacedLatePiece?'melee-web-runtime-paced-120-late-class-piece-v1':paced120?'melee-web-runtime-paced-120-inputs-v1':'melee-web-runtime-paced-eight-inputs-v1'):repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
+const report={schema:paced?(pacedRespawn?'melee-web-runtime-paced-600-respawn-v1':pacedLatePiece?'melee-web-runtime-paced-120-late-class-piece-v1':paced120?'melee-web-runtime-paced-120-inputs-v1':'melee-web-runtime-paced-eight-inputs-v1'):repeatPrefix?'melee-web-runtime-repeated-confirmed-prefix-v1':confirmedPrefix?'melee-web-runtime-confirmed-prefix-transfer-v1':values.phase==='four-tick-correction'?
     (twoArenaEpisodes?'melee-web-runtime-two-arena-episodes-peer-correction-v1':
       values['arena-history']?'melee-web-runtime-four-tick-arena-peer-correction-v1':
       'melee-web-runtime-four-tick-peer-correction-v1'):values.phase==='held-statics'?
     'melee-web-runtime-match-history-paired-held-statics-v1':
     values.windows==='2'?'melee-web-runtime-match-history-paired-two-window-peer-correction-v1':
       'melee-web-runtime-match-history-paired-peer-correction-v1',
-  scope:pacedLatePiece?'120 actual source input ticks with one real beta keyboard change at tick 26, one deferred/released actual peer packet, alpha restore across that late tick and final confirmed checksum; no changed-piece restoration claim without the matched retained-producer control':paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
+  scope:pacedRespawn?'600 actual source inputs with one-poll P2 RIGHT/LEFT/RIGHT corrections, actual P1 respawn-platform exit and four-stock P2 guard; bounded local headless trace':pacedLatePiece?'120 actual source input ticks with one real beta keyboard change at tick 26, one deferred/released actual peer packet, alpha restore across that late tick and final confirmed checksum; no changed-piece restoration claim without the matched retained-producer control':paced120?'120 actual source input ticks with page-owned actual peer receipts, bounded native rollback windows and a functional pacing clock trace; not a full-match or accepted 60 Hz claim':repeatPrefix?'eight actual inputs, two CPU-only prefix transfers including clean prediction and repeated original ticket, later correction and whole-END rebase; no cadence or fullmatch claim':confirmedPrefix?'eight actual source inputs, one CPU-only confirmed-prefix transfer while a suffix remains speculative, native ticket adoption and later correction from the new PRE; no cadence or full-match claim':values.phase==='four-tick-correction'?
     (presentForward?
       'bounded arena correction with one original presentation per forward tick and corrected presentation only at sealed END; no cadence claim':
       twoArenaEpisodes?
@@ -926,14 +931,14 @@ function byteDifference(left,right){
   }
   return {equal:count===0,bytes_left:left.length,bytes_right:right.length,different_byte_count:count,first_mismatch:first};
 }
-async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad,deferredLocalTick=null){
+async function installPeerHistoryBridge(item,relayUrl,roomId,inputTicks,initialRemotePad,deferredLocalTick=null,deferredLocalTicks){
   const sourceIdentityJson=report.pages[item.role].route.takeover.identity;
-  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick})=>{
+  return item.page.evaluate(async ({moduleUrl,role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks})=>{
     const {installRuntimePeerHistoryProbe}=await import(moduleUrl);
-    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick});
+    return installRuntimePeerHistoryProbe({role,relayUrl,roomId,sourceIdentityJson,loadedIdentity,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks});
   },{moduleUrl:new URL('src/slippi_profile/tests/runtime_peer_history_probe.mjs',
       new URL('/__melee_diag__/',baseUrl)).href,
-    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad,deferredLocalTick});
+    role:item.role,relayUrl,roomId,sourceIdentityJson,loadedIdentity:item.host,inputTicks,initialRemotePad,deferredLocalTick,deferredLocalTicks});
 }
 function compareEndToCapture(item,oldEnd,capture,preFrame,captureStatus,retiredStatus,{endView='DRAW_END'}={}){
   assert.equal(oldEnd.view,endView==='CPU_END'?CPU_ENDPOINT_VIEW.cpuEnd:CPU_ENDPOINT_VIEW.drawEnd);
@@ -1168,7 +1173,7 @@ async function runPeerCorrectionWindow({alpha,beta,index,predictedP2,predictionS
     receivedBetaPad:actualP2,drawEndpoints:[alphaDraw,betaDraw]};
 }
 
-async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads,deferredLocalTick=null){
+async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemotePads,deferredLocalTick=null,deferredLocalTicks){
   for(const item of [alpha,beta])
     report.pages[item.role].match_history={statuses:[],commands:[],inputs:{},endpoints:{},checksums:{}};
   const roomRelay=relayRuntime=await startRoomRelayRuntime({producer:{wasmSha256:actualWasmHash,profile:PROFILE},evidenceDir:out,
@@ -1179,7 +1184,7 @@ async function startCorrectionPeers(alpha,beta,peerReport,inputTicks,initialRemo
     transport:'existing pinned local Worker relay; one browser-page WebSocket per peer for the diagnostic'};
   await joinOwned('peer-bridge-install',[
     installPeerHistoryBridge(alpha,relayUrl,roomId,inputTicks,initialRemotePads?.alpha).then(value=>{alpha.peerInstalled=true;return value;}),
-    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta,deferredLocalTick).then(value=>{beta.peerInstalled=true;return value;}),
+    installPeerHistoryBridge(beta,relayUrl,roomId,inputTicks,initialRemotePads?.beta,deferredLocalTick,deferredLocalTicks).then(value=>{beta.peerInstalled=true;return value;}),
   ]).then(([a,b])=>{peerReport.pages.alpha.bridge=a;peerReport.pages.beta.bridge=b;});
   for(const item of [alpha,beta]){
     const initial=await recordHistoryStatus(item,'initial',{window:'window-1',phase:0,sourceFrame:0,preFrame:0,
@@ -1505,18 +1510,23 @@ async function runFourTickWindow({alpha,beta,proof,windowProof,preFrame,previous
 
 async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const items=[alpha,beta],targetFrame=inputTicks,paced120=inputTicks===120;
+  const respawn=inputTicks===RUNTIME_MATCH_HISTORY_RESPAWN_INPUT_TICKS;
+  const lateTicks=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_TICKS:latePiece?[26]:[];
+  const lateKeys=respawn?RUNTIME_MATCH_HISTORY_RESPAWN_DEFERRED_LOCAL_KEYS:[];
+  const neutral=Buffer.alloc(11);
   const prefix={alpha:heldPortPad(report.pages.alpha.route.agreed_start.held,0,'Alpha'),
     beta:heldPortPad(report.pages.beta.route.agreed_start.held,1,'Beta')};
-  assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
+  if(!respawn)assert(!prefix.alpha.pad.equals(P1_RIGHT)&&!prefix.beta.pad.equals(P2_LEFT),
     'Both scripted first local inputs must differ from the actual held-prefix prediction');
-  const proof=report.peer_correction={claim:latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
+  const proof=report.peer_correction={claim:respawn?'bounded 600-input paced local trace, RIGHT/LEFT/RIGHT late inputs, P1 platform exit and stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
       'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
     scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
     checksum_exchange:'none; full native confirmed post-draw checksum compared locally',
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
     ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
-      key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{})};
-  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},latePiece?26:null);
+      key_change_path:'Playwright page.keyboard ArrowLeft to ArrowRight',changed_piece_restoration_claim:'pending matched retained-producer control'}}:{}),
+    ...(respawn?{late_corrections:[],respawn_recovery:null}:{})};
+  await startCorrectionPeers(alpha,beta,proof,inputTicks,{alpha:[...prefix.beta.pad],beta:[...prefix.alpha.pad]},latePiece?26:null,respawn?lateTicks:undefined);
   const moduleUrl=new URL('/__melee_diag__/src/slippi_profile/tests/runtime_paced_history_probe.mjs',baseUrl).href;
   await joinOwned('paced-owner-prepare',items.map(async item=>{
     proof.pages[item.role].prepared=await item.page.evaluate(async({moduleUrl,role,inputTicks,latePiece})=>{
@@ -1528,83 +1538,191 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   for(const item of items){
     await item.page.locator('#canvas').focus();
     assert.equal(await item.page.evaluate(()=>document.activeElement?.id),'canvas');
-    item.keyToRelease=item.role==='alpha'?'KeyD':'ArrowLeft';
-    await item.page.keyboard.down(item.keyToRelease);
+    if(!respawn){
+      item.keyToRelease=item.role==='alpha'?'KeyD':'ArrowLeft';
+      await item.page.keyboard.down(item.keyToRelease);
+    }
   }
   let operationFailure=null;
   const releaseErrors=[];
-  let runTasks=[],runSettled=null,firstRunFinish=null;
+  let runTasks=[],runSettled=null,firstRunFinish=null,walkStopTask=null;
+  let signalWalkFailure;
+  const walkFailure=new Promise(resolve=>{signalWalkFailure=resolve;});
   try{
-    if(latePiece){
+    if(lateTicks.length){
       runTasks=items.map(item=>item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.run()).then(value=>{
         proof.pages[item.role].paced=value;
         if(value.result==='FAIL')throw Error(`${item.role} paced page failed: ${JSON.stringify(value.failure)}`);
         return value;
       }).catch(error=>{
-        (report.operation_failures??=[]).push({label:'paced-120-late-piece',role:item.role,error:String(error?.message||error)});
+        (report.operation_failures??=[]).push({label:values.phase,role:item.role,error:String(error?.message||error)});
         throw error;
       }));
       firstRunFinish=Promise.race(runTasks.map((task,index)=>task.then(value=>({index,value}),error=>({index,error}))));
       runSettled=Promise.allSettled(runTasks);
       const awaitGate=async(promise,label)=>{
-        const result=await Promise.race([promise.then(value=>({value})),firstRunFinish.then(finished=>({finished}))]);
+        const result=await Promise.race([promise.then(value=>({value})),
+          firstRunFinish.then(finished=>({finished})),walkFailure]);
+        if('walkError' in result)throw result.walkError;
         if('finished' in result){
           if(result.finished.error)throw result.finished.error;
           throw Error(`${label}: a paced page completed before the late-input gate`);
         }
         return result.value;
       };
+      const timedCoordination=async(event,stage,operation)=>{
+        const started=performance.now();
+        try{return await operation();}
+        finally{
+          (event.coordination??=[]).push({stage,started_at_ms:started,
+            elapsed_ms:performance.now()-started});
+        }
+      };
       const beta=items.find(item=>item.role==='beta'),alpha=items.find(item=>item.role==='alpha');
-      const inputGate=await awaitGate(beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange()),
-        'Late beta input gate');
-      assert.deepEqual([inputGate.source_tick,inputGate.current_frame],[26,26]);
-      assert(inputGate.pre_frame<=26,'Late keyboard target is already before beta PRE');
-      await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;
-      await beta.page.keyboard.down('ArrowRight');beta.keyToRelease='ArrowRight';
-      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.noteLateKeyChange({
-        from:'ArrowLeft',to:'ArrowRight'}));
-      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeLateKeyChange());
-      const [betaReleaseGate,alphaFrontier]=await Promise.all([
-        awaitGate(beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLatePacketGate()),
-          'Late beta packet-release gate'),
-        awaitGate(alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForLateFrontier()),
-          'Late alpha frontier gate'),
-      ]);
-      const [alphaBoundary,betaEvidence,alphaBeforePacket]=await Promise.all([
-        alpha.page.evaluate(async()=>({status:globalThis.__meleeRuntimeMatchHistory.status(),
-          timeline:await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline')})),
-        beta.page.evaluate(()=>{const run=globalThis.__meleeRuntimePacedHistory.snapshot();
-          return {scenario:run.late_class_piece,poll:run.polls.find(row=>row.sourceFrame===26)};}),
-        alpha.page.evaluate(()=>globalThis.__meleeRuntimePeerHistoryProbe.call('peerRemoteSnapshot',{tick:26})),
-      ]);
-      assert.deepEqual([alphaBoundary.status.metadata.preFrame,alphaBoundary.status.metadata.currentFrame],
-        [alphaFrontier.pre_frame,alphaFrontier.frontier]);
-      assert.deepEqual([alphaBoundary.timeline.simulated_through,alphaBoundary.timeline.remote_contiguous_through,
-        alphaBoundary.timeline.dirty_from,alphaBoundary.timeline.plan_outstanding],
-        [alphaFrontier.frontier-1,25,null,false]);
-      assert.equal(alphaBeforePacket,null,'Actual beta tick 26 escaped before its held release');
-      assert.deepEqual([betaReleaseGate.frontier,betaEvidence.poll?.sourceFrame,betaEvidence.poll?.localPort],
-        [27,26,1]);
-      assert.deepEqual(Buffer.from(betaEvidence.poll.raw).subarray(11,22),P2_RIGHT,
-        'Beta native poll 26 did not read the actual Playwright key change');
-      assert.equal(betaEvidence.scenario.held_packet?.deferred_send,true,
-        'Actual beta tick 26 was not withheld by the existing transport primitive');
-      assert.deepEqual(Buffer.from(betaEvidence.scenario.held_packet.actual_local_pad),P2_RIGHT);
-      proof.late_class_piece.input_gate=inputGate;
-      proof.late_class_piece.beta_release_gate=betaReleaseGate;
-      proof.late_class_piece.alpha_frontier=alphaFrontier;
-      proof.late_class_piece.beta_native_poll=betaEvidence.poll;
-      const released=await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.releaseLatePacket());
-      await beta.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeLatePacket());
-      const remote=await alpha.page.evaluate(()=>globalThis.__meleeRuntimePeerHistoryProbe.call(
-        'peerWaitRemote',{tick:26,timeoutMs:5000}));
-      assert.deepEqual(Buffer.from(remote.receipt.pad),P2_RIGHT,'Released peer packet differs from the actual beta poll');
-      assert.equal(remote.receipt.protocol_input_tick,26);
-      assert.equal(remote.receipt.sender_role,'beta');
-      proof.late_class_piece.network_release=released;
-      proof.late_class_piece.alpha_remote_receipt=remote.receipt;
-      await alpha.page.evaluate(receipt=>globalThis.__meleeRuntimePacedHistory.resumeLateFrontier(receipt),
-        remote.receipt);
+      for(const tick of lateTicks){
+        const event=respawn?{target_source_tick:tick}:proof.late_class_piece;
+        const lateIndex=lateTicks.indexOf(tick);
+        const inputKey=respawn?lateKeys[lateIndex]:'ArrowRight';
+        const expectedBetaPad=inputKey==='ArrowLeft'?P2_LEFT:P2_RIGHT;
+        if(respawn)event.expected_key=inputKey;
+        if(respawn)proof.late_corrections.push(event);
+        event.coordination??=[];
+        const inputGate=await timedCoordination(event,'beta-input-gate',()=>awaitGate(
+          beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateKeyChange(t),tick),
+          'Late beta input gate'));
+        assert.deepEqual([inputGate.source_tick,inputGate.current_frame],[tick,tick]);
+        assert(inputGate.pre_frame<=tick,'Late keyboard target is already before beta PRE');
+        await timedCoordination(event,'beta-key-transition',async()=>{
+          if(beta.keyToRelease){await beta.page.keyboard.up(beta.keyToRelease);beta.keyToRelease=null;}
+          await beta.page.keyboard.down(inputKey);beta.keyToRelease=inputKey;
+        });
+        const keyboardChange=await timedCoordination(event,'beta-note-and-resume-key',()=>
+          beta.page.evaluate(args=>{
+            const api=globalThis.__meleeRuntimePacedHistory;
+            const change=api.noteLateKeyChange(args);api.resumeLateKeyChange(args.tick);return change;
+          },{tick,from:respawn?null:'ArrowLeft',to:inputKey}));
+        event.keyboard_change=keyboardChange;
+        const [betaReleaseGate,alphaFrontier]=await Promise.all([
+          timedCoordination(event,'beta-packet-gate',()=>awaitGate(
+            beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLatePacketGate(t),tick),
+            'Late beta packet-release gate')),
+          timedCoordination(event,'alpha-frontier-gate',()=>awaitGate(
+            alpha.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.waitForLateFrontier(t),tick),
+            'Late alpha frontier gate')),
+        ]);
+        const [alphaObservation,betaEvidence]=await Promise.all([
+          timedCoordination(event,'alpha-pre-release-snapshot',()=>alpha.page.evaluate(async tick=>({
+            status:globalThis.__meleeRuntimeMatchHistory.status(),
+            timeline:await globalThis.__meleeRuntimePeerHistoryProbe.call('episodeTimeline'),
+            beforePacket:await globalThis.__meleeRuntimePeerHistoryProbe.call('peerRemoteSnapshot',{tick}),
+          }),tick)),
+          timedCoordination(event,'beta-actual-poll-snapshot',()=>
+            beta.page.evaluate(t=>globalThis.__meleeRuntimePacedHistory.lateSnapshot(t),tick)),
+        ]);
+        const {status:alphaStatus,timeline:alphaTimeline,beforePacket:alphaBeforePacket}=alphaObservation;
+        assert.deepEqual([alphaStatus.metadata.preFrame,alphaStatus.metadata.currentFrame],
+          [alphaFrontier.pre_frame,alphaFrontier.frontier]);
+        assert.deepEqual([alphaTimeline.simulated_through,alphaTimeline.remote_contiguous_through,
+          alphaTimeline.dirty_from,alphaTimeline.plan_outstanding],
+          [alphaFrontier.frontier-1,tick-1,null,false]);
+        assert.equal(alphaBeforePacket,null,'Actual beta tick escaped before its held release');
+        assert.deepEqual([betaReleaseGate.frontier,betaEvidence.poll?.sourceFrame,betaEvidence.poll?.localPort],
+          [tick+1,tick,1]);
+        assert.deepEqual(Buffer.from(betaEvidence.poll.raw).subarray(11,22),expectedBetaPad,
+          'Beta native poll did not read the actual Playwright direction change');
+        assert.equal(betaEvidence.scenario.held_packet?.deferred_send,true,
+          'Actual beta tick was not withheld by the existing transport primitive');
+        assert.deepEqual(Buffer.from(betaEvidence.scenario.held_packet.actual_local_pad),expectedBetaPad);
+        event.input_gate=inputGate;
+        event.beta_release_gate=betaReleaseGate;
+        event.alpha_frontier=alphaFrontier;
+        event.beta_native_poll=betaEvidence.poll;
+        if(respawn)await timedCoordination(event,'beta-release-key',async()=>{
+          await beta.page.keyboard.up(inputKey);beta.keyToRelease=null;
+        });
+        const alphaReceiptTask=timedCoordination(event,'alpha-target-and-neutral-receipts',()=>awaitGate(
+          alpha.page.evaluate(args=>globalThis.__meleeRuntimePacedHistory.waitLateRemotePairAndResume(args),{
+            tick,sourcePoll:betaEvidence.poll,requireFollowingNeutral:respawn}),
+          'Late target and following-neutral receipts'));
+        const betaReleaseTask=timedCoordination(event,'beta-release-and-resume',()=>awaitGate(
+          beta.page.evaluate(async tick=>{
+            const api=globalThis.__meleeRuntimePacedHistory;
+            const released=await api.releaseLatePacket(tick);api.resumeLatePacket(tick);return released;
+          },tick),'Late beta packet release and source resume'));
+        const [received,released]=await Promise.all([alphaReceiptTask,betaReleaseTask]);
+        const remote=received.target;
+        assert.deepEqual(Buffer.from(remote.pad),Buffer.from(betaEvidence.poll.raw).subarray(11,22),
+          'Released peer packet differs from the actual beta poll');
+        assert.equal(remote.protocol_input_tick,tick);
+        assert.equal(remote.sender_role,'beta');
+        assert.equal(remote.remote_port,1);
+        assert.equal(released.poll_serial,betaEvidence.poll.pollSerial);
+        if(respawn){
+          assert.deepEqual(Buffer.from(received.followingNeutral.pad),neutral);
+          event.following_remote_receipt=received.followingNeutral;
+        }
+        event.network_release=released;
+        event.alpha_remote_receipt=remote;
+        if(respawn&&tick===lateTicks[0]){
+          const start=await awaitGate(alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForWalkStart()),
+            'Walk-off start');
+          assert.equal(start.frame,28);
+          assert.deepEqual(start.players.map(player=>player.stocks),[4,4]);
+          proof.walk_off={start};
+          await alpha.page.keyboard.down('KeyD');alpha.keyToRelease='KeyD';
+          await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeWalkStart());
+          walkStopTask=(async()=>{
+            const stop=await awaitGate(alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.waitForWalkStop()),
+              'Walk-off stop');
+            proof.walk_off.stop=stop;
+            assert.deepEqual(stop.players.map(player=>player.stocks),[3,4]);
+            await alpha.page.keyboard.up('KeyD');alpha.keyToRelease=null;
+            await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeWalkStop());
+            const platform=await awaitGate(alpha.page.evaluate(()=>
+              globalThis.__meleeRuntimePacedHistory.waitForRespawnRecoveryStart()),
+            'Actual P1 respawn platform sample');
+            const p1=platform.players?.[0];
+            assert.equal(platform.kind,'post-present-idle');
+            assert(p1&&p1.stocks===3&&p1.motion===13&&p1.groundAir===1,
+              'P1 platform exit requires an actual stock-three motion-13 airborne sample');
+            assert(Number.isFinite(p1.facing_direction)&&[-1,1].includes(p1.facing_direction)&&
+              Number.isFinite(p1.x)&&Number.isFinite(p1.y),
+            'P1 platform exit requires actual finite facing and source position');
+            const exitKey=p1.facing_direction===-1?'KeyA':'KeyD';
+            const exitPad=p1.facing_direction===-1?P1_LEFT:P1_RIGHT;
+            await alpha.page.keyboard.down(exitKey);alpha.keyToRelease=exitKey;
+            await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeRespawnRecoveryStart());
+            const completion=await awaitGate(alpha.page.evaluate(()=>
+              globalThis.__meleeRuntimePacedHistory.waitForRespawnRecoveryStop()),
+            'P1 one-poll platform exit completion');
+            assert.equal(completion.sample?.frame,platform.frame+1,
+              'P1 platform input did not stop at the next completed source frontier');
+            assert.equal(completion.poll?.sourceFrame,platform.frame,
+              'P1 platform input poll did not match the observed source frame');
+            assert.equal(completion.poll?.localPort,0);
+            const actualExitPad=Buffer.from(completion.poll.raw).subarray(0,11);
+            assert.deepEqual(actualExitPad,exitPad,
+              'P1 platform exit poll differs from the actual facing-directed Playwright key');
+            await alpha.page.keyboard.up(exitKey);alpha.keyToRelease=null;
+            await alpha.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory.resumeRespawnRecoveryStop());
+            proof.respawn_recovery={platform_sample:platform,
+              beta_same_frame_sample:null,
+              key:exitKey,direction:p1.facing_direction,
+              source_tick:completion.poll.sourceFrame,
+              input_poll:{sourceFrame:completion.poll.sourceFrame,ticketId:completion.poll.ticketId,
+                pollSerial:completion.poll.pollSerial,localPort:completion.poll.localPort,
+                actual_local_pad:[...actualExitPad]},
+              completed_frontier:completion.sample.frame,
+              keyup_before_source_tick:completion.sample.frame};
+            return null;
+          })().catch(walkError=>{
+            signalWalkFailure({walkError});
+            return {walkError};
+          });
+        }
+      }
+      const walkResult=await walkStopTask;
+      if(walkResult)throw walkResult.walkError;
       const settled=await runSettled;
       const failed=settled.find(row=>row.status==='rejected');
       if(failed)throw failed.reason;
@@ -1614,11 +1732,12 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       }));
     }
   }catch(error){operationFailure=error;
-    if(latePiece){
+    if(lateTicks.length){
       for(const item of items)try{
         await item.page.evaluate(()=>globalThis.__meleeRuntimePacedHistory?.abortLateScenario?.());
       }catch{}
       if(runSettled)await runSettled;
+      if(walkStopTask)await walkStopTask;
     }
   }finally{
     for(const item of items)if(item.keyToRelease){
@@ -1631,13 +1750,20 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const [a,b]=items.map(item=>proof.pages[item.role].paced);
   for(const item of items){
     const run=proof.pages[item.role].paced;
-    assert.equal(run.result,paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
+    assert.equal(run.result,respawn?'PACED_600_RESPAWN_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE',`${item.role}: ${JSON.stringify(run.failure)}`);
     assert.equal(run.input_ticks,targetFrame);
     assert.equal(run.polls.length,targetFrame);
     assert.deepEqual(run.polls.map(row=>row.sourceFrame),Array.from({length:targetFrame},(_,tick)=>tick));
     assert.equal(new Set(run.polls.map(row=>row.pollSerial)).size,targetFrame);
     for(const row of run.polls){
-      const expectedPad=latePiece&&item.role==='beta'&&row.sourceFrame>=26?P2_RIGHT:
+      const expectedPad=respawn
+        ? item.role==='beta'?(lateTicks.includes(row.sourceFrame)
+            ?(lateKeys[lateTicks.indexOf(row.sourceFrame)]==='ArrowLeft'?P2_LEFT:P2_RIGHT):neutral)
+          :row.sourceFrame===proof.respawn_recovery?.source_tick
+            ?(proof.respawn_recovery.direction===-1?P1_LEFT:P1_RIGHT)
+            :row.sourceFrame>=proof.walk_off.start.frame&&row.sourceFrame<proof.walk_off.stop.frame
+              ?P1_RIGHT:neutral
+        :latePiece&&item.role==='beta'&&row.sourceFrame>=26?P2_RIGHT:
         item.role==='alpha'?P1_RIGHT:P2_LEFT;
       assert.deepEqual(Buffer.from(row.raw).subarray(row.localPort*11,(row.localPort+1)*11),
         expectedPad);
@@ -1669,37 +1795,96 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   assert.equal(releaseErrors.length,0,`Owned keyboard release failed: ${JSON.stringify(releaseErrors)}`);
   assert(a.corrections.some(row=>row.dirty!==null)||b.corrections.some(row=>row.dirty!==null),
     'Paced run must actually correct a wrong prediction');
-  if(latePiece){
-    const correction=a.corrections.find(row=>row.dirty===26);
-    assert(correction,'Alpha did not record the actual late tick-26 prediction correction');
-    const presentedChecksum=a.late_class_piece.presented_checksum;
+  for(const tick of lateTicks){
+    const event=respawn?proof.late_corrections.find(row=>row.target_source_tick===tick):proof.late_class_piece;
+    const correction=a.corrections.find(row=>row.dirty===tick);
+    assert(correction,'Alpha did not record the actual late prediction correction');
+    const presentedChecksum=(respawn?a.late_corrections.find(row=>row.target_source_tick===tick):a.late_class_piece).presented_checksum;
     assert.equal(presentedChecksum?.status,'captured');
     assert.deepEqual([presentedChecksum.pre_frame,presentedChecksum.frontier],
       [correction.pre,correction.frontier]);
     assert.equal(presentedChecksum.bytes.length,64);
-    proof.late_class_piece.alpha_presented_checksum=presentedChecksum;
+    event.alpha_presented_checksum=presentedChecksum;
     const restoreEvent=a.events[correction.restore_event_index];
     assert.equal(restoreEvent.operation,'command');assert.equal(restoreEvent.value,'restore');
     assert.equal(restoreEvent.result.metadata.restoreCount,correction.restore_status.metadata.restoreCount);
-    assert(correction.pre<=26&&26<correction.frontier&&correction.frontier<=correction.pre+7);
-    assert.equal(correction.frontier,proof.late_class_piece.alpha_frontier.frontier);
-    assert(correction.confirmed>26);
+    assert(correction.pre===tick-5&&correction.frontier===tick+2);
+    assert.equal(correction.frontier,event.alpha_frontier.frontier);
+    assert(correction.confirmed>tick);
     assert.equal(correction.restore_status.metadata.restoreCount>=1,true);
+    if(respawn){
+      assert.equal(correction.kind,'fully-confirmed-correction');
+      assert.equal(correction.confirmed,tick+2);
+      assert(a.presentations.some(row=>row.kind==='corrected-frontier'&&row.receipt.sourceFrameAfter===tick+2));
+    }
     const rows=correction.prefix?.rows??correction.replay?.rows;
-    const tick26=rows?.find(entry=>(entry.row??entry).sourceFrame===26)?.row??
-      rows?.find(entry=>(entry.row??entry).sourceFrame===26);
-    assert(tick26,'Late correction did not return the native source tick-26 row');
-    assert.deepEqual(Buffer.from(tick26.forward).subarray(11,22),P2_LEFT,
-      'Tick 26 forward PAD does not show the real earlier prediction');
-    assert.deepEqual(Buffer.from(tick26.selected).subarray(11,22),P2_RIGHT,
-      'Tick 26 corrected selection does not show the actual late beta PAD');
-    assert.equal(tick26.state,2,'Tick 26 was not retained as a completed replay row');
-    proof.late_class_piece.alpha_correction={kind:correction.kind,pre:correction.pre,
+    const replayed=rows?.find(entry=>(entry.row??entry).sourceFrame===tick)?.row??
+      rows?.find(entry=>(entry.row??entry).sourceFrame===tick);
+    assert(replayed,'Late correction did not return the native late source row');
+    const correctedPad=respawn&&lateKeys[lateTicks.indexOf(tick)]==='ArrowLeft'?P2_LEFT:P2_RIGHT;
+    assert.deepEqual(Buffer.from(replayed.forward).subarray(11,22),respawn?neutral:P2_LEFT,
+      'Late tick forward PAD does not show the real earlier prediction');
+    assert.deepEqual(Buffer.from(replayed.selected).subarray(11,22),correctedPad,
+      'Late tick corrected selection does not show the actual late beta PAD');
+    assert.equal(replayed.state,2,'Late tick was not retained as a completed replay row');
+    event.alpha_correction={kind:correction.kind,pre:correction.pre,
       frontier:correction.frontier,confirmed:correction.confirmed,dirty:correction.dirty,
       restore_count:correction.restore_status.metadata.restoreCount,
-      tick26_forward_remote_pad:[...tick26.forward.slice(11,22)],
-      tick26_corrected_remote_pad:[...tick26.selected.slice(11,22)],
+      [respawn?'forward_remote_pad':'tick26_forward_remote_pad']:[...replayed.forward.slice(11,22)],
+      [respawn?'corrected_remote_pad':'tick26_corrected_remote_pad']:[...replayed.selected.slice(11,22)],
       changed_piece_restoration_claim:'requires matched retained-producer control'};
+  }
+  if(respawn){
+    const byFrame=run=>new Map(run.stock_samples.map(sample=>[sample.frame,sample]));
+    const alphaSamples=byFrame(a),betaSamples=byFrame(b);
+    const recovery=proof.respawn_recovery;
+    assert(recovery&&recovery.platform_sample?.kind==='post-present-idle'&&
+      recovery.platform_sample.frame===recovery.source_tick&&
+      recovery.input_poll?.sourceFrame===recovery.source_tick&&
+      recovery.completed_frontier===recovery.source_tick+1&&
+      recovery.keyup_before_source_tick===recovery.completed_frontier,
+    'P1 platform exit lost its observed post-idle source tick or pre-poll key release');
+    const expectedExitPad=recovery.direction===-1?P1_LEFT:P1_RIGHT;
+    const recoveryPoll=a.polls.find(row=>row.sourceFrame===recovery.source_tick);
+    assert(recoveryPoll&&recoveryPoll.pollSerial===recovery.input_poll.pollSerial&&
+      recoveryPoll.ticketId===recovery.input_poll.ticketId,
+    'P1 platform exit poll no longer matches its retained native ticket');
+    assert.deepEqual(Buffer.from(recoveryPoll.raw).subarray(0,11),expectedExitPad,
+      'P1 platform exit input was not the one real facing-directed poll');
+    const followingNeutralPoll=a.polls.find(row=>row.sourceFrame===recovery.completed_frontier);
+    assert(followingNeutralPoll,'P1 platform exit has no following original native poll');
+    const actualFollowingPad=Buffer.from(followingNeutralPoll.raw).subarray(0,11);
+    assert.deepEqual(actualFollowingPad,neutral,
+      'P1 key-up did not produce neutral before the following native poll');
+    recovery.following_neutral_poll={sourceFrame:followingNeutralPoll.sourceFrame,
+      ticketId:followingNeutralPoll.ticketId,pollSerial:followingNeutralPoll.pollSerial,
+      local_port:followingNeutralPoll.localPort,actual_local_pad:[...actualFollowingPad]};
+    const betaPlatform=betaSamples.get(recovery.platform_sample.frame)??null;
+    const retainedAlphaPlatform=alphaSamples.get(recovery.platform_sample.frame)??null;
+    assert(retainedAlphaPlatform,
+      'P1 platform gate sample was invalidated and is absent from retained alpha observations');
+    const platformFields=({stocks,fighter,motion,groundAir,facing_direction,x,y})=>
+      ({stocks,fighter,motion,groundAir,facing_direction,x,y});
+    assert.deepEqual(platformFields(retainedAlphaPlatform.players[0]),
+      platformFields(recovery.platform_sample.players[0]),
+    'P1 platform gate sample differs from the retained same-frame alpha source observation');
+    recovery.beta_same_frame_sample=betaPlatform;
+    if(betaPlatform){
+      assert.deepEqual(platformFields(betaPlatform.players[0]),
+        platformFields(recovery.platform_sample.players[0]),
+      'Same-frame beta source sample disagrees with alpha P1 platform ownership');
+    }
+    const paired=[...alphaSamples.keys()].filter(frame=>betaSamples.has(frame)).sort((x,y)=>x-y)
+      .map(frame=>[alphaSamples.get(frame),betaSamples.get(frame)]);
+    const baseline=paired.find(rows=>rows[0].frame===28&&rows.every(row=>row.players[0].stocks===4));
+    const loss=paired.find(rows=>rows[0].frame>=proof.walk_off.stop.frame&&rows.every(row=>row.players[0].stocks===3));
+    const respawned=loss&&paired.find(rows=>rows[0].frame>loss[0].frame&&rows.every(row=>
+      row.players[0].stocks===3&&row.players[0].fighter===0&&row.players[0].motion===14&&row.players[0].groundAir===0));
+    assert(baseline&&loss&&respawned&&targetFrame-respawned[0].frame>=30,
+      'Expected paired P1 four-to-three stock loss, grounded Wait respawn and 30 further actual inputs');
+    assert(paired.at(-1)?.[0].frame===targetFrame&&paired.at(-1).every(row=>row.players[0].stocks===3),
+      'Final native stock observation lost the same live respawned match');
+    proof.stock_respawn={baseline,loss,respawn:respawned,following_inputs:targetFrame-respawned[0].frame};
   }
   proof.comparisons[`end${targetFrame}`]=byteDifference(Buffer.from(a.finalChecksum.bytes),Buffer.from(b.finalChecksum.bytes));
   assert.equal(a.finalChecksum.bytes.length,64);assert.equal(b.finalChecksum.bytes.length,64);
@@ -1707,8 +1892,8 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   proof.comparisons.authoritative_pad=a.authoritativeInputs.map((row,index)=>({tick:row.tick,
     ...byteDifference(Buffer.from(row.bytes),Buffer.from(b.authoritativeInputs[index].bytes))}));
   assert(proof.comparisons.authoritative_pad.every(row=>row.equal));
-  proof.status=latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
-  report.result=latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
+  proof.status=respawn?'paced-600-respawn-complete':latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
+  report.result=respawn?'PACED_600_RESPAWN_COMPLETE':latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
   if(latePiece)addCheck('actual tick-26 late input, deferred packet release, bounded native restore and final-120 checksum agreement',
     {changed_piece_restoration:'requires matched retained-producer control'});
 }
