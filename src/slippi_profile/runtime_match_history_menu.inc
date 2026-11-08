@@ -343,7 +343,7 @@ bool history_start_source_stable(bool source_generation) {
 }
 
 #if defined(MELEE_WEB_ROLLBACK_STAGING)
-bool history_start_online_menu_transition(int previous_scene,int phase) {
+bool history_start_online_menu_transition_impl(int previous_scene,int phase) {
  auto& start=match_history.start;
  if(start.lobby_role==MatchHistoryStart::NoRole||start.state!=MatchHistoryStartEnabled)
   return false;
@@ -1472,6 +1472,11 @@ bool history_terminal_tail_final_receipt() noexcept {
 }
 } // namespace
 
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+bool history_start_online_menu_transition(int previous_scene,int phase) {
+ return history_start_online_menu_transition_impl(previous_scene,phase);
+}
+#endif
 bool history_start_is_enabled() noexcept {return history_start_is_enabled_impl();}
 bool history_start_offer_waiting() noexcept {return history_start_offer_waiting_impl();}
 bool history_start_capture_offer(const MeleeWebMenuMatchSelection& selection) {
