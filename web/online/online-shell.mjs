@@ -18,7 +18,7 @@ window.addEventListener('keydown',event=>heldKeys.add(event.code),true);
 window.addEventListener('keyup',event=>heldKeys.delete(event.code),true);
 window.addEventListener('blur',()=>heldKeys.clear(),true);
 let player,context,state,controller,setup,bridge,loop,prepareWork,loopWork,closed=false,roomUsed=false,discReady=false;
-let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,nativeRetired=false,userLeave=false;
+let hostIdentity,held,packageInfo,table,role,closeWork,launchWork,historyOwned=false,nativeRetired=false,userLeave=false;
 let startCommitted=false,retireWork,hostOffer=null;
 let menuProgressWork,stopMenuProgress=false;
 const report={schema:'melee-web-staging-rollback-session-v1',result:'pending',failure:null,
@@ -165,7 +165,7 @@ async function close(){
     for(const action of [()=>bridge?.close(),()=>setup?.close(),async()=>{
       // Preparation can already own an asynchronous native command before the
       // live loop promise exists. Let it settle before asking that owner to retire.
-      await Promise.allSettled([prepareWork,loopWork].filter(Boolean));
+      await Promise.allSettled([launchWork,prepareWork,loopWork].filter(Boolean));
       if(controller?.status().ownerState===1){
         // Native cleanup closes the game and cancels its main loop. An ordinary
         // queued unload cannot run after that terminal command.
@@ -285,6 +285,11 @@ async function publishMenuProgress(){
     await new Promise(resolve=>setTimeout(resolve,250));
   }
 }
+async function startRoomPlayer(){
+  launchWork=player.start();
+  await launchWork;
+  healthy();
+}
 async function openRoom(nextRole,roomId){
   if(roomUsed||!discReady||!state.canStart)throw Error('Choose a disc before starting a new room.');
   if(!/^[A-Za-z0-9_-]{24,64}$/.test(roomId))throw Error('Paste the complete room code.');
@@ -293,7 +298,7 @@ async function openRoom(nextRole,roomId){
   $('room-code').value=roomId;$('host').disabled=$('join').disabled=true;
   $('copy').disabled=false;$('leave').disabled=false;
   status(role==='alpha'?'Room created. Share the code and choose locally.':'Joining room…');
-  await player.start();
+  await startRoomPlayer();
   await until(()=>context.Module._melee_web_native_menu_phase()===1);
   controller.startEnable(role);
   const disc=await player.discIdentity();healthy();

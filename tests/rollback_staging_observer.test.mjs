@@ -153,3 +153,59 @@ test('original Results reads trace and native message inside the ordinary owner 
   assert.equal(calls[0], 'ordinary boundary');
   assert(calls.includes('native Results trace'));
 });
+
+test('room launch is recorded before awaiting and cannot continue after Leave', async () => {
+  const healthyStart = shell.indexOf('function healthy(){');
+  const healthyEnd = shell.indexOf('async function until(', healthyStart);
+  const launchStart = shell.indexOf('async function startRoomPlayer(){');
+  const launchEnd = shell.indexOf('async function openRoom(', launchStart);
+  assert(healthyStart >= 0 && healthyEnd > healthyStart && launchStart >= 0 && launchEnd > launchStart);
+  let releaseStart;
+  const launchPromise = new Promise(resolve => { releaseStart = resolve; });
+  const continued = [];
+  const world = vm.createContext({closed:false,state:{},launchWork:null,
+    player:{start:()=>launchPromise}});
+  const start = vm.runInContext(shell.slice(healthyStart, healthyEnd) +
+    shell.slice(launchStart, launchEnd) + '\nstartRoomPlayer', world);
+  const pending = start();
+  assert.equal(world.launchWork, launchPromise,'cleanup must see startup before it settles');
+  const next = pending.then(()=>continued.push('native setup'));
+  world.closed = true;
+  releaseStart();
+  await assert.rejects(pending,/Room was closed/);
+  await assert.rejects(next,/Room was closed/);
+  assert.deepEqual(continued,[],'closed room cannot continue to native setup');
+});
+
+test('player unload waits for room endpoints and the in-flight launch to finish', async () => {
+  const closeStart = shell.indexOf('async function close(){');
+  const retireStart = shell.indexOf('function retireAfterClose(){', closeStart);
+  const retireEnd = shell.indexOf('// Bounded, read-only diagnostics', retireStart);
+  assert(closeStart >= 0 && retireStart > closeStart && retireEnd > retireStart);
+  const events = [];
+  let releaseStart, sdkBusy = true;
+  const launchWork = new Promise(resolve => {
+    releaseStart = () => { sdkBusy = false; events.push('launch settled'); resolve(); };
+  });
+  const elements = new Map();
+  const world = vm.createContext({
+    Promise, AggregateError, setTimeout, launchWork, prepareWork:null, loopWork:null,
+    closed:false, stopMenuProgress:false, closeWork:null, retireWork:null,
+    loop:{abortLateScenario(){}},bridge:{async close(){events.push('bridge close');}},
+    setup:{async close(){events.push('setup close');}},
+    controller:{status:()=>({ownerState:0})},historyOwned:false,nativeRetired:false,
+    report:{},setupEvent(){},
+    context:{},
+    player:{async unload(){assert.equal(sdkBusy,false,'SDK unload must wait for player.start');events.push('player unload');}},
+    $(id){if(!elements.has(id))elements.set(id,{});return elements.get(id);},
+  });
+  const functions = shell.slice(closeStart, retireEnd) + '\n({retireAfterClose})';
+  const {retireAfterClose} = vm.runInContext(functions, world);
+  const pending = retireAfterClose();
+  await new Promise(resolve=>setTimeout(resolve,0));
+  assert.deepEqual(events,['bridge close','setup close'],
+    'network endpoints close before waiting on the player launch');
+  releaseStart();
+  await pending;
+  assert.deepEqual(events,['bridge close','setup close','launch settled','player unload']);
+});

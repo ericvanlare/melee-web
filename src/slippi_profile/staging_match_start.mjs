@@ -28,11 +28,10 @@ export function validateStagingLobbyState(value, role) {
     ['css', 'sss', 'selected', 'preparing'].includes(value.phase) &&
     (value.choice === null || value.choice && typeof value.choice === 'object' &&
       !Array.isArray(value.choice)) &&
-    (value.stage === null || Number.isInteger(value.stage) &&
-      value.stage >= 0 && value.stage <= 255),
+    value.stage === null,
     'Invalid shared lobby state');
   return {phase:value.phase, choice:value.choice===null?null:validateStagingOwnedChoice(value.choice),
-    stage:validateStagingOwnedStage(role,value.stage)};
+    stage:null};
 }
 export function validateStagingOwnedChoice(value) {
   assert(exactKeys(value, ['character', 'costume']) &&
@@ -228,6 +227,7 @@ export function createStagingMatchStart({role, url, roomId, identity, native,
           parseStage(packet.payload, 'alpha');
         } else if (packet.stage === 'stage_ack') {
           assert(role === 'alpha', 'Only the guest may acknowledge the host stage');
+          assert(Number.isInteger(hostStage), 'Guest acknowledged the stage before host selection');
           validateStageAck(packet.payload, hostStage);
         }
         ++receivedSetup;

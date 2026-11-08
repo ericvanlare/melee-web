@@ -109,7 +109,7 @@ test('local menu choices and progress reach both peers before either commits',as
   await f.owners.alpha.publishLobby(css);
   assert.equal(f.traffic.length,2,'unchanged observations should not flood the room');
   await assert.rejects(f.owners.beta.publishLobby({...guestCss,stage:32}),
-    /Only the host may own the stage selection/);
+    /Invalid shared lobby state/);
   await f.owners.alpha.publishLobby({...css,choice:{character:8,costume:1}});
   await f.ends.beta.drainInbound();
   assert.equal(f.lobby.beta.at(-1).revision,2);
@@ -139,6 +139,7 @@ test('only alpha may own a stage choice; beta must send no stage',()=>{
 test('lobby updates reject malformed, replayed and unknown-version packets',async()=>{
   for(const [role,value] of [['alpha',{phase:'css',choice:{character:8,costume:0},stage:null,extra:true}],
     ['alpha',{phase:'playing',choice:{character:8,costume:0},stage:null}],
+    ['alpha',{phase:'sss',choice:{character:8,costume:0},stage:32}],
     ['beta',{phase:'css',choice:{character:8,costume:0},stage:32}],
     ['beta',{phase:'sss',choice:{character:8,costume:0},stage:Infinity}]])
     assert.throws(()=>validateStagingLobbyState(value,role),/Invalid shared lobby state|Only the host may own/);
@@ -179,6 +180,20 @@ test('stale choice/stage revisions and guest stage packets cannot advance setup'
   assert.throws(()=>staleHostStage.ends.beta.options.onMessage(JSON.stringify(stagePacket)),
     /Invalid host stage choice/);
   await Promise.all(Object.values(staleHostStage.owners).map(owner=>owner.close()));
+});
+
+test('guest stage acknowledgement is refused before the host has a concrete stage',async()=>{
+  const f=peers({choiceNever:true});
+  const choice={schema:'melee-web-staging-match-session-v3',role:'beta',channel:'setup',
+    stage:'choice',payload:JSON.stringify({schema:'melee-web-staging-choice-v1',revision:1,
+      provenance:'native-closed-css-p1-v1',character:8,costume:1})};
+  f.ends.alpha.options.onMessage(JSON.stringify(choice));
+  const ack={schema:'melee-web-staging-match-session-v3',role:'beta',channel:'setup',
+    stage:'stage_ack',payload:JSON.stringify({schema:'melee-web-staging-host-stage-v1',
+      revision:1,acknowledged_stage:32})};
+  assert.throws(()=>f.ends.alpha.options.onMessage(JSON.stringify(ack)),
+    /Guest acknowledged the stage before host selection/);
+  await Promise.all(Object.values(f.owners).map(owner=>owner.close()));
 });
 
 test('a peer can keep publishing its own choice while the other is already locked',async()=>{

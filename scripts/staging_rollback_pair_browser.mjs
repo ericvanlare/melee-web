@@ -472,9 +472,25 @@ async function confirmOwnCss(item) {
   assert.equal(settled.phase, 1, `${item.role} left CSS during its UI-only settle interval`);
   item.source.css_settle = {milliseconds: CSS_SETTLE_MS, phase: settled.phase,
     running: settled.running, cursor: settled.css?.geometry?.slice(0, 2)};
+  if (sharedChoices) {
+    const observed = await waitSnapshot(item, snapshot => snapshot.phase === 1 &&
+      snapshot.session?.lobby?.[item.role]?.phase === 'css' &&
+      snapshot.session.lobby[item.role].choice?.character === MARIO_SOURCE_KIND,
+      'source-owned P1 character and costume before confirmation',
+      {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    item.source.own_choice_before = observed.session.lobby[item.role].choice;
+    // The fresh original CSS resolves the two initially identical costumes:
+    // its actual P1 source selection is costume 1, with P2 retaining costume 0.
+    assert.deepEqual(item.source.own_choice_before, {character: 8, costume: 1});
+  }
   if (sharedChoices && item.role === 'beta') {
     item.source.own_costume_input = await pressWithReceipt(item, 'u',
       'Guest local P1 X: choose own costume', {buttonMask: 0x0400});
+    const observed = await waitSnapshot(item, snapshot => snapshot.phase === 1 &&
+      snapshot.session?.lobby?.beta?.choice?.costume === 2,
+      'guest source P1 costume after the actual X input',
+      {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    item.source.own_choice_after = observed.session.lobby.beta.choice;
   }
   await pressWithReceipt(item, 'Enter', 'P1 original CSS Start', {buttonMask: CSS_START_BUTTON});
 }
@@ -556,7 +572,9 @@ async function verifySharedReady(alpha, beta) {
 }
 
 async function verifySharedChoicesBeforeStage(alpha, beta) {
-  const choices = {alpha: {character: 8, costume: 0}, beta: {character: 8, costume: 1}};
+  const choices = {alpha: {character: 8, costume: 1}, beta: {character: 8, costume: 2}};
+  assert.deepEqual(alpha.source.own_choice_before, choices.alpha);
+  assert.deepEqual(beta.source.own_choice_after, choices.beta);
   const guest = await waitSnapshot(beta, value => value.phase === 2 &&
     value.session?.choices?.alpha && value.session?.choices?.beta,
     'guest holds its closed original CSS while host selects stage',
@@ -592,7 +610,7 @@ async function verifySharedChoiceStart(pages) {
     const identity = JSON.parse(start.liveIdentity);
     assert.equal(identity.selection.start.rules.stage_kind, STAGE_FINAL_DESTINATION);
     assert.deepEqual(identity.selection.start.players.slice(0, 2).map(p => p.ckind), [8, 8]);
-    assert.deepEqual(identity.selection.start.players.slice(0, 2).map(p => p.color), [0, 1],
+    assert.deepEqual(identity.selection.start.players.slice(0, 2).map(p => p.color), [1, 2],
       'Constructed native match did not use the independent costumes');
     return {agreement: start.agreement, liveIdentity: start.liveIdentity, heldProof: start.heldProof};
   });
