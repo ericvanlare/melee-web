@@ -29,5 +29,144 @@ class MenuSssCounterHostTests(OwnedWorkspaceTests):
         (work / 'run.json').write_text(json.dumps({'argv': result.args, 'exit_code': result.returncode}, indent=2) + '\n')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn('PASS actual host continuation', result.stdout)
+    def test_staging_closed_css_pair_and_guest_preparation(self):
+        host = (ROOT / 'src/gameplay_menu_host.c').read_text()
+        menu = (ROOT / 'src/gameplay_menu.c').read_text()
+        browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
+        browser_close = _function(browser, 'void close()')
+        self.assertLess(browser_close.index('melee_web_menu_host_online_release_guest_css'),
+                        browser_close.index('world->close()'))
+
+        # Reuse the original continuation fixture and compile the actual menu
+        # and host functions. The source normalizer is the test boundary.
+        prelude = PRELUDE.replace('typedef struct { int pending_scene_change; } CSSData;', """
+#define MELEE_WEB_MENU_CSS 1
+#define Gm_PKind_Human 0
+typedef struct { unsigned slot_type,slot; int ckind,color,nametag; } PlayerInitData;
+typedef struct { int stkind,stock_count; } StartRules;
+typedef struct { StartRules rules; PlayerInitData players[2]; } StartMeleeData;
+typedef struct { StartMeleeData start; int winner; } VsModeData;
+typedef struct { int pending_scene_change; VsModeData vs; } CSSData;
+""").replace('typedef struct { CSSData css; int phase; } MeleeWebMenuSession;', """
+typedef struct {
+ CSSData css;
+ VsModeData match_vs,post_vs_mode;
+ int phase,css_open,sss_open,training_mode_scene,post_vs_mode_valid,online_composition;
+} MeleeWebMenuSession;
+""").replace(' uint32_t seed;SceneInfo source_scene_info;', """
+ int online_guest_css;
+ struct { int unk_x7; } selected_rules;
+ uint32_t seed;SceneInfo source_scene_info;""")
+        functions = '\n'.join(_function(host, signature) for signature in FUNCTIONS)
+        functions += '\n' + r"""
+typedef struct { int costumes; } MeleeWebFighterContent;
+static const MeleeWebFighterContent mario={5};
+static int prepare_source_calls;
+static int live(MeleeWebMenuHost* x,char* e,size_t n) {
+ return x==owner && x->audio && x->generation==world_generation &&
+        melee_web_audio_is_active(x->audio) && bank_active ? ok(e,n) : fail(e,n,"lease");
+}
+static int session_live(const MeleeWebMenuSession* s,char* e,size_t n) {
+ return s==&session ? ok(e,n) : fail(e,n,"session");
+}
+static const MeleeWebFighterContent* melee_web_fighter_content(int kind) {
+ return kind==8 ? &mario : NULL;
+}
+static int melee_web_menu_character_available(int kind) { return kind==8; }
+static int melee_web_menu_stage_available(int stage) { return stage==32; }
+static int melee_web_menu_active_player_count(const StartMeleeData* start) {
+ return (start->players[0].slot_type==Gm_PKind_Human) +
+        (start->players[1].slot_type==Gm_PKind_Human);
+}
+static int match_selection_valid(const StartMeleeData* start) {
+ return start->rules.stkind==32 && start->rules.stock_count==4;
+}
+static int melee_web_vs_prepare_start_source(StartMeleeData* start,
+                                             const VsModeData* raw,VsModeData* post) {
+ assert(h.audio==&audio && h.generation==world_generation && !h.vs_mode_owned);
+ assert(restore_calls==0 && h.online_guest_css==2 && raw->start.rules.stkind==32);
+ ++prepare_source_calls;
+ *start=raw->start;
+ *post=*raw;
+ return 1;
+}
+"""
+        functions += '\nstatic MeleeWebMenuSession* menu_owner=&session;\n#define owner menu_owner\n'
+        functions += '\n'.join(_function(menu, signature) for signature in (
+            'int melee_web_menu_online_compose(', 'int melee_web_menu_online_guest_prepared('))
+        functions += '\n#undef owner\n'
+        functions += '\n' + '\n'.join(_function(host, signature) for signature in (
+            'int melee_web_menu_host_online_hold_guest_css(', 'int melee_web_menu_host_online_choice(',
+            'int melee_web_menu_host_online_release_guest_css(', 'int melee_web_menu_host_online_compose('))
+        setup = CASES.replace('int main(void)', 'static int ordinary_route_controls(void)')
+        test = r"""
+static void closed_css(int guest) {
+ char error[160];
+ setup();
+ prepare_source_calls=0;
+ session.css.vs=(VsModeData){{{11,4},{{0,1,8,1,19},{0,2,8,4,29}}},3};
+ if(guest) {
+  h.entered=1; h.source_scene=MELEE_WEB_HOST_SCENE_CSS;
+  session.phase=MELEE_WEB_MENU_CSS;
+  assert(melee_web_menu_host_online_hold_guest_css(&h,error,sizeof error));
+  h.entered=0; h.source_scene=MELEE_WEB_HOST_SCENE_NONE;
+  session.phase=MELEE_WEB_MENU_SSS_READY;
+  h.online_guest_css=2; /* The real CSS leave owns this transition. */
+ }
+ assert(host_sss_continuation_arm(&h,error,sizeof error));
+ if(!guest)retire_and_rebuild();
+}
+
+int main(void) {
+ char error[160];
+ assert(ordinary_route_controls()==0);
+ const int chars[2]={8,8}, colors[2]={1,2}, guest_colors[2]={0,1};
+ closed_css(0);
+ VsModeData expected=session.css.vs;
+ expected.start.players[1].color=2;
+ assert(!melee_web_menu_host_online_compose(&h,chars,guest_colors,-1,error,sizeof error));
+ assert(melee_web_menu_host_online_compose(&h,chars,colors,-1,error,sizeof error));
+ assert(!memcmp(&expected,&session.css.vs,sizeof expected));
+ assert(!melee_web_menu_host_online_compose(&h,chars,colors,-1,error,sizeof error));
+ assert(session.phase==MELEE_WEB_MENU_SSS_READY && !prepare_source_calls);
+
+ closed_css(1);
+ expected=session.css.vs;
+ expected.start.rules.stkind=32;
+ expected.start.players[0].color=0;
+ expected.start.players[1].color=1;
+ assert(!melee_web_menu_online_compose(&session,chars,guest_colors,31,error,sizeof error));
+ session.phase=MELEE_WEB_MENU_CSS;
+ assert(!melee_web_menu_host_online_compose(&h,chars,guest_colors,32,error,sizeof error));
+ session.phase=MELEE_WEB_MENU_SSS_READY;
+ assert(melee_web_menu_host_online_compose(&h,chars,guest_colors,32,error,sizeof error));
+ assert(melee_web_menu_online_guest_prepared(&session));
+ assert(!memcmp(&expected,&session.css.vs,sizeof expected));
+ assert(!memcmp(&expected,&session.post_vs_mode,sizeof expected));
+ assert(prepare_source_calls==1 && restore_calls==1 && !h.audio && !h.vs_mode_owned);
+ assert(!melee_web_menu_host_online_compose(&h,chars,guest_colors,32,error,sizeof error));
+ assert(melee_web_menu_host_online_release_guest_css(&h,error,sizeof error));
+ assert(prepare_source_calls==1 && restore_calls==1);
+
+ closed_css(1);
+ ++clock_values.counter_4;
+ assert(!melee_web_menu_host_online_compose(&h,chars,guest_colors,32,error,sizeof error));
+ assert(!prepare_source_calls && !restore_calls && h.audio==&audio);
+ assert(melee_web_menu_host_online_release_guest_css(&h,error,sizeof error));
+ assert(!prepare_source_calls && restore_calls==1 && !h.audio && !h.vs_mode_owned);
+ return 0;
+}
+"""
+        work = self.new_workspace(ROOT, 'online-closed-css-host-')
+        source, binary = work / 'control.c', work / 'control'
+        source.write_text(prelude + functions + setup + test)
+        for command in [
+            shlex.split(os.environ.get('CC', 'cc')) +
+            ['-std=c11', '-Wall', '-Wextra', '-Werror', str(source), '-o', str(binary)],
+            [str(binary)],
+        ]:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 if __name__ == '__main__':
     unittest.main()

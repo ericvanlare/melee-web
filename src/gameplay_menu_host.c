@@ -112,6 +112,9 @@ struct MeleeWebMenuHost {
     uint8_t initial_save_data[0x55E8];
     int initial_replay_context;
     int net_start_context;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    int online_guest_css; /* 1 opted in, 2 closed CSS with live source context */
+#endif
     int initial_native_rules;
     GameRules native_rules;
     VsModeData route_saved_vs;
@@ -3430,6 +3433,12 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
                 arm_error[0] ? arm_error :
                     "CSS-to-SSS counter continuation capture failed",e,n);
         }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+        if (h->online_guest_css == 1) {
+            h->online_guest_css = 2;
+            return ok(e,n);
+        }
+#endif
         if (!restore_context_checked(h,e,n)) {
             host_sss_continuation_invalidate(h);
             return 0;
@@ -3571,6 +3580,96 @@ int melee_web_menu_host_provenance(const MeleeWebMenuHost* h,MeleeWebPipelineSou
     return 1;
 }
 #endif
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+int melee_web_menu_host_online_hold_guest_css(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    if (!live(h, e, n)) return 0;
+    if (!h->entered || h->source_scene != MELEE_WEB_HOST_SCENE_CSS ||
+        h->source_mode_kind != GM_VS || !h->vs_mode_owned || h->online_guest_css ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_CSS)
+        return fail(e, n, "Online guest hold requires active original VS CSS");
+    h->online_guest_css = 1;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_online_choice(const MeleeWebMenuHost* h, int* character,
+                                       int* costume, char* e, size_t n)
+{
+    if (!h || h != owner || h->entered || h->source_mode_kind != GM_VS ||
+        !h->vs_mode_owned || seed_ptr != &h->seed ||
+        h->sss_continuation_state != HOST_SSS_CONTINUATION_AVAILABLE ||
+        melee_web_menu_phase(h->session) != MELEE_WEB_MENU_SSS_READY ||
+        !character || !costume)
+        return fail(e, n, "Online choice requires the original closed CSS owner");
+    const CSSData* css = melee_web_menu_css(h->session);
+    if (!css || css->pending_scene_change != 1)
+        return fail(e, n, "Online choice requires original CSS confirmation");
+    const PlayerInitData* player = &css->vs.start.players[0];
+    const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
+    if (player->slot_type != Gm_PKind_Human || player->slot > 1 ||
+        !content || !melee_web_menu_character_available(player->ckind) ||
+        player->color >= content->costumes)
+        return fail(e, n, "Online local source P1 selection is unsupported");
+    *character = player->ckind;
+    *costume = player->color;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_online_release_guest_css(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    if (!h || h != owner)
+        return fail(e, n, "Online guest cleanup requires the owned menu host");
+    if (h->online_guest_css != 2) return ok(e, n);
+    if (h->entered || !h->audio || seed_ptr != &h->seed)
+        return fail(e, n, "Online guest cleanup lost its closed CSS context");
+    if (h->vs_mode_owned) {
+        if (!melee_web_vs_mode_end())
+            return fail(e, n, "Online guest could not release its VS mode");
+        h->vs_mode_owned = 0;
+    }
+    host_sss_continuation_invalidate(h);
+    if (!restore_context_checked(h, e, n)) return 0;
+    h->online_guest_css = 0;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_online_compose(MeleeWebMenuHost* h,
+                                       const int characters[2], const int costumes[2],
+                                       int host_stage, char* e, size_t n)
+{
+    int character, costume;
+    if (!melee_web_menu_host_online_choice(h, &character, &costume, e, n)) return 0;
+    const int guest = host_stage != -1;
+    const int local = guest ? 1 : 0;
+    if (characters[local] != character || costumes[local] != costume ||
+        h->selected_rules.unk_x7 != 0 ||
+        (guest ? h->online_guest_css != 2 : h->online_guest_css != 0 || h->audio))
+        return fail(e, n, "Online setup lost its role-owned selection or manual stage policy");
+    if (guest) {
+        // Keep the original closed CSS audio/profile context for the authored
+        // preparation (including announcer bank work). Revalidate the lease.
+        const MeleeWebMenuClockCounters closed = h->sss_continuation_counters;
+        if (!live(h, e, n) ||
+            h->sss_continuation_session != h->session ||
+            h->sss_continuation_audio != h->audio ||
+            h->sss_continuation_audio_generation != h->audio_generation ||
+            h->sss_continuation_departed_world_generation != h->generation)
+            return fail(e, n, "Online guest lost its closed CSS source lease");
+        if (!host_sss_continuation_arm(h, e, n)) return 0;
+        if (closed.counter_0 != h->sss_continuation_counters.counter_0 ||
+            closed.counter_4 != h->sss_continuation_counters.counter_4 ||
+            closed.counter_8 != h->sss_continuation_counters.counter_8)
+            return fail(e, n, "Online guest CSS source clock advanced while held");
+        if (!melee_web_vs_mode_end())
+            return fail(e, n, "Online guest could not release its VS mode");
+        h->vs_mode_owned = 0;
+    }
+    if (!melee_web_menu_online_compose(h->session, characters, costumes, host_stage, e, n))
+        return 0;
+    return guest ? melee_web_menu_host_online_release_guest_css(h, e, n) : ok(e, n);
+}
+#endif
+
 static int host_selection_from_vs(const MeleeWebMenuHost* h,
                                   const VsModeData* vs,
                                   MeleeWebMenuMatchSelection* out,
@@ -3608,7 +3707,11 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed)
         return fail(e,n,"Selection requires a closed menu scene with owned RNG");
     const VsModeData* vs=melee_web_menu_ready_vs(h->session);
-    if(!vs||!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session)))
+    if(!vs||(!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session))
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+             && !melee_web_menu_online_guest_prepared(h->session)
+#endif
+            ))
         return fail(e,n,"Original menus have not committed a supported selection");
     return host_selection_from_vs(h,vs,out,e,n);
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * Bounded two-page checks of the real online staging UI. Both pages load their
- * own local disc, use the original CSS/SSS, negotiate through the page-owned
+ * own local disc, use original menus, negotiate through the page-owned
  * relay setup, and start the existing rollback loop. The full route uses
  * browser inputs to finish the original match and return from Results to CSS.
  * The harness never advances source ticks or calls a native input/write API.
@@ -31,6 +31,7 @@ const {values} = parseArgs({options: {
   'full-match': {type: 'boolean', default: false},
   'source-idle-probe': {type: 'boolean', default: false},
   'lobby-recovery': {type: 'boolean', default: false},
+  'shared-choices': {type: 'boolean', default: false},
   'guest-gamepad': {type: 'boolean', default: false},
   'timeout-ms': {type: 'string', default: '300000'},
 }, strict: true});
@@ -41,10 +42,12 @@ const timeoutMs = Number(values['timeout-ms']);
 const idleProbe = values['source-idle-probe'];
 const fullMatch = values['full-match'];
 const lobbyRecovery = values['lobby-recovery'];
+const sharedChoices = values['shared-choices'];
 const guestGamepad = values['guest-gamepad'];
 if (!root || !disc || !output || [values['start-only'], idleProbe, fullMatch].filter(Boolean).length !== 1 ||
-    !Number.isSafeInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 300000)
-  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe | --full-match) [--lobby-recovery] [--guest-gamepad] --served-root <immutable-staging-package> [--url <exact-staging-Pages-online-route>] --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
+    !Number.isSafeInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 300000 ||
+    (sharedChoices && lobbyRecovery))
+  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe | --full-match) [--lobby-recovery | --shared-choices] [--guest-gamepad] --served-root <immutable-staging-package> [--url <exact-staging-Pages-online-route>] --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
 
 const SERVER_HOST = '127.0.0.1';
 const SERVER_PORT = 8787;
@@ -80,9 +83,10 @@ const mediaTypes = new Map([
 const report = {
   schema: 'melee-web-staging-rollback-pair-start-only-v1',
   mode: fullMatch ? 'full-match' : idleProbe ? 'source-idle-probe' : 'start-only',
-  lobbyRecovery, guestGamepad,
+  lobbyRecovery, sharedChoices, guestGamepad,
   scope: (fullMatch ? 'two actual online pages; original CSS, SSS, four-stock match, Results, and returned CSS' : idleProbe ? 'two actual online pages; no gameplay input injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 input pulse; UI Leave; no full-match, correction, timing, or acceptance claim') +
-    (guestGamepad ? '; authored browser Gamepad fixture, no physical-controller claim' : '; keyboard input'),
+    (guestGamepad ? '; authored browser Gamepad fixture, no physical-controller claim' : '; keyboard input') +
+    (sharedChoices ? '; independent source CSS choices and host-only original SSS; guest uses explicit network match preparation' : ''),
   result: 'not_started',
   hypothesis: fullMatch ? 'Real P1 walk-offs and respawns reach a common native match-final receipt and original Results before both pages return to CSS and Leave.' : idleProbe ? 'Retain the first native source-file refusal through frame 320 without gameplay key injection and with a nonblocking observation across takeover.' : 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
   producer: null,
@@ -365,7 +369,7 @@ async function settlePair(actions) {
 
 const useGamepad = item => guestGamepad && item.role === 'beta';
 const gamepadActions = {
-  Enter: {button: 9}, j: {button: 0},
+  Enter: {button: 9}, j: {button: 0}, u: {button: 2},
   a: {axis: 0, value: -1}, d: {axis: 0, value: 1},
   w: {axis: 1, value: -1}, s: {axis: 1, value: 1},
 };
@@ -447,7 +451,7 @@ function cssDoors(css) {
     rawSlot: css.doors[port * 10 + 6]}));
 }
 
-async function enterSss(item) {
+async function confirmOwnCss(item) {
   const before = await waitSnapshot(item, snapshot => snapshot.phase === 1 && snapshot.css,
     'original CSS source observer', {source: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
   const doors = cssDoors(before.css);
@@ -468,11 +472,39 @@ async function enterSss(item) {
   assert.equal(settled.phase, 1, `${item.role} left CSS during its UI-only settle interval`);
   item.source.css_settle = {milliseconds: CSS_SETTLE_MS, phase: settled.phase,
     running: settled.running, cursor: settled.css?.geometry?.slice(0, 2)};
+  if (sharedChoices) {
+    const observed = await waitSnapshot(item, snapshot => snapshot.phase === 1 &&
+      snapshot.session?.lobby?.[item.role]?.phase === 'css' &&
+      snapshot.session.lobby[item.role].choice?.character === MARIO_SOURCE_KIND,
+      'source-owned P1 character and costume before confirmation',
+      {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    item.source.own_choice_before = observed.session.lobby[item.role].choice;
+    // The fresh original CSS resolves the two initially identical costumes:
+    // its actual P1 source selection is costume 1, with P2 retaining costume 0.
+    assert.deepEqual(item.source.own_choice_before, {character: 8, costume: 1});
+  }
+  if (sharedChoices && item.role === 'beta') {
+    item.source.own_costume_input = await pressWithReceipt(item, 'u',
+      'Guest local P1 X: choose own costume', {buttonMask: 0x0400});
+    const observed = await waitSnapshot(item, snapshot => snapshot.phase === 1 &&
+      snapshot.session?.lobby?.beta?.choice?.costume === 2,
+      'guest source P1 costume after the actual X input',
+      {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+    item.source.own_choice_after = observed.session.lobby.beta.choice;
+  }
   await pressWithReceipt(item, 'Enter', 'P1 original CSS Start', {buttonMask: CSS_START_BUTTON});
+}
+
+async function waitForSss(item) {
   const sss = await waitSnapshot(item, snapshot => snapshot.phase === 3 && snapshot.sss?.gateObserved && snapshot.sss.cooldown === 0,
     'original CSS→SSS source transition', {source: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
   item.source.css_to_sss = {phase: sss.phase, stage: sss.sss.ids[1], cooldown: sss.sss.cooldown};
   await item.page.screenshot({path: path.join(output, `${item.role}-original-sss.png`), timeout: remaining()});
+}
+
+async function enterSss(item) {
+  await confirmOwnCss(item);
+  await waitForSss(item);
 }
 
 async function hoverStage(item, stageKind) {
@@ -537,6 +569,55 @@ async function verifySharedReady(alpha, beta) {
   assert.match(guestHostLabel, /ready · Mario \/ Final Destination/);
   report.lobbyRecoveryProof = {hostStartState: host.startState, guestStartState: guest.startState,
     guestPhase: guest.phase, guestLobby: guest.session.lobby, guestHostLabel};
+}
+
+async function verifySharedChoicesBeforeStage(alpha, beta) {
+  const choices = {alpha: {character: 8, costume: 1}, beta: {character: 8, costume: 2}};
+  assert.deepEqual(alpha.source.own_choice_before, choices.alpha);
+  assert.deepEqual(beta.source.own_choice_after, choices.beta);
+  const guest = await waitSnapshot(beta, value => value.phase === 2 &&
+    value.session?.choices?.alpha && value.session?.choices?.beta,
+    'guest holds its closed original CSS while host selects stage',
+    {diagnostics: true, timeoutMs: SOURCE_READY_TIMEOUT_MS});
+  const host = await readSnapshot(alpha, false, {diagnostics: true});
+  assert.equal(host.phase, 3, 'Host is not in original SSS');
+  assert.equal(guest.startState, 1, 'Guest made a match offer before the host selected a stage');
+  for (const snapshot of [host, guest]) {
+    assert.deepEqual(snapshot.session.choices, choices, 'Shared choices lost per-player ownership');
+    assert(!snapshot.session.start, 'Match agreement appeared before the host stage');
+  }
+  const rows = {};
+  for (const item of [alpha, beta]) {
+    rows[item.role] = await item.page.locator('#lobby').innerText({timeout: remaining()});
+    assert.match(rows[item.role], /Host.*Mario/);
+    assert.match(rows[item.role], /Guest.*Mario/);
+  }
+  await beta.page.screenshot({path: path.join(output, 'beta-waiting-for-host-stage.png'), timeout: remaining()});
+  assert.deepEqual(beta.inputEvents.map(event => event.label),
+    ['Guest local P1 X: choose own costume', 'P1 original CSS Start'],
+    'Guest received an unexpected menu action before host stage selection');
+  report.sharedChoicesProof = {choices, hostPhase: host.phase, guestPhase: guest.phase,
+    guestStartState: guest.startState, lobbyText: rows,
+    guestMenuInputs: structuredClone(beta.inputEvents)};
+}
+
+async function verifySharedChoiceStart(pages) {
+  const rows = await settlePair(pages.map(item => readSnapshot(item, false, {diagnostics: true})));
+  const identities = rows.map(snapshot => {
+    assert.deepEqual(snapshot.session.choices, report.sharedChoicesProof.choices);
+    const start = snapshot.session.start;
+    assert(start?.agreement && start.liveIdentity && start.heldProof, 'Missing exact native startup proof');
+    const identity = JSON.parse(start.liveIdentity);
+    assert.equal(identity.selection.start.rules.stage_kind, STAGE_FINAL_DESTINATION);
+    assert.deepEqual(identity.selection.start.players.slice(0, 2).map(p => p.ckind), [8, 8]);
+    assert.deepEqual(identity.selection.start.players.slice(0, 2).map(p => p.color), [1, 2],
+      'Constructed native match did not use the independent costumes');
+    return {agreement: start.agreement, liveIdentity: start.liveIdentity, heldProof: start.heldProof};
+  });
+  assert.deepEqual(identities[0], identities[1], 'Peers built different source match state');
+  assert.deepEqual(pages.find(item => item.role === 'beta').inputEvents,
+    report.sharedChoicesProof.guestMenuInputs, 'Guest received extra inputs to select the host stage');
+  report.sharedChoicesProof.nativeStart = identities[0];
 }
 
 async function openPage(item, chromium, browserConfig, browserPath, playwrightPath, url) {
@@ -628,7 +709,8 @@ async function hostThenJoin(alpha, beta) {
   await waitSnapshot(beta, value => value.stage === 'starting' && value.roomId === beta.roomCode,
     'Join room admission', {timeoutMs: 30000});
   report.room = {code: alpha.roomCode, host: 'alpha', join: 'beta',
-    page_owned_setup: true, native_seed_or_selection_writes: false};
+    page_owned_setup: true, harness_native_seed_or_selection_writes: false,
+    page_native_selection_composition: sharedChoices};
 }
 
 function verifyMatch(item, match) {
@@ -1021,6 +1103,15 @@ async function main() {
 
   const [alpha, beta] = pages;
   await hostThenJoin(alpha, beta);
+  if (sharedChoices) {
+    await settlePair(pages.map(confirmOwnCss));
+    await waitForSss(alpha);
+    await verifySharedChoicesBeforeStage(alpha, beta);
+    alpha.source.sss_selection = await hoverStage(alpha, STAGE_FINAL_DESTINATION);
+    beta.traceLive = true;
+    await confirmFinalDestination(alpha);
+    report.checks.push('Each player confirmed their own original CSS choice; guest changed its costume with actual P1 input and held closed CSS while only the host selected the stage.');
+  } else {
   await settlePair(pages.map(enterSss));
   if (lobbyRecovery) {
     await rejectUnsupportedStage(beta);
@@ -1035,10 +1126,13 @@ async function main() {
     report.checks.push('Guest saw the host ready for Final Destination while guest remained in SSS and host held its native offer.');
     await confirmFinalDestination(beta);
   } else await settlePair(pages.map(confirmFinalDestination));
+  }
   await settlePair(pages.map(waitForMatchScene));
-  report.checks.push('Both pages used actual P1 input to traverse the original CSS and source-observed SSS to Final Destination.');
+  if (!sharedChoices)
+    report.checks.push('Both pages used actual P1 input to traverse the original CSS and source-observed SSS to Final Destination.');
 
   await settlePair(pages.map(waitForLiveMatch));
+  if (sharedChoices) await verifySharedChoiceStart(pages);
   report.checks.push('Page-owned negotiation reached the same original four-stock Mario/Final Destination rollback session on both roles.');
 
   let finalMatches;

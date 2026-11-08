@@ -41,6 +41,9 @@ struct MeleeWebMenuSession {
     int css_parent_route_requested;
     int css_parent_ready;
     int training_mode_scene;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    int online_composition; /* 1 host pair, 2 guest prepared */
+#endif
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
     MeleeWebMenuFirstCssReturnNote first_css_return_note;
     int first_css_return_armed;
@@ -1332,6 +1335,9 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
         return fail(error, error_size,
                     "CSS transition request was pending before enter");
     }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+    session->online_composition = 0;
+#endif
     session->css.pending_scene_change = 0;
     session->css_parent_route_requested = 0;
     session->css.match_type = VS_MELEE;
@@ -1899,6 +1905,56 @@ const SSSData* melee_web_menu_sss(const MeleeWebMenuSession* session)
     }
     return &session->sss;
 }
+
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+int melee_web_menu_online_compose(MeleeWebMenuSession* session,
+                                  const int characters[2], const int costumes[2],
+                                  int host_stage, char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size))
+        return 0;
+    if (session->phase != MELEE_WEB_MENU_SSS_READY || session->css_open ||
+        session->sss_open || session->training_mode_scene || session->online_composition ||
+        !characters || !costumes || session->css.pending_scene_change != 1 ||
+        melee_web_menu_active_player_count(&session->css.vs.start) != 2 ||
+        (host_stage != -1 && !melee_web_menu_stage_available(host_stage)))
+        return fail(error, error_size, "Online setup requires closed two-player VS CSS");
+
+    VsModeData composed = session->css.vs;
+    for (unsigned port = 0; port < 2; ++port) {
+        PlayerInitData* player = &composed.start.players[port];
+        const MeleeWebFighterContent* content = melee_web_fighter_content(characters[port]);
+        if (player->slot_type != Gm_PKind_Human ||
+            (player->slot != 0 && player->slot != port + 1) ||
+            !content || !melee_web_menu_character_available(characters[port]) ||
+            costumes[port] < 0 || costumes[port] >= content->costumes)
+            return fail(error, error_size, "Online setup player choice is unsupported");
+        player->ckind = characters[port];
+        player->color = costumes[port];
+    }
+    if (host_stage != -1) {
+        // The guest has no SSS scene. Prepare its retained VS payload with the
+        // same source routine as the host after the host commits original SSS.
+        composed.start.rules.stkind = host_stage;
+        session->match_vs = composed;
+        if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
+                                                &composed, &session->post_vs_mode) ||
+            !match_selection_valid(&session->match_vs.start))
+            return fail(error, error_size, "Online guest source VS preparation refused");
+        session->post_vs_mode_valid = 1;
+        session->phase = MELEE_WEB_MENU_READY;
+    }
+    session->css.vs = composed;
+    session->online_composition = host_stage == -1 ? 1 : 2;
+    return ok(error, error_size);
+}
+
+int melee_web_menu_online_guest_prepared(const MeleeWebMenuSession* session)
+{
+    return session && session == owner && session->phase == MELEE_WEB_MENU_READY &&
+           session->online_composition == 2 && session->post_vs_mode_valid;
+}
+#endif
 
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession* session)
 {

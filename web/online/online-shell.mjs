@@ -18,35 +18,57 @@ window.addEventListener('keydown',event=>heldKeys.add(event.code),true);
 window.addEventListener('keyup',event=>heldKeys.delete(event.code),true);
 window.addEventListener('blur',()=>heldKeys.clear(),true);
 let player,context,state,controller,setup,bridge,loop,prepareWork,loopWork,closed=false,roomUsed=false,discReady=false;
-let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,nativeRetired=false,userLeave=false;
-let startCommitted=false;
+let hostIdentity,held,packageInfo,table,role,closeWork,launchWork,historyOwned=false,nativeRetired=false,userLeave=false;
+let startCommitted=false,retireWork,hostOffer=null;
 let menuProgressWork,stopMenuProgress=false;
 const report={schema:'melee-web-staging-rollback-session-v1',result:'pending',failure:null,
   scope:'experimental Mario/FD match-only rollback; no full-profile or timing acceptance',
-  sourceBoundaryFailures:[],lobby:{},setupEvents:[]};
+  sourceBoundaryFailures:[],lobby:{},choices:null,hostStage:null,setupEvents:[]};
 function setupEvent(kind,value){
   report.setupEvents.push({at:performance.now(),kind,value});
   if(report.setupEvents.length>64)report.setupEvents.shift();
   try{sessionStorage.setItem('webmelee-last-online-session',JSON.stringify(report));}catch{}
 }
+const fighterName=kind=>kind===8?'Mario':kind===1?'Fox':`Fighter ${kind}`;
 function showLobby({role:side,revision,state:selection}){
   report.lobby[side]={revision,...selection};
   setupEvent('lobby',{role:side,revision,...selection});
   const label=side==='alpha'?'Host · P1':'Guest · P2';
-  const characters=selection.characters.every(kind=>kind===8)?'Mario / Mario':'choose Mario for both slots';
-  const phases={css:characters+' · character select',sss:'choosing Final Destination',
-    selected:'ready · Mario / Final Destination',preparing:'preparing the agreed match'};
-  $('lobby-'+side).textContent=label+(side===role?' (you)':'')+': '+phases[selection.phase];
-  const local=report.lobby[role],remote=report.lobby[role==='alpha'?'beta':'alpha'];
-  if(local&&remote&&JSON.stringify(local.colors)!==JSON.stringify(remote.colors))
-    $('lobby-warning').textContent='Costumes differ between computers. Choose the same Mario costumes before leaving character select.';
-  else $('lobby-warning').textContent='';
+  const phases={css:'choosing character',sss:'host choosing stage',
+    selected:'character locked',preparing:'preparing the agreed match'};
+  const choice=selection.choice;
+  const picked=choice?`${fighterName(choice.character)} · costume ${choice.costume+1}`:'choosing character';
+  $('lobby-'+side).textContent=label+(side===role?' (you)':'')+': '+picked+' · '+phases[selection.phase];
+  $('lobby-warning').textContent='';
+  if(side==='alpha'&&selection.stage!==null)showHostStage({role:'alpha',stage:selection.stage});
+}
+function showChoices(choices){
+  report.choices=structuredClone(choices);
+  setupEvent('choices',report.choices);
+  for(const side of ['alpha','beta'])showLobby({role:side,revision:1,
+    state:{phase:'selected',choice:choices[side],stage:null}});
+}
+function showHostStage({role:owner,stage}){
+  if(owner!=='alpha')throw Error('Only the host may publish the selected stage.');
+  report.hostStage=stage;
+  setupEvent('host-stage',{role:owner,stage});
+  $('lobby-stage').textContent='Host stage: '+(stage===32?'Final Destination':`Stage ${stage}`);
 }
 function error(error){
   const message=String(error?.message??error);$('error').textContent=message;$('error').hidden=false;
   report.failure??=message;report.result='FAIL';
   $('report').disabled=false;
   setupEvent('failure',message);
+}
+function expectedSetupCancellation(cause){
+  return userLeave&&!startCommitted&&!report.failure&&[
+    'Room closed','Room setup is closed','Room was closed. Reload to begin a new session.',
+  ].includes(String(cause?.message??cause));
+}
+function recordSetupCancellation(){
+  if(report.failure||report.result!=='pending')return;
+  report.result='CANCELLED_SETUP';
+  setupEvent('cancelled',{boundary:'before-native-start'});
 }
 const status=text=>{$('room-status').textContent=text;setupEvent('status',text);};
 const hex=bytes=>[...new Uint8Array(bytes)].map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -62,7 +84,7 @@ function render(next){
   const progress=$('loading-progress');
   if(next.loading?.total>0){progress.max=next.loading.total;progress.value=next.loading.complete;}
   else progress.removeAttribute('value');
-  if(next.state==='error'){error(next.message);void close().catch(error);}
+  if(next.state==='error'){error(next.message);void retireAfterClose().catch(error);}
 }
 const settings=mountControllerSettings({container:$('controls-dialog'),openButton:$('controls-open'),
   preferenceKey:'melee-online-controls-v1',initialSources:['auto','auto','off','off'],
@@ -143,7 +165,7 @@ async function close(){
     for(const action of [()=>bridge?.close(),()=>setup?.close(),async()=>{
       // Preparation can already own an asynchronous native command before the
       // live loop promise exists. Let it settle before asking that owner to retire.
-      await Promise.allSettled([prepareWork,loopWork].filter(Boolean));
+      await Promise.allSettled([launchWork,prepareWork,loopWork].filter(Boolean));
       if(controller?.status().ownerState===1){
         // Native cleanup closes the game and cancels its main loop. An ordinary
         // queued unload cannot run after that terminal command.
@@ -160,6 +182,20 @@ async function close(){
     if(failures.length)throw new AggregateError(failures,'Room cleanup failed.');
   })();
   closeWork.catch(()=>{});return closeWork;
+}
+function retireAfterClose(){
+  if(retireWork)return retireWork;
+  retireWork=(async()=>{
+    const failures=[];
+    try{await close();}catch(cause){failures.push(cause);}
+    if(!nativeRetired&&player?.unload){
+      try{await player.unload();nativeRetired=true;}
+      catch(cause){failures.push(cause);}
+    }
+    if(failures.length)throw new AggregateError(failures,'Room cleanup and player retirement failed.');
+  })();
+  retireWork.catch(()=>{});
+  return retireWork;
 }
 // Bounded, read-only diagnostics for the same UI that players use. Native
 // observers copy source state; callers receive no runtime or command handles.
@@ -180,6 +216,7 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false,stag
   if(!controller||(!historyOwned&&!nativeRetired&&(state?.requiresReload||startCommitted)))return supplement(structuredClone({
     role,roomId:report.roomId,stage:closed?'closed':report.failure?'failed':roomUsed?'starting':'loading',
     error:report.failure,phase:null,running:null,owner:null,result:report.result,
+    choices:report.choices?structuredClone(report.choices):null,hostStage:report.hostStage,
     closed:!!report.closed,
   }));
   const sample=()=>{
@@ -189,6 +226,7 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false,stag
       stage:closed?'closed':report.failure?'failed':report.result==='MATCH_FINAL_COMPLETE'?'complete':
         loopWork?'playing':roomUsed?'starting':discReady?'ready':'loading',
       roomStatus:$('room-status').textContent,error:report.failure,phase,
+      choices:report.choices?structuredClone(report.choices):null,hostStage:report.hostStage,
       running:m?._melee_web_native_menu_running?.()??null,owner,
       startState:!historyOwned&&!nativeRetired?(m?._melee_web_native_menu_match_history_start_state?.()??null):null,
       canPause:state?.canPause??false,
@@ -238,9 +276,19 @@ async function publishMenuProgress(){
       return p?JSON.parse(m.UTF8ToString(p)):null;
     });
     if(closed||stopMenuProgress)return;
-    if(snapshot)await setup.publishLobby(snapshot);
+    if(snapshot){
+      const character=snapshot.characters?.[0],costume=snapshot.colors?.[0];
+      const choice=Number.isInteger(character)&&character>=0&&Number.isInteger(costume)
+        ?{character,costume}:null;
+      await setup.publishLobby({phase:snapshot.phase,choice,stage:null});
+    }
     await new Promise(resolve=>setTimeout(resolve,250));
   }
+}
+async function startRoomPlayer(){
+  launchWork=player.start();
+  await launchWork;
+  healthy();
 }
 async function openRoom(nextRole,roomId){
   if(roomUsed||!discReady||!state.canStart)throw Error('Choose a disc before starting a new room.');
@@ -250,9 +298,9 @@ async function openRoom(nextRole,roomId){
   $('room-code').value=roomId;$('host').disabled=$('join').disabled=true;
   $('copy').disabled=false;$('leave').disabled=false;
   status(role==='alpha'?'Room created. Share the code and choose locally.':'Joining room…');
-  await player.start();
+  await startRoomPlayer();
   await until(()=>context.Module._melee_web_native_menu_phase()===1);
-  controller.startEnable();
+  controller.startEnable(role);
   const disc=await player.discIdentity();healthy();
   const assetIdentity=JSON.stringify({algorithm:disc.algorithm,dol:disc.dol,fst:disc.fst,
     dolSize:disc.dolSize,fstSize:disc.fstSize});
@@ -261,28 +309,53 @@ async function openRoom(nextRole,roomId){
     save_profile_sha256:await baselineDigest(),profile_identity:packageInfo.profileIdentity};
   healthy();
   report.identity=hostIdentity;
-  $('instructions').textContent='Use Player 1 controls on this computer for the menus. Keep both Mario selections, press Start, then select Final Destination. Both players’ progress appears above. Release controls while the match prepares. You will play P'+(role==='alpha'?'1':'2')+'.';
+  $('instructions').textContent=role==='alpha'
+    ?'Use Player 1 controls to choose your character and costume, then press Start. Select Final Destination in the original stage menu. The guest chooses their own character.'
+    :'Use Player 1 controls to choose your character and costume, then press Start. Stay in character select while the host chooses Final Destination.';
   setup=createStagingMatchStart({role,url:STAGING_RELAY_URL,roomId,identity:hostIdentity,onState:status,
     onLobby:showLobby,
-    onFailure:cause=>{error(cause);void close().catch(error);},
+    onChoices:showChoices,onStage:showHostStage,
+    onFailure:cause=>{
+      if(expectedSetupCancellation(cause)){recordSetupCancellation();return;}
+      error(cause);void retireAfterClose().catch(error);
+    },
     native:{
-      async offer({signal}){
-        await until(()=>controller.startState()===2,{signal,timeoutMs:120000});
+      async choice({signal}){
+        const choice=await until(()=>controller.startChoice(),{signal,timeoutMs:120000});
         stopMenuProgress=true;
         await menuProgressWork;
-        status('Release controls; waiting for the other player.');
+        status('Character locked. Waiting for both choices.');
+        return choice;
+      },
+      selectChoices:({alpha,beta},{signal})=>{
+        signal.throwIfAborted();healthy();
+        return controller.startSelectChoices(alpha,beta);
+      },
+      async hostStage({signal}){
+        if(role!=='alpha')throw Error('Only the host may choose the stage.');
+        await until(()=>controller.startState()===2,{signal,timeoutMs:120000});
+        status('Release controls; sharing the host-selected stage.');
         await until(neutralControls,{signal,timeoutMs:10000});
-        const offer=controller.startOffer(hostIdentity);
-        const selected=JSON.parse(offer).selection.start;
-        await setup.publishLobby({phase:'selected',characters:selected.players.slice(0,2).map(p=>p.ckind),
-          colors:selected.players.slice(0,2).map(p=>p.color),
-          stage:selected.rules.stage_kind});
-        return offer;
+        hostOffer=controller.startOffer(hostIdentity);
+        return hostOffer;
+      },
+      applyStage(stage,{signal}){
+        if(role!=='beta')throw Error('Only the guest may receive the host stage.');
+        signal.throwIfAborted();healthy();
+        return controller.startSelectStage(stage);
+      },
+      async offer({signal}){
+        if(role==='alpha'){
+          if(!hostOffer)throw Error('The host source stage offer is unavailable.');
+          return hostOffer;
+        }
+        await until(()=>controller.startState()===2,{signal,timeoutMs:120000});
+        status('Release controls; preparing the agreed match.');
+        await until(neutralControls,{signal,timeoutMs:10000});
+        return controller.startOffer(hostIdentity);
       },
       agreement:seed=>controller.startAgreement(seed,hostIdentity),
       commit:async(seed,agreement,{signal})=>{
-        const {characters,colors,stage}=report.lobby[role];
-        await setup.publishLobby({phase:'preparing',characters,colors,stage});
         signal.throwIfAborted();healthy();
         startCommitted=true;
         return controller.startCommit(seed,agreement,hostIdentity);
@@ -291,12 +364,13 @@ async function openRoom(nextRole,roomId){
         await until(()=>controller.startState()===5&&!controller.status().gpuPending,{signal});
         held={identity:controller.startLiveIdentity(),prefix:controller.startPrefix(),
           publication:controller.startPublication()};
+        report.startHeld=structuredClone(held);
         return held;
       },
     }});
   context.attachNetworkSession(close);player.focus();
   menuProgressWork=publishMenuProgress();
-  menuProgressWork.catch(cause=>{if(!closed){error(cause);void close().catch(error);}});
+  menuProgressWork.catch(cause=>{if(!closed){error(cause);void retireAfterClose().catch(error);}});
   const agreed=await setup.negotiate();healthy();
   report.start=agreed;
   const localPort=agreed.localPort,remotePort=1-localPort;
@@ -351,8 +425,15 @@ $('disc-file').onchange=async()=>{
 };
 for(const [id,nextRole] of [['host','alpha'],['join','beta']])
   $(id).onclick=()=>void openRoom(nextRole,nextRole==='alpha'?createRoomId():$('room-code').value.trim())
-    .catch(cause=>{error(cause);void close().catch(error);});
-$('leave').onclick=async()=>{userLeave=true;try{await close();if(!nativeRetired)await player.unload();status('Room closed. Reload to play again.');}catch(cause){error(cause);}};
+    .catch(cause=>{
+      if(expectedSetupCancellation(cause)){recordSetupCancellation();return;}
+      error(cause);void retireAfterClose().catch(error);
+    });
+$('leave').onclick=async()=>{userLeave=true;try{
+  await retireAfterClose();
+  if(!startCommitted&&!report.failure)recordSetupCancellation();
+  status('Room closed. Reload to play again.');
+}catch(cause){error(cause);}};
 $('copy').onclick=async()=>{try{
   const url=new URL(location.href);url.hash=new URLSearchParams({room:$('room-code').value}).toString();
   await navigator.clipboard.writeText(url.href);status('Invite copied.');
@@ -390,4 +471,4 @@ try{
   await settings.bindPlayer(player);render(player.getState());
   status('Choose a local disc to begin.');
 }catch(cause){error(cause);}
-window.addEventListener('pagehide',()=>{void close().catch(()=>{});},{once:true});
+window.addEventListener('pagehide',()=>{void retireAfterClose().catch(()=>{});},{once:true});

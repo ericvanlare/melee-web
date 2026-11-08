@@ -28,7 +28,7 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
   put(0,1);put(4,128);put(48,1);put(52,64);
   const startStringPointer=2048,publicationPointer=8192,errorPointer=1024;
   const encoder=new TextEncoder(),decoder=new TextDecoder();
-  let nativeStartPhase=startPhase;
+  let nativeStartPhase=startPhase,onlineChoice=null,onlineRole=0,onlinePairBound=false;
   const cString=pointer=>{
     const end=heap.indexOf(0,pointer);
     if(end<0)throw Error('synthetic native string lacks terminator');
@@ -79,6 +79,21 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
       if(failStart==='enable'||nativeStartPhase!==0)return refuse('enable',51);
       nativeStartPhase=1;return 1;
     };
+    module[prefix+'start_lobby_enable']=role=>{
+      startCalls.push({name:'lobby_enable',role});
+      if(nativeStartPhase!==0)return refuse('lobby_enable',56);
+      onlineRole=role;nativeStartPhase=1;return 1;
+    };
+    module[prefix+'start_choice_json']=()=>onlineChoice===null?0:borrowedString(onlineChoice);
+    module[prefix+'start_select_choices']=(...choices)=>{
+      startCalls.push({name:'select_choices',choices});
+      if(!onlineChoice||onlinePairBound)return refuse('select_choices',57);
+      onlinePairBound=true;return 1;
+    };
+    module[prefix+'start_select_stage']=stage=>{
+      startCalls.push({name:'select_stage',stage});
+      return onlineRole===2&&onlinePairBound?1:refuse('select_stage',58);
+    };
     module[prefix+'start_state']=()=>nativeStartPhase;
     module[prefix+'start_offer_json']=(...pointers)=>{
       startCalls.push({name:'offer',host:recordHost(pointers),phase:nativeStartPhase});
@@ -107,7 +122,8 @@ function fixture({failCommand=0,hangCommand=0,allocationPointer=4096,startPhase=
     };
   }
   return {module,calls,put,view,allocations,frees,padCalls,startCalls,
-    setStartPhase:value=>{nativeStartPhase=value;},writePublication};
+    setStartPhase:value=>{nativeStartPhase=value;},
+    setOnlineChoice:value=>{onlineChoice=value;},writePublication};
 }
 
 function episodeFixture(){
@@ -787,6 +803,40 @@ test('agreed-start forwards host identities and seed while returning exact nativ
   assert.deepEqual(receipt.raw,frozenPublication,'publication bytes are copied out of native storage');
   assert.equal(f.allocations.length,allocationCount,'held-frame reads allocate no host arguments');
   assert.equal(f.frees.length,freeCount,'held-frame reads perform no native frees');
+});
+
+test('online start forwards role-owned CSS scalars and lets only the guest queue a stage',()=>{
+  const f=fixture(),guest=createRuntimeMatchHistoryController(f.module);
+  assert.throws(()=>guest.startEnable('spectator'),/alpha or beta/);
+  assert.equal(guest.startEnable('beta'),1);
+  assert.equal(guest.startChoice(),null);
+  f.setOnlineChoice('{"character":0,"costume":1}');
+  const beta=guest.startChoice();
+  assert.deepEqual(beta,{character:0,costume:1});
+  assert.equal(Object.isFrozen(beta),true);
+  assert.throws(()=>guest.startSelectChoices({character:0,costume:0,nametag:1},beta),
+    /requires a character and costume/);
+  assert.equal(guest.startSelectChoices({character:0,costume:0},beta),true);
+  assert.equal(guest.startSelectStage(32),true);
+  assert.equal(guest.startState(),1,'queuing a stage cannot prepare an offer synchronously');
+  assert.deepEqual(f.startCalls,[
+    {name:'lobby_enable',role:2},{name:'select_choices',choices:[0,0,0,1]},
+    {name:'select_stage',stage:32}]);
+
+  const a=fixture(),alpha=createRuntimeMatchHistoryController(a.module);
+  assert.equal(alpha.startEnable('alpha'),1);
+  a.setOnlineChoice('{"character":0,"costume":0}');
+  assert.equal(alpha.startSelectChoices(alpha.startChoice(),beta),true);
+  assert.throws(()=>alpha.startSelectStage(32),/start_select_stage refused/);
+  assert.throws(()=>alpha.startState(),/start_select_stage refused/);
+});
+
+test('online start rejects unexpected native choice metadata',()=>{
+  const f=fixture(),owner=createRuntimeMatchHistoryController(f.module);
+  owner.startEnable('alpha');
+  f.setOnlineChoice('{"character":0,"costume":0,"nametag":1}');
+  assert.throws(()=>owner.startChoice(),/unexpected fields/);
+  assert.throws(()=>owner.startState(),/unexpected fields/);
 });
 
 test('wrong native phase and native first failure latch without retry or allocation leak',()=>{

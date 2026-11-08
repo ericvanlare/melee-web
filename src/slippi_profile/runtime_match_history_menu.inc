@@ -94,6 +94,13 @@ struct MatchHistoryStart {
  uint64_t source_asset_generation{};
  uint64_t handoff_asset_generation{};
  MeleeWebMenuHost* enabled_host{};
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+ enum LobbyRole { NoRole, Alpha, Beta } lobby_role{};
+ bool lobby_css_held{},lobby_pair_bound{};
+ int lobby_character{},lobby_costume{},lobby_stage{-1};
+ int lobby_characters[2]{},lobby_costumes[2]{};
+ std::string lobby_choice_json;
+#endif
  MeleeWebMenuHost* source_host{};
  GameplayMatchSession* match_owner{};
  MeleeWebMenuMatchSelection local_selection{};
@@ -335,6 +342,38 @@ bool history_start_source_stable(bool source_generation) {
  return true;
 }
 
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+bool history_start_online_menu_transition_impl(int previous_scene,int phase) {
+ auto& start=match_history.start;
+ if(start.lobby_role==MatchHistoryStart::NoRole||start.state!=MatchHistoryStartEnabled)
+  return false;
+ try {
+  if(previous_scene==MELEE_WEB_MENU_HOST_SCENE_SSS){
+   check(start.lobby_role==MatchHistoryStart::Alpha&&phase==MELEE_WEB_MENU_READY,
+         "Online host left stage select before confirmation. Leave and create a new room.");
+   return false;
+  }
+  if(previous_scene!=MELEE_WEB_MENU_HOST_SCENE_CSS)return false;
+  check(phase==MELEE_WEB_MENU_SSS_READY,
+        "Online player left character select before confirmation. Leave and create a new room.");
+  char error[256]{};
+  check(host==start.enabled_host&&!start.lobby_css_held&&!start.lobby_pair_bound&&
+        world&&world_exposed&&!host_entered&&
+        preparation.phase()==melee_web::MenuPreparationState::Phase::Constructing,
+        "Online CSS lock lost its original preparation owner");
+  check(melee_web_menu_host_online_choice(host,&start.lobby_character,&start.lobby_costume,
+                                         error,sizeof(error)),error);
+  start.lobby_choice_json="{\"character\":"+std::to_string(start.lobby_character)+
+                          ",\"costume\":"+std::to_string(start.lobby_costume)+"}";
+  start.lobby_css_held=true;
+  return true;
+ }catch(const std::exception& error){
+  history_refuse(error.what());
+  throw;
+ }
+}
+#endif
+
 bool history_start_capture_offer_impl(const MeleeWebMenuMatchSelection& selection) {
  auto& start=match_history.start;
  if(start.state!=MatchHistoryStartEnabled||!host||host!=start.enabled_host||
@@ -345,6 +384,17 @@ bool history_start_capture_offer_impl(const MeleeWebMenuMatchSelection& selectio
     preparation.phase()!=melee_web::MenuPreparationState::Phase::Constructing||
     asset_destination!=AssetDestination::None)
   return history_refuse("Original-menu agreed-start offer owner refused");
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+ if(start.lobby_role!=MatchHistoryStart::NoRole&&
+    (!start.lobby_pair_bound||start.lobby_css_held||
+     selection.start.players[0].ckind!=start.lobby_characters[0]||
+     selection.start.players[0].color!=start.lobby_costumes[0]||
+     selection.start.players[1].ckind!=start.lobby_characters[1]||
+     selection.start.players[1].color!=start.lobby_costumes[1]||
+     (start.lobby_role==MatchHistoryStart::Beta&&
+      selection.start.rules.stkind!=start.lobby_stage)))
+  return history_refuse("Prepared start differs from the locked online selections");
+#endif
  try {
   start.local_selection=selection;
   start.local_menu_seed=selection.random_seed;
@@ -607,7 +657,11 @@ bool history_start_is_enabled_impl() noexcept {
  return match_history.start.state==MatchHistoryStartEnabled;
 }
 bool history_start_offer_waiting_impl() noexcept {
- return match_history.start.state==MatchHistoryStartOfferReady;
+ const auto& start=match_history.start;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+ if(start.lobby_css_held)return true;
+#endif
+ return start.state==MatchHistoryStartOfferReady;
 }
 bool history_start_ready_hold_pending_impl() noexcept {
  return match_history.start.state==MatchHistoryStartConsumed&&
@@ -692,6 +746,32 @@ bool history_start_ordinary_callback_impl() {
  if(start.state==MatchHistoryStartOfferReady||
     start.state==MatchHistoryStartReadyHeld||
     (start.state!=MatchHistoryStartDisabled&&match_history.status.first_failure))return true;
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+ if(start.lobby_css_held){
+  const bool guest=start.lobby_role==MatchHistoryStart::Beta;
+  if(!start.lobby_pair_bound||(guest&&start.lobby_stage<0))return true;
+  try {
+   char error[256]{};
+   check(start.state==MatchHistoryStartEnabled&&host==start.enabled_host&&
+         !host_entered&&world&&world_exposed&&!pending&&!running&&
+         preparation.phase()==melee_web::MenuPreparationState::Phase::Constructing,
+         "Online setup lost its closed CSS preparation owner");
+   check(melee_web_menu_host_online_compose(host,start.lobby_characters,start.lobby_costumes,
+                                            start.lobby_stage,error,sizeof(error)),error);
+   start.lobby_css_held=false;
+   if(guest){
+    // This goes directly from closed CSS to READY, so it must end CSS audio
+    // continuation just as the original SSS-to-READY preparation does.
+    transition_audio_continues=false;
+    audio_clock.reset();
+    EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),false);},
+           message.c_str());
+    advance();
+   }else begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Stages,MenuRouteEntry::Session);
+  }catch(const std::exception& error){history_refuse(error.what());}
+  return true;
+ }
+#endif
  if(history_start_service_publication())return true;
  if(start.state==MatchHistoryStartAgreed){
   (void)history_start_begin_agreed_match();return true;
@@ -1399,6 +1479,11 @@ bool history_terminal_tail_final_receipt() noexcept {
 }
 } // namespace
 
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+bool history_start_online_menu_transition(int previous_scene,int phase) {
+ return history_start_online_menu_transition_impl(previous_scene,phase);
+}
+#endif
 bool history_start_is_enabled() noexcept {return history_start_is_enabled_impl();}
 bool history_start_offer_waiting() noexcept {return history_start_offer_waiting_impl();}
 bool history_start_capture_offer(const MeleeWebMenuMatchSelection& selection) {
@@ -1479,6 +1564,66 @@ int melee_web_native_menu_match_history_start_enable() {
   start.enabled_host=host;start.state=MatchHistoryStartEnabled;return 1;
  }catch(const std::exception& error){return history_refuse(error.what());}
 }
+#if defined(MELEE_WEB_ROLLBACK_STAGING)
+int melee_web_native_menu_match_history_start_lobby_enable(uint32_t role) {
+ auto& start=match_history.start;
+ if((role!=MatchHistoryStart::Alpha&&role!=MatchHistoryStart::Beta)||
+    !host||melee_web_menu_host_phase(host)!=MELEE_WEB_MENU_CSS)
+  return history_refuse("Online shared selection requires a role and original VS CSS");
+ if(!melee_web_native_menu_match_history_start_enable())return 0;
+ if(role==MatchHistoryStart::Beta){
+  char error[256]{};
+  if(!melee_web_menu_host_online_hold_guest_css(host,error,sizeof(error)))
+   return history_refuse(error);
+ }
+ start.lobby_role=static_cast<MatchHistoryStart::LobbyRole>(role);
+ return 1;
+}
+const char* melee_web_native_menu_match_history_start_choice_json() {
+ const auto& start=match_history.start;
+ if(!history_start_export_idle()||start.lobby_role==MatchHistoryStart::NoRole||
+    !start.lobby_css_held||start.state!=MatchHistoryStartEnabled||host!=start.enabled_host||
+    match_history.status.first_failure)return nullptr;
+ return start.lobby_choice_json.c_str();
+}
+int melee_web_native_menu_match_history_start_select_choices(
+    uint32_t alpha_character,uint32_t alpha_costume,uint32_t beta_character,uint32_t beta_costume) {
+ auto& start=match_history.start;
+ if(!history_start_export_idle()||start.state!=MatchHistoryStartEnabled||
+    start.lobby_role==MatchHistoryStart::NoRole||!start.lobby_css_held||
+    start.lobby_pair_bound||host!=start.enabled_host||match_history.status.first_failure)
+  return history_refuse("Online setup choice pair has no open source-owned lock");
+ const uint32_t characters[]={alpha_character,beta_character};
+ const uint32_t costumes[]={alpha_costume,beta_costume};
+ for(unsigned port=0;port<2;++port){
+  if(characters[port]>255||costumes[port]>255||
+     !melee_web_menu_character_available(characters[port]))
+   return history_refuse("Online choice contains unsupported source content");
+  const auto* fighter=melee_web_fighter_content(characters[port]);
+  if(!fighter||costumes[port]>=fighter->costumes)
+   return history_refuse("Online choice contains unsupported source costume");
+ }
+ const unsigned local=start.lobby_role==MatchHistoryStart::Alpha?0:1;
+ if(characters[local]!=unsigned(start.lobby_character)||costumes[local]!=unsigned(start.lobby_costume))
+  return history_refuse("Online choice pair changed the local CSS selection");
+ for(unsigned port=0;port<2;++port){
+  start.lobby_characters[port]=characters[port];
+  start.lobby_costumes[port]=costumes[port];
+ }
+ start.lobby_pair_bound=true;
+ return 1;
+}
+int melee_web_native_menu_match_history_start_select_stage(uint32_t stage) {
+ auto& start=match_history.start;
+ if(!history_start_export_idle()||start.state!=MatchHistoryStartEnabled||
+    start.lobby_role!=MatchHistoryStart::Beta||!start.lobby_css_held||
+    !start.lobby_pair_bound||start.lobby_stage!=-1||host!=start.enabled_host||
+    match_history.status.first_failure||stage>255||!melee_web_menu_stage_available(stage))
+  return history_refuse("Online host stage has no open guest source setup");
+ start.lobby_stage=stage;
+ return 1;
+}
+#endif
 uint32_t melee_web_native_menu_match_history_start_state(){
  return match_history.start.state;
 }
