@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <placeholder.h>
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <melee/gr/types.h>
@@ -18,6 +19,10 @@
 #include <melee/gm/gm_16AE.h>
 #include <melee/pl/player.h>
 #include <melee/if/ifnametag.h>
+#include <melee/if/ifmagnify.h>
+#include <melee/ft/types.h>
+#include <melee/ft/ftlib.h>
+#include <melee/ft/inlines.h>
 #include <melee/lb/lbvector.h>
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/wobj.h>
@@ -42,6 +47,7 @@ void __assert(char* f,u32 l,char* m) { fprintf(stderr,"assert %s:%u %s\n",f,l,m)
 static void require(int yes) { if(!yes) abort(); }
 static Camera cm_80452C68;
 static HSD_CObj* cm_804D6464;
+static HSD_CObj* current;
 CameraDebugMode cm_80453004;
 StageInfo stage_info;
 HSD_CObjInfo hsdCObj;
@@ -89,6 +95,38 @@ static u8 un_804D6D70[6]={1};
 static int un_804A1EF8[6];
 static HSD_Text* un_804D6D78;
 void HSD_SisLib_803A746C(HSD_Text* t,int i,float x,float y) { (void)t;(void)i;(void)x;(void)y;abort(); }
+/* Model exact owner admission only. Projection, eligibility, edge arithmetic,
+ * and the prepare commit below are actual pinned source bodies. */
+typedef struct Projection {
+ struct Projection* next;
+ Fighter* fp;
+ unsigned char screen[sizeof(S32Vec2)], plan_screen[sizeof(S32Vec2)];
+ unsigned char shadow_retired,plan_flag,plan_ready,flag,selected,listed;
+} Projection;
+static Projection* owners;
+static uint64_t world=17;
+static int private_armed=1,failed,drawing,hud_visible=1,warm_draw_valid,owner_live=1;
+static uint32_t warm_draw_source_frame;
+static int current_projection_owner(const Projection* p){return owner_live&&p==owners;}
+static HSD_GObj* fixture_fighter,*scheduled_main,*scheduled_hud,*scheduled_magnifier;
+static HSD_GObjList entities;
+HSD_GObjList* HSD_GObj_Entities=&entities;
+ifMagnify ifMagnify_804A1DE0;
+enum { PROJECTION_FAILURE_NONE, PROJECTION_FAILURE_FIGHTER_IDENTITY };
+static int refuse(void){failed=1;return 0;}
+static int refuse_with(int reason){(void)reason;return refuse();}
+static int shadow_tuple_failure(const Projection* p){return p!=owners;}
+static Projection* projection_for_fighter(Fighter* fp){return owners->fp==fp?owners:NULL;}
+static int slippi_magnifier_source_hud_visible(void){return hud_visible;}
+static int slippi_particle_source_magnifier_identity(uint64_t w,uint64_t t,HSD_GObj** main,
+ HSD_GObj** hud,HSD_GObj** mag,unsigned* hidden){
+ if(w!=17||t!=29)return 0;
+ *main=scheduled_main;*hud=scheduled_hud;*mag=scheduled_magnifier;*hidden=!hud_visible;
+ return 1;
+}
+HSD_GObj* Player_GetEntity(s32 slot){return slot==0?fixture_fighter:NULL;}
+melee_source_bool Player_GetMoreFlagsBit4(s32 slot){require(slot==0);return 0;}
+static void ftDrawCommon_80080E18(HSD_GObj* gobj,int code){(void)gobj;(void)code;abort();}
 /* ACTUAL_SOURCE */
 
 typedef struct Scene { HSD_CObj main,copy; HSD_WObj eye,interest,copy_eye,copy_interest; Mtx inverse; HSD_GObj owner,tag_owner; HSD_GObjProc proc; HSD_JObj tag,child; u8 slot; } Scene;
@@ -136,6 +174,139 @@ static void equal(Scene* a,Scene* b) {
  require(!memcmp(&a->tag.translate,&b->tag.translate,sizeof(Vec3)));
  require(!memcmp(a->copy.view_mtx,b->copy.view_mtx,sizeof(Mtx))&&!a->copy.proj_mtx&&!b->copy.proj_mtx);
 }
+static int prepare(uint64_t world, uint64_t token, char* error, size_t size) {
+ HSD_GObj* selected=&(HSD_GObj){0};
+ int ok=slippi_camera_source_prepare(world,token,&selected,error,size);
+ require(selected==((ok&&token)?cm_80452C68.gobj:NULL));
+ return ok;
+}
+
+static void compare_subject(Scene* explicit_scene, CmSubject* subject,
+                            int want_write, int want_cull, int want_draw) {
+ const S32Vec2 sentinel={-81234,76543};
+ S32Vec2 expected=sentinel, actual=sentinel;
+ HSD_GObj* reference_owner=cm_80452C68.gobj;
+ HSD_CObj* original_current=HSD_CObjGetCurrent();
+ int wrote=-1,culled=-1,draw=-1;
+ int center_visible=Camera_80030CD8(subject,&expected);
+ int expected_draw=center_visible||Camera_80030CFC(subject,15.0f);
+ HSD_CObj* reference=reference_owner->hsd_obj;
+ Scissor reference_scissor=reference->scissor;
+ reference->scissor=(Scissor){0};
+ require(slippi_camera_source_project_subject(&explicit_scene->main,subject,&actual,
+                                             &wrote,&culled,&draw));
+ reference->scissor=reference_scissor;
+ require(wrote==want_write&&culled==want_cull&&draw==want_draw);
+ require(wrote==(expected.x!=sentinel.x||expected.y!=sentinel.y));
+ require(culled==!center_visible&&draw==expected_draw);
+ require(actual.x==expected.x&&actual.y==expected.y);
+ require(HSD_CObjGetCurrent()==original_current&&cm_80452C68.gobj==reference_owner);
+}
+
+static void check_projection(Scene* ref, Scene* candidate) {
+ CmSubject subject={0};
+ S32Vec2 center;
+ select_scene(ref);
+ current=&ref->copy;
+ subject.bone_pos=ref->interest.pos;
+ ref->main.scissor=(Scissor){.left=0,.right=640,.top=0,.bottom=480};
+ require(Camera_80030CD8(&subject,&center));
+
+ /* The reference camera and SDK current camera are different from the
+  * explicit camera. Compare both paths with identical authored parameters. */
+ candidate->main.scissor=ref->main.scissor;
+ compare_subject(candidate,&subject,1,0,1);
+
+ /* The original uses inclusive left and exclusive right scissor bounds. */
+ ref->main.scissor.left=center.x;
+ candidate->main.scissor=ref->main.scissor;
+ compare_subject(candidate,&subject,1,0,1);
+ ref->main.scissor.left=0;
+ ref->main.scissor.right=center.x;
+ candidate->main.scissor=ref->main.scissor;
+ compare_subject(candidate,&subject,1,1,1); /* tolerance admits the subject */
+
+ subject.bone_pos.x+=1000.0f;
+ compare_subject(candidate,&subject,1,1,0);
+ ref->main.projection_type=candidate->main.projection_type=255;
+ compare_subject(candidate,&subject,0,1,0); /* no projection writes the sentinel */
+ ref->main.projection_type=candidate->main.projection_type=PROJ_PERSPECTIVE;
+ current=NULL;
+}
+
+static void check_warm_arm(void) {
+ Fighter fp={0};
+ Projection owner={.fp=&fp,.listed=1,.flag=1};
+ const S32Vec2 warm={18,39},canonical={8,9};
+ owners=&owner;
+ memcpy(owner.screen,&warm,sizeof(warm));
+ active=0;
+ /* Wrong world, frame, unobserved draw, stale owner, and unlisted owner. */
+ for(int i=0;i<5;++i){
+  private_armed=0;failed=0;warm_draw_valid=i!=2;warm_draw_source_frame=5;
+  owner_live=i!=3;owner.listed=i!=4;
+  fp.x2188=canonical;fp.x221F_b0=0;
+  require(!slippi_fighter_projection_private_arm(i==0?19:17,i==1?6:5));
+  require(!private_armed&&!memcmp(&fp.x2188,&canonical,sizeof(canonical))&&!fp.x221F_b0);
+ }
+ private_armed=0;failed=0;warm_draw_valid=1;owner_live=1;owner.listed=1;
+ require(slippi_fighter_projection_private_arm(17,5));
+ require(private_armed&&!warm_draw_valid&&fp.x221F_b0);
+ require(!memcmp(&fp.x2188,&warm,sizeof(warm)));
+ fp.x2188=canonical;fp.x221F_b0=0;
+ require(!slippi_fighter_projection_private_arm(17,5));
+ require(!memcmp(&fp.x2188,&canonical,sizeof(canonical))&&!fp.x221F_b0);
+ active=1;failed=0;owners=NULL;
+}
+
+static void check_magnifier(Scene* scene) {
+ Fighter fp={0};
+ HSD_GObj fighter={0},hud={0},magnifier={0};
+ CmSubject subject={0};
+ Projection owner={.fp=&fp};
+ select_scene(scene);
+ scene->main.scissor=(Scissor){.left=0,.right=640,.top=0,.bottom=480};
+ cm_80452C68.x398_b0=0;
+ scheduled_main=&scene->owner;scheduled_hud=&hud;scheduled_magnifier=&magnifier;
+ magnifier.hsd_obj=&scene->copy;
+ owners=&owner;fixture_fighter=&fighter;entities.fighters=&fighter;
+ fighter.classifier=HSD_GOBJ_CLASS_FIGHTER;
+ fighter.p_link=8;fighter.user_data_kind=4;fighter.gx_link=5;
+ fighter.user_data=&fp;fighter.render_cb=ftDrawCommon_80080E18;
+ heads[5]=tails[5]=&fighter;gobj_alloc_data.used=2;
+ subject.bone_pos=scene->interest.pos;
+ fp.x890_cameraBox=&subject;fp.x221F_b0=1;
+ fp.x2188=(S32Vec2){1,1};
+ ifMagnifyPlayer* slot=&ifMagnify_804A1DE0.player[0];
+ ifMagnify_804A1DE0.player[1].state.ignore_offscreen=1;
+ ifMagnify_804A1DE0.player[1].state.edge=4;
+ S32Vec2 expected=fp.x2188;
+ require(Camera_80030CD8(&subject,&expected));
+ ifMagnifyPlayer projected=*slot;
+ Vec2 direction={expected.x-320.0f,-((f32)expected.y-240.0f)},edge_position;
+ ifMagnify_802FB73C(&projected,&direction,&edge_position);
+ require(slippi_fighter_projection_source_prepare(17,29,&scene->owner,&hud,&magnifier,0));
+ require(slot->state.is_offscreen&&!fp.x221F_b0&&slot->state.edge==projected.state.edge);
+ require(!memcmp(&fp.x2188,&expected,sizeof(expected)));
+ require(slippi_fighter_projection_source_prepare(17,29,&scene->owner,&hud,&magnifier,0));
+ require(!slot->state.is_offscreen&&slot->state.edge==projected.state.edge);
+
+ /* A callback skipped by the original fighter guard leaves stale screen
+  * coordinates. The arrow still runs from those coordinates. */
+ fp.x221F_b0=1;fp.x221F_b3=1;fp.x2188=(S32Vec2){12,240};
+ require(slippi_fighter_projection_source_prepare(17,29,&scene->owner,&hud,&magnifier,0));
+ require(slot->state.is_offscreen&&slot->state.edge==2&&fp.x2188.x==12&&fp.x221F_b0);
+ fp.invisible=1;
+ require(slippi_fighter_projection_source_prepare(17,29,&scene->owner,&hud,&magnifier,0));
+ require(!slot->state.is_offscreen&&slot->state.edge==2);
+ require(ifMagnify_804A1DE0.player[1].state.ignore_offscreen&&
+         ifMagnify_804A1DE0.player[1].state.edge==4);
+ const ifMagnify before=ifMagnify_804A1DE0;
+ heads[5]=tails[5]=NULL;
+ require(!slippi_fighter_projection_source_prepare(17,29,&scene->owner,&hud,&magnifier,0));
+ require(!memcmp(&before,&ifMagnify_804A1DE0,sizeof(before)));
+}
+
 int main(void) {
  Scene ref,candidate,omitted; char error[256];
  init(&ref);init(&candidate);init(&omitted);
@@ -146,28 +317,31 @@ int main(void) {
  select_scene(&omitted);original_draw_cpu(&omitted);
  for(int tick=1;tick<=3;++tick) {
   inputs(tick);select_scene(&ref);fn_802FCC44(&ref.tag_owner);original_draw_cpu(&ref);
-  select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(slippi_camera_source_prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);original_draw_cpu(&candidate);equal(&ref,&candidate);
+  select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);original_draw_cpu(&candidate);equal(&ref,&candidate);
   select_scene(&omitted);fn_802FCC44(&omitted.tag_owner);
  }
  require(memcmp(&ref.tag.translate,&omitted.tag.translate,sizeof(Vec3))!=0);
+ check_projection(&ref,&candidate);
+ check_warm_arm();
+ check_magnifier(&ref);
  /* Modeled in-place PRE restoration of these typed fixture values, not an
   * aggregate checkpoint test; original warm computation is replayed exactly. */
  init(&ref);init(&candidate);inputs(0);select_scene(&ref);original_draw_cpu(&ref);select_scene(&candidate);original_draw_cpu(&candidate);
  for(int replay=0;replay<2;++replay) {
   for(int tick=1;tick<=3;++tick) {
    inputs(tick);select_scene(&ref);fn_802FCC44(&ref.tag_owner);original_draw_cpu(&ref);
-   select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(slippi_camera_source_prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);
+   select_scene(&candidate);fn_802FCC44(&candidate.tag_owner);require(prepare(17,29,error,sizeof(error)));equal(&ref,&candidate);
   }
   init(&ref);init(&candidate);inputs(0);select_scene(&ref);original_draw_cpu(&ref);select_scene(&candidate);original_draw_cpu(&candidate);
  }
  select_scene(&candidate);Scene before=candidate;
- healthy=0;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));healthy=1;require(!memcmp(&before,&candidate,sizeof(before)));
- require(!slippi_camera_source_prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
- candidate.main.proj_mtx=NULL;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));candidate.main.proj_mtx=&candidate.inverse;
- active=0;candidate.main.proj_mtx=NULL;before=candidate;require(slippi_camera_source_prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));active=1;candidate.main.proj_mtx=&candidate.inverse;
- inputs(1);cm_80452C68.mode=CAMERA_FREE;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));cm_80452C68.mode=CAMERA_STANDARD;
- stage_info.grkind=Gr_Kind_Castle;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));stage_info.grkind=Gr_Kind_Last;
- inverse_live=0;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));inverse_live=1;
- candidate.owner.render_cb=NULL;before=candidate;require(!slippi_camera_source_prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
+ healthy=0;require(!prepare(17,29,error,sizeof(error)));healthy=1;require(!memcmp(&before,&candidate,sizeof(before)));
+ require(!prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
+ candidate.main.proj_mtx=NULL;before=candidate;require(!prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));candidate.main.proj_mtx=&candidate.inverse;
+ active=0;candidate.main.proj_mtx=NULL;before=candidate;require(prepare(17,0,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));active=1;candidate.main.proj_mtx=&candidate.inverse;
+ inputs(1);cm_80452C68.mode=CAMERA_FREE;before=candidate;require(!prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));cm_80452C68.mode=CAMERA_STANDARD;
+ stage_info.grkind=Gr_Kind_Castle;require(!prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));stage_info.grkind=Gr_Kind_Last;
+ inverse_live=0;require(!prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));inverse_live=1;
+ candidate.owner.render_cb=NULL;before=candidate;require(!prepare(17,29,error,sizeof(error)));require(!memcmp(&before,&candidate,sizeof(before)));
  require(!alloc_calls);puts("camera-history actual-source PASS");return 0;
 }

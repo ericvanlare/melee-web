@@ -1746,19 +1746,11 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
             completed_frontier:exit.sample.frame,keyup_before_source_tick:exit.sample.frame});
           proof.full_match_stockouts.cycles.push({stock_before:stockBefore,stock_after:stockAfter,
             loss,platform,exit,grounded});
-          currentWalk=await startWalkAfterGrounded(stockAfter,grounded);
+          currentWalk=await startWalk(stockAfter,grounded);
         }
         proof.full_match_stockouts.final_walkoff={...currentWalk,
           stock_after_third_respawn:1,terminal_entry:'pending-native-terminal-cursor'};
-        return structuredClone(proof.full_match_stockouts);
-      };
-      const startWalkAfterGrounded=async(stock,sample)=>{
-        const key=outwardKey(sample.players[0]);
-        await alpha.page.keyboard.down(key);alpha.keyToRelease=key;
-        await alpha.page.evaluate(value=>
-          globalThis.__meleeRuntimePacedHistory.resumeFullMatchGroundedRespawn(value),stock);
-        return {stock_before:stock,key,first_source_tick:sample.frame,
-          source_pad:[...padForKey(key)]};
+        return null;
       };
       for(const tick of lateTicks){
         const event=stockoutScenario?{target_source_tick:tick}:proof.late_class_piece;

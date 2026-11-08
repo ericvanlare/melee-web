@@ -12,6 +12,7 @@
 #include <exception>
 #include "gameplay_net_input.h"
 #include "gameplay_bootstrap.h"
+#include "slippi_profile/fighter_projection.h"
 
 namespace melee_web {
 namespace {
@@ -98,12 +99,21 @@ std::unique_ptr<RuntimeMatchHistory> RuntimeMatchHistory::capture(
                         "Ordinary match owner refused retained-history PRE admission");
         return {};
     }
-
     std::unique_ptr<RuntimeMatchHistory> result(
         new(std::nothrow) RuntimeMatchHistory(session,boundary,present,audio_step,audio_phase,callback_context));
     if(!result){
         capture_refusal(diagnostic,RuntimeMatchHistoryFailure::Capture,
                         "Runtime history owner allocation returned null");
+        return {};
+    }
+    /* Only the first private arena PRE may seed the rollback-owned camera
+     * carry. Rebase captures at later source frames restore this pair from PRE
+     * and must never adopt the speculative presentation cache. Arming follows
+     * successful owner allocation and precedes the PRE storage copy. */
+    if(arena_mode&&owners.frame==0&&
+       !slippi_fighter_projection_private_arm(owners.world,owners.frame)){
+        capture_refusal(diagnostic,RuntimeMatchHistoryFailure::Capture,
+                        "Private projection carry could not bind the completed warm draw before PRE");
         return {};
     }
     result->owners_=owners;

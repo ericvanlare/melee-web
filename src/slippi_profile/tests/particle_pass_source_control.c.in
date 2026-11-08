@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <melee/if/ifmagnify.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
@@ -311,6 +312,7 @@ int slippi_particle_presentation_interval_end(uint64_t world, uint64_t interval)
 
 void grDisplay_801C5F60(HSD_GObj* gobj, int code)
 { (void) gobj; (void) code; }
+ifMagnify ifMagnify_804A1DE0;
 void ifMagnify_802FBBDC(HSD_GObj* gobj) { (void) gobj; }
 void efLib_Update(HSD_GObj* gobj) { (void) gobj; }
 void efLib_remove_user_data(void* data) { (void) data; }

@@ -581,11 +581,42 @@ static int run_source_control(const char* mode)
  return 0;
 }
 #endif
+/* Model an admitted private owner while using actual draw begin/end. */
+void fixture_enable_private_draw(void);
+static void run_private_canonical_carry(void)
+{
+ Fighter fp={0};HSD_GObj fighter={0};int descriptor=1;
+ init_fixture(&fp,&fighter);
+ identity.world=20;
+ assert(slippi_fighter_projection_world_begin(identity.world));
+ assert(slippi_fighter_projection_created(&fp,&descriptor,sizeof(fp)));
+ assert(slippi_fighter_projection_draw_begin());
+ fp.x2188=(S32Vec2){10,20};fp.x221F_b0=1;
+ assert(slippi_fighter_projection_draw_end());
+ fixture_enable_private_draw();
+ uint64_t token=melee_web_cpu_interval_begin();
+ assert(token);
+ /* Model restored source bytes that differ from the latest draw cache. */
+ fp.x2188=(S32Vec2){30,40};fp.x221F_b0=0;
+ for(int i=0;i<2;++i) {
+  assert(slippi_fighter_projection_draw_begin());
+  assert(fp.x2188.x==30&&fp.x2188.y==40&&!fp.x221F_b0);
+  assert(slippi_fighter_projection_draw_end());
+  assert(fp.x2188.x==30&&fp.x2188.y==40&&!fp.x221F_b0);
+ }
+ assert(slippi_fighter_projection_draw_begin());
+ fp.x2188.x=10;fp.x221F_b0=1;
+ assert(!slippi_fighter_projection_draw_end());
+ assert(fp.x2188.x==30&&fp.x2188.y==40&&!fp.x221F_b0);
+ assert(melee_web_cpu_interval_end(token));
+ assert(slippi_fighter_projection_world_end(identity.world));
+}
 int main(int argc,char** argv)
 {
  Fighter fp={0}; CmSubject subject={0}; HSD_GObj fighter={0};
  assert(!melee_web_cpu_interval_active());
  if(argc>1) {
+  if(strcmp(argv[1],"private-canonical-carry")==0){run_private_canonical_carry();return 0;}
   int handled=run_topology_mode(argv[1]);
 #ifdef MELEE_WEB_FIGHTER_PROJECTION_SOURCE_CONTROLS
   if(!handled)handled=run_source_control(argv[1]);

@@ -67,7 +67,8 @@ class CameraSourcePrepareTests(OwnedWorkspaceTests):
         self.assertEqual(camera.count('void slippi_camera_source_identity('), 1,
                          'composed source must contain exactly one actual camera identity bridge')
         prepared_camera=read('melee/cm/camera.c')
-        for name in ('Camera_8002A4AC','Camera_8002AF68'):
+        for name in ('Camera_8002A4AC','Camera_8002AF68','Camera_80030BBC',
+                     'Camera_80030CD8','Camera_80030CFC'):
             self.assertEqual(extract(camera,name),extract(prepared_camera,name))
         cobj=read('sysdolphin/baselib/cobj.c'); wobj=read('sysdolphin/baselib/wobj.c')
         # Select the actual build's non-MUST_MATCH branches before brace extraction.
@@ -78,13 +79,37 @@ class CameraSourcePrepareTests(OwnedWorkspaceTests):
         pieces=[]
         for name in ['HSD_WObjSetPosition','HSD_WObjGetPosition']:
             pieces.append(extract(wobj,name))
-        for name in ['HSD_CObjSetFlags','HSD_CObjClearFlags','HSD_CObjGetInterestWObj','HSD_CObjGetEyePositionWObj','HSD_CObjGetInterest','HSD_CObjSetInterest','HSD_CObjGetEyePosition','HSD_CObjSetEyePosition','HSD_CObjGetEyeVector','vec_get_x','roll2upvec','HSD_CObjGetUpVector','HSD_CObjMtxIsDirty','get_up_vector_for_viewing_mtx_inner','get_up_vector_for_viewing_mtx','HSD_CObjSetupViewingMtx','HSD_CObjGetInvViewingMtxPtrDirect','HSD_CObjGetViewingMtxPtr','HSD_CObjSetFov','HSD_CObjSetNear','HSD_CObjSetFar','HSD_CObjGetProjectionType']:
+        for name in ['HSD_CObjSetFlags','HSD_CObjClearFlags','HSD_CObjGetInterestWObj','HSD_CObjGetEyePositionWObj','HSD_CObjGetInterest','HSD_CObjSetInterest','HSD_CObjGetEyePosition','HSD_CObjSetEyePosition','HSD_CObjGetEyeVector','vec_get_x','roll2upvec','HSD_CObjGetUpVector','HSD_CObjMtxIsDirty','get_up_vector_for_viewing_mtx_inner','get_up_vector_for_viewing_mtx','HSD_CObjSetupViewingMtx','HSD_CObjGetInvViewingMtxPtrDirect','HSD_CObjGetViewingMtxPtr','HSD_CObjSetFov','HSD_CObjSetNear','HSD_CObjSetFar','HSD_CObjGetProjectionType','HSD_CObjGetScissor','HSD_CObjGetCurrent']:
             pieces.append(extract(cobj,name))
         jobj=read('sysdolphin/baselib/jobj.c')
         pieces += [extract(jobj,name) for name in ['HSD_JObjSetFlags','HSD_JObjClearFlags']]
         for name in ['get_stage_floor_height','Camera_8002AF68','Camera_8002A4AC','Camera_80030A50','slippi_camera_source_identity','slippi_particle_source_main_camera_identity']:
             pieces.append(extract(camera,name))
-        pieces += [extract(gx.read_text(),'GXProject'),extract(vector,'lbVector_WorldToScreen'),extract(nametag,'has_nametag'),extract(nametag,'fn_802FCC44')]
+        pieces.append(extract(gx.read_text(),'GXProject'))
+        for name in ('lbVector_WorldToScreen','lbVector_Diff','lbVector_Normalize',
+                     'lbVector_Add','lbVector_8000E838'):
+            pieces.append(extract(vector,name))
+        for name in ('Camera_80030BBC','Camera_80030CD8','Camera_80030CFC',
+                     'slippi_camera_source_to_screen','slippi_camera_source_subject_visible',
+                     'slippi_camera_source_project_subject'):
+            pieces.append(extract(camera,name))
+        pieces += [extract(nametag,'has_nametag'),extract(nametag,'fn_802FCC44')]
+        magnifier=camera_path.parents[1]/'if/ifmagnify.c'
+        magnifier=read(str(magnifier.relative_to(tree/'src')))
+        ftlib=read('melee/ft/ftlib.c')
+        projection=(ROOT/'src/slippi_profile/fighter_projection.c').read_text()
+        for name in ('ftLib_80086B64','ftLib_80086ED0'):
+            pieces.append(extract(ftlib,name))
+        pieces.append(extract(magnifier,'ifMagnify_802FB73C'))
+        for name in ('slippi_camera_source_fighter_pass_enabled','fighter_gx_member',
+                     'slippi_fighter_projection_source_prepare',
+                     'slippi_fighter_projection_private_arm'):
+            body=extract(camera if name.startswith('slippi_camera_') else projection,name)
+            if name=='slippi_fighter_projection_private_arm':
+                body=('#define current(p) current_projection_owner(p)\n'+body+
+                      '\n#undef current')
+            pieces.append(body)
+
         template=(ROOT/'src/slippi_profile/tests/camera_source_prepare_control.c.in').read_text()
         source=work/'control.c'; source.write_text(template.replace('/* ACTUAL_SOURCE */','\n\n'.join(pieces)))
         common=['-O2','-std=gnu11','-ffp-contract=off','-DTARGET_PC','-DMELEE_WEB_GAMEPLAY=1','-DMELEE_WEB_CPU_INTERVAL_ENABLED=1','-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1','-ffunction-sections','-fdata-sections', '-I'+str(ROOT/'src'), '-I'+str(prepared), '-I'+str(ROOT/'.deps/aurora/include'), '-I'+str(ROOT/'.deps/melee/extern/dolphin/include'), '-include',ROOT/'src/gameplay_compat.h']
@@ -93,7 +118,7 @@ class CameraSourcePrepareTests(OwnedWorkspaceTests):
         result=run('execute',[node_runtime(),output])
         self.assertIn('camera-history actual-source PASS',result.stdout)
         disabled=work/'disabled.c'
-        disabled.write_text('#include "slippi_profile/camera_source_prepare.h"\nint main(void) { return !slippi_camera_source_prepare(0,1,0,0); }\n')
+        disabled.write_text('#include "slippi_profile/camera_source_prepare.h"\nint main(void) { return !slippi_camera_source_prepare(0,1,0,0,0); }\n')
         off=[x for x in common if x!='-DMELEE_WEB_SLIPPI_PARTICLE_PRESENTATION_CACHE=1']
         run('disabled-compile',[emcc,*off,disabled,'-sENVIRONMENT=node','-sEXIT_RUNTIME=1','-sWASM_ASYNC_COMPILATION=0','-o',work/'disabled.js'])
         run('disabled-execute',[node_runtime(),work/'disabled.js'])

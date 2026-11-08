@@ -109,6 +109,7 @@ struct HSD_GObj {
  void *hsd_obj, *user_data; void (*user_data_remove_func)(void*);
 };
 #define HSD_GOBJ_CLASS_EFFECT 8
+#define HSD_GOBJ_CLASS_UI 0xE
 #define HSD_GOBJ_CLASS_CAMERA 0x13
 #define HSD_GOBJ_OBJ_NONE 255
 #define HSD_GOBJ_USER_DATA_NONE 255
@@ -225,6 +226,9 @@ void grDisplay_801C5F60(HSD_GObj*, int);
     "melee/if/ifmagnify.h": r'''#ifndef FIXTURE_IFMAGNIFY_H
 #define FIXTURE_IFMAGNIFY_H
 #include <sysdolphin/baselib/gobj.h>
+typedef struct { HSD_GObj* gobj; void* jobj; void* idesc; } ifMagnifyPlayer;
+typedef struct { ifMagnifyPlayer player[6]; } ifMagnify;
+extern ifMagnify ifMagnify_804A1DE0;
 void ifMagnify_802FBBDC(HSD_GObj*);
 void ifMagnify_802FB8C0(HSD_GObj*, int);
 #endif

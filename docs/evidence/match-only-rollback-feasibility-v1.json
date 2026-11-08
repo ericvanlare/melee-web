@@ -15029,7 +15029,7 @@
             },
             "issue_373_complete_match_v1": {
               "issue": 373,
-              "status": "first-public-attempt-retained; reduced network-wait repair in progress",
+              "status": "second-public-attempt retained; remote wait repair works in observed interval; first magnifier draw-state drift under source reduction",
               "scope": "Experimental private profile functional attempt; no full-match/public rollback success or complete profile/acceptance claim.",
               "producer": {
                 "native": "ba55fca8d3250e900ca8b81443f3e7ab062cbcdf",
@@ -15160,9 +15160,120 @@
                   },
                   "cleanup": "Native peers closed; outer owner cleanup passes;20 recorded browser PIDs absent; original server/capture groups retired.",
                   "h1_scope": "Native clock journal retained; no existing-recorder timing incident was projected. Do not call missing H1 projection an H1 pass."
+                },
+                {
+                  "run": "runtime-peer-complete-match-public-v2",
+                  "native_producer": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                  "harness_producer": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                  "summary": {
+                    "path": "runtime-peer-complete-match-public-v2/result-summary.json",
+                    "sha256": "14dc48ec89a8ccef38d39c801ea1863aba24e99368951d7cf5424b03186a4703"
+                  },
+                  "browser": {
+                    "path": "runtime-peer-complete-match-public-v2/browser/result.json",
+                    "sha256": "71aaa8ac8655f9c0f2d14e3ac5d8ead2d854dfdb8385d39b0160a9f6d74aee9a"
+                  },
+                  "owner": {
+                    "path": "runtime-peer-complete-match-public-v2/owner.json",
+                    "sha256": "1a3a8aa097b108d690b585aeec0acd31e0b9cf5b4276009ac2718471c04f0d4a"
+                  },
+                  "review": {
+                    "path": "runtime-peer-complete-match-public-v2/independent-result-review.json",
+                    "sha256": "58a00b4b2166d8c2a75cc7d4a53329581b521b824f875dce1853b25eb5d39fa2"
+                  },
+                  "result": "FAIL",
+                  "first_failure": "beta PRE133 toF140 dirtyinput139; strict statics-close row2919 address0x004d1e08 byte32 sealed0d live0c. Catalog binds ifMagnify_804A1DE0; player0 is_offscreen bit clears during source draw. Alpha later times out awaiting input140 atF147.",
+                  "observed": {
+                    "alpha_polls": 147,
+                    "beta_polls": 140,
+                    "alpha_completed_correction": [
+                      21,
+                      28,
+                      26
+                    ],
+                    "beta_completed_correction": [
+                      28,
+                      35,
+                      28
+                    ],
+                    "beta_failing_correction": [
+                      133,
+                      140,
+                      139
+                    ],
+                    "alpha_stock_loss_sample": 139,
+                    "native_clock_stalls": 0,
+                    "max_debt_ticks": {
+                      "alpha": 7.1183,
+                      "beta": 6.6211
+                    },
+                    "completed_native_wait_pairs": 48,
+                    "exact_debt_unchanged_for_all_pairs": true,
+                    "excluded_wait_ms": {
+                      "alpha": 236.24499988555908,
+                      "beta": 245.83999967575073
+                    },
+                    "unmatched_alpha_wait_begin": {
+                      "source_frame": 147,
+                      "input_ordinal": 140,
+                      "not_booked_as_excluded": true
+                    },
+                    "input_delay_policy": {
+                      "gameplay_input_delay_ticks": 0,
+                      "protocol_preroll_frames": 2,
+                      "scope": "Two protocol-only neutral envelope frames are not consumed as game input; actual native local PAD is used at its same gameplay ordinal. Seven-tick prediction bound unchanged."
+                    }
+                  },
+                  "cleanup": "Owner cleanup passes;19 recorded browser PIDs absent; source/archive/provider/surface pins unchanged.",
+                  "scope": "Observed early public corrections and source-time network backpressure; no complete-match/Results/profile/performance acceptance."
                 }
               ],
-              "next": "Validated exact remote-input waits preserve already accrued fractional debt and use unchanged guards; correct initial walk/late-frontier driver ordering. Review and focused controls before another bounded run. No padding, reset, deadline/cap increase or implicit resume."
+              "next": "Reduce exact magnifier packed-state writer and all remaining readers before a bounded repair. Keep complete source row in strict comparisons; no sealed-byte recopy, exclusion, arithmetic/input/RNG/order/guard/cap change. The separate stock-cycle-success return defect is source-fixed but was not reached by v2.",
+              "network_wait_repair": {
+                "source_head": "7ab14a6bea15621f805b5eedfb8aab8190da1a80",
+                "source_review": {
+                  "path": "runtime373-integrated-source-review-v2.json",
+                  "sha256": "89cf6f406ae23ca580abebf30bdebce2cfa924ddced112cfd4e7fde88873256b"
+                },
+                "native_focused": {
+                  "path": "runtime373-network-wait-focused-v1/independent-review.json",
+                  "sha256": "6b9471241bd8ff3c5dfbbcd891da06965a58c5747babd4da284f6e81ab250cab"
+                },
+                "host_focused": {
+                  "path": "runtime373-network-wait-host-v1/freeze.json",
+                  "sha256": "ac495465762f94dcddf9e81d961c500886d22fcb9a7e5cc097cf0fb618fc42fb"
+                },
+                "private_build": {
+                  "path": "runtime373-complete-match-build-v2/result.json",
+                  "sha256": "e5e05bfd43850a229b48ce16aa572601e98debbd794c5b5473f5e51eb42e32d0"
+                },
+                "retained_fixture_failures": [
+                  "work/runtime-match-history-pacing-humgig1g",
+                  "work/runtime-match-history-pacing-ni2f1ifi"
+                ]
+              },
+              "stock_driver_repair": {
+                "review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-stock-driver-review-v1/review.json",
+                "review_sha256": "2d04865d88490e49d1135ae9b642ca4ee83ec6136ad15b0fb69b4aa72398c3d1",
+                "result": "PASS focused actual-function orchestration control; full public gameplay pending",
+                "scope": "Mock gates verify three-cycle helper scope, key/resume sequence, null success and refusal guards. No gameplay state generated."
+              },
+              "magnifier_partial_retained": {
+                "path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-partial-luna-v1/freeze.json",
+                "sha256": "935ed6966740f97a159378b07e274c9ee6977b19c08c96f7fd97a215582d6135",
+                "result": "PARTIAL_NOT_BUILDABLE_TRANSFER_TO_SOL",
+                "failure": "Corrupt source overlay at line2976; no canonical source or tests from this candidate. Exact nine source files and original corrupt patch preserved.",
+                "next": "Escalated minimal composition/authentication repair and actual-source focused controls before build or capture."
+              },
+              "magnifier_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-handoff-v3/freeze.json",
+                "freeze_sha256": "ffac61137d14c52ac8fe0c62e3eaa80ae15d45f8dc310d1e47666eb85618d97e",
+                "runtime_focused_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-magnifier-runtime-focused-v1/result.json",
+                "runtime_focused_sha256": "ec73ab98d99cb0608f051e9c0f381ca589be281d093bf6e258d7c3a7d6ad1680",
+                "checks": "Four focused source controls; seven affected actual compile-command syntax; 21 runtime-history controls PASS. No new build/capture yet.",
+                "scope": "Private owner source-order repair. Modeled ownership fixtures are not live whole-session evidence. Full magnifier row retained; no game arithmetic, source input, RNG, history/cap/timing guard change.",
+                "next": "Clean private Release build/archive/catalog and one bounded public complete-match capture."
+              }
             }
           }
         }
