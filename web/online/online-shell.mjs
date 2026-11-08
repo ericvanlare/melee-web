@@ -19,8 +19,10 @@ window.addEventListener('keyup',event=>heldKeys.delete(event.code),true);
 window.addEventListener('blur',()=>heldKeys.clear(),true);
 let player,context,state,controller,setup,bridge,loop,prepareWork,loopWork,closed=false,roomUsed=false,discReady=false;
 let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,nativeRetired=false,userLeave=false;
+let startCommitted=false;
 const report={schema:'melee-web-staging-rollback-session-v1',result:'pending',failure:null,
-  scope:'experimental Mario/FD match-only rollback; no full-profile or timing acceptance'};
+  scope:'experimental Mario/FD match-only rollback; no full-profile or timing acceptance',
+  sourceBoundaryFailures:[]};
 function error(error){
   const message=String(error?.message??error);$('error').textContent=message;$('error').hidden=false;
   report.failure??=message;report.result='FAIL';
@@ -149,8 +151,11 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
     }
     return snapshot;
   };
-  if(!controller||(!historyOwned&&!nativeRetired&&state?.requiresReload))return supplement(structuredClone({
-    role,roomId:report.roomId,stage:closed?'closed':report.failure?'failed':'loading',
+  // Once the agreed start is committed, takeover may cancel the ordinary
+  // callback queue before a newly queued read runs. Observe this transition in
+  // JavaScript only; the typed history owner resumes native reads below.
+  if(!controller||(!historyOwned&&!nativeRetired&&(state?.requiresReload||startCommitted)))return supplement(structuredClone({
+    role,roomId:report.roomId,stage:closed?'closed':report.failure?'failed':roomUsed?'starting':'loading',
     error:report.failure,phase:null,running:null,owner:null,result:report.result,
     closed:!!report.closed,
   }));
@@ -222,7 +227,10 @@ async function openRoom(nextRole,roomId){
         return controller.startOffer(hostIdentity);
       },
       agreement:seed=>controller.startAgreement(seed,hostIdentity),
-      commit:(seed,agreement)=>controller.startCommit(seed,agreement,hostIdentity),
+      commit:(seed,agreement)=>{
+        startCommitted=true;
+        return controller.startCommit(seed,agreement,hostIdentity);
+      },
       async held({signal}){
         await until(()=>controller.startState()===5&&!controller.status().gpuPending,{signal});
         held={identity:controller.startLiveIdentity(),prefix:controller.startPrefix(),
@@ -270,6 +278,7 @@ async function openRoom(nextRole,roomId){
     throw Error(result.failure?.message||'Rollback session stopped.');
   }
   historyOwned=false;
+  startCommitted=false;
   report.result='MATCH_FINAL_COMPLETE';
   await bridge.close();
   status('Match confirmed. Continue through the original Results screen.');
@@ -307,6 +316,11 @@ if(invite&&/^[A-Za-z0-9_-]{24,64}$/.test(invite))$('room-code').value=invite;
 try{
   const loaded=await loadPackage();packageInfo=loaded.manifest;table=loaded.linked;report.producer=packageInfo;
   player=await mountMeleeRuntime({canvas:$('canvas'),onState:render,onError:error,
+    onLog:(text,isError)=>{
+      if(isError&&text.startsWith('MATCH_HISTORY_SOURCE_BOUNDARY_REFUSED ')&&
+          report.sourceBoundaryFailures.length<8)
+        report.sourceBoundaryFailures.push({at:performance.now(),text:text.slice(0,512)});
+    },
     onOwner:owner=>{context=owner;player=owner.handle;},createAudio:createRuntimeAudio,
     readDisc:loadNativeGameDisc,openDisc:openNativeGameSession,
     stagingDiagnosticsOrigin:'https://webmelee-staging.pages.dev',

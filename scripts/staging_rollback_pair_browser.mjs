@@ -23,15 +23,17 @@ const {values} = parseArgs({options: {
   output: {type: 'string'},
   playwright: {type: 'string'},
   'start-only': {type: 'boolean', default: false},
+  'source-idle-probe': {type: 'boolean', default: false},
   'timeout-ms': {type: 'string', default: '300000'},
 }, strict: true});
 const root = values['served-root'] ? path.resolve(values['served-root']) : null;
 const output = values.output ? path.resolve(values.output) : null;
 const disc = values.disc || process.env.MELEE_DISC_IMAGE || null;
 const timeoutMs = Number(values['timeout-ms']);
-if (!root || !disc || !output || !values['start-only'] ||
+const idleProbe = values['source-idle-probe'];
+if (!root || !disc || !output || values['start-only'] === idleProbe ||
     !Number.isSafeInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 300000)
-  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs --start-only --served-root <immutable-staging-package> --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
+  throw Error('Usage: node scripts/staging_rollback_pair_browser.mjs (--start-only | --source-idle-probe) --served-root <immutable-staging-package> --disc <local-iso> --output <new-external-dir> [--playwright <installed-package-dir>] [--timeout-ms 300000]');
 
 const SERVER_HOST = '127.0.0.1';
 const SERVER_PORT = 8787;
@@ -60,9 +62,10 @@ const mediaTypes = new Map([
 
 const report = {
   schema: 'melee-web-staging-rollback-pair-start-only-v1',
-  scope: 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 keyboard pulse; UI Leave; no full-match, correction, timing, or acceptance claim',
+  mode: idleProbe ? 'source-idle-probe' : 'start-only',
+  scope: idleProbe ? 'two actual online pages; no gameplay key injection through source frame 320 or first failure; source-file boundary reducer; no full-match, correction, timing, or acceptance claim' : 'two real online staging pages; original CSS/SSS; page-owned match agreement and rollback start; one actual P2 keyboard pulse; UI Leave; no full-match, correction, timing, or acceptance claim',
   result: 'not_started',
-  hypothesis: 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
+  hypothesis: idleProbe ? 'Retain the first native source-file refusal through frame 320 without gameplay key injection and with a nonblocking observation across takeover.' : 'Two independently loaded staging pages can reach the original agreed Mario/FD match, consume one actual local P2 input, and leave through the page-owned cleanup path.',
   producer: null,
   disc: null,
   relay: {owner: 'existing deployed staging relay selected by the online page', harness_owned: false},
@@ -614,19 +617,27 @@ async function main() {
   await settlePair(pages.map(waitForLiveMatch));
   report.checks.push('Page-owned negotiation reached the same original four-stock Mario/Final Destination rollback session on both roles.');
 
-  const pulseBaseline = await settlePair(pages.map(item =>
-    readSnapshot(item, false, {label: 'P2 pre-pulse source frame baseline'})));
-  for (const [index, item] of pages.entries()) {
-    const frame = frameOf(pulseBaseline[index]);
-    assert(Number.isSafeInteger(frame), `${item.role} lacked a source frame before P2 pulse`);
-    item.source.live.frameBeforePulse = frame;
+  if (idleProbe) {
+    const observations = await settlePair(pages.map(item => waitSnapshot(item,
+      value => value.stage === 'playing' && frameOf(value) >= 320,
+      'source-file boundary through frame 320', {timeoutMs: 15000})));
+    for (const [index, item] of pages.entries()) item.source.idleProbe = {frame: frameOf(observations[index])};
+    report.checks.push('Both page-owned loops reached source frame 320 without gameplay key injection and with no source boundary failure.');
+  } else {
+    const pulseBaseline = await settlePair(pages.map(item =>
+      readSnapshot(item, false, {label: 'P2 pre-pulse source frame baseline'})));
+    for (const [index, item] of pages.entries()) {
+      const frame = frameOf(pulseBaseline[index]);
+      assert(Number.isSafeInteger(frame), `${item.role} lacked a source frame before P2 pulse`);
+      item.source.live.frameBeforePulse = frame;
+    }
+    await sendP2Pulse(beta);
+    const progressed = await settlePair(pages.map((item, index) =>
+      waitForProgress(item, frameOf(pulseBaseline[index]))));
+    report.pages.alpha.source.live.frameAfterPulse = frameOf(progressed[0]);
+    report.pages.beta.source.live.frameAfterPulse = frameOf(progressed[1]);
+    report.checks.push('Beta P2 ArrowRight was observed in a real native keyboard input poll; both page-owned loops progressed across the pulse interval.');
   }
-  await sendP2Pulse(beta);
-  const progressed = await settlePair(pages.map((item, index) =>
-    waitForProgress(item, frameOf(pulseBaseline[index]))));
-  report.pages.alpha.source.live.frameAfterPulse = frameOf(progressed[0]);
-  report.pages.beta.source.live.frameAfterPulse = frameOf(progressed[1]);
-  report.checks.push('Beta P2 ArrowRight was observed in a real native keyboard input poll; both page-owned loops progressed across the pulse interval.');
 
   for (const item of pages) {
     assert.deepEqual(item.websockets, [RELAY_ORIGIN], `${item.role} did not use the expected staging relay`);
@@ -650,7 +661,7 @@ async function main() {
     assert.deepEqual(alphaStart[field], betaStart[field], `Page-owned ${field} receipts differ`);
   }
   assert.deepEqual(pages.flatMap(item => item.errors), [], 'One or both online pages reported browser/network errors');
-  report.result = 'START_ONLY_PASS';
+  report.result = idleProbe ? 'IDLE_320_PASS' : 'START_ONLY_PASS';
 }
 
 try {
