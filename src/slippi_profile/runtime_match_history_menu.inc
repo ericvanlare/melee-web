@@ -759,8 +759,15 @@ bool history_start_ordinary_callback_impl() {
    check(melee_web_menu_host_online_compose(host,start.lobby_characters,start.lobby_costumes,
                                             start.lobby_stage,error,sizeof(error)),error);
    start.lobby_css_held=false;
-   if(guest)advance();
-   else begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Stages,MenuRouteEntry::Session);
+   if(guest){
+    // This goes directly from closed CSS to READY, so it must end CSS audio
+    // continuation just as the original SSS-to-READY preparation does.
+    transition_audio_continues=false;
+    audio_clock.reset();
+    EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),false);},
+           message.c_str());
+    advance();
+   }else begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Stages,MenuRouteEntry::Session);
   }catch(const std::exception& error){history_refuse(error.what());}
   return true;
  }
