@@ -1500,10 +1500,15 @@ int main(){
         helper_end = menu.index('\n}\n\nextern "C" {', helper_start) + 2
         getter_start = menu.index('unsigned melee_web_native_menu_match_history_terminal_receipt_bytes()', helper_end)
         getter_end = menu.index('const char* melee_web_native_menu_match_history_terminal_tail_json()', getter_start)
-        exports = menu[helper_start:helper_end] + '\n' + menu[getter_start:getter_end]
-        fixture = r'''#include <cassert>
+        tail_end = menu.index('unsigned melee_web_native_menu_match_history_terminal_tail_ticket_bytes()', getter_end)
+        exports = menu[helper_start:helper_end] + '\n' + menu[getter_start:tail_end]
+        fixture = r'''#include <array>
+#include <cassert>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 namespace melee_web {
+@PHASE@
 struct RuntimeMatchHistoryTerminalReceipt {
  std::uint32_t schema=1,bytes=104,flags{},incarnation{};
  std::uint32_t pre_source_frame{},selected_source_frame{},pre_ordinal{},selected_ordinal{};
@@ -1514,6 +1519,7 @@ struct RuntimeMatchHistoryTerminalReceipt {
 };
 static_assert(sizeof(RuntimeMatchHistoryTerminalReceipt)==104);
 }
+using Phase=melee_web::RuntimeMatchHistoryPhase;
 enum { PAD_MAX_CONTROLLERS=4 };
 struct HistoryStatus {
  unsigned owner_state=1,first_failure{},pending_command{},last_completed_command=20;
@@ -1521,13 +1527,24 @@ struct HistoryStatus {
 };
 struct Capsule {
  unsigned current=11;unsigned source_writes{};
+ Phase state=Phase::TerminalTailReady;
+ Phase phase()const noexcept{return state;}
+ unsigned terminal_tail_source_frame()const noexcept{return current;}
+ unsigned terminal_tail_consumed_ordinal()const noexcept{return 13;}
+ unsigned terminal_tail_completed_tick()const noexcept{return 103;}
+ unsigned terminal_tail_suffix_count()const noexcept{return 0;}
+ unsigned terminal_tail_suffix_cursor()const noexcept{return 0;}
+ struct Cursor {struct {unsigned world_generation=7,context_epoch=9;} owner;};
+ Cursor terminal_cursor()const noexcept{return {};}
  melee_web::RuntimeMatchHistoryTerminalReceipt receipt{};
  unsigned current_frame()const noexcept{return current;}
  melee_web::RuntimeMatchHistoryTerminalReceipt terminal_receipt()const noexcept{return receipt;}
 };
 struct MatchHistoryControl {
  HistoryStatus status{};Capsule* capsule{};bool dispatching{};void* match_owner{};
- bool episode_enabled=true,arena_enabled=true;
+ bool episode_enabled=true,arena_enabled=true,terminal_tail_handoff_ready=false;
+ unsigned presentation_command=29,presentation_request_sequence=87;
+ std::array<char,2048> terminal_tail_json{};
  melee_web::RuntimeMatchHistoryTerminalReceipt terminal_receipt{};
 };
 struct MatchHandle {void* value{};explicit operator bool()const{return value!=nullptr;}void* get()const{return value;}
@@ -1565,6 +1582,29 @@ int main(){
  const auto* selected=melee_web_native_menu_match_history_terminal_receipt_data();
  assert(selected&&selected->flags==3&&selected->first_ordinal==13&&selected->selected_ordinal==12);
  assert(selected->selected_source_frame==11&&selected->ticket_id==101&&selected->poll_serial==1001);
+ auto& c=match_history;
+ const auto descriptor=melee_web_native_menu_match_history_terminal_tail_json;
+ c.status.last_completed_command=5;
+ assert(!descriptor());
+ c.terminal_tail_handoff_ready=true;
+ const auto* text=descriptor();
+ assert(text&&std::strstr(text,"\"completedTick\":\"103\"")&&
+        std::strstr(text,"\"sourceFrame\":11")&&
+        std::strstr(text,"\"consumedOrdinal\":13"));
+ capsule.state=Phase::TerminalTailPresented;assert(descriptor());
+ capsule.state=Phase::TerminalTailPresentPending;assert(!descriptor());
+ capsule.state=Phase::TerminalTailReady;
+ c.presentation_request_sequence=86;assert(!descriptor());
+ c.presentation_request_sequence=87;c.presentation_command=19;assert(!descriptor());
+ c.presentation_command=29;
+ c.status.last_completed_command=26;assert(descriptor());
+ c.status.last_completed_command=27;assert(!descriptor());
+ capsule.state=Phase::TerminalTailTicketed;assert(descriptor());
+ c.status.last_completed_command=28;capsule.state=Phase::TerminalTailForwarded;assert(descriptor());
+ c.status.last_completed_command=29;capsule.state=Phase::TerminalTailPresentPending;
+ assert(!descriptor());c.presentation_request_sequence=88;assert(descriptor());
+ c.status.last_completed_command=30;assert(!descriptor());
+ c.status.last_completed_command=20;c.terminal_tail_handoff_ready=false;
  auto saved=match_history.status;
  match_history.status.pending_command=1;expect_refused();match_history.status=saved;
  match_history.dispatching=true;expect_refused();match_history.dispatching=false;
@@ -1580,7 +1620,7 @@ int main(){
  capsule.receipt.flags=2;expect_refused();capsule.receipt.flags=0;expect_refused();
  capsule.receipt.flags=4;expect_refused();
 }
-'''.replace('@EXPORTS@', exports)
+'''.replace('@EXPORTS@', exports).replace('@PHASE@', native_enum('RuntimeMatchHistoryPhase'))
         source = self.work / 'terminal-receipt-export.cpp'
         binary = self.work / 'terminal-receipt-export'
         source.write_text(fixture)

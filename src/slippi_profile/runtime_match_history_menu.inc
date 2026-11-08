@@ -2374,7 +2374,22 @@ const char* melee_web_native_menu_match_history_terminal_tail_json(){
     !c.terminal_tail_handoff_ready||!c.capsule||!history_start_export_idle()||
     c.status.pending_command||c.status.complete_seq!=c.status.request_seq||
     !match||match.get()!=c.match_owner||
-    c.status.last_completed_command<26||c.capsule->terminal_tail_source_frame()!=match->source_frames())
+    c.capsule->terminal_tail_source_frame()!=match->source_frames())
+  return nullptr;
+ using Phase=melee_web::RuntimeMatchHistoryPhase;
+ const auto phase=c.capsule->phase();
+ const auto command=c.status.last_completed_command;
+ const bool present_bound=c.presentation_command==29&&c.presentation_request_sequence!=0;
+ const bool idle_completed=command==5&&present_bound&&
+     c.presentation_request_sequence!=UINT32_MAX&&
+     c.presentation_request_sequence+1u==c.status.request_seq&&
+     (phase==Phase::TerminalTailReady||phase==Phase::TerminalTailPresented);
+ if(!idle_completed&&
+    !(command==26&&phase==Phase::TerminalTailReady)&&
+    !(command==27&&phase==Phase::TerminalTailTicketed)&&
+    !(command==28&&phase==Phase::TerminalTailForwarded)&&
+    !(command==29&&phase==Phase::TerminalTailPresentPending&&present_bound&&
+      c.presentation_request_sequence==c.status.request_seq))
   return nullptr;
  const auto receipt=c.capsule->terminal_receipt();
  const auto owner=c.capsule->terminal_cursor().owner;

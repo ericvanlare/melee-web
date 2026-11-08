@@ -15273,6 +15273,26 @@
                 "checks": "Four focused source controls; seven affected actual compile-command syntax; 21 runtime-history controls PASS. No new build/capture yet.",
                 "scope": "Private owner source-order repair. Modeled ownership fixtures are not live whole-session evidence. Full magnifier row retained; no game arithmetic, source input, RNG, history/cap/timing guard change.",
                 "next": "Clean private Release build/archive/catalog and one bounded public complete-match capture."
+              },
+              "public_v3": {
+                "source_head": "3abed173ae73d000842646ff7995e292d371a28e",
+                "result": "FAIL terminal-tail descriptor after successful first tail idle; magnifier boundary and three stock/respawn cycles traversed",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v3/result-summary.json",
+                "summary_sha256": "db718e92054099e48da96859651864f92488d09fd74cbce29d5c0b037d00a483",
+                "raw_report_sha256": "3667dc2deb78241d227932b6dc50aa4ec6d66c06e8b081fc8878d3c899fba3aa",
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 21,
+                "polls_each": 1125,
+                "source_frame_at_refusal": 1123,
+                "source_failure": "Descriptor numeric command guard rejected normal idle5 after tail presentation29; both native owners had failure0.",
+                "scope": "No final outcome/wire checksum/Results completion; exact raw review will accompany next boundary."
+              },
+              "terminal_descriptor_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-terminal-descriptor-repair-v1/freeze.json",
+                "freeze_sha256": "b8ea77cdbe4d0e88b0d36cd23abfc3bfad91377d06a87585bb6964fecdc94fda",
+                "focused_result": "1 passed",
+                "scope": "Exact terminal-tail read-only descriptor phase-command admission. No build or browser rerun.",
+                "next": "Clean producer and one bounded v4 public full match"
               }
             }
           }
