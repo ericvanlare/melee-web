@@ -245,6 +245,13 @@ const diagnosticModuleBodies=new Map([
   [diagnosticBindings[4].url,lockstepCoreBytes],[diagnosticBindings[5].url,websocketRelayBytes],
   [diagnosticBindings[6].url,timelineBytes],
 ]);
+for(const file of ['src/slippi_profile/runtime_match_session_bridge.mjs',
+  ...(paced?['src/slippi_profile/runtime_match_session_loop.mjs']:[])]){
+  const bytes=await fs.readFile(path.join(ROOT,file));
+  const url=new URL('/__melee_diag__/'+file,baseUrl).href;
+  diagnosticBindings.push({url,checkout_path:file,sha256:sha256(bytes)});
+  diagnosticModuleBodies.set(url,bytes);
+}
 const diagnosticImportResolutions=[];
 if(paced){
   const file='src/slippi_profile/tests/runtime_paced_history_probe.mjs';

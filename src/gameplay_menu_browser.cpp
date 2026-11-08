@@ -2003,7 +2003,11 @@ unsigned reference_menu_preparations=0;
 bool replay_match_complete=false;
 int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+int configured_save_mode=MELEE_WEB_SAVE_MODE_FRESH_ONLINE;
+#else
 int configured_save_mode=MELEE_WEB_SAVE_MODE_EVERYTHING;
+#endif
 std::vector<uint8_t> configured_save_profile;
 // The owner that is running right now, expressed in the recipe's scene codes.
 // Zero means the host is between scenes and cannot consume a replay sample.

@@ -10,6 +10,9 @@ import {createRuntimeMatchHistoryController,decodeRuntimeMatchHistoryStatus,
   validateRuntimeMatchStartPrefix} from '../runtime_match_history_controller.mjs';
 
 const prefix='_melee_web_native_menu_match_history_';
+const diagnosticExports=['remote_pad','input','input_bytes','cpu_endpoint_begin','cpu_endpoint_record',
+  'cpu_endpoint_data','cpu_endpoint_bytes','cpu_endpoint_end','motor_data','motor_bytes',
+  'motor_commit_data','motor_commit_bytes','pcm_data','pcm_bytes'];
 const HOST_FIELDS=['runtime_sha256','asset_identity_sha256','save_profile_sha256','profile_identity'];
 const DEFAULT_PUBLICATION={schema:2,bytes:48,state:5,sourceFrame:0,sourceDraws:3,
   padPolicy:1,firstUsePending:0,reserved:0,
@@ -1113,10 +1116,99 @@ function inlineFixture(options){
   f.module[prefix+'cpu_arena_endpoint_bytes']=()=>144;
   let enableCalls=0;
   f.module[prefix+'inline_dispatch_enable']=()=>{enableCalls++;return 1;};
+  if(options?.mode==='staging'){
+    for(const name of diagnosticExports)delete f.module[prefix+name];
+    delete f.module[prefix+'cpu_arena_endpoint_data'];
+    delete f.module[prefix+'cpu_arena_endpoint_bytes'];
+  }
   const owner=createRuntimeMatchHistoryController(f.module,options);
   owner.takeOver({sourceFrame:0,localPort:0,remotePort:1});
   return {...f,owner,inlineEnableCalls:()=>enableCalls};
 }
+
+test('staging controller needs typed admission and PAD validation but exposes no diagnostic collectors',async()=>{
+  const f=inlineFixture({mode:'staging'}),{owner,module}=f;
+  assert.equal(owner.mode,'staging');
+  for(const name of ['input','remotePad','endpoint','motor','motorCommit','pcm'])
+    assert.equal(owner[name],undefined,`staging mode omits ${name}`);
+  assert.equal(typeof owner.admitEndpoint,'function');
+  assert.equal(typeof owner.validatePad,'function');
+  assert.equal(module[prefix+'cpu_arena_endpoint_data'],undefined,
+    'typed staging mode does not require the diagnostic arena endpoint data export');
+  assert.equal(module[prefix+'cpu_arena_endpoint_bytes'],undefined,
+    'typed staging mode does not require the diagnostic arena endpoint size export');
+  const pad=Uint8Array.from([4,0,127,128,0,0,20,0,30,0,0]);
+  assert.equal(owner.validatePad(pad),true,'the actual native PAD predicate remains available');
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();
+  await owner.command('capture');f.put(56,1);
+  let calls=0;
+  module[prefix+'cpu_endpoint_admit']=(view,provenance)=>{
+    calls++;assert.deepEqual([view,provenance],[1,1]);f.put(56,2);f.put(84,1);return 0;
+  };
+  module[prefix+'cpu_endpoint_begin']=()=>assert.fail('staging must not use split raw endpoint collection');
+  const admitted=owner.admitEndpoint({view:1,provenance:1});
+  assert.equal(calls,1);
+  assert.equal(admitted.rawRowsPublished,false);
+  assert.deepEqual(owner.journalRetention().commands,{retained:1,dropped:0,limit:256});
+});
+
+test('staging controller refuses a missing native PAD validator and invalid mode',()=>{
+  const f=inlineFixture({mode:'staging'});
+  assert.throws(()=>createRuntimeMatchHistoryController(f.module,{mode:'telemetry'}),/mode must be diagnostic or staging/);
+  for(const remove of ['_melee_web_net_validate_pad',prefix+'cpu_endpoint_admit']){
+    const module=fixture().module;
+    for(const name of diagnosticExports)delete module[prefix+name];
+    delete module[remove];
+    assert.throws(()=>createRuntimeMatchHistoryController(module,{mode:'staging'}),/exports are unavailable/);
+  }
+});
+
+test('staging journals retain bounded tails and count dropped command, pacing, and wait entries',async()=>{
+  const f=inlineFixture({mode:'staging'}),{owner,module}=f;
+  owner.enableArenaHistory();
+  module.ccall=async(name,_result,_types,args)=>module['_'+name](...args);
+  owner.enableInlineDispatch();
+  await owner.command('capture');
+  await owner.command('beginEpisode');
+  for(let index=0;index<260;index++)await owner.command('pollTicket');
+  let retained=owner.journalRetention();
+  assert.deepEqual(retained.commands,{retained:256,dropped:6,limit:256});
+  assert.equal(owner.journal()[0].name,'pollTicket');
+
+  f.put(56,4);
+  const pacingPointer=24576,pacingBytes=new Uint8Array(64),pacingView=new DataView(pacingBytes.buffer);
+  [1,64,4,0,0,0,0,0].forEach((value,index)=>pacingView.setUint32(index*4,value,true));
+  pacingView.setFloat64(32,0.25,true);pacingView.setFloat64(40,0.25,true);
+  pacingView.setFloat64(48,0,true);pacingView.setFloat64(56,8,true);
+  module.HEAPU8.set(pacingBytes,pacingPointer);
+  module[prefix+'pacing_start']=()=>1;
+  module[prefix+'pacing_sample_bytes']=()=>64;
+  module[prefix+'pacing_sample']=()=>pacingPointer;
+  owner.pacingStart();
+  for(let index=0;index<257;index++)owner.pacingSample(0);
+  retained=owner.journalRetention();
+  assert.deepEqual(retained.pacing,{retained:256,dropped:1,limit:256});
+
+  let active=0,totalExcludedMs=0,excludedMs=0,currentInputOrdinal=0;
+  const waitPointer=2048,encode=new TextEncoder();
+  module[prefix+'pacing_wait_begin']=(_kind,inputOrdinal)=>{active=1;excludedMs=0;currentInputOrdinal=inputOrdinal;return 1;};
+  module[prefix+'pacing_wait_end']=(_kind,inputOrdinal)=>{active=0;excludedMs=2.5;currentInputOrdinal=inputOrdinal;
+    totalExcludedMs+=excludedMs;return 1;};
+  module[prefix+'pacing_wait_json']=()=>{
+    module.HEAPU8.set(encode.encode(JSON.stringify({schema:1,active,kind:1,inputOrdinal:currentInputOrdinal,
+      sourceFrame:0,phase:4,requestSequence:f.view.getUint32(280,true),excludedMs,totalExcludedMs,
+      pendingTicks:0.25})+'\0'),waitPointer);
+    return waitPointer;
+  };
+  for(let index=0;index<65;index++){
+    owner.pacingWaitBegin(1,0);owner.pacingWaitEnd(1,0);
+  }
+  retained=owner.journalRetention();
+  assert.deepEqual(retained.networkWaits,{retained:64,dropped:66,limit:64});
+  assert.equal(owner.pacingWaitJournal().at(-1).active,0);
+});
 
 test('native endpoint admission is atomic, publishes no raw rows, and latches refusal',async()=>{
   for(const failure of [null,'admit']){

@@ -25,6 +25,9 @@ int melee_web_menu_host_rng_boundary(const MeleeWebMenuHost*,
 enum {
     MELEE_WEB_SAVE_MODE_EVERYTHING = 0,
     MELEE_WEB_SAVE_MODE_PERSONAL = 1,
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    MELEE_WEB_SAVE_MODE_FRESH_ONLINE = 2,
+#endif
 };
 typedef struct MeleeWebMenuMatchSelection {
     /* Complete source payload copied while the menu-owned VsModeData is still

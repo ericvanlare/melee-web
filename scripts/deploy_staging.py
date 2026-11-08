@@ -229,10 +229,11 @@ class Pages:
         return body['result']
 
 
-def verify_http(source_root, origin, manifest):
+def verify_http(source_root, origin, manifest, *, rollback_staging=False):
     require(origin in (STABLE, PAGES) or immutable_origin(origin), 'Invalid staging origin')
     verifier = load_module(source_root / 'scripts/verify_public_http.py', '_staging_http')
-    report = verifier.verify(origin, manifest)
+    report = (verifier.verify(origin, manifest, rollback_staging=True) if rollback_staging
+              else verifier.verify(origin, manifest))
     records = json.loads(manifest.read_text())['files']
     maps = tuple('/' + record['path'] + '.map' for record in records
                  if record['path'].endswith(('.wasm', '.js', '.mjs')))
@@ -399,6 +400,9 @@ def main():
     parser.add_argument('--deployment-id')
     parser.add_argument('--immutable-url')
     parser.add_argument('--previous-record', type=Path)
+    parser.add_argument('--rollback-build', type=Path)
+    parser.add_argument('--rollback-linked', type=Path)
+    parser.add_argument('--rollback-linked-receipt-sha256')
     parser.add_argument('--verify-custom-domain', action='store_true',
                         help='Also require the optional staging.webmelee.gg hostname to pass')
     args = parser.parse_args()
@@ -407,6 +411,14 @@ def main():
     require(re.fullmatch(r'[0-9a-f]{64}', args.manifest_sha256) and
             hashlib.sha256(args.manifest.read_bytes()).hexdigest() == args.manifest_sha256,
             'Frozen staging manifest identity mismatch')
+    rollback_values = (args.rollback_build, args.rollback_linked, args.rollback_linked_receipt_sha256)
+    rollback_staging = all(value is not None for value in rollback_values)
+    require(rollback_staging or not any(value is not None for value in rollback_values),
+            'Rollback staging producer inputs are all-or-none')
+    audit_options = (dict(rollback_build=args.rollback_build.resolve(),
+                          rollback_linked=args.rollback_linked.resolve(),
+                          rollback_linked_receipt_sha256=args.rollback_linked_receipt_sha256)
+                     if rollback_staging else {})
     args.report_dir = args.report_dir.resolve()
     require(not args.report_dir.is_relative_to(args.output.resolve()) and
             not args.report_dir.is_relative_to(args.base_output.resolve()),
@@ -414,7 +426,8 @@ def main():
     args.report_dir.mkdir(parents=True, exist_ok=False, mode=0o700)
     stage = load_module(ROOT / 'scripts/stage_public.py', '_staging_package')
     evidence = stage.audit_staging(args.source_root.resolve(), args.sha, args.base_output.resolve(),
-        args.base_manifest.resolve(), args.base_manifest_sha256, args.output.resolve(), args.manifest.resolve())
+        args.base_manifest.resolve(), args.base_manifest_sha256, args.output.resolve(), args.manifest.resolve(),
+        **audit_options)
     write_json(args.report_dir / 'preflight.json', evidence)
     manifest_value = json.loads(args.manifest.read_text())
     backend = manifest_value.get('backend')
@@ -464,14 +477,15 @@ def main():
             record.update(validate_deployment(target, args.sha))
             immutable = record['immutable_url']
             write_json(args.report_dir / 'rollback-target-http.json',
-                       verify_http(args.source_root, immutable, args.manifest))
+                       verify_http(args.source_root, immutable, args.manifest, rollback_staging=rollback_staging))
             api.request('/deployments/' + args.deployment_id, rollback=True)
         else:
             with tempfile.TemporaryDirectory(prefix='webmelee-staging-upload-') as directory:
                 upload = Path(directory) / 'public'
                 shutil.copytree(args.output, upload)
                 stage.audit_staging(args.source_root.resolve(), args.sha, args.base_output.resolve(),
-                    args.base_manifest.resolve(), args.base_manifest_sha256, upload, args.manifest.resolve())
+                    args.base_manifest.resolve(), args.base_manifest_sha256, upload, args.manifest.resolve(),
+                    **audit_options)
                 if backend_sidecar is not None:
                     shutil.copytree(backend_sidecar / 'functions', Path(directory) / 'functions')
                     shutil.copy2(backend_sidecar / '_routes.json', upload / '_routes.json')
@@ -504,7 +518,8 @@ def main():
     if args.verify_custom_domain:
         origins.append(('custom', STABLE))
     for name, origin in origins:
-        write_json(args.report_dir / (name + '-http.json'), verify_http(args.source_root, origin, args.manifest))
+        write_json(args.report_dir / (name + '-http.json'), verify_http(args.source_root, origin, args.manifest,
+                        rollback_staging=rollback_staging))
     write_json(args.report_dir / 'verified.json', {**record, 'http_result': 'pass',
                 'custom_domain_verified': args.verify_custom_domain,
                 'browser_result': 'separate headed lifecycle check required'})

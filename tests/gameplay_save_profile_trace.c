@@ -50,6 +50,10 @@ static void mutate_original_profile(void)
     transient_trophy_pending[1] = 0x87654321;
 }
 
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+#include "slippi_profile/tests/fresh_online_baseline_control.inc"
+#endif
+
 int main(void)
 {
     char error[256] = { 0 };
@@ -63,6 +67,10 @@ int main(void)
     MeleeWebSaveProfileOwner* profile;
     struct gmm_x1868* save;
     struct gmm_x0* source_root = gmMainLib_GetProfileRoot();
+
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+    check_fresh_online_baseline();
+#endif
 
     check(gmMainLib_804D3EE0 == source_root,
           "original save root is not the authored first profile object");

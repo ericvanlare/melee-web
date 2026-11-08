@@ -215,7 +215,7 @@ void publish_runtime_timing(RuntimeTimingSample s){
 #endif
 }
 extern "C" {
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME) && !defined(MELEE_WEB_ROLLBACK_STAGING)
 EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
  // Read-only observer: serialize copied diagnostic storage, never live source
  // globals. KEEPALIVE exports only this getter; there is no injection endpoint.

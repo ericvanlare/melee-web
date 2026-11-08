@@ -212,6 +212,26 @@ class StagingDeploymentTests(unittest.TestCase):
             account.assert_not_called()
             self.assertFalse((root / 'reports').exists())
 
+    def test_partial_rollback_producer_inputs_stop_before_account_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / 'candidate.manifest.json'
+            manifest.write_text('{}')
+            arguments = ['deploy_staging.py', 'deploy', '--source-root', str(root),
+                '--sha', 'a' * 40, '--base-output', str(root / 'base'),
+                '--base-manifest', str(root / 'base.manifest.json'),
+                '--base-manifest-sha256', 'b' * 64, '--output', str(root / 'public'),
+                '--manifest', str(manifest), '--manifest-sha256',
+                staging.hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                '--report-dir', str(root / 'reports'), '--rollback-build', str(root / 'producer')]
+            with patch.object(staging.sys, 'argv', arguments), \
+                    patch.object(staging, 'tooling_head', return_value='d' * 40), \
+                    patch.object(staging, 'Pages') as account, \
+                    self.assertRaisesRegex(ValueError, 'all-or-none'):
+                staging.main()
+            account.assert_not_called()
+            self.assertFalse((root / 'reports').exists())
+
     def test_http_verification_rejects_raw_wasm_alias(self):
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / 'candidate.manifest.json'

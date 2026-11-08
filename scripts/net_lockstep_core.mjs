@@ -1,6 +1,7 @@
 export const LOCKSTEP_VERSION = 1;
 export const LOCKSTEP_DELAY = 2;
 export const LOCKSTEP_MAX_SOURCE_TICKS = 216000;
+export const LOCKSTEP_STREAM_MAX_INPUT_TICKS = LOCKSTEP_MAX_SOURCE_TICKS - LOCKSTEP_DELAY;
 export const LOCKSTEP_WINDOW = 32;
 export const LOCKSTEP_MAX_BATCH = 32;
 export const LOCKSTEP_MAX_PENDING_RECEIVE_MESSAGES = 64;
@@ -169,7 +170,7 @@ export class LockstepPeer {
   constructor({role, sourceTicks, inputTicks, pushFrame, onTerminal = () => {}, onReady = () => {},
     onRemoteContributionBatch = () => {},
     isClosedSendCancellation = () => false, isClosedDisconnect = () => false,
-    onSendCancellation = () => {}}) {
+    onSendCancellation = () => {}, streaming = false}) {
     if (!(role in opposite)) throw Error('Lockstep role must be alpha or beta');
     this.role = role;
     this.remoteRole = opposite[role];
@@ -179,6 +180,8 @@ export class LockstepPeer {
     this.inputTicks = integer(inputTicks, LOCKSTEP_MAX_SOURCE_TICKS, 'input tick bound');
     if (this.sourceTicks < LOCKSTEP_DELAY || this.inputTicks + LOCKSTEP_DELAY !== this.sourceTicks)
       throw Error('Lockstep input and source tick bounds must differ by the fixed two-tick delay');
+    if (typeof streaming !== 'boolean') throw Error('Lockstep streaming mode must be boolean');
+    this.streaming = streaming;
     this.pushFrame = pushFrame;
     this.onTerminal = onTerminal;
     this.onReady = onReady;
@@ -216,6 +219,12 @@ export class LockstepPeer {
     // advertised as acknowledged only after its remote contribution observer
     // has accepted every newly received PAD row.
     this.admittedSequence = -1;
+    this.remoteAckSequence = -1;
+    this.ackAdvertisedBySequence = new Map();
+    this.remoteAckAdvertisedInput = -1;
+    this.remoteAckAdvertisedChecksum = -1;
+    this.remoteInputRetiredThrough = -1;
+    this.remoteChecksumRetiredThrough = -1;
     this.lastAccepted = new Map();
     this.pendingSequence = new Map();
     this.nextSourceFrame = 0;
@@ -258,6 +267,11 @@ export class LockstepPeer {
     this.startAttempted = true;
     if (agreement?.match_final !== undefined && agreement.match_final !== 1)
       throw Error('Lockstep match_final capability must be exactly 1 when present');
+    if (agreement?.streaming !== undefined && agreement.streaming !== 1)
+      throw Error('Lockstep streaming capability must be exactly 1 when present');
+    if (this.streaming !== (agreement?.streaming === 1) ||
+        (this.streaming && agreement?.match_final !== 1))
+      throw Error('Lockstep stream mode must be explicitly agreed with final checksum exchange');
     this.matchFinalEnabled = agreement?.match_final === 1;
     const hello = {
       type: 'hello', version: LOCKSTEP_VERSION, role: this.role,
@@ -375,17 +389,37 @@ export class LockstepPeer {
     this.#assertReady();
     if (this.localMatchFinal)
       throw Error('Lockstep final checksum was published; new local PAD publication is closed');
+    if (this.streaming && deferSend)
+      throw Error('Streaming match mode does not permit deferred local PAD publication');
     if (!Array.isArray(entries) || !entries.length || entries.length > LOCKSTEP_MAX_BATCH)
       throw Error(`Lockstep local input batches must contain 1..${LOCKSTEP_MAX_BATCH} contributions`);
     const seen = new Set();
     const overrides = new Map(nativeOverrides);
     for (const [tick, sample] of entries) {
+      if (this.streaming && Number.isSafeInteger(tick) && tick >= this.inputTicks) {
+        const error = Error(`Streaming input capacity ${this.inputTicks} was exhausted before native terminal`);
+        await this.fail('protocol', {reason: 'stream_input_capacity_exhausted',
+          input_capacity: this.inputTicks, local_contiguous_input: this.localContiguousInput});
+        throw error;
+      }
       integer(tick, this.inputTicks - 1, 'input tick');
       if (seen.has(tick)) throw Error('Local input batch repeats an input tick');
       seen.add(tick);
       const value = bytesFrom(sample, 'Local PAD contribution');
       if (value.length !== PAD_BYTES) throw Error('Local PAD contribution must contain 11 bytes');
       const previous = this.local.get(tick);
+      if (this.streaming && !previous && tick <= this.localContiguousInput) {
+        const error = Error(`Streaming local PAD ${tick} was already retired`);
+        await this.fail('protocol', {reason: 'stream_local_pad_republished_after_retirement', tick});
+        throw error;
+      }
+      if (this.streaming && !previous &&
+          (this.local.size >= LOCKSTEP_WINDOW || this.nativeLocal.size >= LOCKSTEP_WINDOW)) {
+        const error = Error(`Streaming local PAD retention reached its ${LOCKSTEP_WINDOW}-row protocol window`);
+        await this.fail('protocol', {reason: 'stream_local_retention_window_exhausted',
+          local_rows: this.local.size, native_local_rows: this.nativeLocal.size});
+        throw error;
+      }
       if (previous && !equalBytes(previous, value))
         return this.fail('protocol', {reason: 'local input changed after publication', tick});
       // A deferred contribution remains native-local but cannot escape through
@@ -406,6 +440,7 @@ export class LockstepPeer {
     }
     while (this.local.has(this.localContiguousInput + 1)) ++this.localContiguousInput;
     await this.#pumpFrames();
+    this.#pruneStreamingRows();
     if (!deferSend) {
       const outcome = await this.#sendState({context: 'local_input', input_ticks: entries.map(([tick]) => tick)});
       if (outcome?.status === 'cancelled_unpublished') return outcome;
@@ -419,10 +454,17 @@ export class LockstepPeer {
     const tick = recordTick(value);
     if (tick >= this.sourceTicks) throw Error('Native checksum is beyond the source tick bound');
     const previous = this.localChecksums.get(tick);
+    if (this.streaming && !previous && this.localChecksums.size >= LOCKSTEP_WINDOW) {
+      const error = Error(`Streaming local checksum retention reached its ${LOCKSTEP_WINDOW}-row protocol window`);
+      await this.fail('protocol', {reason: 'stream_local_checksum_window_exhausted',
+        retained_rows: this.localChecksums.size});
+      throw error;
+    }
     if (previous && !equalBytes(previous, value)) return this.fail('protocol', {reason: 'native emitted conflicting checksums', tick});
     this.localChecksums.set(tick, value);
     while (this.localChecksums.has(this.localContiguousChecksum + 1)) ++this.localContiguousChecksum;
     await this.#compareReadyChecksums();
+    this.#pruneStreamingRows();
   }
 
   async publishMatchFinal({inputOrdinal, sourceFrame, checksum, outcome, winner} = {}) {
@@ -497,6 +539,18 @@ export class LockstepPeer {
       }
       return;
     }
+    if (this.streaming && this.nextSequence >= 0xffffffff) {
+      const error = Error('Streaming state packet sequence capacity exhausted before native terminal');
+      await this.fail('protocol', {reason: 'stream_state_sequence_exhausted',
+        next_sequence: this.nextSequence});
+      throw error;
+    }
+    if (this.streaming && this.nextSequence - (this.remoteAckSequence + 1) >= LOCKSTEP_WINDOW) {
+      const error = Error(`Streaming state ACKs exceeded the ${LOCKSTEP_WINDOW}-packet protocol window`);
+      await this.fail('protocol', {reason: 'stream_state_ack_window_exhausted',
+        next_sequence: this.nextSequence, remote_ack_sequence: this.remoteAckSequence});
+      throw error;
+    }
     const unacknowledged = [...this.local.entries()]
       .filter(([tick]) => tick > this.remoteAckInput && !this.deferredInputs.has(tick))
       .slice(0, LOCKSTEP_MAX_BATCH)
@@ -513,6 +567,11 @@ export class LockstepPeer {
       ack_checksum: this.remoteContiguousChecksum >= 0 ? this.remoteContiguousChecksum : null,
       unacknowledged, delayed_checksums: checksums,
     };
+    if (this.streaming) {
+      this.ackAdvertisedBySequence.set(packet.sequence, Object.freeze({
+        input:this.remoteContiguousInput, checksum:this.remoteContiguousChecksum,
+      }));
+    }
     try { await this.sendObject(packet); }
     catch (error) {
       if (this.ready && (!this.terminal || this.terminal.kind === 'disconnect') &&
@@ -538,6 +597,8 @@ export class LockstepPeer {
 
   async #receiveState(packet, raw) {
     integer(packet.sequence, 0xffffffff, 'packet sequence');
+    if (this.streaming && packet.sequence === 0xffffffff)
+      throw Error('Streaming state packet sequence capacity exhausted before native terminal');
     const rawHash = await digestText(raw);
     if (this.terminal) return;
     if (packet.sequence < this.expectedSequence) {
@@ -581,6 +642,7 @@ export class LockstepPeer {
       this.admittedSequence = next.packet.sequence;
     }
     await this.#pumpFrames();
+    this.#pruneStreamingRows();
     if (this.matchFinalEnabled) this.#queueMatchFinalDrive();
     if (changed) return this.#sendState({context: 'inbound_state_ack'});
   }
@@ -713,6 +775,16 @@ export class LockstepPeer {
     if (ackSequence !== null) {
       integer(ackSequence, 0xffffffff, 'sequence acknowledgement');
       if (ackSequence >= this.nextSequence) throw Error('peer acknowledged an unsent state packet');
+      if (this.streaming && ackSequence > this.remoteAckSequence) {
+        const advertised = this.ackAdvertisedBySequence.get(ackSequence);
+        if (!advertised) throw Error('peer acknowledged an expired streaming state watermark');
+        this.remoteAckSequence = ackSequence;
+        this.remoteAckAdvertisedInput = Math.max(this.remoteAckAdvertisedInput, advertised.input);
+        this.remoteAckAdvertisedChecksum = Math.max(this.remoteAckAdvertisedChecksum, advertised.checksum);
+        for (const sequence of this.ackAdvertisedBySequence.keys()) {
+          if (sequence <= ackSequence) this.ackAdvertisedBySequence.delete(sequence);
+        }
+      }
     }
     for (const [field, current, countName] of [
       ['ack_input', this.remoteAckInput, 'acknowledgedInputs'],
@@ -736,6 +808,8 @@ export class LockstepPeer {
     const seenInputs = new Set();
     for (const entry of packet.unacknowledged) {
       const tick = integer(entry?.tick, this.inputTicks - 1, 'remote input tick');
+      if (this.streaming && tick <= this.remoteInputRetiredThrough)
+        throw Error(`Remote PAD tick ${tick} arrived after its acknowledged retirement`);
       if (seenInputs.has(tick)) throw Error('state packet repeats an input tick');
       seenInputs.add(tick);
       if (tick > this.remoteContiguousInput + LOCKSTEP_WINDOW + 1)
@@ -744,13 +818,19 @@ export class LockstepPeer {
       const old = this.remote.get(tick);
       if (old && !equalBytes(old, sample)) throw Error(`conflicting remote PAD contribution at tick ${tick}`);
       if (old) ++this.inputDuplicates;
-      else { remoteInputs.push({tick, pad: sample}); changed = true; }
+      else {
+        if (this.streaming && this.remote.size + remoteInputs.length >= LOCKSTEP_WINDOW)
+          throw Error(`Streaming remote PAD retention exceeded its ${LOCKSTEP_WINDOW}-row protocol window`);
+        remoteInputs.push({tick, pad: sample}); changed = true;
+      }
       if (tick > this.remoteContiguousInput + 1) ++this.outOfOrderInputs;
     }
 
     const seenChecksums = new Set();
     for (const entry of packet.delayed_checksums) {
       const tick = integer(entry?.tick, this.sourceTicks - 1, 'remote checksum tick');
+      if (this.streaming && tick <= this.remoteChecksumRetiredThrough)
+        throw Error(`Remote checksum tick ${tick} arrived after its acknowledged retirement`);
       if (seenChecksums.has(tick)) throw Error('state packet repeats a checksum tick');
       seenChecksums.add(tick);
       let record;
@@ -761,7 +841,11 @@ export class LockstepPeer {
       const old = this.remoteChecksums.get(tick);
       if (old && !equalBytes(old, record)) throw Error(`conflicting remote checksum at tick ${tick}`);
       if (old) ++this.checksumDuplicates;
-      else { this.remoteChecksums.set(tick, record); changed = true; }
+      else {
+        if (this.streaming && this.remoteChecksums.size >= LOCKSTEP_WINDOW)
+          throw Error(`Streaming remote checksum retention exceeded its ${LOCKSTEP_WINDOW}-row protocol window`);
+        this.remoteChecksums.set(tick, record); changed = true;
+      }
       if (tick > this.remoteContiguousChecksum + LOCKSTEP_WINDOW + 1)
         throw Error('remote checksum is outside the bounded reorder window');
     }
@@ -785,6 +869,37 @@ export class LockstepPeer {
         return;
       }
       ++this.nextChecksumCompare;
+    }
+    this.#pruneStreamingRows();
+  }
+
+  #pruneStreamingRows() {
+    if (!this.streaming) return;
+    for (const tick of this.local.keys()) {
+      if (tick <= this.remoteAckInput) this.local.delete(tick);
+    }
+    const nativeInputThrough = Math.min(this.localContiguousInput, this.remoteContiguousInput,
+      this.nextSourceFrame - LOCKSTEP_DELAY - 1);
+    for (const tick of this.nativeLocal.keys())
+      if (tick <= nativeInputThrough) this.nativeLocal.delete(tick);
+    const remoteInputThrough = Math.min(nativeInputThrough, this.remoteAckAdvertisedInput);
+    for (const tick of this.remote.keys()) {
+      if (tick <= remoteInputThrough) {
+        this.remote.delete(tick);
+        if (tick > this.remoteInputRetiredThrough) this.remoteInputRetiredThrough = tick;
+      }
+    }
+    const localChecksumThrough = Math.min(this.nextChecksumCompare - 1, this.remoteAckChecksum);
+    for (const tick of this.localChecksums.keys()) {
+      if (tick <= localChecksumThrough) this.localChecksums.delete(tick);
+    }
+    const remoteChecksumThrough = Math.min(this.nextChecksumCompare - 1,
+      this.remoteAckAdvertisedChecksum);
+    for (const tick of this.remoteChecksums.keys()) {
+      if (tick <= remoteChecksumThrough) {
+        this.remoteChecksums.delete(tick);
+        if (tick > this.remoteChecksumRetiredThrough) this.remoteChecksumRetiredThrough = tick;
+      }
     }
   }
 
@@ -829,6 +944,7 @@ export class LockstepPeer {
   async fail(kind, details = {}, {notify = true} = {}) {
     if (this.terminal) return;
     this.terminal = {kind, ...details};
+    if (this.streaming) this.ackAdvertisedBySequence.clear();
     this.matchFinalCompletion.reject(Error(`Lockstep peer reached ${kind} before final checksum agreement`));
     let callbackError = null;
     try { await this.onTerminal(this.terminal, this); }
@@ -848,14 +964,15 @@ export class LockstepPeer {
   }
 
   summary() {
-    return {
+    const result = {
       role: this.role, local_port: this.localPort, remote_port: this.remotePort,
       ready: this.ready, terminal: this.terminal,
-      local_input_ticks: this.local.size,
+      local_input_ticks: this.streaming ? this.localContiguousInput + 1 : this.local.size,
       deferred_input_ticks: [...this.deferredInputs].sort((a, b) => a - b),
-      remote_input_ticks: this.remote.size,
-      native_local_divergences: [...this.local.entries()].filter(([tick, sample]) =>
-        this.nativeLocal.get(tick) && !equalBytes(this.nativeLocal.get(tick), sample)).length,
+      remote_input_ticks: this.streaming ? this.remoteContiguousInput + 1 : this.remote.size,
+      native_local_divergences: this.streaming ? this.nativeLocalDivergences :
+        [...this.local.entries()].filter(([tick, sample]) =>
+          this.nativeLocal.get(tick) && !equalBytes(this.nativeLocal.get(tick), sample)).length,
       remote_contiguous_input: this.remoteContiguousInput,
       remote_ack_input: this.remoteAckInput,
       local_checksum_ticks: this.localChecksums.size,
@@ -874,15 +991,27 @@ export class LockstepPeer {
       checksum_mismatches: this.checksumMismatches,
       start_identity_hash: this.agreementHash ?? null,
     };
+    if (this.streaming) Object.assign(result, {streaming: true,
+      retained_local_input_rows: this.local.size,
+      retained_native_local_rows: this.nativeLocal.size,
+      retained_remote_input_rows: this.remote.size,
+      retained_local_checksum_rows: this.localChecksums.size,
+      retained_remote_checksum_rows: this.remoteChecksums.size,
+      retained_ack_watermarks: this.ackAdvertisedBySequence.size,
+      remote_ack_advertised_input: this.remoteAckAdvertisedInput,
+      remote_ack_advertised_checksum: this.remoteAckAdvertisedChecksum,
+      remote_ack_sequence: this.remoteAckSequence});
+    return result;
   }
 
   /** Compact read-only counters for hot health paths; full arrays stay in summary(). */
   health() {
-    return Object.freeze({
+    const result = {
       role: this.role, local_port: this.localPort, remote_port: this.remotePort,
       ready: this.ready, terminal: this.terminal ? Object.freeze({...this.terminal}) : null,
-      local_input_ticks: this.local.size, deferred_input_count: this.deferredInputs.size,
-      remote_input_ticks: this.remote.size,
+      local_input_ticks: this.streaming ? this.localContiguousInput + 1 : this.local.size,
+      deferred_input_count: this.deferredInputs.size,
+      remote_input_ticks: this.streaming ? this.remoteContiguousInput + 1 : this.remote.size,
       native_local_divergences: this.nativeLocalDivergences,
       remote_contiguous_input: this.remoteContiguousInput, remote_ack_input: this.remoteAckInput,
       local_checksum_ticks: this.localChecksums.size,
@@ -897,7 +1026,18 @@ export class LockstepPeer {
       acknowledged_checksums: this.acknowledgedChecksums,
       checksum_mismatch_count: this.checksumMismatches.length,
       start_identity_hash: this.agreementHash ?? null,
-    });
+    };
+    if (this.streaming) Object.assign(result, {streaming: true,
+      retained_local_input_rows: this.local.size,
+      retained_native_local_rows: this.nativeLocal.size,
+      retained_remote_input_rows: this.remote.size,
+      retained_local_checksum_rows: this.localChecksums.size,
+      retained_remote_checksum_rows: this.remoteChecksums.size,
+      retained_ack_watermarks: this.ackAdvertisedBySequence.size,
+      remote_ack_advertised_input: this.remoteAckAdvertisedInput,
+      remote_ack_advertised_checksum: this.remoteAckAdvertisedChecksum,
+      remote_ack_sequence: this.remoteAckSequence});
+    return Object.freeze(result);
   }
 }
 

@@ -18,6 +18,8 @@ import {
   RUNTIME_MATCH_HISTORY_RESPAWN_PEER_SCOPE,
   RUNTIME_MATCH_HISTORY_MATCH_FINAL_INPUT_TICKS,
   RUNTIME_MATCH_HISTORY_MATCH_FINAL_PEER_SCOPE,
+  RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,
+  RUNTIME_MATCH_HISTORY_STREAM_PEER_SCOPE,
 } from '../src/slippi_profile/runtime_match_history_peer.mjs';
 import {LOCKSTEP_VERSION, lockstepConstants} from '../scripts/net_lockstep_core.mjs';
 import {installRuntimePeerHistoryProbe} from '../src/slippi_profile/tests/runtime_peer_history_probe.mjs';
@@ -266,10 +268,11 @@ function createEndpointBus() {
 
 function makePeer(bus, role, {sourceFrame = 120, sourceJson = identityText(sourceFrame),
   identity = loadedIdentity, validateNativePad = () => true, inputTicks = 1, timeoutMs = 1000,
-  sampleTimeoutMs = timeoutMs,matchFinal = false,deferredLocalTick = null,deferredLocalTicks = null} = {}) {
+  sampleTimeoutMs = timeoutMs,matchFinal = false,streaming = false,
+  deferredLocalTick = null,deferredLocalTicks = null} = {}) {
   return createRuntimeMatchHistoryPeer({
     role, relayUrl: 'ws://local.test/room', roomId: 'R'.repeat(24), timeoutMs, sampleTimeoutMs,
-    sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks, matchFinal,
+    sourceIdentityJson: sourceJson, loadedIdentity: identity, sourceFrame, inputTicks, matchFinal, streaming,
     validateNativePad,deferredLocalTick,deferredLocalTicks,createEndpoint: bus.createEndpoint,
   });
 }
@@ -613,8 +616,14 @@ test('remote wait rejects a previously held sample after terminal failure or clo
     const pending = failed.alpha.waitForRemoteSample();
     const endpoint = failed.bus.endpoints.get('alpha');
     await endpoint.options.onDisconnect('alpha', '1006: peer ended after contribution');
-    await assert.rejects(pending, /relay disconnected/);
-    await assert.rejects(failed.alpha.waitForRemoteSample(), /relay disconnected/);
+    const priorFailure = failed.alpha.failure;
+    const pendingFailure = await pending.catch(error => error);
+    assert.equal(pendingFailure,priorFailure,'the first unexpected disconnect failure remains authoritative');
+    assert.match(pendingFailure.message,/relay disconnected/);
+    assert.notEqual(pendingFailure.code,'RUNTIME_MATCH_PEER_CLOSED');
+    await failed.alpha.close();
+    const afterFailure = await failed.alpha.waitForRemoteSample().catch(error => error);
+    assert.equal(afterFailure,priorFailure,'explicit cleanup cannot reclassify an earlier relay failure');
   } finally {
     await failed.alpha.close().catch(() => {});
   }
@@ -623,12 +632,22 @@ test('remote wait rejects a previously held sample after terminal failure or clo
   try {
     const pending = closed.alpha.waitForRemoteSample();
     const closing = closed.alpha.close();
-    await assert.rejects(pending, /closed before remote PAD acceptance/);
+    const pendingFailure = await pending.catch(error => error);
+    assert.match(pendingFailure.message,/closed before remote PAD acceptance/);
+    assert.equal(pendingFailure.code,'RUNTIME_MATCH_PEER_CLOSED');
     await closing;
-    await assert.rejects(closed.alpha.waitForRemoteSample(), /closed before remote PAD acceptance/);
+    const afterClose = await closed.alpha.waitForRemoteSample().catch(error => error);
+    assert.match(afterClose.message,/closed before remote PAD acceptance/);
+    assert.equal(afterClose.code,'RUNTIME_MATCH_PEER_CLOSED');
   } finally {
     await closed.alpha.close().catch(() => {});
   }
+
+  const neverStarted = makePeer(createEndpointBus(),'alpha');
+  await neverStarted.close();
+  const startAfterClose = await neverStarted.start().catch(error => error);
+  assert.match(startAfterClose.message,/peer is closed/);
+  assert.equal(startAfterClose.code,'RUNTIME_MATCH_PEER_CLOSED');
 });
 
 test('missing remote hello fails the readiness deadline and closes the owned endpoint', async () => {
@@ -642,7 +661,7 @@ test('missing remote hello fails the readiness deadline and closes the owned end
 
 test('production bridge uses page WebSocket owner and has no Node or native/game input dependency', async () => {
   const source = await readFile(new URL('../src/slippi_profile/runtime_match_history_peer.mjs', import.meta.url), 'utf8');
-  assert.match(source, /import \{LockstepPeer, LOCKSTEP_VERSION, lockstepConstants, parseNetChecksum, validateMatchFinalOutcome\}\s+from '\.\.\/\.\.\/scripts\/net_lockstep_core\.mjs'/);
+  assert.match(source, /import \{LockstepPeer, LOCKSTEP_VERSION, LOCKSTEP_WINDOW, LOCKSTEP_STREAM_MAX_INPUT_TICKS, lockstepConstants,\s+parseNetChecksum, validateMatchFinalOutcome\}\s+from '\.\.\/\.\.\/scripts\/net_lockstep_core\.mjs'/);
   assert.match(source, /import \{createRoomRelayPeerEndpoint\} from '\.\.\/\.\.\/scripts\/net_lockstep_websocket_relay\.mjs'/);
   assert.doesNotMatch(source, /from ['"]node:|\b(?:Buffer|process|require)\b/);
   assert.doesNotMatch(source, /pushIndexed|melee_web_net_push_indexed|Module\.ccall/);
@@ -1028,7 +1047,7 @@ test('late packet handoff refuses a non-neutral following receipt before resumin
 
 test('actual paced gate abort settles both pre-entry and paused owners',async()=>{
   const source=await readFile(new URL(
-    '../src/slippi_profile/tests/runtime_paced_history_probe.mjs',import.meta.url),'utf8');
+    '../src/slippi_profile/runtime_match_session_loop.mjs',import.meta.url),'utf8');
   const start=source.indexOf('function pauseGate('),end=source.indexOf('\nfunction matchesBytes(',start);
   assert(start>=0&&end>start);
   const gate=new Function(source.slice(start,end)+'\nreturn pauseGate;')();
@@ -1431,7 +1450,7 @@ test('default peer wire remains dense and does not send final control packets',a
 
 test('released late waits exclude only actual missing receipts in admitted input order',async()=>{
   const source=await readFile(new URL(
-    '../src/slippi_profile/tests/runtime_peer_history_probe.mjs',import.meta.url),'utf8');
+    '../src/slippi_profile/runtime_match_session_bridge.mjs',import.meta.url),'utf8');
   const start=source.indexOf("        case 'episodeAwaitNetworkInput': {");
   const end=source.indexOf("        case 'episodeTimeline':",start);
   assert(start>=0&&end>start);
@@ -1457,7 +1476,7 @@ test('released late waits exclude only actual missing receipts in admitted input
   // The harness completed its deliberate hold and beta release before starting alpha's wait.
   time=140;
   const pacedSource=await readFile(new URL(
-    '../src/slippi_profile/tests/runtime_paced_history_probe.mjs',import.meta.url),'utf8');
+    '../src/slippi_profile/runtime_match_session_loop.mjs',import.meta.url),'utf8');
   const callbackStart=pacedSource.indexOf('async sourceTick=>{');
   const callbackEnd=pacedSource.indexOf('},\n        ...(networkBackpressure?',callbackStart);
   assert(callbackStart>=0&&callbackEnd>callbackStart);
@@ -1482,4 +1501,102 @@ test('released late waits exclude only actual missing receipts in admitted input
     {tick:26,startedAt:140,observedAt:180,endedAt:183,excludedMs:39},
     {tick:27,startedAt:183,observedAt:183,endedAt:183,excludedMs:0},
   ]);
+});
+
+test('terminal streaming agreement retires confirmed receipts and still ACKs the final row',async()=>{
+  const base={sourceIdentityJson:identityText(120),loadedIdentity,sourceFrame:120,
+    inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS};
+  const agreement=buildRuntimeMatchHistoryPeerAgreement({...base,matchFinal:true,streaming:true});
+  assert.equal(agreement.scope,RUNTIME_MATCH_HISTORY_STREAM_PEER_SCOPE);
+  assert.equal(agreement.input_ticks,215998);
+  assert.equal(agreement.source_ticks,216000);
+  assert.equal(agreement.match_final,1);
+  assert.equal(agreement.streaming,1);
+  assert.throws(()=>buildRuntimeMatchHistoryPeerAgreement({...base,streaming:true}),/requires the final/);
+  assert.throws(()=>buildRuntimeMatchHistoryPeerAgreement({...base,inputTicks:3600,
+    matchFinal:true,streaming:true}),/supports one, two, four, eight, 120, 600, or 3600/);
+
+  const bus=createEndpointBus();
+  const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,
+    matchFinal:true,streaming:true});
+  const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,
+    matchFinal:true,streaming:true});
+  const [startedAlpha,startedBeta]=await Promise.all([alpha.start(),beta.start()]);
+  assert.equal(startedAlpha.agreement_hash,startedBeta.agreement_hash);
+  for(const role of ['alpha','beta']){
+    const hello=bus.sent[role].map(text=>JSON.parse(text)).find(packet=>packet.type==='hello');
+    assert.equal(hello.agreement.streaming,1);
+    assert.equal(hello.agreement.match_final,1);
+    assert.equal((role==='alpha'?alpha:beta).snapshot().protocol_only_frames.length,0,
+      'streaming mode keeps the preroll count without an unbounded frame journal');
+  }
+
+  const flush=async()=>{
+    for(let round=0;round<12;++round){
+      const before=bus.sent.alpha.length+':'+bus.sent.beta.length;
+      await Promise.all([bus.flush('alpha'),bus.flush('beta')]);
+      if(before===bus.sent.alpha.length+':'+bus.sent.beta.length)return;
+    }
+    assert.fail('stream peer state ACKs did not settle in the bounded fixture');
+  };
+  for(let tick=0;tick<32;++tick){
+    await Promise.all([
+      alpha.publishLocal({port:0,tick,pollSerial:String(1000+tick),pad:validPad(tick+1)}),
+      beta.publishLocal({port:1,tick,pollSerial:String(2000+tick),pad:validPad(tick+101)}),
+    ]);
+    await Promise.all([alpha.waitForRemoteSample({tick}),beta.waitForRemoteSample({tick})]);
+    await flush();
+    for(const peer of [alpha,beta]){
+      const result=peer.prune({confirmedThrough:tick,retainedFrom:Math.max(0,tick-7),
+        nativeConsumedThrough:tick});
+      assert.equal(result.frozen,false);
+      const snapshot=peer.snapshot();
+      assert.equal(snapshot.protocol_frame_count,tick+3);
+      assert(snapshot.retained_local_receipts<=8);
+      assert(snapshot.retained_remote_receipts<=8);
+    }
+  }
+  for(const peer of [alpha,beta]){
+    assert.equal(peer.remoteSnapshot(23),null);
+    assert.equal(peer.remoteSnapshot(24).protocol_input_tick,24);
+    assert.equal(peer.remoteSnapshot(31).protocol_input_tick,31);
+    await assert.rejects(peer.waitForRemoteSample({tick:23}),/older than the retained stream window/);
+    const frozen=peer.prune({confirmedThrough:31,retainedFrom:32,
+      nativeConsumedThrough:31,planFrom:24});
+    assert.equal(frozen.frozen,true,'an outstanding plan freezes transport receipt pruning');
+  }
+
+  const inputOrdinal=31,sourceFrame=602,checksum=finalChecksum(inputOrdinal,sourceFrame);
+  const [finalAlpha,finalBeta]=await Promise.all([
+    alpha.publishMatchFinal({inputOrdinal,sourceFrame,checksum,...finalOutcome}),
+    beta.publishMatchFinal({inputOrdinal,sourceFrame,checksum,...finalOutcome}),
+  ]);
+  assert.deepEqual({...finalAlpha,role:undefined},{...finalBeta,role:undefined});
+  assert.equal(finalAlpha.input_ordinal,inputOrdinal);
+  assert.equal(finalAlpha.matched_bytes,64);
+  assert.equal(alpha.snapshot().retained_local_receipts,8);
+  assert.equal(alpha.snapshot().retained_remote_receipts,8);
+  await Promise.all([alpha.close(),beta.close()]);
+});
+
+test('terminal streaming refuses receipt growth when its owner omits safe pruning',async()=>{
+  const bus=createEndpointBus();
+  const alpha=makePeer(bus,'alpha',{inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,
+    matchFinal:true,streaming:true});
+  const beta=makePeer(bus,'beta',{inputTicks:RUNTIME_MATCH_HISTORY_STREAM_INPUT_TICKS,
+    matchFinal:true,streaming:true});
+  await Promise.all([alpha.start(),beta.start()]);
+  for(let tick=0;tick<32;++tick){
+    await alpha.publishLocal({port:0,tick,pollSerial:String(3000+tick),pad:validPad(tick+3)});
+    await beta.waitForRemoteSample({tick});
+    await bus.flush('alpha');
+    await bus.flush('beta');
+  }
+  assert.equal(alpha.snapshot().retained_local_receipts,32);
+  assert.equal(beta.snapshot().retained_remote_receipts,32);
+  await assert.rejects(alpha.publishLocal({port:0,tick:32,pollSerial:'3032',pad:validPad(35)}),
+    /stream_local_receipt_window_exhausted/);
+  assert.equal(alpha.snapshot().retained_local_receipts,32,
+    'the overflow refusal does not retain a 33rd local receipt');
+  await Promise.allSettled([alpha.close(),beta.close()]);
 });

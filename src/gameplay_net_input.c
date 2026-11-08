@@ -13,6 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef MELEE_WEB_ROLLBACK_STAGING
+#define DENSE_NET_EXPORT
+#else
+#define DENSE_NET_EXPORT EMSCRIPTEN_KEEPALIVE
+#endif
+
 enum LocalCaptureFailureReason {
     LOCAL_CAPTURE_FAILURE_NONE = 0,
     LOCAL_CAPTURE_FAILURE_INVALID_RAW,
@@ -176,7 +182,7 @@ int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
     return net_begin(seed, max_frames, 1, e, n);
 }
 
-EMSCRIPTEN_KEEPALIVE int melee_web_net_enable_local_input_capture(
+DENSE_NET_EXPORT int melee_web_net_enable_local_input_capture(
     unsigned local_port, uint32_t input_ticks)
 {
     if (!net.active || !net.start_required || net.start_confirmed ||
@@ -435,7 +441,7 @@ int melee_web_net_decode_pad(const uint8_t* p, unsigned bytes, PADStatus* out)
 
 /* Early rollback contributions use exactly the full-frame PAD predicate,
  * without creating a network session or publishing a partial native frame. */
-EMSCRIPTEN_KEEPALIVE int melee_web_net_validate_pad(const uint8_t* p, unsigned bytes)
+DENSE_NET_EXPORT int melee_web_net_validate_pad(const uint8_t* p, unsigned bytes)
 {
     PADStatus pad;
     return melee_web_net_decode_pad(p, bytes, &pad);
@@ -449,7 +455,7 @@ static int decode_frame(const uint8_t* p, PADStatus out[4])
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int melee_web_net_push(const uint8_t* bytes, unsigned count)
+DENSE_NET_EXPORT int melee_web_net_push(const uint8_t* bytes, unsigned count)
 {
     if (!net.active || net.terminal_kind || !bytes || !count ||
         count > net.max_frames - net.pushed) return 0;
@@ -461,7 +467,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_push(const uint8_t* bytes, unsigned count
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int melee_web_net_push_indexed(uint32_t first_tick,
+DENSE_NET_EXPORT int melee_web_net_push_indexed(uint32_t first_tick,
                                                     const uint8_t* bytes,
                                                     unsigned count)
 {
@@ -508,7 +514,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_push_indexed(uint32_t first_tick,
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE int melee_web_net_confirm_start(void)
+DENSE_NET_EXPORT int melee_web_net_confirm_start(void)
 {
     if (!net.active || !net.start_recorded || net.start_capture_failed ||
         net.terminal_kind) return 0;
@@ -516,7 +522,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_confirm_start(void)
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE void melee_web_net_terminate(unsigned kind,
+DENSE_NET_EXPORT void melee_web_net_terminate(unsigned kind,
                                                   uint32_t tick,
                                                   unsigned channel)
 {
@@ -529,11 +535,11 @@ EMSCRIPTEN_KEEPALIVE void melee_web_net_terminate(unsigned kind,
     net.terminal_channel = channel;
 }
 
-EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_cursor(void) { return net.cursor; }
-EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_pushed(void) { return net.pushed; }
+DENSE_NET_EXPORT unsigned melee_web_net_cursor(void) { return net.cursor; }
+DENSE_NET_EXPORT unsigned melee_web_net_pushed(void) { return net.pushed; }
 
 /* Copy up to max_records 64-byte records, oldest first. */
-EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_checksum_drain(uint8_t* out, unsigned max_records)
+DENSE_NET_EXPORT unsigned melee_web_net_checksum_drain(uint8_t* out, unsigned max_records)
 {
     unsigned copied = 0;
     if (!out) return 0;
@@ -548,7 +554,7 @@ EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_checksum_drain(uint8_t* out, unsigne
 }
 
 /* Diagnostic arena pattern for channel experiments; before disc import. */
-EMSCRIPTEN_KEEPALIVE int melee_web_net_arena_fill(int pattern)
+DENSE_NET_EXPORT int melee_web_net_arena_fill(int pattern)
 {
     if (melee_web_gameplay_session_active() || pattern < -1 || pattern > 255) return 0;
     net.arena_fill = pattern;
@@ -556,7 +562,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_arena_fill(int pattern)
     return 1;
 }
 
-EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
+DENSE_NET_EXPORT const char* melee_web_net_status(void)
 {
     size_t used = 0;
     char local_capture_failure[320];

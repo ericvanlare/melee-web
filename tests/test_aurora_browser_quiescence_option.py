@@ -178,11 +178,11 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
         )
         self.assertIn('AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"', build)
         self.assertIn(
-            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic or match_history_diagnostic else 'OFF'}",
+            "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET or aurora_staging_shadow_diagnostic or match_history_core else 'OFF'}",
             build,
         )
         self.assertIn(
-            "MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic or match_history_diagnostic else 'OFF'}",
+            "MELEE_WEB_AURORA_STAGING_SHADOW_INVENTORY={'ON' if aurora_staging_shadow_diagnostic or match_history_core else 'OFF'}",
             build,
         )
         self.assertEqual(

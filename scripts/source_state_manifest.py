@@ -364,9 +364,9 @@ def _read_cmake_cache_values(path: Path) -> dict[str, tuple[str, str]]:
     return values
 
 
-def _validate_match_history_cmake_profile(path: Path) -> None:
+def _validate_match_history_cmake_profile(path: Path, *, rollback_staging: bool = False) -> None:
     required = {
-        "MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC": "ON",
+        "MELEE_WEB_MATCH_HISTORY_DIAGNOSTIC": "OFF" if rollback_staging else "ON",
         "MELEE_WEB_SLIPPI_SYNCTEST": "OFF",
         "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
         "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
@@ -379,6 +379,10 @@ def _validate_match_history_cmake_profile(path: Path) -> None:
         "MELEE_WEB_STAGE_ARENA_OWNER_INVENTORY": "OFF",
     }
     cache = _read_cmake_cache_values(path)
+    if rollback_staging:
+        required["MELEE_WEB_ROLLBACK_STAGING"] = "ON"
+    elif "MELEE_WEB_ROLLBACK_STAGING" in cache:
+        required["MELEE_WEB_ROLLBACK_STAGING"] = "OFF"
     if cache.get("CMAKE_BUILD_TYPE") != ("STRING", "Release"):
         raise ManifestError("match-history CMake cache is not a Release build")
     for name, expected in required.items():
@@ -451,6 +455,9 @@ def _validate_profile_source_overlay(
 
 def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
     target_profile = TARGET_PROFILES.get(args.target)
+    rollback_staging = getattr(args, "rollback_staging", False)
+    if rollback_staging and args.target != MATCH_HISTORY_TARGET:
+        raise ManifestError("rollback staging requires the match-history browser target")
     if target_profile is None:
         raise ManifestError(
             "manifest is private to explicitly admitted targets; unsupported target: "
@@ -466,7 +473,7 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
     repository_root = Path(args.repository_root).resolve()
     cmake_cache_path = Path(args.cmake_cache).resolve()
     if target_profile["release_only"]:
-        _validate_match_history_cmake_profile(cmake_cache_path)
+        _validate_match_history_cmake_profile(cmake_cache_path, rollback_staging=rollback_staging)
     build_graph_value = args.build_graph or str(Path(args.compile_commands).resolve().parent / "build.ninja")
     build_graph_path = Path(build_graph_value).resolve()
     version_path = Path(args.emscripten_version_file).resolve()
@@ -553,7 +560,9 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
         **artifact_hashes,
     }
     if profile_overlay is not None:
-        identity_inputs["execution_profile"] = target_profile["name"]
+        identity_inputs["execution_profile"] = (
+            "runtime-rollback-staging" if rollback_staging else target_profile["name"]
+        )
         identity_inputs["source_profile"] = target_profile["source_profile"]
     canonical_identity = json.dumps(identity_inputs, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return {
@@ -576,6 +585,7 @@ def build_manifest(args: argparse.Namespace) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--target", required=True)
+    parser.add_argument("--rollback-staging", action="store_true")
     parser.add_argument("--link-map", required=True)
     parser.add_argument("--wasm", required=True)
     parser.add_argument("--compile-commands", required=True)

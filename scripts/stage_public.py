@@ -49,6 +49,35 @@ EXACT_SPEC = "copy the audited production/player base without a staging overlay"
 EXACT_SPEC_SHA256 = hashlib.sha256(EXACT_SPEC.encode("utf-8")).hexdigest()
 EXACT_VERSION = "melee-web-staging-exact-v1"
 
+ROLLBACK_VERSION = "melee-web-staging-rollback-v1"
+ROLLBACK_SPEC_SHA256 = hashlib.sha256(
+    b"audited vanilla bytes plus exact online player and route-scoped CSP v1"
+).hexdigest()
+ROLLBACK_RELAY = "wss://melee-web-room-relay-staging-288.mywebcomic.workers.dev"
+ROLLBACK_NATIVE_FILES = frozenset((
+    "gameplay_menu_browser.js", "gameplay_menu_browser.wasm", "gameplay_menu_browser.data",
+))
+# Preserve the original source-relative import graph under /online/.
+ROLLBACK_SOURCE_FILES = (
+    "web/online/online-shell.mjs", "web/online/online.css",
+    "web/melee-runtime.mjs", "web/runtime-assets.mjs", "web/disc-image.mjs",
+    "web/disc-session.mjs", "web/controller-input.mjs", "web/controller-panel.mjs",
+    "web/controller-panel.css", "web/controller-settings.mjs", "web/controller-settings.css",
+    "web/prototype-keyboard-layouts.mjs", "web/touch-controls.mjs", "web/touch-controls.css",
+    "web/runtime-audio.mjs", "web/runtime-audio-assets.mjs", "web/dsp-coefficients.mjs",
+    "web/staging-room.mjs", "web/runtime-diagnostics.mjs",
+    "web/runtime-diagnostics-delivery.mjs", "web/diagnostics-schema.mjs",
+    "web/diagnostics-settings.mjs", "web/startup-profile.mjs", "web/runtime-cache.js",
+    "src/slippi_profile/runtime_match_history_controller.mjs",
+    "src/slippi_profile/runtime_match_history_peer.mjs",
+    "src/slippi_profile/runtime_match_session_bridge.mjs",
+    "src/slippi_profile/runtime_match_session_loop.mjs",
+    "src/slippi_profile/staging_match_start.mjs",
+    "src/slippi_profile/tests/cpu_endpoint.mjs",
+    "scripts/net_lockstep_core.mjs", "scripts/net_lockstep_websocket_relay.mjs",
+    "scripts/net_rollback_input_timeline.mjs",
+)
+
 CPU_MARKERS = (b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic")
 REQUIRED_PUBLIC_DEFINE = b"MELEE_WEB_PUBLIC_RUNTIME"
 OPERATOR = "NaiadAI, LLC"
@@ -372,6 +401,135 @@ def _overlay_headers(data: bytes) -> bytes:
     return result
 
 
+def _rollback_headers(data: bytes) -> bytes:
+    # Keep the existing catch-all verbatim. The combined detach/replacement
+    # requires separate Pages HTTP verification before deployment.
+    match = re.search(rb"^/\*\n  Content-Security-Policy: ([^\n]+)", data, re.MULTILINE)
+    if (match is None or data.count(b"Content-Security-Policy: ") != 1
+            or b"/online" in data or match[1].count(b"connect-src 'self';") != 1
+            or not data.endswith(b"\n")):
+        raise StageError("vanilla header inventory cannot accept the rollback overlay")
+    policy = match[1].replace(b"connect-src 'self';",
+                             b"connect-src 'self' " + ROLLBACK_RELAY.encode("ascii") + b";", 1)
+    return (data + b"/online/*\n  ! Content-Security-Policy\n  Content-Security-Policy: "
+            + policy + b"\n  Cache-Control: no-cache\n")
+
+
+def _rollback_inputs(build, linked, receipt_sha256):
+    options = (build, linked, receipt_sha256)
+    if any(value is not None for value in options) and not all(value is not None for value in options):
+        raise StageError("rollback build, linked table directory and receipt SHA-256 are all-or-none")
+    if build is None:
+        return None
+    if not isinstance(receipt_sha256, str) or not SHA256_RE.fullmatch(receipt_sha256):
+        raise StageError("rollback linked receipt requires a full SHA-256")
+    return Path(build), Path(linked), receipt_sha256
+
+
+def _rollback_native_has_local_path(name: str, data: bytes, root: Path) -> bool:
+    if name == "gameplay_menu_browser.js":
+        # Emscripten creates a virtual home and publishes it as HOME.
+        # Match the actual generated calls, rather than exempting a path prefix.
+        data = data.replace(b'FS.mkdir("/home/web_user")', b'')
+        data = data.replace(b'PWD:"/",HOME:"/home/web_user",LANG:lang', b'')
+    return any(marker in data for marker in (
+        str(root.resolve()).encode(), b"/Users/", b"/Volumes/AgentStorage/", b"/home/",
+    ))
+
+
+def _rollback_package(root, source_sha, base, inputs):
+    build, linked, receipt_sha256 = inputs
+    _require_directory(build, "rollback native build")
+    _require_directory(linked, "rollback linked table directory")
+    receipt, raw = _load_json(linked / "linked-statics-receipt.json", "rollback linked receipt")
+    if (_sha256_bytes(raw) != receipt_sha256
+            or receipt.get("schema") != "melee-web-rollback-staging-linked-table-receipt-v1"
+            or receipt.get("profile") != "runtime-rollback-staging"
+            or receipt.get("sourceSha") != source_sha):
+        raise StageError("rollback linked receipt does not bind the exact staging producer")
+    artifacts = receipt.get("artifacts")
+    if not isinstance(artifacts, dict) or set(artifacts) != ROLLBACK_NATIVE_FILES:
+        raise StageError("rollback linked receipt native artifact inventory is invalid")
+    for digest in (*artifacts.values(), receipt.get("policySha256"), receipt.get("tableSha256"),
+                   receipt.get("configurationIdentitySha256")):
+        if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+            raise StageError("rollback linked receipt contains an invalid digest")
+
+    online = {}
+    for name, digest in sorted(artifacts.items()):
+        path = build / name
+        _require_file(path, "rollback native artifact")
+        data = path.read_bytes()
+        if not data or _sha256_bytes(data) != digest:
+            raise StageError(f"rollback native artifact differs from its producer pin: {name}")
+        if _rollback_native_has_local_path(name, data, root):
+            raise StageError(f"rollback native artifact contains a local path: {name}")
+        online["online/runtime/" + name] = data
+    table, table_raw = _load_json(linked / "linked-statics.json", "rollback compact statics")
+    wasm_sha = artifacts["gameplay_menu_browser.wasm"]
+    if (_sha256_bytes(table_raw) != receipt["tableSha256"]
+            or set(table) != {"schema", "wasmSha256", "policySha256", "rows"}
+            or table["schema"] != "melee-web-rollback-linked-statics-v1"
+            or table["wasmSha256"] != wasm_sha or table["policySha256"] != receipt["policySha256"]
+            or not isinstance(table["rows"], list) or not table["rows"]
+            or len(table["rows"]) != receipt.get("rowCount")):
+        raise StageError("rollback compact statics differs from its native producer")
+    end = 0
+    for row in table["rows"]:
+        if (not isinstance(row, list) or len(row) != 4
+                or any(type(value) is not int for value in row)
+                or not 0 < row[0] <= 0xffffffff or not 0 < row[1] <= 0xffffffff
+                or row[0] < end or row[0] + row[1] > 0x100000000
+                or row[2] not in (1, 2) or row[3] not in (1, 2)):
+            raise StageError("rollback compact statics contains an invalid row")
+        end = row[0] + row[1]
+    online["online/runtime/linked-statics.json"] = table_raw
+
+    profile = (root / "src/slippi_profile/profile.h").read_text(encoding="utf-8")
+    match = re.search(r'#define SLIPPI_PROFILE_CAMERA_HISTORY_V20_ID\s+\\?\s*"([a-z0-9-]+)"', profile)
+    if not match:
+        raise StageError("rollback source profile identity is unavailable")
+    player = {"schema": "melee-web-rollback-staging-player-v1", "sourceSha": source_sha,
+              "profileIdentity": match[1], "wasmSha256": wasm_sha,
+              "policySha256": receipt["policySha256"], "tableSha256": receipt["tableSha256"],
+              "artifacts": artifacts}
+    online["online/runtime/rollback.json"] = _canonical_json_bytes(player)
+    sources = {f"online/{path}": path for path in ROLLBACK_SOURCE_FILES}
+    sources.update({
+        "online/index.html": "web/online/index.html",
+        "online/runtime/audio-worklet.js": "web/audio-worklet.js",
+        "online/runtime/audio-ring.mjs": "web/audio-ring.mjs",
+        "online/licenses/GPL-3.0.txt": "src/slippi_profile/COPYING",
+        "online/licenses/runtime-third-party.txt": "docs/licenses/runtime-third-party.txt",
+        "online/licenses/dolphin-gpl-2.0-or-later.txt": "docs/licenses/dolphin-gpl-2.0-or-later.txt",
+        "online/licenses/PROFILE.md": "src/slippi_profile/README.md",
+    })
+    for destination, source in sources.items():
+        path = root / source
+        _require_file(path, "rollback source")
+        if not path.resolve().is_relative_to(root.resolve()):
+            raise StageError(f"rollback source path escapes the checkout: {source}")
+        online[destination] = path.read_bytes()
+    online["online/source.html"] = (
+        '<!doctype html><html lang="en"><meta charset="utf-8"><title>Online profile source</title>'
+        '<h1>Experimental rollback profile</h1><p>GPL-3.0-or-later.</p>'
+        f'<p><a href="https://github.com/ericvanlare/melee-web/tree/{source_sha}">'
+        'Corresponding source and build instructions</a></p>'
+        '<ul><li><a href="./licenses/GPL-3.0.txt">GPL version 3</a></li>'
+        '<li><a href="./licenses/runtime-third-party.txt">Runtime third-party notices</a></li>'
+        '<li><a href="./licenses/dolphin-gpl-2.0-or-later.txt">Dolphin audio adaptation license</a></li>'
+        '<li><a href="./licenses/PROFILE.md">Profile documentation</a></li></ul>'
+        '<p>Original game data is supplied locally by the player.</p></html>\n'
+    ).encode("ascii")
+    if any(path == "online" or path.startswith("online/") for path in base):
+        raise StageError("vanilla package already has an online subtree")
+    result = dict(base, **online)
+    result["_headers"] = _rollback_headers(base["_headers"])
+    metadata = {"linked_receipt_sha256": receipt_sha256, "player": player, "files": _records(online)}
+    _portable(metadata)
+    return result, metadata
+
+
 def _write_package(files: dict[str, bytes], output: Path) -> dict[str, bytes]:
     """Write a fresh package from already-audited bytes."""
     _require_directory(output, "staging output")
@@ -497,6 +655,8 @@ def _receipt_payload(audit_result: dict[str, Any]) -> dict[str, Any]:
         overlay_version, overlay_spec_sha256 = EXACT_VERSION, EXACT_SPEC_SHA256
     elif staging_mode == "label":
         overlay_version, overlay_spec_sha256 = OVERLAY_VERSION, OVERLAY_SPEC_SHA256
+    elif staging_mode == "rollback":
+        overlay_version, overlay_spec_sha256 = ROLLBACK_VERSION, ROLLBACK_SPEC_SHA256
     else:
         raise StageError("unsupported staging mode in audit result")
     receipt = {
@@ -520,6 +680,8 @@ def _receipt_payload(audit_result: dict[str, Any]) -> dict[str, Any]:
         "audio_policy": audit_result["audio_policy"],
         "changed_files": audit_result["changed_files"],
     }
+    if staging_mode == "rollback":
+        receipt["rollback"] = audit_result["rollback"]
     _portable(receipt)
     return receipt
 
@@ -546,7 +708,9 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
                             base_manifest_sha256: str | None = None,
                             overlay_manifest_sha256: str | None = None) -> dict[str, Any]:
     _portable(value)
-    if set(value) != RECEIPT_KEYS:
+    rollback = value.get("staging_mode") == "rollback"
+    expected_keys = RECEIPT_KEYS | ({"rollback"} if rollback else set())
+    if set(value) != expected_keys:
         raise StageError("staging receipt has unexpected or missing fields")
     if value.get("schema") != RECEIPT_SCHEMA:
         raise StageError("unsupported staging receipt schema")
@@ -571,14 +735,16 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
         expected_overlay = (EXACT_VERSION, EXACT_SPEC_SHA256)
     elif staging_mode == "label":
         expected_overlay = (OVERLAY_VERSION, OVERLAY_SPEC_SHA256)
+    elif rollback:
+        expected_overlay = (ROLLBACK_VERSION, ROLLBACK_SPEC_SHA256)
     else:
         raise StageError("staging receipt mode is invalid")
     if (value.get("overlay_version"), value.get("overlay_spec_sha256")) != expected_overlay:
         raise StageError("staging receipt overlay identity is invalid")
     if staging_mode == "exact" and value.get("overlay_manifest_sha256") != value.get("base_manifest_sha256"):
         raise StageError("exact staging receipt must preserve the base manifest digest")
-    if staging_mode == "label" and value.get("overlay_manifest_sha256") == value.get("base_manifest_sha256"):
-        raise StageError("label staging receipt must have a distinct overlay manifest digest")
+    if staging_mode in ("label", "rollback") and value.get("overlay_manifest_sha256") == value.get("base_manifest_sha256"):
+        raise StageError("overlay staging receipt must have a distinct manifest digest")
     if (value.get("profile"), value.get("mode"), value.get("index_production")) != ("player", "production", False):
         raise StageError("staging receipt release contract is invalid")
     if value.get("operator") != OPERATOR or value.get("contact") != CONTACT:
@@ -608,7 +774,7 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
                 or not isinstance(item["sha256"], str) or not SHA256_RE.fullmatch(item["sha256"])):
             raise StageError("staging receipt native artifact hash/size is invalid")
     changed = value.get("changed_files")
-    expected_changed = [] if staging_mode == "exact" else sorted(OVERLAY_CHANGED_PATHS)
+    expected_changed = [] if staging_mode == "exact" else (["_headers"] if rollback else sorted(OVERLAY_CHANGED_PATHS))
     if not isinstance(changed, list) or [item.get("path") for item in changed if isinstance(item, dict)] != expected_changed:
         raise StageError("staging receipt changed-file list is invalid")
     for item in changed:
@@ -624,6 +790,21 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
                 or not isinstance(item["base_sha256"], str) or not SHA256_RE.fullmatch(item["base_sha256"])
                 or not isinstance(item["overlay_sha256"], str) or not SHA256_RE.fullmatch(item["overlay_sha256"])):
             raise StageError("receipt changed-file hash/size is invalid")
+    if rollback:
+        metadata = value["rollback"]
+        if (not isinstance(metadata, dict) or set(metadata) != {"linked_receipt_sha256", "player", "files"}
+                or not isinstance(metadata["linked_receipt_sha256"], str)
+                or not SHA256_RE.fullmatch(metadata["linked_receipt_sha256"])
+                or not isinstance(metadata["player"], dict)
+                or metadata["player"].get("sourceSha") != actual_source
+                or not isinstance(metadata["files"], list) or not metadata["files"]):
+            raise StageError("rollback staging receipt metadata is invalid")
+        for record in metadata["files"]:
+            if (not isinstance(record, dict) or set(record) != {"path", "size", "sha256"}
+                    or not _safe_relative(record["path"]).startswith("online/")
+                    or type(record["size"]) is not int or record["size"] < 1
+                    or not isinstance(record["sha256"], str) or not SHA256_RE.fullmatch(record["sha256"])):
+                raise StageError("rollback staging receipt file inventory is invalid")
     return value
 
 
@@ -643,7 +824,8 @@ def validate_receipt(receipt: Path | str | dict[str, Any], *, source_sha: str | 
 def audit_staging(source_root: Path | str, sha: str, base_output: Path | str,
                   base_manifest: Path | str, base_manifest_sha256: str,
                   output: Path | str, manifest: Path | str, *,
-                  label_staging: bool | None = None) -> dict[str, Any]:
+                  label_staging: bool | None = None, rollback_build=None,
+                  rollback_linked=None, rollback_linked_receipt_sha256=None) -> dict[str, Any]:
     """Source-audit the base and validate an exact or label staging package.
 
     The function never writes to ``source_root``, ``base_output`` or
@@ -672,6 +854,28 @@ def audit_staging(source_root: Path | str, sha: str, base_output: Path | str,
     base_files = _validate_manifest_inventory(base_output, base_value, "base output")
     overlay_value, overlay_raw = _load_json(manifest, "staging manifest")
     overlay_contract = _manifest_contract(overlay_value)
+    rollback_inputs = _rollback_inputs(rollback_build, rollback_linked, rollback_linked_receipt_sha256)
+    if rollback_inputs is not None:
+        if label_staging or _inside(output, source_root) or _inside(output, base_output) or _inside(base_output, output) or _inside(manifest, output):
+            raise StageError("rollback staging requires a separate external package and manifest")
+        expected_files, metadata = _rollback_package(source_root, sha, base_files, rollback_inputs)
+        expected_manifest = dict(base_value, files=_records(expected_files), rollback=metadata)
+        if (overlay_raw != _canonical_json_bytes(expected_manifest)
+                or _validate_manifest_inventory(output, overlay_value, "rollback output") != expected_files):
+            raise StageError("rollback staging package differs from the audited exact overlay")
+        base_directories = _walk_directories(base_output, "base output")
+        online_directories = {parent.as_posix() for record in metadata["files"]
+                              for parent in Path(record["path"]).parents if parent != Path(".")}
+        if _walk_directories(output, "rollback output") != base_directories | online_directories:
+            raise StageError("rollback staging directory inventory differs from the exact overlay")
+        changed = [{"path": "_headers", "base_size": len(base_files["_headers"]),
+                    "base_sha256": _sha256_bytes(base_files["_headers"]),
+                    "overlay_size": len(expected_files["_headers"]),
+                    "overlay_sha256": _sha256_bytes(expected_files["_headers"])}]
+        result = _result(sha, base_manifest_sha256, _sha256_bytes(overlay_raw),
+                         base_contract, expected_files, changed, "rollback")
+        result["rollback"] = metadata
+        return result
     if set(overlay_value) != set(base_value):
         raise StageError("staging manifest metadata differs from the base manifest schema")
     for key in base_value:
@@ -773,7 +977,8 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
                     receipt: Path | str, *, reuse_output: Path | str | None = None,
                     reuse_manifest: Path | str | None = None,
                     base_manifest_sha256: str | None = None,
-                    label_staging: bool = False) -> dict[str, Any]:
+                    label_staging: bool = False, rollback_build=None, rollback_linked=None,
+                    rollback_linked_receipt_sha256=None) -> dict[str, Any]:
     """Prepare a fresh staging package and portable receipt.
 
     Exact byte-identical mode is the default; pass ``label_staging=True`` to
@@ -786,6 +991,9 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
     source_root = Path(source_root)
     output = Path(output)
     receipt = Path(receipt)
+    rollback_inputs = _rollback_inputs(rollback_build, rollback_linked, rollback_linked_receipt_sha256)
+    if rollback_inputs is not None and label_staging:
+        raise StageError("rollback and label staging modes are mutually exclusive")
     reuse_values = (reuse_output, reuse_manifest, base_manifest_sha256)
     if any(value is not None for value in reuse_values) and not all(value is not None for value in reuse_values):
         raise StageError("--reuse-output, --reuse-manifest and --base-manifest-sha256 are all-or-none")
@@ -818,20 +1026,28 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
     # this check after the overlay so callers cannot skip source provenance.
     _source_audit(source_root, base_output, base_manifest)
     base_files = _validate_manifest_inventory(base_output, base_value, "base output")
+    if rollback_inputs is not None:
+        expected_files, metadata = _rollback_package(source_root, sha, base_files, rollback_inputs)
     output.mkdir()
-    overlay_files = (
-        _apply_overlay(base_files, output)
-        if label_staging else _write_package(dict(base_files), output)
-    )
-    overlay_value = copy.deepcopy(base_value)
-    if label_staging:
-        overlay_value["files"] = _records(overlay_files)
-        _write_json_new(manifest, overlay_value, "staging manifest")
+    if rollback_inputs is not None:
+        overlay_files = _write_package(expected_files, output)
+        overlay_value = dict(base_value, files=_records(overlay_files), rollback=metadata)
+        _write_json_new(manifest, overlay_value, "rollback staging manifest")
     else:
-        _write_bytes_new(manifest, base_raw, "staging manifest")
+        overlay_files = (
+            _apply_overlay(base_files, output)
+            if label_staging else _write_package(dict(base_files), output)
+        )
+        if label_staging:
+            overlay_value = dict(base_value, files=_records(overlay_files))
+            _write_json_new(manifest, overlay_value, "staging manifest")
+        else:
+            _write_bytes_new(manifest, base_raw, "staging manifest")
     result = audit_staging(source_root, sha, base_output, base_manifest,
                            base_manifest_sha256, output, manifest,
-                           label_staging=label_staging)
+                           label_staging=label_staging, rollback_build=rollback_build,
+                           rollback_linked=rollback_linked,
+                           rollback_linked_receipt_sha256=rollback_linked_receipt_sha256)
     receipt_value = _receipt_payload(result)
     _write_json_new(receipt, receipt_value, "staging receipt")
     validate_receipt(receipt, source_sha=sha,
@@ -853,6 +1069,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-manifest-sha256")
     parser.add_argument("--label-staging", action="store_true",
                         help="opt into the three-file [staging] label overlay")
+    parser.add_argument("--rollback-build", type=Path)
+    parser.add_argument("--rollback-linked", type=Path)
+    parser.add_argument("--rollback-linked-receipt-sha256")
     return parser
 
 
@@ -864,7 +1083,9 @@ def main(argv: Iterable[str] | None = None) -> int:
             reuse_output=args.reuse_output,
             reuse_manifest=args.reuse_manifest,
             base_manifest_sha256=args.base_manifest_sha256,
-            label_staging=args.label_staging,
+            label_staging=args.label_staging, rollback_build=args.rollback_build,
+            rollback_linked=args.rollback_linked,
+            rollback_linked_receipt_sha256=args.rollback_linked_receipt_sha256,
         )
     except (StageError, OSError, ValueError) as exc:
         print(f"public staging preparation rejected: {exc}", file=sys.stderr)
