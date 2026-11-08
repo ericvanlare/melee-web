@@ -24,7 +24,7 @@ BASE_SOURCE_PINS = {
 }
 PROFILE_COMPOSED_SOURCE_PINS = {
     "sysdolphin/baselib/pobj.c": "9d8f99b06d96fd2ff719ed2bd98116db05a7bffc183289ca09888928cc776079",
-    "sysdolphin/baselib/shadow.c": "63e69afcc3c470b4c38d7880a1fa666c95ada9d3a5fd8541f06976669ce2fab4",
+    "sysdolphin/baselib/shadow.c": "38d1260e8e6de522eb33d6d160b4e1ec41f7066a877763aed184319474a20d8b",
     "melee/ft/ftparts.c": "9db8fb8c2b6eb53309015b78e41fcbdef7e0aa4216596a300f7b6e64c90eeed7",
 }
 
