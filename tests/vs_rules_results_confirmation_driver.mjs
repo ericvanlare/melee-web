@@ -324,17 +324,23 @@ export async function confirmTwoHumanResults({
     let observed;
     while (Date.now() < deadlineAt) {
       observed = await sample(label);
-      const readiness = observed.host.phase === 8
+      // Native stops and labels the exit before releasing the Results owner.
+      // That exact phase-8 state is part of the destination route only once
+      // the retained trace proves the second Human's completed Start edge.
+      const retiringResults = allowHostExit && allowResultsPreparationFromIndex !== null &&
+        !checkHostReadinessShape(observed.host) && stoppedPreparation(observed.host, 8,
+          RESULTS_NEXT_SCENE_PREPARATION_MESSAGE, 'results-retirement');
+      const readiness = retiringResults || (observed.host.phase === 8
         ? classifyResultsOwnerReadiness(observed.host)
         : allowHostExit
           ? classifyResultsDestinationReadiness(observed.host)
-          : invalidReadiness(`original Results exited before this confirmation boundary (host phase ${observed.host.phase})`);
+          : invalidReadiness(`original Results exited before this confirmation boundary (host phase ${observed.host.phase})`));
       if (readiness.kind === 'invalid')
         throw Error(`${label}: ${readiness.reason}: ${JSON.stringify(observed.host)}`);
       // P2's copied PAD edge is asynchronous relative to the UI observer. Keep
       // polling Results, including its checked preparation states, until that
       // edge arrives; require it before leaving Results for a destination.
-      if (allowResultsPreparationFromIndex !== null && observed.host.phase !== 8)
+      if (allowResultsPreparationFromIndex !== null && (retiringResults || observed.host.phase !== 8))
         assertP2CompletionTrace(observed.trace, allowResultsPreparationFromIndex, label, secondPort);
       if (readiness.kind === 'preparing' && allowResultsPreparationFromIndex !== null) {
         const existing = postConfirmationPreparation.find(row => row.phase === readiness.phase &&
