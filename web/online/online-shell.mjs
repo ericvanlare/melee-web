@@ -364,6 +364,7 @@ async function openRoom(nextRole,roomId){
         await until(()=>controller.startState()===5&&!controller.status().gpuPending,{signal});
         held={identity:controller.startLiveIdentity(),prefix:controller.startPrefix(),
           publication:controller.startPublication()};
+        report.startHeld=structuredClone(held);
         return held;
       },
     }});
