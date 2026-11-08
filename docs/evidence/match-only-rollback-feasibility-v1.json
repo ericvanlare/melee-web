@@ -15285,7 +15285,9 @@
                 "polls_each": 1125,
                 "source_frame_at_refusal": 1123,
                 "source_failure": "Descriptor numeric command guard rejected normal idle5 after tail presentation29; both native owners had failure0.",
-                "scope": "No final outcome/wire checksum/Results completion; exact raw review will accompany next boundary."
+                "scope": "Original ending reached; no final outcome/wire checksum/Results completion. Independent raw review retained.",
+                "independent_review_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v3/independent-result-review.json",
+                "independent_review_sha256": "5b717849dcb74fa125dbda68db1c5361430539f2f2e023d43bc4531e68c4da05"
               },
               "terminal_descriptor_repair": {
                 "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-terminal-descriptor-repair-v1/freeze.json",
@@ -15293,6 +15295,31 @@
                 "focused_result": "1 passed",
                 "scope": "Exact terminal-tail read-only descriptor phase-command admission. No build or browser rerun.",
                 "next": "Clean producer and one bounded v4 public full match"
+              },
+              "public_v4": {
+                "source_head": "b100d0e98095eae2cecb951f928fdb157cbc65be",
+                "harness_head": "b100d0e98095eae2cecb951f928fdb157cbc65be",
+                "result": "FAIL outer harness expected a published winner before original VS exit",
+                "summary_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime-peer-complete-match-public-v4/result-summary.json",
+                "summary_sha256": "5760df0a66372c7adca15aa395d3b2a47d9618499eef36b6cb0ed4f7ac1bd130",
+                "raw_report_sha256": "586cc0114d7128e505692934016949500e195f077f74766e90e3e78c33c4d715",
+                "owner_cleanup_passed": true,
+                "owned_pids_absent_count": 18,
+                "actual_input_traversals_each": 1237,
+                "terminal_source_frame": 1123,
+                "confirmed_last_ordinal": 1236,
+                "terminal_checksum_bytes": 64,
+                "outcome": 2,
+                "pre_close_winner": -1,
+                "terminal_agreement": "Both peers matched exact pre-close checksum and elimination outcome, acknowledged on wire; native command30 released both owners. Winner is intentionally unavailable until canonical finish_vs publishes original MatchEnd.",
+                "scope": "No Results/CSS success observed; not complete functional route or player-ready integration. No source order changes authorized to satisfy a premature harness assertion."
+              },
+              "published_winner_harness_repair": {
+                "freeze_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-published-winner-harness-v2/freeze.json",
+                "freeze_sha256": "a7ad865b5869a4c6593c110c076ca507ad808c5a7fd06134dc995764a0415f72",
+                "offline_replay_path": "/Volumes/AgentStorage/melee-web/runs/rollback-renderer-resume-20261028-155740-eef0524c/runtime373-retained-v4-assertion-replay-v2/result.json",
+                "offline_replay_sha256": "930d47e8cbad3034110c9a747eecde8030cbaad5166edf4708add0e3a7602b8e",
+                "scope": "Harness-only source-boundary repair: unpublished winner before original close; published winner at Results; exact Fall29 after one-poll platform exit. No native or wire change. Two focused controls and actual assertion-tail replay pass; neither establishes new browser route completion."
               }
             }
           }

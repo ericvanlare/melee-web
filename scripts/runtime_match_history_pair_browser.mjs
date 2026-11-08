@@ -1597,7 +1597,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   const proof=report.peer_correction={claim:fullMatch?'fixed 3600-input whole-match capacity, three actual late P2 corrections, repeated P1 stock losses, native terminal tail and final wire agreement':respawn?'bounded 600-input paced local trace, RIGHT/LEFT/RIGHT late inputs, P1 platform exit and stock respawn':latePiece?'bounded 120-input actual-peer trace with a late tick-26 key change and deferred packet; changed-piece restoration requires matched retained-producer control':paced120?'bounded page-owned 120-input paced clock trace with actual peer authority and native-sized rollback windows':
       'bounded page-owned eight-input cadence with actual late peer input and no-draw correction',
     scope:'native typed admission; no full raw endpoint publication during paced work',input_ticks:inputTicks,
-    checksum_exchange:fullMatch?'exact native terminal 64-byte checksum and outcome/winner acknowledged on wire':
+    checksum_exchange:fullMatch?'exact native terminal 64-byte checksum and pre-close outcome acknowledged on wire; published winner compared locally at Results':
       'none; full native confirmed post-draw checksum compared locally',
     pages:{alpha:{port:0},beta:{port:1}},comparisons:{},checks:[],
     ...(latePiece?{late_class_piece:{target_source_tick:26,transport:'LockstepPeer deferSend and exact same-tick release',
@@ -1959,7 +1959,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       assert.equal(final.consumedOrdinal,consumedTicks);
       assert.equal(final.lastInputOrdinal,consumedTicks-1);
       assert.equal(final.outcome,2,'Native source did not report the expected stock-elimination outcome');
-      assert.equal(final.winner,1,'Native source did not report P2 source slot 1 as the winner');
+      assert.equal(final.winner,-1,'Pre-close winner must remain unpublished until original VS exit');
       assert(Number.isInteger(final.randomSeed)&&final.randomSeed>=0&&final.randomSeed<=0xffffffff,
         'Native terminal receipt is missing its exact source random seed');
       assert.equal(run.finalOwner?.ownerState,2);
@@ -2148,9 +2148,9 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
         `P1 ${stockAfter}-stock browser gate differs from the native retained platform sample`);
       const exit=cycle.platform_exit;
       assert(exit?.sample?.kind==='post-present-idle'&&exit.sample.frame===platform.frame+1&&
-        exit.sample.players?.[0]?.stocks===stockAfter&&exit.sample.players[0].motion===13&&
+        exit.sample.players?.[0]?.stocks===stockAfter&&exit.sample.players[0].motion===29&&
         exit.sample.players[0].groundAir===1,
-      `P1 ${stockAfter}-stock platform exit did not complete one actual source frame later`);
+      `P1 ${stockAfter}-stock platform exit did not enter airborne Fall one actual source frame later`);
       const exitPoll=a.polls.find(value=>value.sourceFrame===platform.frame);
       assert(exitPoll&&exitPoll.pollSerial===exit.poll?.pollSerial&&
         exitPoll.ticketId===exit.poll?.ticketId&&exitPoll.localPort===0&&exitPoll.remotePort===1,
@@ -2253,7 +2253,7 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
   proof.status=fullMatch?'paced-3600-match-final-complete':respawn?'paced-600-respawn-complete':latePiece?'paced-120-late-piece-complete':paced120?'paced-120-inputs-complete':'paced-eight-inputs-complete';
   report.result=fullMatch?'PACED_3600_MATCH_FINAL_COMPLETE':respawn?'PACED_600_RESPAWN_COMPLETE':latePiece?'PACED_120_LATE_CLASS_PIECE_COMPLETE':paced120?'PACED_120_INPUTS_COMPLETE':'PACED_EIGHT_INPUTS_COMPLETE';
   if(fullMatch)addCheck('native terminal outcome and exact final wire agreement matched on both peers',
-    {outcome:a.terminal_final.receipt.outcome,winner:a.terminal_final.receipt.winner,
+    {outcome:a.terminal_final.receipt.outcome,winner_publication:'pending original VS exit',
       input_ordinal:a.terminal_final.receipt.lastInputOrdinal,
       source_frame:a.terminal_final.receipt.sourceFrame,
       matched_bytes:a.terminal_final.agreement.matched_bytes,
@@ -2262,6 +2262,38 @@ async function runPacedInputs(alpha,beta,inputTicks,latePiece=false){
       network_wait:proof.network_wait,native_network_wait:proof.native_network_wait});
   if(latePiece)addCheck('actual tick-26 late input, deferred packet release, bounded native restore and final-120 checksum agreement',
     {changed_piece_restoration:'requires matched retained-producer control'});
+}
+
+function validatePublishedFullMatchResult(role,snapshot,final){
+  const match=snapshot.match;
+  assert.equal(snapshot.state?.phase,8,`${role} published result requires original Results`);
+  assert.equal(match?.leg,'vs');
+  assert.equal(match.complete,true);
+  assert.deepEqual(match.observed_player_source_slots,[0,1]);
+  assert.equal(match.players?.length,2);
+  assert(match.players.every(player=>player.human===true));
+  assert.equal(match.frame,final.sourceFrame);
+  assert.equal(match.outcome,final.outcome);
+  assert.equal(final.outcome,2);
+  assert.deepEqual(match.terminal,{outcome:2,winners:[1]},
+    `${role} original VS exit did not publish P2 source slot 1 as the winner`);
+  return match.terminal;
+}
+
+async function readFullMatchResultsEntry(item,deadlineAt,final){
+  const readyHandle=await item.page.waitForFunction(()=>{
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    return Module._melee_web_native_menu_phase()===8&&
+      typeof Module._melee_web_native_menu_results_pad_trace==='function';
+  },null,{timeout:Math.max(1,deadlineAt-Date.now())});
+  const ready=await readyHandle.jsonValue();await readyHandle.dispose();
+  if(ready.error)throw Error(`${item.role} did not enter original Results: ${ready.error}`);
+  const snapshot=await observeRuntimeOwner(item.page,{},'published-original-match-result',
+    {includeMatch:true});
+  if(snapshot.state?.error)throw Error(`${item.role} original Results entry: ${snapshot.state.error}`);
+  const published=validatePublishedFullMatchResult(item.role,snapshot,final);
+  return {role:item.role,published,observation:snapshot.match};
 }
 
 async function finishFullMatchResultsToCss(item,deadlineAt){
@@ -2279,14 +2311,6 @@ async function finishFullMatchResultsToCss(item,deadlineAt){
     if(!['Enter','End'].includes(key))throw Error('Full-match Results permits only the actual Enter and End keys');
     return item.driver.pressChord([key],{holdMs:160,releaseMs:150});
   };
-  const readyHandle=await item.page.waitForFunction(()=>{
-    const error=document.querySelector('#status')?.dataset.runtimeError;
-    if(error)return {error};
-    return Module._melee_web_native_menu_phase()===8&&
-      typeof Module._melee_web_native_menu_results_pad_trace==='function';
-  },null,{timeout:Math.max(1,deadlineAt-Date.now())});
-  const ready=await readyHandle.jsonValue();await readyHandle.dispose();
-  if(ready.error)throw Error(`${item.role} did not enter original Results: ${ready.error}`);
   const confirmation=await confirmTwoHumanResults({deadlineAt,sourcePorts:[0,1],
     observeSample,press:()=>press('Enter'),pressSecond:()=>press('End'),
     wait:milliseconds=>item.page.waitForTimeout(milliseconds)});
@@ -2864,6 +2888,15 @@ try{
   }
   if(pacedFullMatch){
     const resultsDeadline=Date.now()+45000;
+    const entries=await joinOwned('original-results-published-match-end',[alpha,beta].map(item=>
+      readFullMatchResultsEntry(item,resultsDeadline,
+        report.peer_correction.terminal_final[item.role].receipt)));
+    report.peer_correction.published_match_end=entries;
+    assert.deepEqual(entries[0].published,entries[1].published,
+      'Peers published different original MatchEnd outcomes or ordered winners');
+    addCheck('both peers published the same original MatchEnd at Results entry',
+      {outcome:entries[0].published.outcome,winners:entries[0].published.winners,
+        scope:'local comparison after confirmed pre-close wire agreement'});
     const returned=await joinOwned('original-results-css-return',[alpha,beta].map(item=>
       finishFullMatchResultsToCss(item,resultsDeadline)));
     report.peer_correction.results_css=returned;

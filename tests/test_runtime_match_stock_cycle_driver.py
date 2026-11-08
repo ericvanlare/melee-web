@@ -143,6 +143,55 @@ console.log('stock-cycle-source-control: passed; mocked orchestration only');
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("stock-cycle-source-control: passed; mocked orchestration only", result.stdout)
 
+    def test_actual_results_entry_requires_the_source_published_winner(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node.js is required for the extracted source control")
+        source = DRIVER_PATH.read_text(encoding="utf-8")
+        start = source.index("function validatePublishedFullMatchResult(")
+        end = source.index("async function finishFullMatchResultsToCss(", start)
+        functions = source[start:end]
+        program = r'''import assert from 'node:assert/strict';
+const final={sourceFrame:1123,outcome:2,winner:-1,randomSeed:11};
+const sourceMatch={leg:'vs',complete:true,observed_player_source_slots:[0,1],
+  players:[{human:true},{human:true}],frame:1123,rng:22,outcome:2,winner:-1,
+  terminal:{outcome:2,winners:[1]}};
+let sample,events;
+const item={role:'alpha',page:{waitForFunction:async()=>{
+  events.push('results-ready');
+  return {jsonValue:async()=>true,dispose:async()=>events.push('dispose')};
+}}};
+const observeRuntimeOwner=async(page,retention,label,options)=>{
+  assert.equal(page,item.page);
+  assert.deepEqual(options,{includeMatch:true});
+  events.push(label);
+  return sample;
+};
+@@FUNCTIONS@@
+sample={state:{phase:8},match:structuredClone(sourceMatch)};events=[];
+const result=await readFullMatchResultsEntry(item,Date.now()+1000,final);
+assert.deepEqual(result.published,{outcome:2,winners:[1]});
+assert.deepEqual(result.observation,sourceMatch);
+assert.deepEqual(events,['results-ready','dispose','published-original-match-result']);
+for(const corrupt of [
+  row=>{delete row.match.terminal;},
+  row=>{row.match.terminal.winners=[0];},
+  row=>{row.match.terminal.outcome=1;},
+  row=>{row.match.frame++;},
+  row=>{row.state.phase=7;},
+]){
+  sample={state:{phase:8},match:structuredClone(sourceMatch)};events=[];
+  corrupt(sample);
+  await assert.rejects(readFullMatchResultsEntry(item,Date.now()+1000,final),
+    error=>error instanceof assert.AssertionError);
+}
+console.log('published-match-end-source-control: passed; modeled Results observation');
+'''.replace("@@FUNCTIONS@@", functions)
+        result = subprocess.run([node, "--input-type=module", "-e", program],
+                                cwd=ROOT, capture_output=True, text=True, timeout=15)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("published-match-end-source-control: passed", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()
