@@ -10,7 +10,7 @@ import urllib.parse
 import urllib.request
 
 from build_public import PLAYER_ALLOWED_ARTIFACTS, PLAYER_CSP, PLAYER_SOURCE_ALLOWLIST
-from stage_public import ROLLBACK_RELAY
+from stage_public import FROZEN_AUDIO_BASE, ROLLBACK_RELAY
 
 BLOCKED_PATHS = (
     '/runtime.html', '/prototype.html', '/viewer.html', '/native-menu.html',
@@ -132,13 +132,54 @@ def check_resource(origin, route, record, require_noindex, profile='maintenance'
             'canonical_path': urllib.parse.urlsplit(canonical).path}
 
 
-def verify(url, manifest, *, rollback_staging=False):
+def _verify_rollback_audio(origin, records, base_manifest):
+    from stage_audio_preview import verify as verify_audio
+
+    base_raw = Path(base_manifest).read_bytes()
+    require(hashlib.sha256(base_raw).hexdigest() == FROZEN_AUDIO_BASE['manifest_sha256'],
+            'rollback HTTP audit requires the frozen audio base manifest')
+    base = json.loads(base_raw)
+    rollback = records.get('rollback')
+    require(isinstance(rollback, dict) and rollback.get('audio_base') == FROZEN_AUDIO_BASE
+            and {key: value for key, value in records.items() if key not in ('files', 'rollback')}
+            == {key: value for key, value in base.items() if key != 'files'},
+            'rollback HTTP manifest changed the frozen audio identity')
+    online = [record for record in records['files'] if record['path'].startswith('online/')]
+    require(online and online == rollback.get('files'), 'rollback HTTP audit requires an exact online inventory')
+    base_paths = [record for record in records['files'] if not record['path'].startswith('online/')]
+    require(len(base_paths) == len(base['files'])
+            and {record['path'] for record in base_paths} == {record['path'] for record in base['files']}
+            and [record for record in base_paths if record['path'] != '_headers']
+            == [record for record in base['files'] if record['path'] != '_headers'],
+            'rollback HTTP manifest changed protected audio files')
+    result = verify_audio(origin, base_manifest, production=True, exact_vanilla_csp=True)
+    result['online_resources'] = [check_resource(origin, '/' + record['path'], record, True,
+                                                 'player', rollback_staging=True)
+                                  for record in online]
+    by_path = {record['path']: record for record in online}
+    result['online_aliases'] = [check_resource(origin, route, by_path[name], True, 'player',
+                                               rollback_staging=True)
+                                for route, name in (('/online', 'online/index.html'),
+                                                    ('/online/', 'online/index.html'),
+                                                    ('/online/source', 'online/source.html'))]
+    return result
+
+
+def verify(url, manifest, *, rollback_staging=False, base_audio_manifest=None):
     origin = urllib.parse.urlsplit(url)
     if origin.scheme not in ('http', 'https') or origin.path not in ('', '/') or origin.query or origin.fragment:
         raise ValueError('URL must be a plain HTTP(S) origin')
     loopback = origin.hostname in ('localhost', '127.0.0.1', '::1')
     origin = urllib.parse.urlunsplit((origin.scheme, origin.netloc, '', '', ''))
-    records = json.loads(Path(manifest).read_text())
+    manifest_raw = Path(manifest).read_bytes()
+    records = json.loads(manifest_raw)
+    if base_audio_manifest is not None:
+        require(rollback_staging, 'frozen audio manifest requires an explicit rollback HTTP audit')
+        result = _verify_rollback_audio(origin, records, base_audio_manifest)
+        result['base_manifest_sha256'] = result['manifest_sha256']
+        result['manifest_sha256'] = hashlib.sha256(manifest_raw).hexdigest()
+        result['rollback_source_sha'] = records['rollback']['player']['sourceSha']
+        return result
     profile = records.get('profile', 'maintenance')
     if profile not in ('maintenance', 'player'):
         raise ValueError('manifest profile must be maintenance or player')
@@ -209,11 +250,13 @@ def main():
     parser.add_argument('--manifest', required=True)
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--rollback-staging', action='store_true')
+    parser.add_argument('--base-audio-manifest', type=Path)
     args = parser.parse_args()
-    result = verify(args.url, args.manifest, rollback_staging=args.rollback_staging)
+    result = verify(args.url, args.manifest, rollback_staging=args.rollback_staging,
+                    base_audio_manifest=args.base_audio_manifest)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(result, indent=2) + '\n')
-    print(f"HTTP verification passed: {len(result['resources'])} exact resources, {len(result['missing'])} missing routes")
+    print(f"HTTP verification passed: {len(result['resources']) + len(result.get('online_resources', []))} exact resources, {len(result['missing'])} missing routes")
 
 
 if __name__ == '__main__':

@@ -4,8 +4,13 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from build_public import _diagnostics_graph_hash
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -196,6 +201,65 @@ class PublicStagingTests(unittest.TestCase):
                 with self.assertRaisesRegex(stage.StageError, error):
                     stage._rollback_package(*args, inputs)
                 path.write_bytes(data)
+
+    def test_frozen_audio_overlay_preserves_distinct_source_and_backend(self):
+        options = self._rollback_fixture()
+        base_source = "a" * 40
+        base_runtime = "1234567890abcdef"
+        deployment_id = "11111111-2222-3333-4444-555555555555"
+        origin = "https://11111111.webmelee-staging.pages.dev"
+        proof = self.root / "audio-proof"
+        proof.mkdir()
+        backend = self.base.with_name(self.base.name + ".functions")
+        backend.mkdir()
+        routes = {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}
+        backend_bytes = {"_routes.json": stage._canonical_json_bytes(routes),
+                         "functions/api/diagnostics.js": b"frozen diagnostics"}
+        for name, raw in backend_bytes.items():
+            path = backend / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+        graph_hash = _diagnostics_graph_hash(backend_bytes)
+        identity = {"audio_policy": stage.FROZEN_AUDIO_POLICY, "artifacts": []}
+        identity_sha = stage._sha256_bytes(stage._canonical_json_bytes(identity))
+        manifest = {
+            "schema": "melee-web-audio-player-package-v1", "profile": "audio-player", "project": "webmelee",
+            "source_sha": base_source, "runtime_hash": base_runtime, "identity_sha256": identity_sha,
+            "files": stage._records(self.base_files),
+            "backend": {"directory": backend.name, "routes": routes, "graph_sha256": graph_hash,
+                        "files": stage._records(backend_bytes)},
+        }
+        self.base_manifest.write_bytes(stage._canonical_json_bytes(manifest))
+        digest = stage._sha256_bytes(self.base_manifest.read_bytes())
+        pin = {"source_sha": base_source, "runtime_hash": base_runtime, "deployment_id": deployment_id,
+               "manifest_sha256": digest, "backend_sha256": graph_hash}
+        receipts = {
+            "deployment-receipt.json": dict(pin, project=stage.STAGING_PROJECT, branch=stage.STAGING_BRANCH,
+                                            immutable_url=origin),
+            "immutable-http.json": {"origin": origin, "result": "pass", "manifest_sha256": digest},
+            "functions-proof.json": {"validated": True},
+            "runtime-audio-preview-identity.json": identity,
+        }
+        for name, data in receipts.items():
+            (proof / name).write_bytes(stage._canonical_json_bytes(data))
+        proof_pins = {name: stage._sha256_bytes((proof / name).read_bytes()) for name in receipts}
+        output, receipt = self.root / "online-output", self.root / "online-receipt.json"
+        with patch.object(stage, "FROZEN_AUDIO_BASE", pin), patch.object(stage, "FROZEN_AUDIO_PROOFS", proof_pins), \
+                patch.object(stage, "_validate_source_sha"), patch.object(stage, "_validate_pr15_guard"), \
+                patch.object(stage, "_source_audit") as source_audit:
+            result = stage.prepare_staging(
+                self.source, "b" * 40, output, receipt, reuse_output=self.base, reuse_manifest=self.base_manifest,
+                base_manifest_sha256=digest, frozen_audio_proof=proof, **options)
+            source_audit.assert_not_called()
+            overlay = json.loads(result["manifest"].read_bytes())
+            self.assertEqual(overlay["source_sha"], base_source)
+            self.assertEqual(overlay["rollback"]["player"]["sourceSha"], "b" * 40)
+            self.assertEqual(overlay["backend"], manifest["backend"])
+            self.assertEqual(stage.validate_receipt(receipt)["rollback"]["audio_base"], pin)
+            (backend / "functions/api/diagnostics.js").write_bytes(b"unexpected Functions")
+            with self.assertRaisesRegex(stage.StageError, "Functions bytes changed"):
+                stage.audit_staging(self.source, "b" * 40, self.base, self.base_manifest, digest, output,
+                                    result["manifest"], frozen_audio_proof=proof, **options)
 
     def test_reuse_inputs_are_all_or_none(self):
         output = self.root / "new-output"

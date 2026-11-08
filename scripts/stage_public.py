@@ -49,6 +49,24 @@ EXACT_SPEC = "copy the audited production/player base without a staging overlay"
 EXACT_SPEC_SHA256 = hashlib.sha256(EXACT_SPEC.encode("utf-8")).hexdigest()
 EXACT_VERSION = "melee-web-staging-exact-v1"
 
+FROZEN_AUDIO_BASE = {
+    "source_sha": "0258f2fc73613fbfd2d07fe67277bf4f97890c9b",
+    "runtime_hash": "5e6240776085dbf6",
+    "deployment_id": "526e0535-279b-4174-b53b-563b60fac501",
+    "manifest_sha256": "529d6ca0cf62196bd411e117437fb3bea3348d2be74d3c12cdca71be0ca56ac8",
+    "backend_sha256": "8224be9550e62d06c02a0866787212be1f2cfe86cb040e557222cd3402b659b6",
+}
+FROZEN_AUDIO_PROOFS = {
+    "deployment-receipt.json": "fc13d331819c6755bd918cb5b1886d987bea3f5f707811d7ee617caa0b7c17ce",
+    "immutable-http.json": "0cc0451fb8c269a98ad695ee22dc5547ab6681b13a23cd961e1adb17c8fcc779",
+    "functions-proof.json": "57e43f6d1e9520c0cb7b332e3d936e5b9f5e2be9263eff805ffd419814518c4c",
+    "runtime-audio-preview-identity.json": "0e956a2ef0f82f65a45a080a0efe9d3b969626f8ffb43d50c96e2e316c33aff4",
+}
+FROZEN_AUDIO_POLICY = {
+    "mode": "enabled-preview", "pcm_output": True, "dsp_resampler": True,
+    "dsp_coefficients_required": True,
+}
+
 ROLLBACK_VERSION = "melee-web-staging-rollback-v1"
 ROLLBACK_SPEC_SHA256 = hashlib.sha256(
     b"audited vanilla bytes plus exact online player and route-scoped CSP v1"
@@ -401,6 +419,56 @@ def _overlay_headers(data: bytes) -> bytes:
     return result
 
 
+def _audit_frozen_audio_base(base_output, manifest, manifest_digest, proof_dir):
+    from build_public import _diagnostics_graph_hash
+
+    pin = FROZEN_AUDIO_BASE
+    if (manifest_digest != pin["manifest_sha256"]
+            or manifest.get("schema") != "melee-web-audio-player-package-v1"
+            or manifest.get("profile") != "audio-player" or manifest.get("project") != "webmelee"
+            or manifest.get("source_sha") != pin["source_sha"]
+            or manifest.get("runtime_hash") != pin["runtime_hash"]
+            or manifest.get("identity_sha256") != FROZEN_AUDIO_PROOFS["runtime-audio-preview-identity.json"]):
+        raise StageError("rollback audio base is not the reviewed deployed artifact")
+    proof_dir = Path(proof_dir)
+    _require_directory(proof_dir, "frozen audio evidence")
+    proof = {}
+    for name, expected in FROZEN_AUDIO_PROOFS.items():
+        value, raw = _load_json(proof_dir / name, "frozen audio evidence")
+        if _sha256_bytes(raw) != expected:
+            raise StageError(f"frozen audio evidence digest changed: {name}")
+        proof[name] = value
+    deployment = proof["deployment-receipt.json"]
+    http = proof["immutable-http.json"]
+    if (deployment.get("deployment_id") != pin["deployment_id"]
+            or deployment.get("project") != STAGING_PROJECT or deployment.get("branch") != STAGING_BRANCH
+            or deployment.get("source_sha") != pin["source_sha"]
+            or deployment.get("runtime_hash") != pin["runtime_hash"]
+            or deployment.get("manifest_sha256") != manifest_digest
+            or http.get("origin") != deployment.get("immutable_url")
+            or http.get("result") != "pass" or http.get("manifest_sha256") != manifest_digest
+            or proof["functions-proof.json"].get("validated") is not True):
+        raise StageError("frozen audio deployment and audit receipts do not agree")
+
+    backend = manifest["backend"]
+    expected_routes = {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}
+    if (backend.get("directory") != base_output.name + ".functions"
+            or backend.get("routes") != expected_routes
+            or backend.get("graph_sha256") != pin["backend_sha256"]):
+        raise StageError("frozen audio Functions metadata changed")
+    files = _walk_files(base_output.parent / backend["directory"], "frozen audio Functions")
+    expected = [{key: item[key] for key in ("path", "size", "sha256")} for item in backend["files"]]
+    if (_records(files) != sorted(expected, key=lambda item: item["path"])
+            or _diagnostics_graph_hash(files) != pin["backend_sha256"]):
+        raise StageError("frozen audio Functions bytes changed")
+    identity = proof["runtime-audio-preview-identity.json"]
+    if identity.get("audio_policy") != FROZEN_AUDIO_POLICY:
+        raise StageError("frozen audio producer policy changed")
+    return {"profile": "audio-player", "audio_policy": FROZEN_AUDIO_POLICY, "identity": identity,
+            "runtime": {"path": f"runtime/{pin['runtime_hash']}", "hash": pin["runtime_hash"],
+                        "identity_sha256": manifest["identity_sha256"]}}
+
+
 def _rollback_headers(data: bytes) -> bytes:
     # Keep the existing catch-all verbatim. The combined detach/replacement
     # requires separate Pages HTTP verification before deployment.
@@ -633,7 +701,7 @@ def _result(
         "base_manifest_sha256": base_manifest_sha256,
         "overlay_manifest_sha256": overlay_manifest_sha256,
         "staging_mode": staging_mode,
-        "profile": "player",
+        "profile": base.get("profile", "player"),
         "mode": "production",
         "index_production": False,
         "operator": OPERATOR,
@@ -745,7 +813,9 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
         raise StageError("exact staging receipt must preserve the base manifest digest")
     if staging_mode in ("label", "rollback") and value.get("overlay_manifest_sha256") == value.get("base_manifest_sha256"):
         raise StageError("overlay staging receipt must have a distinct manifest digest")
-    if (value.get("profile"), value.get("mode"), value.get("index_production")) != ("player", "production", False):
+    frozen_audio = rollback and value.get("profile") == "audio-player"
+    expected_profile = "audio-player" if frozen_audio else "player"
+    if (value.get("profile"), value.get("mode"), value.get("index_production")) != (expected_profile, "production", False):
         raise StageError("staging receipt release contract is invalid")
     if value.get("operator") != OPERATOR or value.get("contact") != CONTACT:
         raise StageError("staging receipt operator/contact facts are invalid")
@@ -758,11 +828,12 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
             or not SHA256_RE.fullmatch(runtime["identity_sha256"])):
         raise StageError("staging receipt runtime identity is invalid")
     policy = value.get("audio_policy")
-    if policy != {
-        "mode": "disabled", "pcm_output": False,
-        "dsp_resampler": False, "dsp_coefficients_required": False,
-    }:
-        raise StageError("staging receipt audio policy is not silent")
+    expected_policy = FROZEN_AUDIO_POLICY if frozen_audio else {
+        "mode": "disabled", "pcm_output": False, "dsp_resampler": False,
+        "dsp_coefficients_required": False,
+    }
+    if policy != expected_policy:
+        raise StageError("staging receipt audio policy differs from its reviewed base")
     native = value.get("native_artifacts")
     if not isinstance(native, list):
         raise StageError("staging receipt native artifact list is invalid")
@@ -792,13 +863,21 @@ def _validate_receipt_value(value: dict[str, Any], *, source_sha: str | None = N
             raise StageError("receipt changed-file hash/size is invalid")
     if rollback:
         metadata = value["rollback"]
-        if (not isinstance(metadata, dict) or set(metadata) != {"linked_receipt_sha256", "player", "files"}
+        metadata_keys = {"linked_receipt_sha256", "player", "files"}
+        if frozen_audio:
+            metadata_keys.add("audio_base")
+        if (not isinstance(metadata, dict) or set(metadata) != metadata_keys
                 or not isinstance(metadata["linked_receipt_sha256"], str)
                 or not SHA256_RE.fullmatch(metadata["linked_receipt_sha256"])
                 or not isinstance(metadata["player"], dict)
                 or metadata["player"].get("sourceSha") != actual_source
                 or not isinstance(metadata["files"], list) or not metadata["files"]):
             raise StageError("rollback staging receipt metadata is invalid")
+        if frozen_audio and (metadata["audio_base"] != FROZEN_AUDIO_BASE
+                             or value["base_manifest_sha256"] != FROZEN_AUDIO_BASE["manifest_sha256"]
+                             or runtime["hash"] != FROZEN_AUDIO_BASE["runtime_hash"]
+                             or runtime["identity_sha256"] != FROZEN_AUDIO_PROOFS["runtime-audio-preview-identity.json"]):
+            raise StageError("rollback receipt does not retain the frozen audio base")
         for record in metadata["files"]:
             if (not isinstance(record, dict) or set(record) != {"path", "size", "sha256"}
                     or not _safe_relative(record["path"]).startswith("online/")
@@ -825,7 +904,8 @@ def audit_staging(source_root: Path | str, sha: str, base_output: Path | str,
                   base_manifest: Path | str, base_manifest_sha256: str,
                   output: Path | str, manifest: Path | str, *,
                   label_staging: bool | None = None, rollback_build=None,
-                  rollback_linked=None, rollback_linked_receipt_sha256=None) -> dict[str, Any]:
+                  rollback_linked=None, rollback_linked_receipt_sha256=None,
+                  frozen_audio_proof=None) -> dict[str, Any]:
     """Source-audit the base and validate an exact or label staging package.
 
     The function never writes to ``source_root``, ``base_output`` or
@@ -849,16 +929,22 @@ def audit_staging(source_root: Path | str, sha: str, base_output: Path | str,
     base_value, base_raw = _load_json(base_manifest, "base manifest")
     if _sha256_bytes(base_raw) != base_manifest_sha256:
         raise StageError("base manifest SHA-256 does not match the pinned digest")
-    base_contract = _manifest_contract(base_value)
-    _source_audit(source_root, base_output, base_manifest)
+    rollback_inputs = _rollback_inputs(rollback_build, rollback_linked, rollback_linked_receipt_sha256)
+    if frozen_audio_proof is not None:
+        if rollback_inputs is None:
+            raise StageError("frozen audio base requires the explicit rollback overlay")
+        base_contract = _audit_frozen_audio_base(base_output, base_value, base_manifest_sha256, frozen_audio_proof)
+    else:
+        base_contract = _manifest_contract(base_value)
+        _source_audit(source_root, base_output, base_manifest)
     base_files = _validate_manifest_inventory(base_output, base_value, "base output")
     overlay_value, overlay_raw = _load_json(manifest, "staging manifest")
-    overlay_contract = _manifest_contract(overlay_value)
-    rollback_inputs = _rollback_inputs(rollback_build, rollback_linked, rollback_linked_receipt_sha256)
     if rollback_inputs is not None:
         if label_staging or _inside(output, source_root) or _inside(output, base_output) or _inside(base_output, output) or _inside(manifest, output):
             raise StageError("rollback staging requires a separate external package and manifest")
         expected_files, metadata = _rollback_package(source_root, sha, base_files, rollback_inputs)
+        if frozen_audio_proof is not None:
+            metadata["audio_base"] = FROZEN_AUDIO_BASE
         expected_manifest = dict(base_value, files=_records(expected_files), rollback=metadata)
         if (overlay_raw != _canonical_json_bytes(expected_manifest)
                 or _validate_manifest_inventory(output, overlay_value, "rollback output") != expected_files):
@@ -876,6 +962,7 @@ def audit_staging(source_root: Path | str, sha: str, base_output: Path | str,
                          base_contract, expected_files, changed, "rollback")
         result["rollback"] = metadata
         return result
+    overlay_contract = _manifest_contract(overlay_value)
     if set(overlay_value) != set(base_value):
         raise StageError("staging manifest metadata differs from the base manifest schema")
     for key in base_value:
@@ -978,7 +1065,7 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
                     reuse_manifest: Path | str | None = None,
                     base_manifest_sha256: str | None = None,
                     label_staging: bool = False, rollback_build=None, rollback_linked=None,
-                    rollback_linked_receipt_sha256=None) -> dict[str, Any]:
+                    rollback_linked_receipt_sha256=None, frozen_audio_proof=None) -> dict[str, Any]:
     """Prepare a fresh staging package and portable receipt.
 
     Exact byte-identical mode is the default; pass ``label_staging=True`` to
@@ -997,6 +1084,8 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
     reuse_values = (reuse_output, reuse_manifest, base_manifest_sha256)
     if any(value is not None for value in reuse_values) and not all(value is not None for value in reuse_values):
         raise StageError("--reuse-output, --reuse-manifest and --base-manifest-sha256 are all-or-none")
+    if frozen_audio_proof is not None and (rollback_inputs is None or not all(reuse_values)):
+        raise StageError("frozen audio base requires rollback inputs and all reuse pins")
     _validate_source_sha(source_root, sha)
     _validate_pr15_guard(source_root)
     _new_external_directory(output, source_root, "staging output")
@@ -1021,13 +1110,16 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
     base_value, base_raw = _load_json(base_manifest, "base manifest")
     if _sha256_bytes(base_raw) != base_manifest_sha256:
         raise StageError("base manifest SHA-256 does not match the requested digest")
-    _manifest_contract(base_value)
-    # Run the immutable base audit before copying it.  audit_staging repeats
-    # this check after the overlay so callers cannot skip source provenance.
-    _source_audit(source_root, base_output, base_manifest)
+    if frozen_audio_proof is not None:
+        _audit_frozen_audio_base(base_output, base_value, base_manifest_sha256, frozen_audio_proof)
+    else:
+        _manifest_contract(base_value)
+        _source_audit(source_root, base_output, base_manifest)
     base_files = _validate_manifest_inventory(base_output, base_value, "base output")
     if rollback_inputs is not None:
         expected_files, metadata = _rollback_package(source_root, sha, base_files, rollback_inputs)
+        if frozen_audio_proof is not None:
+            metadata["audio_base"] = FROZEN_AUDIO_BASE
     output.mkdir()
     if rollback_inputs is not None:
         overlay_files = _write_package(expected_files, output)
@@ -1047,7 +1139,8 @@ def prepare_staging(source_root: Path | str, sha: str, output: Path | str,
                            base_manifest_sha256, output, manifest,
                            label_staging=label_staging, rollback_build=rollback_build,
                            rollback_linked=rollback_linked,
-                           rollback_linked_receipt_sha256=rollback_linked_receipt_sha256)
+                           rollback_linked_receipt_sha256=rollback_linked_receipt_sha256,
+                           frozen_audio_proof=frozen_audio_proof)
     receipt_value = _receipt_payload(result)
     _write_json_new(receipt, receipt_value, "staging receipt")
     validate_receipt(receipt, source_sha=sha,
@@ -1072,6 +1165,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--rollback-build", type=Path)
     parser.add_argument("--rollback-linked", type=Path)
     parser.add_argument("--rollback-linked-receipt-sha256")
+    parser.add_argument("--frozen-audio-proof", type=Path)
     return parser
 
 
@@ -1086,6 +1180,7 @@ def main(argv: Iterable[str] | None = None) -> int:
             label_staging=args.label_staging, rollback_build=args.rollback_build,
             rollback_linked=args.rollback_linked,
             rollback_linked_receipt_sha256=args.rollback_linked_receipt_sha256,
+            frozen_audio_proof=args.frozen_audio_proof,
         )
     except (StageError, OSError, ValueError) as exc:
         print(f"public staging preparation rejected: {exc}", file=sys.stderr)

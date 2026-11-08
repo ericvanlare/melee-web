@@ -229,11 +229,15 @@ class Pages:
         return body['result']
 
 
-def verify_http(source_root, origin, manifest, *, rollback_staging=False):
+def verify_http(source_root, origin, manifest, *, rollback_staging=False, base_audio_manifest=None):
     require(origin in (STABLE, PAGES) or immutable_origin(origin), 'Invalid staging origin')
     verifier = load_module(source_root / 'scripts/verify_public_http.py', '_staging_http')
-    report = (verifier.verify(origin, manifest, rollback_staging=True) if rollback_staging
-              else verifier.verify(origin, manifest))
+    if base_audio_manifest is not None:
+        report = verifier.verify(origin, manifest, rollback_staging=True, base_audio_manifest=base_audio_manifest)
+    elif rollback_staging:
+        report = verifier.verify(origin, manifest, rollback_staging=True)
+    else:
+        report = verifier.verify(origin, manifest)
     records = json.loads(manifest.read_text())['files']
     maps = tuple('/' + record['path'] + '.map' for record in records
                  if record['path'].endswith(('.wasm', '.js', '.mjs')))
@@ -403,6 +407,7 @@ def main():
     parser.add_argument('--rollback-build', type=Path)
     parser.add_argument('--rollback-linked', type=Path)
     parser.add_argument('--rollback-linked-receipt-sha256')
+    parser.add_argument('--frozen-audio-proof', type=Path)
     parser.add_argument('--verify-custom-domain', action='store_true',
                         help='Also require the optional staging.webmelee.gg hostname to pass')
     args = parser.parse_args()
@@ -419,6 +424,11 @@ def main():
                           rollback_linked=args.rollback_linked.resolve(),
                           rollback_linked_receipt_sha256=args.rollback_linked_receipt_sha256)
                      if rollback_staging else {})
+    base_audio_manifest = None
+    if args.frozen_audio_proof is not None:
+        require(rollback_staging, 'Frozen audio proof requires all rollback staging producer inputs')
+        audit_options['frozen_audio_proof'] = args.frozen_audio_proof.resolve()
+        base_audio_manifest = args.base_manifest.resolve()
     args.report_dir = args.report_dir.resolve()
     require(not args.report_dir.is_relative_to(args.output.resolve()) and
             not args.report_dir.is_relative_to(args.base_output.resolve()),
@@ -436,7 +446,8 @@ def main():
     if backend is not None:
         require(isinstance(backend, dict) and isinstance(backend.get('directory'), str),
                 'Diagnostics backend manifest metadata is invalid')
-        backend_sidecar = args.output.parent / backend['directory']
+        backend_sidecar = ((args.base_output if base_audio_manifest is not None else args.output).parent
+                           / backend['directory'])
         if not backend_sidecar.is_dir():
             base_candidate = args.base_output.parent / backend['directory']
             if base_candidate.is_dir():
@@ -462,6 +473,9 @@ def main():
         validate_project(project)
         previous = project.get('canonical_deployment')
         record['previous_staging_deployment_id'] = previous.get('id') if previous else None
+        if base_audio_manifest is not None and args.action == 'deploy':
+            require((previous or {}).get('id') == stage.FROZEN_AUDIO_BASE['deployment_id'],
+                    'Canonical staging deployment differs from the frozen audio base')
         if previous and args.action == 'deploy':
             require(args.previous_record, 'Preserve the previous staging deployment record before replacing it')
             previous_record = json.loads(args.previous_record.read_text())
@@ -469,6 +483,9 @@ def main():
                     previous_record.get('project') == PROJECT and
                     re.fullmatch(r'[0-9a-f]{64}', previous_record.get('manifest_sha256', '')),
                     'Previous staging record does not match the current rollback target')
+            if base_audio_manifest is not None:
+                require(previous_record['manifest_sha256'] == stage.FROZEN_AUDIO_BASE['manifest_sha256'],
+                        'Previous staging receipt does not bind the frozen audio manifest')
             write_json(args.report_dir / 'previous-staging-deployment.json', previous_record)
         write_json(args.report_dir / 'operation-started.json', record)
         if args.action == 'rollback':
@@ -477,7 +494,8 @@ def main():
             record.update(validate_deployment(target, args.sha))
             immutable = record['immutable_url']
             write_json(args.report_dir / 'rollback-target-http.json',
-                       verify_http(args.source_root, immutable, args.manifest, rollback_staging=rollback_staging))
+                       verify_http(args.source_root, immutable, args.manifest, rollback_staging=rollback_staging,
+                                   base_audio_manifest=base_audio_manifest))
             api.request('/deployments/' + args.deployment_id, rollback=True)
         else:
             with tempfile.TemporaryDirectory(prefix='webmelee-staging-upload-') as directory:
@@ -489,6 +507,14 @@ def main():
                 if backend_sidecar is not None:
                     shutil.copytree(backend_sidecar / 'functions', Path(directory) / 'functions')
                     shutil.copy2(backend_sidecar / '_routes.json', upload / '_routes.json')
+                    if base_audio_manifest is not None:
+                        copied = {'functions/' + name: data for name, data in
+                                  stage._walk_files(Path(directory) / 'functions', 'upload Functions').items()}
+                        copied['_routes.json'] = (upload / '_routes.json').read_bytes()
+                        expected = [{key: item[key] for key in ('path', 'size', 'sha256')}
+                                    for item in backend['files']]
+                        require(stage._records(copied) == sorted(expected, key=lambda item: item['path']),
+                                'Frozen audio Functions bytes changed before upload')
                 config_path = Path(directory) / 'wrangler.json'
                 write_json(config_path, diagnostics_wrangler_config(project))
                 command = [api.wrangler, 'pages', 'deploy', str(upload), '--project-name', PROJECT,
@@ -519,7 +545,7 @@ def main():
         origins.append(('custom', STABLE))
     for name, origin in origins:
         write_json(args.report_dir / (name + '-http.json'), verify_http(args.source_root, origin, args.manifest,
-                        rollback_staging=rollback_staging))
+                        rollback_staging=rollback_staging, base_audio_manifest=base_audio_manifest))
     write_json(args.report_dir / 'verified.json', {**record, 'http_result': 'pass',
                 'custom_domain_verified': args.verify_custom_domain,
                 'browser_result': 'separate headed lifecycle check required'})

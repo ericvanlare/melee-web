@@ -18,7 +18,7 @@ window.addEventListener('keydown',event=>heldKeys.add(event.code),true);
 window.addEventListener('keyup',event=>heldKeys.delete(event.code),true);
 window.addEventListener('blur',()=>heldKeys.clear(),true);
 let player,context,state,controller,setup,bridge,loop,prepareWork,loopWork,closed=false,roomUsed=false,discReady=false;
-let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,userLeave=false;
+let hostIdentity,held,packageInfo,table,role,closeWork,historyOwned=false,nativeRetired=false,userLeave=false;
 const report={schema:'melee-web-staging-rollback-session-v1',result:'pending',failure:null,
   scope:'experimental Mario/FD match-only rollback; no full-profile or timing acceptance'};
 function error(error){
@@ -121,12 +121,17 @@ async function close(){
       // Preparation can already own an asynchronous native command before the
       // live loop promise exists. Let it settle before asking that owner to retire.
       await Promise.allSettled([prepareWork,loopWork].filter(Boolean));
-      if(controller?.status().ownerState===1)await controller.command('cleanup');
+      if(controller?.status().ownerState===1){
+        // Native cleanup closes the game and cancels its main loop. An ordinary
+        // queued unload cannot run after that terminal command.
+        report.cleanupOwner=await controller.command('cleanup');nativeRetired=true;
+        await context.pauseAudioForPreparation();
+      }
       historyOwned=false;
     }]){
       try{await action();}catch(cause){failures.push(cause);}
     }
-    $('host').disabled=$('join').disabled=$('leave').disabled=true;
+    $('host').disabled=$('join').disabled=$('leave').disabled=$('controls-open').disabled=true;
     report.closed=true;
     if(failures.length)throw new AggregateError(failures,'Room cleanup failed.');
   })();
@@ -135,11 +140,20 @@ async function close(){
 // Bounded, read-only diagnostics for the same UI that players use. Native
 // observers copy source state; callers receive no runtime or command handles.
 export async function onlineSessionSnapshot({source=false,diagnostics=false}={}){
-  if(!controller||(!historyOwned&&state?.requiresReload))return structuredClone({
+  const supplement=async snapshot=>{
+    snapshot.stagingDiagnosticsEnabled=context?.callbacks?.menuStagingDiagnosticsEnabled()??false;
+    if(diagnostics){
+      snapshot.session=structuredClone(report);
+      snapshot.incidents=context?.diagnostics?.exportReports()??null;
+      snapshot.retainedIncidents=await context?.diagnostics?.exportRetained()??null;
+    }
+    return snapshot;
+  };
+  if(!controller||(!historyOwned&&!nativeRetired&&state?.requiresReload))return supplement(structuredClone({
     role,roomId:report.roomId,stage:closed?'closed':report.failure?'failed':'loading',
     error:report.failure,phase:null,running:null,owner:null,result:report.result,
-    closed:!!report.closed,...(diagnostics?{session:report}:{}),
-  });
+    closed:!!report.closed,
+  }));
   const sample=()=>{
     const m=context?.Module,owner=controller?.status()??null;
     const phase=m?._melee_web_native_menu_phase?.()??null;
@@ -172,12 +186,11 @@ export async function onlineSessionSnapshot({source=false,diagnostics=false}={})
           !owner.gpuPending&&!owner.endpointActive&&!owner.firstFailure&&!owner.rendererErrors)
         snapshot.match=readJSON('_melee_web_native_menu_match_observe');
     }
-    if(diagnostics){snapshot.session=report;snapshot.incidents=context?.diagnostics?.exportReports()??null;}
     return structuredClone(snapshot);
   };
   // The ordinary runtime owns menu/loading Asyncify. During rollback the typed
   // controller guards its own inline calls instead; never re-enter either owner.
-  return controller&&!historyOwned&&!state?.requiresReload?context.boundary(sample):sample();
+  return supplement(!historyOwned&&!nativeRetired?await context.boundary(sample):sample());
 }
 window.onlineSessionSnapshot=onlineSessionSnapshot;
 async function openRoom(nextRole,roomId){
@@ -278,7 +291,7 @@ $('disc-file').onchange=async()=>{
 for(const [id,nextRole] of [['host','alpha'],['join','beta']])
   $(id).onclick=()=>void openRoom(nextRole,nextRole==='alpha'?createRoomId():$('room-code').value.trim())
     .catch(cause=>{error(cause);void close().catch(error);});
-$('leave').onclick=async()=>{userLeave=true;try{await close();await player.unload();status('Room closed. Reload to play again.');}catch(cause){error(cause);}};
+$('leave').onclick=async()=>{userLeave=true;try{await close();if(!nativeRetired)await player.unload();status('Room closed. Reload to play again.');}catch(cause){error(cause);}};
 $('copy').onclick=async()=>{try{
   const url=new URL(location.href);url.hash=new URLSearchParams({room:$('room-code').value}).toString();
   await navigator.clipboard.writeText(url.href);status('Invite copied.');

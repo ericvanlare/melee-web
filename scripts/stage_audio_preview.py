@@ -255,7 +255,7 @@ def prepare(output, manifest, *, production=False):
     return audit(output, manifest, production=production)
 
 
-def verify(origin, manifest, *, production=False):
+def verify(origin, manifest, *, production=False, exact_vanilla_csp=False):
     loopback = bool(re.fullmatch(r'http://(?:127\.0\.0\.1|localhost):\d+', origin or ''))
     allowed = (origin == 'https://webmelee.gg' or
                re.fullmatch(r'https://[0-9a-f]{8}\.webmelee\.pages\.dev', origin or '') or
@@ -287,10 +287,12 @@ def verify(origin, manifest, *, production=False):
     for item in records:
         if item['path'] in ('_headers', '_redirects'):
             continue
-        http.check_resource(origin, '/' + item['path'], item, True, 'player')
+        http.check_resource(origin, '/' + item['path'], item, True, 'player',
+                            rollback_staging=exact_vanilla_csp)
         checked.append(item['path'])
     by_path = {item['path']: item for item in records}
-    aliases = [http.check_resource(origin, route, by_path[name], True, 'player')
+    aliases = [http.check_resource(origin, route, by_path[name], True, 'player',
+                                   rollback_staging=exact_vanilla_csp)
                for route, name in (('/', 'index.html'), ('/terms', 'terms.html'), ('/privacy', 'privacy.html'),
                                    ('/copyright', 'copyright.html'), ('/notices', 'notices.html'))]
     missing, limitations = [], []
