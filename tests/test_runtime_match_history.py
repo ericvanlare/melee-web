@@ -838,7 +838,7 @@ struct MockCheckpoint {
   unsigned seal_calls{}, close_calls{}, archive_calls{}, restore_calls{}, begin_calls{};
   std::uint32_t seal_frame{}, restore_frame=100;
   bool seal_history_incarnation(Session& s,const char**) { ++seal_calls; seal_frame=s.frame; return seal_ok; }
-  bool close_history_endpoint(Session&) { ++close_calls; return close_ok; }
+  bool close_history_endpoint(Session&,char*,std::size_t) { ++close_calls; return close_ok; }
   bool archive_history_endpoint(Session&) { ++archive_calls; return archive_ok; }
   GameplayCpuCommitResult restore_history_pre(Session& s,char*,std::size_t) {
     ++restore_calls; if(!restore_ok)return GameplayCpuCommitResult::Refused;

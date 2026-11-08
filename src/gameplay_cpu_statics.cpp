@@ -1,5 +1,6 @@
 #include "gameplay_cpu_statics.hpp"
 #include <cstring>
+#include <cstdio>
 #include <limits>
 #include <new>
 #include <exception>
@@ -319,16 +320,37 @@ CpuStaticEndpointRow GameplayCpuStatics::history_endpoint_row(std::uint64_t inde
 }
 
 bool GameplayCpuStatics::history_close_endpoint(std::uint64_t incarnation,
-                                                 std::uint32_t actual_end) noexcept
+    std::uint32_t actual_end, char* refusal, std::size_t refusal_bytes) noexcept
 {
-    if((history_phase_!=HistoryPhase::EndpointSealed&&
-        history_phase_!=HistoryPhase::ConfirmedPrefix)||history_endpoint_closed_||
-       incarnation!=history_incarnation_||actual_end!=history_end_frame_||
-       !layout_valid()||!invariants_match())return false;
+    const auto refuse=[&](const char* reason){
+        if(refusal&&refusal_bytes)
+            std::snprintf(refusal,refusal_bytes,"leaf=statics-close reason=%s",reason);
+        return false;
+    };
+    if(history_phase_!=HistoryPhase::EndpointSealed&&
+       history_phase_!=HistoryPhase::ConfirmedPrefix)return refuse("phase");
+    if(history_endpoint_closed_)return refuse("already-closed");
+    if(incarnation!=history_incarnation_||actual_end!=history_end_frame_)
+        return refuse("identity");
+    if(!layout_valid())return refuse("layout");
+    if(!invariants_match())return refuse("invariant");
     std::size_t offset=0;
-    for(const auto& row:rows_){
-        if(std::memcmp(after_.data()+offset,
-                       reinterpret_cast<const void*>(std::uintptr_t(row.address)),row.bytes))return false;
+    for(std::size_t ordinal=0;ordinal<rows_.size();++ordinal){
+        const auto& row=rows_[ordinal];
+        const auto* sealed=reinterpret_cast<const unsigned char*>(after_.data()+offset);
+        const auto* live=reinterpret_cast<const unsigned char*>(std::uintptr_t(row.address));
+        if(std::memcmp(sealed,live,row.bytes)){
+            if(refusal&&refusal_bytes){
+                std::uint32_t byte=0;
+                while(byte<row.bytes&&sealed[byte]==live[byte])++byte;
+                if(byte<row.bytes)
+                    std::snprintf(refusal,refusal_bytes,
+                        "leaf=statics-close reason=row-drift ordinal=%zu address=0x%08x byte=%u sealed=%02x live=%02x",
+                        ordinal,row.address,byte,static_cast<unsigned>(sealed[byte]),
+                        static_cast<unsigned>(live[byte]));
+            }
+            return false;
+        }
         offset+=row.bytes;
     }
     history_endpoint_closed_=true;

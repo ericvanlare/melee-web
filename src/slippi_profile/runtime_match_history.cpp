@@ -1065,14 +1065,21 @@ bool RuntimeMatchHistory::close_selected_endpoint() noexcept
     const bool presented_frontier=phase_==RuntimeMatchHistoryPhase::PresentedComplete;
     const std::uint32_t required=presented_frontier?PresentedFrontier:
         (corrected?(CorrectedCpu|CorrectedDraw):(PredictedCpu|PredictedDraw));
-    if((!corrected&&!reference&&!presented_frontier)||!checkpoint_||
-       (endpoint_mask_&required)!=required||
-       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||reader_.active()||
-       !live_owner(sealed_end_)||
-       (presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
-       !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_)||
-       !checkpoint_->close_history_endpoint(session_))
+    if(!corrected&&!reference&&!presented_frontier)
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint phase refused");
+    if(!checkpoint_)
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint owner refused");
+    if((endpoint_mask_&required)!=required||
+       (presented_frontier&&endpoint_mask_!=PresentedFrontier)||reader_.active())
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint receipt or reader refused");
+    if(!live_owner(sealed_end_))
+        return fail(RuntimeMatchHistoryFailure::Close,"Close endpoint owner refused");
+    if((presented_frontier&&!gate(RuntimeMatchHistoryGatePoint::PresentComplete,sealed_end_))||
+       !gate(RuntimeMatchHistoryGatePoint::Close,sealed_end_))
         return fail(RuntimeMatchHistoryFailure::Close);
+    char refusal[192]{};
+    if(!checkpoint_->close_history_endpoint(session_,refusal,sizeof(refusal)))
+        return fail(RuntimeMatchHistoryFailure::Close,refusal[0]?refusal:"Close checkpoint endpoint refused");
     phase_=RuntimeMatchHistoryPhase::Closed;
     return true;
 }

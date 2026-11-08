@@ -66,7 +66,8 @@ public:
     bool archive_history_endpoint(const GameplayMatchSession&) noexcept;
     /* Close ActionStore only after the endpoint is selected (corrected, or
      * an uncorrected final endpoint) and its complete receipt was copied. */
-    bool close_history_endpoint(const GameplayMatchSession&) noexcept;
+    bool close_history_endpoint(const GameplayMatchSession&,char* refusal=nullptr,
+                                std::size_t refusal_bytes=0) noexcept;
     GameplayCpuCommitResult restore_history_pre(const GameplayMatchSession&,
         char* refusal=nullptr, std::size_t refusal_bytes=0) noexcept;
     bool finish_history_replay(const GameplayMatchSession&) noexcept;

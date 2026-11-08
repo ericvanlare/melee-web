@@ -438,16 +438,22 @@ bool GameplayCpuCheckpoint::archive_history_endpoint(
 }
 
 bool GameplayCpuCheckpoint::close_history_endpoint(
-    const GameplayMatchSession& session) noexcept {
-    if(!history_endpoint_admit(session)||history_endpoint_closed_)return false;
+    const GameplayMatchSession& session,char* refusal,std::size_t refusal_bytes) noexcept {
+    const auto refuse=[&](const char* leaf){
+        if(refusal&&refusal_bytes)std::snprintf(refusal,refusal_bytes,"leaf=%s",leaf);
+        return false;
+    };
+    if(!history_endpoint_admit(session))return refuse("checkpoint-endpoint-admit");
+    if(history_endpoint_closed_)return refuse("checkpoint-endpoint-already-closed");
     if(!history_endpoint_archived_){
-        if(!statics_->history_close_endpoint(history_incarnation_,history_end_frame_)){
+        if(!statics_->history_close_endpoint(history_incarnation_,history_end_frame_,
+                                              refusal,refusal_bytes)){
             disarm();phase_=Phase::Failed;return false;
         }
         history_endpoint_archived_=true;
     }
     if(!history_actions_->close_endpoint_batch(history_incarnation_)){
-        disarm();phase_=Phase::Failed;return false;
+        disarm();phase_=Phase::Failed;return refuse("action-close");
     }
     history_endpoint_closed_=true;
     return true;
